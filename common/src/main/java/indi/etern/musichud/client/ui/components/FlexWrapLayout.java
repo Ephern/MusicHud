@@ -17,7 +17,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
  * 使用多个水平 LinearLayout 来实现多行布局
  */
 public class FlexWrapLayout extends LinearLayout {
-
     private int rowSpacing = 0;
     private int colSpacing = 0;
     private int maxWidth = Integer.MAX_VALUE;

@@ -9,9 +9,9 @@ import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.login.LoginType;
-import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.Playlist;
+import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.music.NowPlayingInfo;
@@ -20,12 +20,11 @@ import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.pushMessages.c2s.AddPlaylistToIdlePlaySourceMessage;
+import indi.etern.musichud.network.pushMessages.c2s.AddToIdlePlaySourceMessage;
 import indi.etern.musichud.network.pushMessages.c2s.ClientPushMusicToQueueMessage;
 import indi.etern.musichud.network.pushMessages.c2s.ClientRemoveMusicFromQueueMessage;
-import indi.etern.musichud.network.pushMessages.c2s.RemovePlaylistFromIdlePlaySourceMessage;
-import indi.etern.musichud.network.requestResponseCycle.GetPlaylistDetailRequest;
-import indi.etern.musichud.network.requestResponseCycle.GetPlaylistDetailResponse;
+import indi.etern.musichud.network.pushMessages.c2s.RemoveFromIdlePlaySourceMessage;
+import indi.etern.musichud.network.requestResponseCycle.*;
 import indi.etern.musichud.throwable.ApiException;
 import lombok.Getter;
 import org.apache.logging.log4j.Logger;
@@ -46,16 +45,20 @@ public class MusicService {
             .expireAfterAccess(5, TimeUnit.MINUTES)
             .maximumSize(20)
             .build();
+    private static final Cache<Long, AlbumInfo> albumCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .maximumSize(20)
+            .build();
     private static final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
     private static volatile MusicService instance;
     @Getter
-    private final Set<Playlist> idlePlaylists = new HashSet<>();
+    private final Set<MusicCollection> idlePlaySources = new HashSet<>();
     @Getter
-    private final List<Consumer<Playlist>> idlePlaylistAddListeners = new ArrayList<>();
+    private final List<Consumer<MusicCollection>> idlePlaySourceAddListeners = new ArrayList<>();
     @Getter
-    private final List<Consumer<Playlist>> idlePlaylistRemoveListeners = new ArrayList<>();
+    private final List<Consumer<MusicCollection>> idlePlaylistRemoveListeners = new ArrayList<>();
     @Getter
-    private final List<Consumer<Playlist>> idlePlaylistChangeListeners = new ArrayList<>();
+    private final List<Consumer<MusicCollection>> idlePlaySourceChangeListeners = new ArrayList<>();
     @Getter
     private final Queue<MusicDetail> musicQueue = new ArrayDeque<>();
     @Getter
@@ -78,24 +81,34 @@ public class MusicService {
         return instance;
     }
 
-    private void loadIdlePlaylistsFromConfig() {
+    private void loadIdlePlaySourceFromConfig() {
         if (!idlePlaySourceLoaded) {
             idlePlaySourceLoaded = true;
-            if (!profileConfigData.getIdlePlaySourcePlaylistIds().isEmpty()) {
+            Set<IdlePlaySource> idlePlaySources = profileConfigData.getIdlePlaySources();
+            if (!idlePlaySources.isEmpty()) {
                 MusicHud.EXECUTOR.execute(() -> {
-                    for (Long id : profileConfigData.getIdlePlaySourcePlaylistIds()) {
+                    for (IdlePlaySource idlePlaySource : idlePlaySources) {
                         try {
-                            NetworkManager.sendToServer(new AddPlaylistToIdlePlaySourceMessage(id));
-                            getInstance().loadPlaylistDetail(id).thenAcceptAsync(playlist1 -> {
-                                getInstance().addToIdlePlaySource(playlist1);
+                            NetworkManager.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
+                            loadIdlePlaySource(idlePlaySource.getType(), idlePlaySource.getId()).thenAcceptAsync(musicCollection -> {
+                                getInstance().addToIdlePlaySource(musicCollection);
                             }, MusicHud.EXECUTOR);
                         } catch (Exception e) {
-                            logger.error("Failed to load idle play source playlist with id:{}", id, e);
+                            logger.error("Failed to load idle play source playlist with idlePlaySource:{}", idlePlaySource, e);
                         }
                     }
                 });
             }
         }
+    }
+
+    public CompletableFuture<? extends MusicCollection> loadIdlePlaySource(Class<?> type, long id) {
+        if (type.equals(AlbumInfo.class)) {
+            return loadAlbumDetail(id);
+        } else if (type.equals(Playlist.class)) {
+            return loadPlaylistDetail(id);
+        }
+        return null;
     }
 
     public CompletableFuture<Playlist> loadPlaylistDetail(long id) {
@@ -107,8 +120,7 @@ public class MusicService {
         MusicHud.EXECUTOR.execute(() -> {
             NetworkManager.sendToServer(new GetPlaylistDetailRequest(id));
             Thread pendingThread = Thread.currentThread();
-            GetPlaylistDetailResponse.setReceiver(id, value -> {
-                Playlist playlist = value.playlist();
+            GetPlaylistDetailResponse.setReceiver(id, playlist -> {
                 playlistCache.put(id, playlist);
                 completableFuture.complete(playlist);
                 pendingThread.interrupt();
@@ -122,22 +134,47 @@ public class MusicService {
         return completableFuture;
     }
 
-    public void addToIdlePlaySource(Playlist playlist) {
-        idlePlaylists.add(playlist);
-        idlePlaylistAddListeners.forEach(l -> l.accept(playlist));
-        idlePlaylistChangeListeners.forEach(l -> l.accept(playlist));
-        profileConfigData.getIdlePlaySourcePlaylistIds().add(playlist.getId());
-        profileConfigData.saveToConfig();
-        NetworkManager.sendToServer(new AddPlaylistToIdlePlaySourceMessage(playlist.getId()));
+    public CompletableFuture<AlbumInfo> loadAlbumDetail(long id) {
+        AlbumInfo cachedPlaylist = albumCache.getIfPresent(id);
+        if (cachedPlaylist != null) {
+            return CompletableFuture.completedFuture(cachedPlaylist);
+        }
+        CompletableFuture<AlbumInfo> completableFuture = new CompletableFuture<>();
+        MusicHud.EXECUTOR.execute(() -> {
+            NetworkManager.sendToServer(new GetAlbumDetailRequest(id));
+            Thread pendingThread = Thread.currentThread();
+            GetAlbumDetailResponse.setReceiver(id, albumInfo -> {
+                albumCache.put(id, albumInfo);
+                completableFuture.complete(albumInfo);
+                pendingThread.interrupt();
+            });
+            try {
+                Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
+                completableFuture.completeExceptionally(new ApiException());
+            } catch (InterruptedException ignored) {
+            }
+        });
+        return completableFuture;
     }
 
-    public void removeFromIdlePlaySource(Playlist playlist) {
-        idlePlaylists.remove(playlist);
-        idlePlaylistRemoveListeners.forEach(l -> l.accept(playlist));
-        idlePlaylistChangeListeners.forEach(l -> l.accept(playlist));
-        profileConfigData.getIdlePlaySourcePlaylistIds().remove(playlist.getId());
+    public void addToIdlePlaySource(MusicCollection collection) {
+        idlePlaySources.add(collection);
+        idlePlaySourceAddListeners.forEach(l -> l.accept(collection));
+        idlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
+        IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
+        profileConfigData.getIdlePlaySources().add(idlePlaySource);
         profileConfigData.saveToConfig();
-        NetworkManager.sendToServer(new RemovePlaylistFromIdlePlaySourceMessage(playlist.getId()));
+        NetworkManager.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
+    }
+
+    public void removeFromIdlePlaySource(MusicCollection collection) {
+        idlePlaySources.remove(collection);
+        idlePlaylistRemoveListeners.forEach(l -> l.accept(collection));
+        idlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
+        IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
+        profileConfigData.getIdlePlaySources().remove(idlePlaySource);
+        profileConfigData.saveToConfig();
+        NetworkManager.sendToServer(new RemoveFromIdlePlaySourceMessage(idlePlaySource));
     }
 
     public synchronized void refreshQueue(Queue<MusicDetail> queue) {
@@ -223,6 +260,21 @@ public class MusicService {
         }
     }
 
+    public CompletableFuture<Artist> loadArtist(long id) {
+        CompletableFuture<Artist> future = new CompletableFuture<>();
+        GetArtistDetailResponse.setReceiver(id, future::complete);
+        NetworkManager.sendToServer(new GetArtistDetailRequest(id));
+        return future;
+    }
+
+    public CompletableFuture<List<MusicDetail>> loadArtistMusic(long id, int offset) {
+        CompletableFuture<List<MusicDetail>> future = new CompletableFuture<>();
+        GetArtistMoreMusicResponse.RequestData requestData = new GetArtistMoreMusicResponse.RequestData(id, offset);
+        GetArtistMoreMusicResponse.setReceiver(requestData, future::complete);
+        NetworkManager.sendToServer(new GetArtistMoreMusicRequest(id ,offset));
+        return future;
+    }
+
     @RegisterMark
     public static class RegisterImpl implements ClientRegister {
         public static void reset() {
@@ -230,9 +282,9 @@ public class MusicService {
                 instance.switchMusic(MusicDetail.NONE, null, "");
                 instance.idlePlaySourceLoaded = false;
                 instance.musicQueue.clear();
-                instance.idlePlaylistAddListeners.clear();
+                instance.idlePlaySourceAddListeners.clear();
                 instance.idlePlaylistRemoveListeners.clear();
-                instance.idlePlaylistChangeListeners.clear();
+                instance.idlePlaySourceChangeListeners.clear();
                 instance.musicQueueRefreshListeners.clear();
                 instance.musicQueuePushListeners.clear();
                 instance.musicQueueRemoveListeners.clear();
@@ -247,7 +299,7 @@ public class MusicService {
         public void register() {
             LoginService.getInstance().getLoginCompleteListeners().add((loginCookieInfo) -> {
                 if (loginCookieInfo.type() != LoginType.ANONYMOUS) {
-                    MusicService.getInstance().loadIdlePlaylistsFromConfig();
+                    MusicService.getInstance().loadIdlePlaySourceFromConfig();
                 }
             });
             ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> {

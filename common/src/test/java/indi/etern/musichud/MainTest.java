@@ -1,5 +1,6 @@
 package indi.etern.musichud;
 
+import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Playlist;
@@ -25,7 +26,7 @@ public class MainTest {
     @Test
     public void testSearch() {
         LOGGER.info("test search");
-        List<MusicDetail> searchResult = musicApiService.search("Hideaway Feint");
+        List<MusicDetail> searchResult = musicApiService.search("Hideaway Feint", 0, SearchType.MUSIC, response -> JsonUtil.gson.fromJson(response, MusicApiService.SearchMusicResponseBody.class)).result().getMusicDetails();
         assert !searchResult.isEmpty();
         LOGGER.info(JsonUtil.gson.toJson(searchResult));
     }

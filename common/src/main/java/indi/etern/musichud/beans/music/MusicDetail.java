@@ -20,15 +20,15 @@ public class MusicDetail {
             MusicDetail::getName,
             ByteBufCodecs.LONG,
             MusicDetail::getId,
-            Codecs.ofList(Artist.CODEC),
+            Codecs.ofList(() -> Artist.CODEC),
             MusicDetail::getArtists,
-            Codecs.ofList(ByteBufCodecs.STRING_UTF8),
+            Codecs.ofList(() -> ByteBufCodecs.STRING_UTF8),
             MusicDetail::getAlias,
             AlbumInfo.CODEC,
             MusicDetail::getAlbum,
             ByteBufCodecs.INT,
             MusicDetail::getDurationMillis,
-            Codecs.ofList(ByteBufCodecs.STRING_UTF8),
+            Codecs.ofList(() -> ByteBufCodecs.STRING_UTF8),
             MusicDetail::getTranslations,
             PusherInfo.CODEC,
             MusicDetail::getPusherInfo,
@@ -37,6 +37,7 @@ public class MusicDetail {
             MusicDetail::new
     );
     public static final MusicDetail NONE = new MusicDetail();
+    @Setter
     PrivilegeInfo privilege = PrivilegeInfo.NONE;
     String name = "";
     @Getter
@@ -55,6 +56,7 @@ public class MusicDetail {
     @Getter
     int musicVersion;
     @SerializedName("al")
+    @Setter
     AlbumInfo album = AlbumInfo.NONE;
     @SerializedName("dt")
     @Getter

@@ -1,7 +1,7 @@
 package indi.etern.musichud.server.api;
 
+import indi.etern.musichud.beans.api.MusicDetailsResponse;
 import indi.etern.musichud.beans.music.LyricInfo;
-import indi.etern.musichud.beans.music.MusicDetailResponse;
 import indi.etern.musichud.beans.music.PlaylistResponse;
 import indi.etern.musichud.beans.music.PlaylistsResponse;
 import indi.etern.musichud.beans.user.AccountDetail;
@@ -163,21 +163,26 @@ public class ServerApiMeta {
                 true, false, true, String.class);
     }
     public static class Artist {
-        public static final UrlMeta<String> GENERAL_INFO = new UrlMeta<>(
-                "/artists",
+        public static final UrlMeta<String> DESCRIPTION = new UrlMeta<>(
+                "/artist/desc",
                 Set.of("id"),
                 null,
                 false, false, true, String.class);
+        public static final UrlMeta<MusicApiService.GetArtistDetailResponse> DETAIL = new UrlMeta<>(
+                "/artist/detail",
+                Set.of("id"),
+                null,
+                true, false, true, MusicApiService.GetArtistDetailResponse.class);
         public static final UrlMeta<String> TOP50 = new UrlMeta<>(
                 "/artist/top/song",
                 Set.of("id"),
                 null,
                 false, false, true, String.class);
-        public static final UrlMeta<String> ALL_SONGS = new UrlMeta<>(
+        public static final UrlMeta<MusicApiService.GetArtistMusicResponse> ALL_SONGS = new UrlMeta<>(
                 "/artist/songs",
                 Set.of("id"),
                 Set.of("limit"/*default:50*/, "offset", "order"/* hot|time */),
-                false, false, true, String.class);
+                true, false, true, MusicApiService.GetArtistMusicResponse.class);
     }
     public static class Playlist {
         public static final UrlMeta<String> CATEGORIES = new UrlMeta<>("/playlist/catlist", null, null, false, false, true, String.class);
@@ -229,13 +234,13 @@ public class ServerApiMeta {
                 Set.of("id"),
                 Set.of("source"/*pyncmd|bodian|kuwo|kugou|qq|migu*/),
                 true, false, true, MusicApiService.GetMatchResourceUrlResponse.class);
-        public static final UrlMeta<MusicDetailResponse> DETAIL = new UrlMeta<>(
+        public static final UrlMeta<MusicDetailsResponse> DETAIL = new UrlMeta<>(
                 "/song/detail",
                 Set.of("ids"),
                 null,
                 true,
                 false,
-                true, MusicDetailResponse.class);
+                true, MusicDetailsResponse.class);
         public static final UrlMeta<LyricInfo> LYRIC = new UrlMeta<>("/lyric",
                 Set.of("id")
                 ,null,
@@ -247,14 +252,14 @@ public class ServerApiMeta {
                 true, false, true, LyricInfo.class);
     }
     public static class Album {
-        public static final UrlMeta<String> DETAIL = new UrlMeta<>(
+        public static final UrlMeta<MusicApiService.GetAlbumDetailResult> DETAIL = new UrlMeta<>(
                 "/album",
                 Set.of("id"),
                 null,
-                false, false, true, String.class);
+                true, false, true, MusicApiService.GetAlbumDetailResult.class);
     }
     public static class Search {
-        public static final UrlMeta<MusicApiService.SearchResponseBody> CLOUD = new UrlMeta<>(
+        public static final UrlMeta<String> CLOUD = new UrlMeta<>(
                 "/cloudsearch",
                 Set.of("keywords"),
                 Set.of("limit"/*default:30*/,
@@ -263,7 +268,7 @@ public class ServerApiMeta {
                         /* 1: 单曲, 10: 专辑, 100: 歌手, 1000: 歌单, 1002: 用户, 1004: MV, 1006: 歌词, 1009: 电台, 1014: 视频, 1018:综合, 2000:声音 */),
                 true,
                 false,
-                true, MusicApiService.SearchResponseBody.class);
+                true, String.class);
         public static final UrlMeta<String> SUGGEST = new UrlMeta<>(
                 "/search/suggest",
                 Set.of("keywords"),

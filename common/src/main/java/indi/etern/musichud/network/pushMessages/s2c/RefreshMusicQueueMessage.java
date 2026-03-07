@@ -15,7 +15,7 @@ import java.util.Queue;
 
 public record RefreshMusicQueueMessage(Queue<MusicDetail> queue) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, RefreshMusicQueueMessage> CODEC = StreamCodec.composite(
-            Codecs.ofQueue(MusicDetail.CODEC),
+            Codecs.ofQueue(() -> MusicDetail.CODEC),
             RefreshMusicQueueMessage::queue,
             RefreshMusicQueueMessage::new
     );

@@ -1,6 +1,7 @@
 package indi.etern.musichud.beans.music;
 
 import indi.etern.musichud.beans.user.Profile;
+import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.network.Codecs;
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -9,11 +10,13 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class Playlist {
+public class Playlist implements MusicCollection {
     public static final StreamCodec<RegistryFriendlyByteBuf, Playlist> CODEC = StreamCodec.composite(
             ByteBufCodecs.LONG,
             Playlist::getId,
@@ -27,7 +30,7 @@ public class Playlist {
             Playlist::getCoverImgUrl,
             Profile.STREAM_CODEC,
             Playlist::getCreator,
-            Codecs.ofList(MusicDetail.CODEC),
+            Codecs.ofList(() -> MusicDetail.CODEC),
             Playlist::getTracks,
             Playlist::new
     );
@@ -67,12 +70,38 @@ public class Playlist {
         return Objects.requireNonNullElse(name, "");
     }
 
+    @Override
+    public String getNameI18nKey() {
+        return "music_hud.text.playlist";
+    }
+
+    @Override
+    public String getImageThumbnailUrl(int size) {
+        return getThumbnailCoverUrl(size);
+    }
+
+    @Override
+    public List<MusicDetail> getMusicDetails() {
+        return getTracks();
+    }
+
+    @Override
+    public CompletableFuture<Collection<MusicDetail>> loadMusicDetails() {
+        CompletableFuture<Collection<MusicDetail>> future = new CompletableFuture<>();
+        MusicService.getInstance().loadPlaylistDetail(id).thenAccept(playlist -> future.complete(playlist.tracks));
+        return future;
+    }
+
     public String getCoverImgId_str() {
         return Objects.requireNonNullElse(coverImgId_str, "");
     }
 
     public String getCoverImgUrl() {
         return Objects.requireNonNullElse(coverImgUrl, "");
+    }
+
+    public String getThumbnailCoverUrl(int size) {
+        return coverImgUrl + "?param=" + size + "y" + size;
     }
 
     public Profile getCreator() {

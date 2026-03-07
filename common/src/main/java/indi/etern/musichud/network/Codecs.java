@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.function.Supplier;
 
 public class Codecs {
     public static final StreamCodec<ByteBuf, ZonedDateTime> ZONED_DATE_TIME =
@@ -65,31 +66,31 @@ public class Codecs {
     };
 
     private static final int STRING_SIZE = 32767;
-    public static final StreamCodec<ByteBuf, Class<? extends Throwable>> THROWABLE_CODEC =
+    public static final StreamCodec<ByteBuf, Class<?>> CLASS =
             new StreamCodec<>() {
                 @Override
-                public @NotNull Class<? extends Throwable> decode(@NotNull ByteBuf buf) {
+                public @NotNull Class<?> decode(@NotNull ByteBuf buf) {
                     try {
-                        //noinspection unchecked
-                        return (Class<? extends Throwable>) Class.forName(Utf8String.read(buf, STRING_SIZE));
+                        return Class.forName(Utf8String.read(buf, STRING_SIZE));
                     } catch (ClassNotFoundException e) {
                         throw new RuntimeException(e);
                     }
                 }
 
                 @Override
-                public void encode(@NotNull ByteBuf buf, Class<? extends Throwable> clazz) {
+                public void encode(@NotNull ByteBuf buf, Class<?> clazz) {
                     Utf8String.write(buf, clazz.getName(), STRING_SIZE);
                 }
             };
 
-    public static <B extends ByteBuf, T> StreamCodec<B, List<T>> ofList(StreamCodec<B, T> codec) {
+    public static <B extends ByteBuf, T> StreamCodec<B, List<T>> ofList(Supplier<StreamCodec<B, T>> codecSupplier) {
         return new StreamCodec<>() {
             @Override
             @NotNull
             public List<T> decode(@NotNull B buf) {
                 int length = buf.readInt();
                 List<T> tList = new ArrayList<>(length);
+                StreamCodec<B, T> codec = codecSupplier.get();
                 for (int i = 0; i < length; i++) {
                     tList.add(codec.decode(buf));
                 }
@@ -101,6 +102,7 @@ public class Codecs {
                 List<T> notNullList = new ArrayList<>(tList);
                 notNullList.removeIf(Objects::isNull);
                 buf.writeInt(notNullList.size());
+                StreamCodec<B, T> codec = codecSupplier.get();
                 for (T t : notNullList) {
                     codec.encode(buf, t);
                 }
@@ -108,13 +110,14 @@ public class Codecs {
         };
     }
 
-    public static <B extends ByteBuf, T> StreamCodec<B, Queue<T>> ofQueue(StreamCodec<B, T> codec) {
+    public static <B extends ByteBuf, T> StreamCodec<B, Queue<T>> ofQueue(Supplier<StreamCodec<B, T>> codecSupplier) {
         return new StreamCodec<>() {
             @Override
             @NotNull
             public Queue<T> decode(@NotNull B buf) {
                 int length = buf.readInt();
                 Queue<T> tList = new ArrayDeque<>(length);
+                StreamCodec<B, T> codec = codecSupplier.get();
                 for (int i = 0; i < length; i++) {
                     tList.add(codec.decode(buf));
                 }
@@ -124,6 +127,7 @@ public class Codecs {
             @Override
             public void encode(@NotNull B buf, @NotNull Queue<T> tList) {
                 buf.writeInt(tList.size());
+                StreamCodec<B, T> codec = codecSupplier.get();
                 for (T t : tList) {
                     codec.encode(buf, t);
                 }

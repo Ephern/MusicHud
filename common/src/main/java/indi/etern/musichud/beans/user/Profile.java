@@ -5,8 +5,9 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
+import java.util.Objects;
+
 @Getter
-//@JsonIgnoreProperties(ignoreUnknown = true)
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Profile {
@@ -27,7 +28,17 @@ public class Profile {
     @Setter
     private static volatile Profile current;
     String nickname;
-    String avatarUrl;
-    String backgroundUrl;
+    String avatarUrl = "";
+    String backgroundUrl = "";
     long userId;
+
+    public String getNickname() {
+        return Objects.requireNonNullElse(nickname, "");
+    }
+    public String getAvatarUrl() {
+        return Objects.requireNonNullElse(avatarUrl, "");
+    }
+    private String getBackgroundUrl() {
+        return Objects.requireNonNullElse(backgroundUrl, "");
+    }
 }
