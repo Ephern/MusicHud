@@ -19,8 +19,8 @@ public record GetPlaylistDetailResponse(Playlist playlist) implements S2CPayload
             GetPlaylistDetailResponse::new
     );
 
-    static Map<Long, Consumer<GetPlaylistDetailResponse>> consumerMap = new HashMap<>();
-    public static void setReceiver(long id, Consumer<GetPlaylistDetailResponse> consumer) {
+    static Map<Long, Consumer<Playlist>> consumerMap = new HashMap<>();
+    public static void setReceiver(long id, Consumer<Playlist> consumer) {
         if (consumerMap.containsKey(id)) {
             consumerMap.get(id).accept(null);
         }
@@ -33,9 +33,9 @@ public record GetPlaylistDetailResponse(Playlist playlist) implements S2CPayload
             NetworkRegisterUtil.autoRegisterPayload(
                     GetPlaylistDetailResponse.class, CODEC,
                     (playlistDetailRequest, context) -> {
-                        Consumer<GetPlaylistDetailResponse> consumer = consumerMap.remove(playlistDetailRequest.playlist().getId());
+                        Consumer<Playlist> consumer = consumerMap.remove(playlistDetailRequest.playlist().getId());
                         if (consumer != null) {
-                            consumer.accept(playlistDetailRequest);
+                            consumer.accept(playlistDetailRequest.playlist);
                         }
                     }
             );

@@ -14,15 +14,15 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricLine;
+import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.FlexWrapLayout;
+import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicListItem;
-import indi.etern.musichud.client.ui.components.PlaylistCard;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import indi.etern.musichud.client.ui.utils.Easings;
 import lombok.Getter;
@@ -46,7 +46,7 @@ public class HomeView extends LinearLayout {
     private static HomeView instance;
     private final ScrollController lyricScrollController;
     private final HashMap<LyricLine, TextView> textViewMap = new LinkedHashMap<>();
-    private final HashMap<Playlist, PlaylistCard> idlePlaylistCardMap = new HashMap<>();
+    private final HashMap<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new HashMap<>();
     volatile boolean continueUpdateScroll = false;
     private TextView lastHighlightLine;
     private LinearLayout lyricLinesView;
@@ -148,14 +148,14 @@ public class HomeView extends LinearLayout {
         textView.setPivotX(0f);
         int height = textView.getHeight();
         textView.setPivotY(Math.min(height, dp(24)));
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(textView, View.SCALE_X, 1f, 1.15f);
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(textView, View.SCALE_X, 1f, 1.1f);
         scaleX.setInterpolator(Easings.EASE_IN_OUT_QUAD);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(textView, View.SCALE_Y, 1f, 1.15f);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(textView, View.SCALE_Y, 1f, 1.1f);
         scaleY.setInterpolator(Easings.EASE_IN_OUT_QUAD);
 
         AnimatorSet set = new AnimatorSet();
         set.playTogether(scaleX, scaleY, colorAnim);
-        set.setDuration(500);
+        set.setDuration(250);
         set.start();
     }
 
@@ -174,14 +174,14 @@ public class HomeView extends LinearLayout {
         ObjectAnimator colorAnim = ObjectAnimator.ofInt(textView, TEXT_COLOR, Theme.EMPHASIZE_TEXT_COLOR, Theme.FADE_TEXT_COLOR);
         colorAnim.setEvaluator(ColorEvaluator.getInstance());
 
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(textView, View.SCALE_X, 1.15f, 1f);
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(textView, View.SCALE_X, 1.1f, 1f);
         scaleX.setInterpolator(Easings.EASE_IN_OUT_QUAD);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(textView, View.SCALE_Y, 1.15f, 1f);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(textView, View.SCALE_Y, 1.1f, 1f);
         scaleY.setInterpolator(Easings.EASE_IN_OUT_QUAD);
 
         AnimatorSet set = new AnimatorSet();
         set.playTogether(scaleX, scaleY, colorAnim);
-        set.setDuration(500);
+        set.setDuration(250);
         set.start();
     }
 
@@ -315,38 +315,38 @@ public class HomeView extends LinearLayout {
             LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             idlePlaySourceView.addView(idlePlaySourceViewDescription, params3);
 
-            FlexWrapLayout idlePlaylistCardsList = new FlexWrapLayout(context);
-            idlePlaylistCardsList.setItemSpacing(dp(0));
-            idlePlaylistCardsList.setLineSpacing(dp(0));
+            FlexWrapLayout idlePlaySourceCardsList = new FlexWrapLayout(context);
+            idlePlaySourceCardsList.setItemSpacing(dp(0));
+            idlePlaySourceCardsList.setLineSpacing(dp(0));
             LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params4.setMargins(0, dp(16), 0, 0);
-            idlePlaySourceView.addView(idlePlaylistCardsList, params4);
+            idlePlaySourceView.addView(idlePlaySourceCardsList, params4);
 
             scrollViewContainer.addView(idlePlaySourceView, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-            musicService.getIdlePlaylists().forEach(playlist -> {
-                PlaylistCard child = new PlaylistCard(context, playlist);
-                idlePlaylistCardsList.addView(child);
-                idlePlaylistCardMap.put(playlist, child);
+            musicService.getIdlePlaySources().forEach(playlist -> {
+                MusicCollectionCard child = new MusicCollectionCard(context, playlist);
+                idlePlaySourceCardsList.addView(child);
+                idlePlaySourceCardMap.put(playlist, child);
             });
 
-            Consumer<Playlist> addListener = playlist -> {
+            Consumer<MusicCollection> addListener = collection -> {
                 MuiModApi.postToUiThread(() -> {
-                    PlaylistCard child = new PlaylistCard(context, playlist);
-                    idlePlaylistCardsList.addView(child);
-                    idlePlaylistCardMap.put(playlist, child);
+                    MusicCollectionCard child = new MusicCollectionCard(context, collection);
+                    idlePlaySourceCardsList.addView(child);
+                    idlePlaySourceCardMap.put(collection, child);
                 });
             };
-            Consumer<Playlist> removeListener = playlist -> {
+            Consumer<MusicCollection> removeListener = collection -> {
                 MuiModApi.postToUiThread(() -> {
-                    PlaylistCard view = idlePlaylistCardMap.get(playlist);
+                    MusicCollectionCard view = idlePlaySourceCardMap.get(collection);
                     if (view != null) {
-                        idlePlaylistCardsList.removeView(view);
-                        idlePlaylistCardMap.remove(playlist);
+                        idlePlaySourceCardsList.removeView(view);
+                        idlePlaySourceCardMap.remove(collection);
                     }
                 });
             };
-            musicService.getIdlePlaylistAddListeners().add(addListener);
+            musicService.getIdlePlaySourceAddListeners().add(addListener);
             musicService.getIdlePlaylistRemoveListeners().add(removeListener);
 
             playQueueListView.removeAllViews();
@@ -389,7 +389,7 @@ public class HomeView extends LinearLayout {
                     }
                     removeCallbacks(autoRecenterRunnable);
                     musicService.getIdlePlaylistRemoveListeners().remove(removeListener);
-                    musicService.getIdlePlaylistAddListeners().remove(addListener);
+                    musicService.getIdlePlaySourceAddListeners().remove(addListener);
                     instance = null;
                 }
             });

@@ -179,7 +179,7 @@ public class AccountView extends LinearLayout {
             accountService.loadUserPlaylist().thenAcceptAsync(playlists -> {
                 MuiModApi.postToUiThread(() -> {
                     for (Playlist playlist : playlists) {
-                        playlistCards.addView(new PlaylistCard(context, playlist));
+                        playlistCards.addView(new MusicCollectionCard(context, playlist));
                     }
                     removeView(progressBar);
                 });
