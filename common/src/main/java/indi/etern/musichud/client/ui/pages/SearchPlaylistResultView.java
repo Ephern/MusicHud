@@ -27,7 +27,7 @@ public class SearchPlaylistResultView extends FlexWrapLayout {
     }
 
     public void refresh() {
-        removeAllViews();
+        clearFlexChildren();
         setItemSpacing(0);
         setLineSpacing(0);
         if (result != null) {

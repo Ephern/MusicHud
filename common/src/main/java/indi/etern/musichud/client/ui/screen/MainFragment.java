@@ -48,7 +48,7 @@ public class MainFragment extends Fragment {
     private final NowPlayingInfo playingInfo = NowPlayingInfo.getInstance();
     private UrlImageView albumImage;
     private TextView titleText;
-    private LinearLayout artists;
+    private FlexWrapLayout artists;
     private LinearLayout albumContainer;
     private TextView pusherText;
     @Setter
@@ -101,7 +101,7 @@ public class MainFragment extends Fragment {
                     instance.titleText.setText(I18n.get("music_hud.text.idle"));
                 }
                 instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                instance.artists.removeAllViews();
+                instance.artists.clearFlexChildren();
                 instance.pusherText.setText("");
                 instance.progressBar.setVisibility(View.GONE);
                 instance.progressText.setText("");
@@ -118,7 +118,7 @@ public class MainFragment extends Fragment {
                     instance.pusherText.setText(I18n.get("music_hud.text.pusherSource") + name);
                 }
                 Context context = ModernUI.getInstance();
-                instance.artists.removeAllViews();
+                instance.artists.clearFlexChildren();
                 int index = 0;
                 for (Artist artist : musicDetail.getArtists()) {
                     if (index != 0) {
@@ -284,8 +284,7 @@ public class MainFragment extends Fragment {
                 }
                 musicInfo.addView(titleText);
 
-                artists = new LinearLayout(context);
-                artists.setOrientation(LinearLayout.HORIZONTAL);
+                artists = new FlexWrapLayout(context);
                 musicInfo.addView(artists);
 
                 albumContainer = new LinearLayout(context);
