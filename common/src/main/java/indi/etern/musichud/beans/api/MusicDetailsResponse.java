@@ -1,13 +1,15 @@
-package indi.etern.musichud.beans.music;
+package indi.etern.musichud.beans.api;
 
 import com.google.gson.annotations.SerializedName;
+import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.PrivilegeInfo;
 import indi.etern.musichud.interfaces.PostProcessable;
 import lombok.Getter;
 
 import java.util.List;
 import java.util.Objects;
 
-public class MusicDetailResponse implements PostProcessable {
+public class MusicDetailsResponse implements PostProcessable {
     @Getter
     int code;
     @SerializedName("songs")
@@ -18,7 +20,7 @@ public class MusicDetailResponse implements PostProcessable {
         int index = 0;
         if (musicDetails != null && privileges != null && musicDetails.size() == privileges.size()) {
             for (MusicDetail musicDetail : musicDetails) {
-                musicDetail.privilege = privileges.get(index++);
+                musicDetail.setPrivilege(privileges.get(index++));
             }
         } else {
             throw new IllegalStateException();

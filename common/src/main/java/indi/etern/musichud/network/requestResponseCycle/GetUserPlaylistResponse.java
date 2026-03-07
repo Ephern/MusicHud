@@ -15,7 +15,7 @@ import java.util.function.Consumer;
 public record GetUserPlaylistResponse(List<Playlist> playlists) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, GetUserPlaylistResponse> CODEC =
             StreamCodec.composite(
-                    Codecs.ofList(Playlist.CODEC),
+                    Codecs.ofList(() -> Playlist.CODEC),
                     GetUserPlaylistResponse::playlists,
                     GetUserPlaylistResponse::new
             );

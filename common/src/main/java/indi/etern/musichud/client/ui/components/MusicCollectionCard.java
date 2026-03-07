@@ -9,7 +9,7 @@ import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import icyllis.modernui.widget.Toast;
-import indi.etern.musichud.beans.music.Playlist;
+import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
@@ -20,15 +20,15 @@ import net.minecraft.client.resources.language.I18n;
 import java.util.function.Consumer;
 
 @Slf4j
-public class PlaylistCard extends LinearLayout {
+public class MusicCollectionCard extends LinearLayout {
     private final MusicService musicService = MusicService.getInstance();
     private final Button addToWaitingListButton;
     @Getter
-    Playlist playlist;
+    MusicCollection musicCollection;
 
-    public PlaylistCard(Context context, Playlist playlist) {
+    public MusicCollectionCard(Context context, MusicCollection musicCollection) {
         super(context);
-        this.playlist = playlist;
+        this.musicCollection = musicCollection;
 
         setOrientation(VERTICAL);
 
@@ -39,13 +39,13 @@ public class PlaylistCard extends LinearLayout {
         LayoutParams imageParams = new LayoutParams(dp(128), dp(128));
         imageParams.setMargins(0, 0, 0, dp(4));
         addView(imageView, imageParams);
-        imageView.loadUrl(playlist.getCoverImgUrl());
+        imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp(128)));
         imageView.setCornerRadius(dp(8));
 
         TextView name = new TextView(context);
         name.setTextSize(Theme.TEXT_SIZE_NORMAL);
         name.setTextColor(Theme.NORMAL_TEXT_COLOR);
-        name.setText(playlist.getName());
+        name.setText(musicCollection.getName());
         LayoutParams params1 = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         params1.setMargins(dp(4), 0, 0, 0);
         addView(name, params1);
@@ -61,12 +61,12 @@ public class PlaylistCard extends LinearLayout {
                 .build().get();
         addToWaitingListButton.setBackground(background1);
         addToWaitingListButton.setOnClickListener((v) -> {
-            if (musicService.getIdlePlaylists().contains(playlist)) {
-                Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + playlist.getName(), Toast.LENGTH_SHORT).show();
-                musicService.removeFromIdlePlaySource(playlist);
+            if (musicService.getIdlePlaySources().contains(musicCollection)) {
+                Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
+                musicService.removeFromIdlePlaySource(musicCollection);
             } else {
-                Toast.makeText(context, I18n.get("music_hud.text.addedToIdlePlaySource") + "\n" + playlist.getName(), Toast.LENGTH_SHORT).show();
-                musicService.addToIdlePlaySource(playlist);
+                Toast.makeText(context, I18n.get("music_hud.text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
+                musicService.addToIdlePlaySource(musicCollection);
             }
         });
         addView(addToWaitingListButton, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
@@ -77,7 +77,7 @@ public class PlaylistCard extends LinearLayout {
             RouterContainer routerContainer = RouterContainer.getInstance();
             if (routerContainer != null) {
                 routerContainer.pushNavigate(
-                        new PlaylistDetailView(context, playlist)
+                        new MusicCollectionDetailView(context, musicCollection)
                 );
             }
         });
@@ -88,8 +88,8 @@ public class PlaylistCard extends LinearLayout {
                 .build();
         setBackground(background.get());
 
-        Consumer<Playlist> listener = playlist1 -> {
-            if (playlist1.equals(playlist)) {
+        Consumer<MusicCollection> listener = playlist1 -> {
+            if (playlist1.equals(musicCollection)) {
                 MuiModApi.postToUiThread(this::updateButton);
             }
         };
@@ -97,18 +97,18 @@ public class PlaylistCard extends LinearLayout {
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
             public void onViewAttachedToWindow(View v) {
-                musicService.getIdlePlaylistChangeListeners().add(listener);
+                musicService.getIdlePlaySourceChangeListeners().add(listener);
             }
 
             @Override
             public void onViewDetachedFromWindow(View v) {
-                musicService.getIdlePlaylistChangeListeners().remove(listener);
+                musicService.getIdlePlaySourceChangeListeners().remove(listener);
             }
         });
     }
 
     private void updateButton() {
-        if (musicService.getIdlePlaylists().contains(playlist)) {
+        if (musicService.getIdlePlaySources().contains(musicCollection)) {
             addToWaitingListButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
         } else {
             addToWaitingListButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));

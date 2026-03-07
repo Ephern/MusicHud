@@ -1,10 +1,13 @@
 package indi.etern.musichud.client.ui.screen;
 
 import dev.architectury.networking.NetworkManager;
+import icyllis.modernui.ModernUI;
 import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.Nullable;
+import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
+import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.util.DataSet;
@@ -18,9 +21,7 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.RouterContainer;
-import indi.etern.musichud.client.ui.components.SideMenu;
-import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.components.*;
 import indi.etern.musichud.client.ui.pages.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
@@ -47,7 +48,8 @@ public class MainFragment extends Fragment {
     private final NowPlayingInfo playingInfo = NowPlayingInfo.getInstance();
     private UrlImageView albumImage;
     private TextView titleText;
-    private TextView artistsText;
+    private LinearLayout artists;
+    private LinearLayout albumContainer;
     private TextView pusherText;
     @Setter
     private int defaultSelectedIndex = 0;
@@ -99,7 +101,7 @@ public class MainFragment extends Fragment {
                     instance.titleText.setText(I18n.get("music_hud.text.idle"));
                 }
                 instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                instance.artistsText.setText("");
+                instance.artists.removeAllViews();
                 instance.pusherText.setText("");
                 instance.progressBar.setVisibility(View.GONE);
                 instance.progressText.setText("");
@@ -115,10 +117,64 @@ public class MainFragment extends Fragment {
                 } else {
                     instance.pusherText.setText(I18n.get("music_hud.text.pusherSource") + name);
                 }
-                instance.artistsText.setText(musicDetail.getArtists().stream()
-                        .map(Artist::getName)
-                        .reduce((a, b) -> a + " / " + b)
-                        .orElse(""));
+                Context context = ModernUI.getInstance();
+                instance.artists.removeAllViews();
+                int index = 0;
+                for (Artist artist : musicDetail.getArtists()) {
+                    if (index != 0) {
+                        TextView split = new TextView(context);
+                        split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                        split.setTextSize(Theme.TEXT_SIZE_SMALL);
+                        split.setText(" / ");
+                        instance.artists.addView(split);
+                    }
+                    index++;
+                    Button artistButton = new Button(context);
+                    Drawable background = ButtonInsetBackground.builder()
+                            .inset(0)
+                            .cornerRadius(artistButton.dp(2))
+                            .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
+                            .build().get();
+                    artistButton.setBackground(background);
+                    artistButton.setFocusable(true);
+                    artistButton.setClickable(true);
+                    artistButton.setTextColor(Theme.PRIMARY_COLOR);
+                    artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                    artistButton.setText(artist.getName());
+                    artistButton.setOnClickListener(button -> {
+                        RouterContainer routerContainer = RouterContainer.getInstance();
+                        if (routerContainer != null) {
+                            routerContainer.pushNavigate(
+                                    new ArtistDetailView(context, artist)
+                            );
+                        }
+                    });
+                    instance.artists.addView(artistButton);
+                }
+
+                instance.albumContainer.removeAllViews();
+                Button albumButton = new Button(context);
+                Drawable background = ButtonInsetBackground.builder()
+                        .inset(0)
+                        .cornerRadius(albumButton.dp(2))
+                        .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
+                        .build().get();
+                albumButton.setBackground(background);
+                albumButton.setFocusable(true);
+                albumButton.setClickable(true);
+                albumButton.setTextColor(Theme.PRIMARY_COLOR);
+                albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                albumButton.setText(musicDetail.getAlbum().getName());
+                albumButton.setOnClickListener(button -> {
+                    RouterContainer routerContainer = RouterContainer.getInstance();
+                    if (routerContainer != null) {
+                        routerContainer.pushNavigate(
+                                new MusicCollectionDetailView(context, musicDetail.getAlbum())
+                        );
+                    }
+                });
+                instance.albumContainer.addView(albumButton);
+
                 instance.skipCurrentButton.setText(I18n.get("music_hud.button.voteForSkip"));
                 instance.skipCurrentButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 instance.skipCurrentButton.setEnabled(true);
@@ -228,10 +284,13 @@ public class MainFragment extends Fragment {
                 }
                 musicInfo.addView(titleText);
 
-                artistsText = new TextView(context);
-                artistsText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                artistsText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                musicInfo.addView(artistsText);
+                artists = new LinearLayout(context);
+                artists.setOrientation(LinearLayout.HORIZONTAL);
+                musicInfo.addView(artists);
+
+                albumContainer = new LinearLayout(context);
+                albumContainer.setOrientation(LinearLayout.HORIZONTAL);
+                musicInfo.addView(albumContainer);
 
                 pusherText = new TextView(context);
                 pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);

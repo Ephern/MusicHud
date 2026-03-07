@@ -7,6 +7,7 @@ import com.google.gson.stream.JsonWriter;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.AliasEnum;
 import indi.etern.musichud.interfaces.IntegerCodeEnum;
+import lombok.SneakyThrows;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
@@ -18,6 +19,7 @@ public class JsonUtil {
     static {
         gson = new GsonBuilder()
                 .registerTypeAdapterFactory(new LenientEnumTypeAdapterFactory())
+                .registerTypeAdapter(Class.class, new ClassAdapter())
                 .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeAdapter())
                 .create();
     }
@@ -111,6 +113,21 @@ public class JsonUtil {
         @Override
         public ZonedDateTime deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) {
             return ZonedDateTime.parse(json.getAsString(), FORMATTER);
+        }
+    }
+
+    public static class ClassAdapter implements JsonSerializer<Class<?>>, JsonDeserializer<Class<?>> {
+        private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_ZONED_DATE_TIME;
+
+        @Override
+        public JsonElement serialize(Class<?> src, Type typeOfSrc, JsonSerializationContext context) {
+            return new JsonPrimitive(src.getName());
+        }
+
+        @SneakyThrows
+        @Override
+        public Class<?> deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) {
+            return Class.forName(json.getAsString());
         }
     }
 }

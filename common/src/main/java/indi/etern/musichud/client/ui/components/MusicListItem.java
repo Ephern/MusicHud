@@ -1,21 +1,23 @@
 package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.ViewGroup;
+import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 
 import java.time.Duration;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
-import java.util.stream.Collectors;
 
 public class MusicListItem extends LinearLayout {
 
@@ -24,7 +26,7 @@ public class MusicListItem extends LinearLayout {
     public static final int imageSize = 54;
     private UrlImageView albumImage;
     private TextView musicName;
-    private TextView musicArtistAndAlbum;
+    private LinearLayout musicArtistAndAlbum;
     private TextView durationText;
     private TextView pusherText;
 
@@ -55,10 +57,8 @@ public class MusicListItem extends LinearLayout {
         musicName.setTextColor(Theme.NORMAL_TEXT_COLOR);
         musicTexts.addView(musicName);
 
-        musicArtistAndAlbum = new TextView(context);
-        musicArtistAndAlbum.setSingleLine(true);
-        musicArtistAndAlbum.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        musicArtistAndAlbum.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        musicArtistAndAlbum = new LinearLayout(context);
+        musicArtistAndAlbum.setOrientation(HORIZONTAL);
         musicTexts.addView(musicArtistAndAlbum);
 
         LinearLayout linearLayout = new LinearLayout(context);
@@ -85,11 +85,66 @@ public class MusicListItem extends LinearLayout {
 
         musicName.setText(musicDetail.getName());
 
-        String artistsName = musicDetail.getArtists().stream()
-                .map(Artist::getName).collect(Collectors.joining(" / "));
-        String string = artistsName
-                + "  -  " + musicDetail.getAlbum().getName();
-        musicArtistAndAlbum.setText(string);
+        musicArtistAndAlbum.removeAllViews();
+        int index = 0;
+        Context context = getContext();
+        for (Artist artist : musicDetail.getArtists()) {
+            if (index != 0) {
+                TextView split = new TextView(context);
+                split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                split.setTextSize(Theme.TEXT_SIZE_SMALL);
+                split.setText(" / ");
+                musicArtistAndAlbum.addView(split);
+            }
+            index++;
+            Button artistButton = new Button(context);
+            Drawable background = ButtonInsetBackground.builder()
+                    .inset(0)
+                    .cornerRadius(dp(2))
+                    .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
+                    .build().get();
+            artistButton.setBackground(background);
+            artistButton.setFocusable(true);
+            artistButton.setClickable(true);
+            artistButton.setTextColor(Theme.PRIMARY_COLOR);
+            artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            artistButton.setText(artist.getName());
+            artistButton.setOnClickListener(button -> {
+                RouterContainer routerContainer = RouterContainer.getInstance();
+                if (routerContainer != null) {
+                    routerContainer.pushNavigate(
+                            new ArtistDetailView(context, artist)
+                    );
+                }
+            });
+            musicArtistAndAlbum.addView(artistButton);
+        }
+        TextView split = new TextView(context);
+        split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        split.setTextSize(Theme.TEXT_SIZE_SMALL);
+        split.setText(" - ");
+        musicArtistAndAlbum.addView(split);
+        Button albumButton = new Button(context);
+        Drawable background = ButtonInsetBackground.builder()
+                .inset(0)
+                .cornerRadius(dp(2))
+                .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
+                .build().get();
+        albumButton.setBackground(background);
+        albumButton.setFocusable(true);
+        albumButton.setClickable(true);
+        albumButton.setTextColor(Theme.PRIMARY_COLOR);
+        albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        albumButton.setText(musicDetail.getAlbum().getName());
+        albumButton.setOnClickListener(button -> {
+            RouterContainer routerContainer = RouterContainer.getInstance();
+            if (routerContainer != null) {
+                routerContainer.pushNavigate(
+                        new MusicCollectionDetailView(context, musicDetail.getAlbum())
+                );
+            }
+        });
+        musicArtistAndAlbum.addView(albumButton);
 
         Duration duration = Duration.of(musicDetail.getDurationMillis(), ChronoUnit.MILLIS);
         DateTimeFormatter formatter = duration.toHoursPart() >= 1 ?

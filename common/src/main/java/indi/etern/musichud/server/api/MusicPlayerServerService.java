@@ -4,6 +4,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import dev.architectury.networking.NetworkManager;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -38,7 +39,7 @@ public class MusicPlayerServerService {
             .build();
     @Getter
     ArrayDeque<MusicDetail> musicQueue = new ArrayDeque<>();
-    Map<ServerPlayer, Set<Playlist>> idlePlaySources = new ConcurrentHashMap<>();
+    Map<ServerPlayer, Set<IdlePlaySource>> idlePlaySources = new ConcurrentHashMap<>();
     boolean continuable;
     @Getter
     private volatile MusicDetail currentMusicDetail = MusicDetail.NONE;
@@ -147,21 +148,21 @@ public class MusicPlayerServerService {
                 return Optional.empty();
             }
 
-            List<Map.Entry<ServerPlayer, Set<Playlist>>> entryList =
+            List<Map.Entry<ServerPlayer, Set<IdlePlaySource>>> entryList =
                     new ArrayList<>(idlePlaySources.entrySet());
 
             if (entryList.isEmpty()) {
                 return Optional.empty();
             }
 
-            Map.Entry<ServerPlayer, Set<Playlist>> randomEntry =
+            Map.Entry<ServerPlayer, Set<IdlePlaySource>> randomEntry =
                     entryList.get(MusicHud.RANDOM.nextInt(entryList.size()));
 
             ServerPlayer sourcePlayer = randomEntry.getKey();
-            Set<Playlist> playlists = randomEntry.getValue();
+            Set<IdlePlaySource> idlePlaySource = randomEntry.getValue();
 
-            List<MusicDetail> allTracks = playlists.stream()
-                    .flatMap(playlist -> playlist.getTracks().stream())
+            List<MusicDetail> allTracks = idlePlaySource.stream()
+                    .flatMap(playSource -> playSource.getMusicCollection().getMusicDetails().stream())
                     .toList();
 
             if (allTracks.isEmpty()) {
@@ -312,17 +313,22 @@ public class MusicPlayerServerService {
         }
     }
 
-    public void addIdlePlaySource(long playlistId, ServerPlayer player) {
-        Set<Playlist> playlists = idlePlaySources.getOrDefault(player, new HashSet<>());
-        playlists.add(musicApiService.getPlaylistDetail(playlistId, player));
-        idlePlaySources.put(player, playlists);
+    public void addIdlePlaySource(long id, Class<?> type, ServerPlayer player) {
+        Set<IdlePlaySource> musicCollections = idlePlaySources.getOrDefault(player, new HashSet<>());
+        IdlePlaySource idlePlaySource = new IdlePlaySource(id, type);
+        idlePlaySource.setPlayer(player);
+        idlePlaySource.serverLoadMusicCollection(player);
+        musicCollections.add(idlePlaySource);
+        idlePlaySources.put(player, musicCollections);
         updateContinuable(true);
     }
 
-    public void removeIdlePlaySource(long playlistId, ServerPlayer player) {
-        Set<Playlist> playlists = idlePlaySources.get(player);
-        if (playlists != null) {
-            playlists.removeIf(playlist -> playlist.getId() == playlistId);
+    public void removeIdlePlaySource(long id, Class<?> musicCollectionClass, ServerPlayer player) {
+        Set<IdlePlaySource> musicCollections = idlePlaySources.get(player);
+        if (musicCollections != null) {
+            IdlePlaySource idlePlaySource = new IdlePlaySource(id, musicCollectionClass);
+            idlePlaySource.setPlayer(player);
+            musicCollections.remove(idlePlaySource);
         }
     }
 

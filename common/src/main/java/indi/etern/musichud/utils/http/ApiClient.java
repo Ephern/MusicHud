@@ -79,7 +79,12 @@ public class ApiClient {
                     String string = response.body().toString();
                     var codeOnlyResponse = JsonUtil.gson.fromJson(string, CodeOnlyResponse.class);
                     if (codeOnlyResponse.code == 200 || trial == maxTrial || !urlMeta.autoRetry()) {
-                        t = JsonUtil.gson.fromJson(string, urlMeta.responseType());
+                        if (urlMeta.responseType().equals(String.class)) {
+                            //noinspection unchecked
+                            t = (T) string;
+                        } else {
+                            t = JsonUtil.gson.fromJson(string, urlMeta.responseType());
+                        }
                     }
                 } catch (ConnectException e) {
                     MusicHud.getLogger(ApiClient.class).error("Please check Api server status");
@@ -121,7 +126,12 @@ public class ApiClient {
                     String string = response.body().toString();
                     var codeOnlyResponse = JsonUtil.gson.fromJson(string, CodeOnlyResponse.class);
                     if (codeOnlyResponse.code == 200 || trial == maxTrial || !urlMeta.autoRetry()) {
-                        t = JsonUtil.gson.fromJson(string, urlMeta.responseType());
+                        if (urlMeta.responseType().equals(String.class)) {
+                            //noinspection unchecked
+                            t = (T) string;
+                        } else {
+                            t = JsonUtil.gson.fromJson(string, urlMeta.responseType());
+                        }
                     }
                 } catch (ConnectException e) {
                     MusicHud.getLogger(ApiClient.class).error("Please check Api server status");

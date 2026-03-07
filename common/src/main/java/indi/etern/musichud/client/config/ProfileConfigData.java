@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.config;
 
+import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.utils.JsonUtil;
 import lombok.AccessLevel;
@@ -15,7 +16,7 @@ import java.util.Set;
 public class ProfileConfigData {
     private static volatile ProfileConfigData instance;
     Profile profile;
-    Set<Long> idlePlaySourcePlaylistIds = new HashSet<>();
+    Set<IdlePlaySource> idlePlaySources = new HashSet<>();
 
     @SneakyThrows
     public void saveToConfig() {
