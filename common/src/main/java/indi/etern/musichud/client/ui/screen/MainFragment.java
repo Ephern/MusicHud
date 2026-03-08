@@ -101,7 +101,8 @@ public class MainFragment extends Fragment {
                     instance.titleText.setText(I18n.get("music_hud.text.idle"));
                 }
                 instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                instance.artists.clearFlexChildren();
+                instance.artists.removeAllViews();
+                instance.albumContainer.removeAllViews();
                 instance.pusherText.setText("");
                 instance.progressBar.setVisibility(View.GONE);
                 instance.progressText.setText("");
@@ -118,7 +119,7 @@ public class MainFragment extends Fragment {
                     instance.pusherText.setText(I18n.get("music_hud.text.pusherSource") + name);
                 }
                 Context context = ModernUI.getInstance();
-                instance.artists.clearFlexChildren();
+                instance.artists.removeAllViews();
                 int index = 0;
                 for (Artist artist : musicDetail.getArtists()) {
                     if (index != 0) {
@@ -138,6 +139,7 @@ public class MainFragment extends Fragment {
                     artistButton.setBackground(background);
                     artistButton.setFocusable(true);
                     artistButton.setClickable(true);
+                    artistButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
                     artistButton.setTextColor(Theme.PRIMARY_COLOR);
                     artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
                     artistButton.setText(artist.getName());
@@ -164,6 +166,7 @@ public class MainFragment extends Fragment {
                 albumButton.setClickable(true);
                 albumButton.setTextColor(Theme.PRIMARY_COLOR);
                 albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                albumButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
                 albumButton.setText(musicDetail.getAlbum().getName());
                 albumButton.setOnClickListener(button -> {
                     RouterContainer routerContainer = RouterContainer.getInstance();
@@ -289,6 +292,7 @@ public class MainFragment extends Fragment {
 
                 albumContainer = new LinearLayout(context);
                 albumContainer.setOrientation(LinearLayout.HORIZONTAL);
+                albumContainer.setGravity(Gravity.TOP | Gravity.LEFT);
                 musicInfo.addView(albumContainer);
 
                 pusherText = new TextView(context);

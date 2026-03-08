@@ -108,6 +108,7 @@ public class MusicCollectionDetailView extends LinearLayout {
 
     private void addItem(Context context, MusicDetail musicDetail, LinearLayout tracks) {
         var musicLayout = new MusicListItem(context);
+        musicLayout.setShowPusherInfo(false);
         musicLayout.bindData(musicDetail);
         var background = ButtonInsetBackground.builder()
                 .cornerRadius(dp(12))

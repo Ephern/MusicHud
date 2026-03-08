@@ -121,9 +121,11 @@ public class MusicService {
             NetworkManager.sendToServer(new GetPlaylistDetailRequest(id));
             Thread pendingThread = Thread.currentThread();
             GetPlaylistDetailResponse.setReceiver(id, playlist -> {
-                playlistCache.put(id, playlist);
-                completableFuture.complete(playlist);
-                pendingThread.interrupt();
+                if (playlist != null) {
+                    playlistCache.put(id, playlist);
+                    completableFuture.complete(playlist);
+                    pendingThread.interrupt();
+                }
             });
             try {
                 Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));

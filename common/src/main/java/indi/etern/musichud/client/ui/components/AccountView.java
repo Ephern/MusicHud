@@ -169,9 +169,7 @@ public class AccountView extends LinearLayout {
             LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             layout1.addView(textView, params);
 
-            FlexWrapLayout playlistCards = new FlexWrapLayout(context);
-            playlistCards.setItemSpacing(dp(0));
-            playlistCards.setLineSpacing(dp(0));
+            AutoFlowGridLayout playlistCards = new AutoFlowGridLayout(context);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params1.setMargins(0, dp(16), 0, 0);
             layout1.addView(playlistCards, params1);

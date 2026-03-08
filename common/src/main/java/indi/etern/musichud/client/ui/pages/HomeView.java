@@ -20,7 +20,7 @@ import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.FlexWrapLayout;
+import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicListItem;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
@@ -315,9 +315,7 @@ public class HomeView extends LinearLayout {
             LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             idlePlaySourceView.addView(idlePlaySourceViewDescription, params3);
 
-            FlexWrapLayout idlePlaySourceCardsList = new FlexWrapLayout(context);
-            idlePlaySourceCardsList.setItemSpacing(dp(0));
-            idlePlaySourceCardsList.setLineSpacing(dp(0));
+            AutoFlowGridLayout idlePlaySourceCardsList = new AutoFlowGridLayout(context);
             LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params4.setMargins(0, dp(16), 0, 0);
             idlePlaySourceView.addView(idlePlaySourceCardsList, params4);
@@ -561,8 +559,8 @@ public class HomeView extends LinearLayout {
     }
 
     private void addMusicQueueItem(MusicDetail musicDetail, LinearLayout playQueueView) {
-        MusicListItem item = new MusicListItem(getContext());
-        item.bindData(musicDetail);
+        var musicListItem = new MusicListItem(getContext());
+        musicListItem.bindData(musicDetail);
         LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, WRAP_CONTENT);
         layoutParams.setMargins(0, 0, 0, dp(16));
         LinearLayout actions = new LinearLayout(getContext());
@@ -580,13 +578,13 @@ public class HomeView extends LinearLayout {
                     .build().get();
             removeButton.setBackground(background);
             removeButton.setOnClickListener(v -> {
-                MusicService.getInstance().sendRemoveMusicFromQueue(playQueueView.indexOfChild(item), musicDetail);
+                MusicService.getInstance().sendRemoveMusicFromQueue(playQueueView.indexOfChild(musicListItem), musicDetail);
             });
             actions.addView(removeButton, new LayoutParams(WRAP_CONTENT, dp(MusicListItem.imageSize)));
         }
-        item.addView(actions);
-        item.setLayoutParams(layoutParams);
-        playQueueView.addView(item, layoutParams);
+        musicListItem.addView(actions);
+        musicListItem.setLayoutParams(layoutParams);
+        playQueueView.addView(musicListItem, layoutParams);
     }
 
     public void switchMusic(Queue<LyricLine> lyricLines) {
@@ -626,11 +624,12 @@ public class HomeView extends LinearLayout {
         if (lyricLinesWrapper == null) {
             return;
         }
-        lyricLinesView = new LinearLayout(getContext());
-        lyricLinesView.setOrientation(VERTICAL);
+        LinearLayout lyricLinesView1 = new LinearLayout(getContext());
+        lyricLinesView = lyricLinesView1;
+        lyricLinesView1.setOrientation(VERTICAL);
         LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         params1.setMargins(0, 0, 0, dp(256));
-        lyricLinesWrapper.addView(lyricLinesView, params1);
+        lyricLinesWrapper.addView(lyricLinesView1, params1);
 
         if (lyricLines != null) {
             for (LyricLine lyricLine : lyricLines) {
@@ -670,7 +669,7 @@ public class HomeView extends LinearLayout {
 
                     if (translatedText != null && !translatedText.isEmpty()) {
                         lyricParams1.setMargins(0, dp(16), 0, dp(4));
-                        lyricLinesView.addView(lyricTextWrapper);
+                        lyricLinesView1.addView(lyricTextWrapper);
 
                         TextView subLyricText = new TextView(context);
                         subLyricText.setTextColor(Theme.FADE_TEXT_COLOR);
@@ -680,23 +679,27 @@ public class HomeView extends LinearLayout {
 
                         LayoutParams subParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
                         subParams.setMargins(0, 0, dp(32), 0);
-                        lyricLinesView.addView(subLyricText, subParams);
+                        lyricLinesView1.addView(subLyricText, subParams);
                     } else {
                         lyricParams1.setMargins(0, dp(16), 0, 0);
-                        lyricLinesView.addView(lyricTextWrapper);
+                        lyricLinesView1.addView(lyricTextWrapper);
                     }
                 }
             }
         }
-        lyricLinesView.setAlpha(0);
+        lyricLinesView1.setAlpha(0);
 
-        lyricLinesView.post(() -> {
-            lyricLinesView.requestLayout();
-            lyricScrollView.requestLayout();
-            initializeScrollToCurrentLyric();
-            ObjectAnimator fadeAnimator = ObjectAnimator.ofFloat(lyricLinesView, View.ALPHA, 0.0f, 1.0f);
-            fadeAnimator.setDuration(150);
-            fadeAnimator.start();
+        lyricLinesView1.post(() -> {
+            if (lyricScrollView != null) {
+                lyricLinesView1.requestLayout();
+                lyricScrollView.requestLayout();
+                initializeScrollToCurrentLyric();
+                ObjectAnimator fadeAnimator = ObjectAnimator.ofFloat(lyricLinesView1, View.ALPHA, 0.0f, 1.0f);
+                fadeAnimator.setDuration(150);
+                fadeAnimator.start();
+            } else {
+                MusicHud.LOGGER.warn("Cannot initialize lyrics view because lyricScrollView is null");
+            }
         });
     }
 

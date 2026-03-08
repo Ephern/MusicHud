@@ -164,7 +164,9 @@ public class SearchView extends LinearLayout {
         CompletableFuture<CompletingType> pendingFuture = searchMeta.pendingFuture;
         searchMeta.pendingFuture = null;
         searchMetas.put(searchType, searchMeta);
-        pendingFuture.complete(mayHasMore ? CompletingType.NORMAL : CompletingType.NO_MORE_RESULT);
+        if (pendingFuture != null) {
+            pendingFuture.complete(mayHasMore ? CompletingType.NORMAL : CompletingType.NO_MORE_RESULT);
+        }
     }
 
     public void setSearchMusicResult(int offset, List<MusicDetail> result) {
