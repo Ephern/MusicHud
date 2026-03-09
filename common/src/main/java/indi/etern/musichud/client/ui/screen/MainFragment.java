@@ -101,7 +101,8 @@ public class MainFragment extends Fragment {
                     instance.titleText.setText(I18n.get("music_hud.text.idle"));
                 }
                 instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                instance.artists.clearFlexChildren();
+                instance.artists.removeAllViews();
+                instance.albumContainer.removeAllViews();
                 instance.pusherText.setText("");
                 instance.progressBar.setVisibility(View.GONE);
                 instance.progressText.setText("");
@@ -118,7 +119,7 @@ public class MainFragment extends Fragment {
                     instance.pusherText.setText(I18n.get("music_hud.text.pusherSource") + name);
                 }
                 Context context = ModernUI.getInstance();
-                instance.artists.clearFlexChildren();
+                instance.artists.removeAllViews();
                 int index = 0;
                 for (Artist artist : musicDetail.getArtists()) {
                     if (index != 0) {
@@ -138,6 +139,7 @@ public class MainFragment extends Fragment {
                     artistButton.setBackground(background);
                     artistButton.setFocusable(true);
                     artistButton.setClickable(true);
+                    artistButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
                     artistButton.setTextColor(Theme.PRIMARY_COLOR);
                     artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
                     artistButton.setText(artist.getName());
@@ -164,6 +166,7 @@ public class MainFragment extends Fragment {
                 albumButton.setClickable(true);
                 albumButton.setTextColor(Theme.PRIMARY_COLOR);
                 albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                albumButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
                 albumButton.setText(musicDetail.getAlbum().getName());
                 albumButton.setOnClickListener(button -> {
                     RouterContainer routerContainer = RouterContainer.getInstance();
@@ -231,9 +234,7 @@ public class MainFragment extends Fragment {
             instance = this;
             var context = requireContext();
             var base = new LinearLayout(context);
-            int dp24 = base.dp(24);
-            int dp32 = base.dp(32);
-            base.setPadding(dp32, dp24, dp24, 0);
+            base.setPadding(base.dp(24), 0, base.dp(24), 0);
 
             var baseBackground = new ShapeDrawable();
             baseBackground.setColor(Theme.BASE_BACKGROUND_COLOR);
@@ -289,6 +290,7 @@ public class MainFragment extends Fragment {
 
                 albumContainer = new LinearLayout(context);
                 albumContainer.setOrientation(LinearLayout.HORIZONTAL);
+                albumContainer.setGravity(Gravity.TOP | Gravity.LEFT);
                 musicInfo.addView(albumContainer);
 
                 pusherText = new TextView(context);
@@ -345,16 +347,21 @@ public class MainFragment extends Fragment {
 
                 musicInfo.addView(skipCurrentButton, buttonParams);
                 musicInfo.setMinimumHeight(side.dp(128));
+
+                side.addView(musicInfo, params1);
+                side.addView(sideMenu, params);
+
+                var sideParams = new LinearLayout.LayoutParams(widthDp, MATCH_PARENT);
+                sideParams.setMargins(0, side.dp(24), 0, 0);
+                base.addView(side, sideParams);
+
                 LayoutTransition transition1 = new LayoutTransition();
                 transition1.enableTransitionType(LayoutTransition.CHANGING);
                 musicInfo.setLayoutTransition(transition1);
 
-                side.addView(musicInfo, params1);
-                side.addView(sideMenu, params);
                 LayoutTransition transition2 = new LayoutTransition();
                 transition2.enableTransitionType(LayoutTransition.CHANGING);
-                side.setLayoutTransition(transition1);
-                base.addView(side, params);
+                side.setLayoutTransition(transition2);
 
                 switchMusic(currentlyPlayingMusicDetail, playingInfo.getLyricLines());
             }

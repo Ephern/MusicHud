@@ -4,7 +4,6 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
@@ -19,6 +18,9 @@ import net.minecraft.client.resources.language.I18n;
 
 import java.util.function.Consumer;
 
+import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
+import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+
 @Slf4j
 public class MusicCollectionCard extends LinearLayout {
     private final MusicService musicService = MusicService.getInstance();
@@ -32,13 +34,14 @@ public class MusicCollectionCard extends LinearLayout {
 
         setOrientation(VERTICAL);
 
-        LayoutParams params = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT);
+        LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         setLayoutParams(params);
 
         UrlImageView imageView = new UrlImageView(context);
         LayoutParams imageParams = new LayoutParams(dp(128), dp(128));
         imageParams.setMargins(0, 0, 0, dp(4));
         addView(imageView, imageParams);
+
         imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp(128)));
         imageView.setCornerRadius(dp(8));
 
@@ -46,7 +49,7 @@ public class MusicCollectionCard extends LinearLayout {
         name.setTextSize(Theme.TEXT_SIZE_NORMAL);
         name.setTextColor(Theme.NORMAL_TEXT_COLOR);
         name.setText(musicCollection.getName());
-        LayoutParams params1 = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         params1.setMargins(dp(4), 0, 0, 0);
         addView(name, params1);
 
@@ -69,7 +72,7 @@ public class MusicCollectionCard extends LinearLayout {
                 musicService.addToIdlePlaySource(musicCollection);
             }
         });
-        addView(addToWaitingListButton, new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        addView(addToWaitingListButton, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         setClickable(true);
         setFocusable(true);

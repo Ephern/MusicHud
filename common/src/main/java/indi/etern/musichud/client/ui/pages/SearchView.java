@@ -71,7 +71,7 @@ public class SearchView extends LinearLayout {
         LinearLayout top = new LinearLayout(context);
         top.setOrientation(HORIZONTAL);
         LayoutParams topParams = new LayoutParams(MATCH_PARENT, dp(38));
-        topParams.setMargins(0, dp(16), 0, 0);
+        topParams.setMargins(0, dp(24), 0, 0);
         addView(top, topParams);
 
         top.addView(new View(context), new LayoutParams(0, WRAP_CONTENT, 2));
@@ -164,7 +164,9 @@ public class SearchView extends LinearLayout {
         CompletableFuture<CompletingType> pendingFuture = searchMeta.pendingFuture;
         searchMeta.pendingFuture = null;
         searchMetas.put(searchType, searchMeta);
-        pendingFuture.complete(mayHasMore ? CompletingType.NORMAL : CompletingType.NO_MORE_RESULT);
+        if (pendingFuture != null) {
+            pendingFuture.complete(mayHasMore ? CompletingType.NORMAL : CompletingType.NO_MORE_RESULT);
+        }
     }
 
     public void setSearchMusicResult(int offset, List<MusicDetail> result) {

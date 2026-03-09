@@ -136,11 +136,11 @@ public class AccountView extends LinearLayout {
             LayoutParams logoutButtonParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             Button logoutButton = new Button(context);
             logoutButton.setText(I18n.get("music_hud.button.logout"));
-            logoutButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            logoutButton.setTextColor(Theme.PRIMARY_COLOR);
             logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             Drawable background = ButtonInsetBackground.builder()
                     .inset(0).cornerRadius(dp(4))
-                    .padding(new ButtonInsetBackground.Padding(dp(8), dp(2), dp(8), dp(2)))
+                    .padding(new ButtonInsetBackground.Padding(0, dp(4), 0, dp(4)))
                     .build().get();
             logoutButton.setBackground(background);
             texts.addView(logoutButton, logoutButtonParam);
@@ -150,7 +150,7 @@ public class AccountView extends LinearLayout {
             });
 
             LayoutParams topPanelLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            topPanelLayoutParams.setMargins(0, 0, 0, dp(32));
+            topPanelLayoutParams.setMargins(0, dp(24), 0, dp(32));
             addView(topPanel, topPanelLayoutParams);
 
             ProgressBar progressBar = new ProgressBar(context);
@@ -169,9 +169,8 @@ public class AccountView extends LinearLayout {
             LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             layout1.addView(textView, params);
 
-            FlexWrapLayout playlistCards = new FlexWrapLayout(context);
-            playlistCards.setItemSpacing(dp(0));
-            playlistCards.setLineSpacing(dp(0));
+            AutoFlowGridLayout playlistCards = new AutoFlowGridLayout(context);
+            playlistCards.setRowMinWidth(dp(143));
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params1.setMargins(0, dp(16), 0, 0);
             layout1.addView(playlistCards, params1);

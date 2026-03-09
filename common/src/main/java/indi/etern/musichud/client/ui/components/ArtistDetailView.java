@@ -21,6 +21,9 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class ArtistDetailView extends LinearLayout {
+    private final LinearLayout musicList;
+    private final TextView noMoreResultText;
+    private final ProgressBar loadingProgressRing;
     Artist artist;
 
     public ArtistDetailView(Context context, Artist artist) {
@@ -48,17 +51,18 @@ public class ArtistDetailView extends LinearLayout {
                 .padding(new ButtonInsetBackground.Padding(dp(16), 0, dp(16), 0))
                 .build().get();
         backButton.setBackground(drawable);
-        LayoutParams topBarParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
-        topBarParams.setMargins(0, 0, dp(4), 0);
-        topBar.addView(backButton, topBarParams);
+        LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
+        backButtonParams.setMargins(0, 0, dp(4), 0);
+        topBar.addView(backButton, backButtonParams);
 
         UrlImageView avatarImageView = new UrlImageView(context);
+        avatarImageView.setLoading(true);
         LayoutParams imageParams = new LayoutParams(dp(128), dp(128));
         avatarImageView.setCircular(true);
         topBar.addView(avatarImageView, imageParams);
 
         LinearLayout texts = new LinearLayout(context);
-        texts.setGravity(Gravity.CENTER_VERTICAL);
+        texts.setGravity(Gravity.LEFT | Gravity.TOP);
         texts.setOrientation(VERTICAL);
         LayoutParams params1 = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
         params1.setMargins(dp(16), 0, 0, 0);
@@ -94,7 +98,9 @@ public class ArtistDetailView extends LinearLayout {
 
         texts.addView(descriptionScrollView);
 
-        addView(topBar);
+        LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        topBarParams.setMargins(0, dp(24), 0, 0);
+        addView(topBar, topBarParams);
 
         ProgressBar progressBar = new ProgressBar(context);
         progressBar.setIndeterminate(true);
@@ -109,14 +115,44 @@ public class ArtistDetailView extends LinearLayout {
         tracksParams.setMargins(0, dp(24), 0, 0);
         addView(scrollView, tracksParams);
 
-        LinearLayout musicList = new LinearLayout(context);
+        LinearLayout musicListWrapper = new LinearLayout(context);
+        musicListWrapper.setOrientation(VERTICAL);
+        musicListWrapper.setGravity(Gravity.TOP | Gravity.CENTER_HORIZONTAL);
+
+        musicList = new LinearLayout(context);
         musicList.setOrientation(VERTICAL);
-        scrollView.addView(musicList, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        musicListWrapper.addView(musicList, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+        {
+            loadingProgressRing = new ProgressBar(getContext());
+            loadingProgressRing.setIndeterminate(true);
+            loadingProgressRing.setVisibility(GONE);
+            LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            layoutParams.setMargins(0, dp(16), 0, dp(16));
+            layoutParams.gravity = Gravity.CENTER;
+            loadingProgressRing.setLayoutParams(layoutParams);
+            musicListWrapper.addView(loadingProgressRing);
+        }
+        {
+            noMoreResultText = new TextView(getContext());
+            noMoreResultText.setText(I18n.get("music_hud.text.searchNoMoreResult"));
+            noMoreResultText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            noMoreResultText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            noMoreResultText.setTextAlignment(TEXT_ALIGNMENT_CENTER);
+            noMoreResultText.setVisibility(GONE);
+            LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            layoutParams.setMargins(0, dp(32), 0, dp(32));
+            layoutParams.gravity = Gravity.CENTER;
+            noMoreResultText.setLayoutParams(layoutParams);
+            musicListWrapper.addView(noMoreResultText);
+        }
+
+        scrollView.addView(musicListWrapper, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         scrollView.setOnScrollChangeListener(new OnScrollChangeListener() {
             @Override
             public void onScrollChange(View v, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
-                checkInfiniteScroll(scrollY, scrollView, musicList);
+                checkInfiniteScroll(scrollY, scrollView);
             }
         });
 
@@ -131,7 +167,7 @@ public class ArtistDetailView extends LinearLayout {
                     avatarImageView.loadUrl(artist1.getAvatarThumbnailUrl(dp(128)));
                     removeView(progressBar);
                     for (MusicDetail musicDetail : artist1.getMusicDetails()) {
-                        addItem(context, musicDetail, musicList);
+                        addItem(context, musicDetail);
                     }
                 });
             }
@@ -140,7 +176,7 @@ public class ArtistDetailView extends LinearLayout {
 
     boolean noMoreResult = false;
     boolean loadingMore = false;
-    private void checkInfiniteScroll(int scrollY, ScrollView sv, LinearLayout musicList) {
+    private void checkInfiniteScroll(int scrollY, ScrollView sv) {
         if (loadingMore || noMoreResult) return;
         if (sv.getChildCount() > 0) {
             View child = sv.getChildAt(0);
@@ -149,27 +185,26 @@ public class ArtistDetailView extends LinearLayout {
             int maxScroll = Math.max(0, contentHeight - viewHeight);
             int threshold = sv.dp(100);
 
+            MuiModApi.postToUiThread(() -> {
+                if (loadingProgressRing != null) {
+                    loadingProgressRing.setVisibility(View.VISIBLE);
+                }
+            });
             if (maxScroll - scrollY <= threshold) {
-                if (artist.getMusicDetails().size() == artist.getMusicCount()) {
-                    TextView noMoreResultText = new TextView(getContext());
-                    noMoreResultText.setText(I18n.get("music_hud.text.searchNoMoreResult"));
-                    noMoreResultText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                    noMoreResultText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                    noMoreResultText.setTextAlignment(TEXT_ALIGNMENT_CENTER);
-                    LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-                    layoutParams.setMargins(0, dp(32), 0, dp(32));
-                    layoutParams.gravity = Gravity.CENTER;
-                    noMoreResultText.setLayoutParams(layoutParams);
-
-                    musicList.addView(noMoreResultText);
+                if (artist.getMusicDetails().size() >= artist.getMusicCount()) {
                     noMoreResult = true;
+                    MuiModApi.postToUiThread(() -> {
+                        loadingProgressRing.setVisibility(View.GONE);
+                        noMoreResultText.setVisibility(View.VISIBLE);
+                    });
                 } else {
                     loadingMore = true;
                     artist.loadMoreMusic().thenAccept((musicDetails) -> {
                         MuiModApi.postToUiThread(() -> {
                             for (MusicDetail musicDetail : musicDetails) {
-                                addItem(getContext(), musicDetail, musicList);
+                                addItem(getContext(), musicDetail);
                             }
+                            loadingProgressRing.setVisibility(View.GONE);
                             loadingMore = false;
                         });
                     });
@@ -178,8 +213,9 @@ public class ArtistDetailView extends LinearLayout {
         }
     }
 
-    private void addItem(Context context, MusicDetail musicDetail, LinearLayout musicList) {
+    private void addItem(Context context, MusicDetail musicDetail) {
         var musicLayout = new MusicListItem(context);
+        musicLayout.setShowPusherInfo(false);
         musicLayout.bindData(musicDetail);
         var background = ButtonInsetBackground.builder()
                 .cornerRadius(dp(12))

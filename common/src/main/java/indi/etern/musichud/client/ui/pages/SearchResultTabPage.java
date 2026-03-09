@@ -112,11 +112,9 @@ public class SearchResultTabPage extends FrameLayout {
         @NonNull
         @Override
         public Object instantiateItem(@NonNull ViewGroup container, int position) {
-            final int maxWidth = dp(1000);
             var context = container.getContext();
 
             ClampingScrollView sv = new ClampingScrollView(context);
-            sv.setMaxWidth(maxWidth);
             sv.setTag(position);
 
             ProgressBar loadingMoreProgressBar = new ProgressBar(context);
@@ -171,18 +169,22 @@ public class SearchResultTabPage extends FrameLayout {
             LinearLayout ll = new LinearLayout(context);
             ll.setOrientation(LinearLayout.VERTICAL);
 
-            var vgParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL);
+            var vgParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            vgParams.gravity = Gravity.CENTER_HORIZONTAL;
             ll.addView(layout, vgParams);
 
-            var progressParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL);
-            progressParams.setMargins(dp(4), dp(16), dp(4), dp(16));
+            var progressParams = new LinearLayout.LayoutParams(MATCH_PARENT, dp(48), 0);
+            progressParams.setMargins(0, dp(16), 0, dp(16));
+            progressParams.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
             ll.addView(loadingMoreProgressBar, progressParams);
 
-            LayoutParams tParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL);
-            tParams.setMargins(dp(4), dp(32), dp(4), dp(32));
+            var tParams = new LinearLayout.LayoutParams(MATCH_PARENT, dp(16), 0);
+            tParams.setMargins(0, dp(32), 0, dp(32));
+            tParams.gravity = Gravity.CENTER_HORIZONTAL | Gravity.TOP;
             ll.addView(noMoreResultText, tParams);
 
-            var llParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT, Gravity.CENTER_HORIZONTAL);
+            var llParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            llParams.gravity = Gravity.CENTER_HORIZONTAL;
             sv.addView(ll, llParams);
 
             return sv;
@@ -209,8 +211,12 @@ public class SearchResultTabPage extends FrameLayout {
         private void checkFuture(TextView noMoreResultText, ProgressBar loadingProgressBar, CompletableFuture<SearchView.CompletingType> completableFuture) {
             if (!completableFuture.isDone()) {
                 MuiModApi.postToUiThread(() -> {
-                    noMoreResultText.setVisibility(GONE);
-                    loadingProgressBar.setVisibility(VISIBLE);
+                    if (noMoreResultText.getVisibility() != GONE) {
+                        noMoreResultText.setVisibility(GONE);
+                    }
+                    if (loadingProgressBar.getVisibility() != VISIBLE) {
+                        loadingProgressBar.setVisibility(VISIBLE);
+                    }
                 });
                 completableFuture.thenAccept(result -> {
                     MuiModApi.postToUiThread(() -> {

@@ -63,7 +63,7 @@ public class Artist {
     }
 
     public CompletableFuture<Artist> loadDetail() {
-        if (avatarUrl == null || avatarUrl.isEmpty()) {
+        if (musicDetails == null || musicDetails.isEmpty()) {
             return MusicService.getInstance().loadArtist(id);
         } else return CompletableFuture.completedFuture(this);
     }

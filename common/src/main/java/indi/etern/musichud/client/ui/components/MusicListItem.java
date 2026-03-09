@@ -12,15 +12,17 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import lombok.Getter;
+import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 
 import java.time.Duration;
+import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 
 public class MusicListItem extends LinearLayout {
-
     private final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("mm:ss");
     public static final int imageSize = 54;
@@ -29,6 +31,9 @@ public class MusicListItem extends LinearLayout {
     private LinearLayout musicArtistAndAlbum;
     private TextView durationText;
     private TextView pusherText;
+    @Setter
+    @Getter
+    private boolean showPusherInfo = true;
 
     public MusicListItem(Context context) {
         super(context);
@@ -151,15 +156,16 @@ public class MusicListItem extends LinearLayout {
                 timeFormatterWithHour :
                 timeFormatter;
         durationText.setText(formatter.format(
-                java.time.LocalTime.MIDNIGHT.plusSeconds(duration.toSeconds())
+                LocalTime.MIDNIGHT.plusSeconds(duration.toSeconds())
         ));
 
-        PusherInfo pusherInfo = musicDetail.getPusherInfo();
-        if (!pusherInfo.playerName().isEmpty()) {
-            ClientPacketListener connection = Minecraft.getInstance().getConnection();
-            if (connection == null) throw new IllegalStateException();
-            pusherText.setText(pusherInfo.playerName());
+        if (showPusherInfo) {
+            PusherInfo pusherInfo = musicDetail.getPusherInfo();
+            if (!pusherInfo.playerName().isEmpty()) {
+                ClientPacketListener connection = Minecraft.getInstance().getConnection();
+                if (connection == null) throw new IllegalStateException();
+                pusherText.setText(pusherInfo.playerName());
+            }
         }
     }
-
 }

@@ -50,6 +50,30 @@ public class UrlImageView extends FrameLayout {
         return true;
     };
     private CompletableFuture<Void> loadFuture;
+    private float aspectRatio = 1.0f; // 默认长宽比
+
+    public void setAspectRatio(float aspectRatio) {
+        this.aspectRatio = aspectRatio;
+        requestLayout();
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+
+        if (aspectRatio > 0) {
+            int width = getMeasuredWidth();
+            int height = (int) (width / aspectRatio);
+
+            // 设置测量尺寸
+            setMeasuredDimension(width, height);
+
+            // 同时设置内部ImageView的尺寸
+            LayoutParams params = new LayoutParams(width, height);
+            imageView.setLayoutParams(params);
+            nextImageView.setLayoutParams(params);
+        }
+    }
 
     public UrlImageView(Context context) {
         super(context);
@@ -62,6 +86,8 @@ public class UrlImageView extends FrameLayout {
         imageView = new ImageView(context);
         nextImageView = new ImageView(context);
         nextImageView.setAlpha(0f);
+        imageView.setAdjustViewBounds(true);
+        nextImageView.setAdjustViewBounds(true);
         imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         nextImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
         addView(imageView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -251,6 +277,9 @@ public class UrlImageView extends FrameLayout {
     }
 
     private void createDrawable(Bitmap bitmap) {
+        float ratio = (float) bitmap.getWidth() / bitmap.getHeight();
+        setAspectRatio(ratio);
+
         //noinspection UnstableApiUsage
         RoundedImageDrawable drawable = new RoundedImageDrawable(
                 getContext().getResources(),

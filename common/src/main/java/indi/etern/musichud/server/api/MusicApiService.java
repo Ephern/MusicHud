@@ -274,7 +274,7 @@ public class MusicApiService {
         return MusicResourceInfo.from(unblockResponse.data, musicDetail);
     }
 
-    public List<Playlist> getPlayersUserPlaylists(ServerPlayer player) {
+    public List<Playlist> getPlayersUserSubsctibedPlaylists(ServerPlayer player) {
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {
@@ -282,7 +282,37 @@ public class MusicApiService {
         } else {
             PlaylistsResponse playlistData = ApiClient.post(
                     ServerApiMeta.User.PLAYLIST,
-                    new RequestDataWithUID(profile.getUserId()),
+                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
+                    loginInfo.loginCookieInfo.rawCookie()
+            );
+            return playlistData.getPlaylists();
+        }
+    }
+
+    public List<Playlist> getPlayersUserSubscribedAlbums(ServerPlayer player) {
+        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
+        Profile profile = loginInfo.profile;
+        if (profile == null) {
+            return List.of();
+        } else {
+            PlaylistsResponse playlistData = ApiClient.post(
+                    ServerApiMeta.User.PLAYLIST,
+                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
+                    loginInfo.loginCookieInfo.rawCookie()
+            );
+            return playlistData.getPlaylists();
+        }
+    }
+
+    public List<Playlist> getPlayersUserSubscribedArtists(ServerPlayer player) {
+        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
+        Profile profile = loginInfo.profile;
+        if (profile == null) {
+            return List.of();
+        } else {
+            PlaylistsResponse playlistData = ApiClient.post(
+                    ServerApiMeta.User.PLAYLIST,
+                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
                     loginInfo.loginCookieInfo.rawCookie()
             );
             return playlistData.getPlaylists();
@@ -363,6 +393,9 @@ public class MusicApiService {
     public record GetMatchResourceUrlResponse(int code, String data) {
     }
 
-    public record RequestDataWithUID(long uid) {
+    public record PagedRequestDataWithUID(long uid, int limit, int offset) {
+    }
+
+    public record PagedRequestData(int limit, int offset) {
     }
 }

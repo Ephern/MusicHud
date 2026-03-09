@@ -35,7 +35,7 @@
   "music_hud.button.logout": "登出",
   "music_hud.text.myPlaylists": "我的歌单",
   "music_hud.text.idlePlaySources": "我的空闲播放源",
-  "music_hud.text.idlePlaySourcesDescription": "播放器空闲时可能会播放这些歌单中的音乐",
+  "music_hud.text.idlePlaySourcesDescription": "播放器空闲时可能会播放这些歌单或专辑中的音乐",
   "music_hud.text.loginWithQRCode": "通过扫描二维码登录网易云音乐",
   "music_hud.text.loginDescription": "Music Hud 可能会使用你的登录状态获取音源",
   "music_hud.button.loadQRCode": "获取二维码",
