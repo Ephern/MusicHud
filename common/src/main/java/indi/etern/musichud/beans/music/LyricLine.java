@@ -1,9 +1,6 @@
 package indi.etern.musichud.beans.music;
 
-import lombok.AccessLevel;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+import lombok.*;
 
 import java.time.Duration;
 import java.util.Objects;
@@ -12,6 +9,11 @@ import java.util.Objects;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class LyricLine {
+    public enum Type {
+        NORMAL, META_DATA
+    }
+    @Setter
+    Type type;
     Duration startTime;
     String text;
     String translatedText;

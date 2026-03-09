@@ -24,9 +24,9 @@ public class Theme {
     public static final int ERROR_TEXT_COLOR = 0xFFFF4F4F;
 
     public static final int GHOST_BUTTON_BACKGROUND = 0x00FFFFFF;
-    public static final int GHOST_BUTTON_BACKGROUND_PRESSED = 0x04FFFFFF;
-    public static final int GHOST_BUTTON_BACKGROUND_HOVERED = 0x05FFFFFF;
-    public static final int GHOST_BUTTON_BACKGROUND_CHECKED = 0x06FFFFFF;
+    public static final int GHOST_BUTTON_BACKGROUND_PRESSED = 0x05FFFFFF;
+    public static final int GHOST_BUTTON_BACKGROUND_HOVERED = 0x07FFFFFF;
+    public static final int GHOST_BUTTON_BACKGROUND_CHECKED = 0x08FFFFFF;
 
     public static final ColorStateList GHOST_BUTTON_STATES = new ColorStateList(
             new int[][]{
@@ -62,6 +62,8 @@ public class Theme {
     public static final int TEXT_SIZE_NORMAL = 12;
     public static final int TEXT_SIZE_LARGE = 15;
     public static final int TEXT_SIZE_LARGER = 18;
+    public static final int MAIN_LYRIC_SIZE = 24;
+    public static final int SUB_LYRIC_SIZE = 15;
 
     public static TextView getNotificationTextView(Context context, boolean enabled) {
         TextView textView = new TextView(context);

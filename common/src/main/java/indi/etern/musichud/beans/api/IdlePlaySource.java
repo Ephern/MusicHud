@@ -54,7 +54,7 @@ public final class IdlePlaySource {
     public boolean equals(Object o) {
         if (o == null || getClass() != o.getClass()) return false;
         IdlePlaySource that = (IdlePlaySource) o;
-        return id == that.id && Objects.equals(type, that.type) && Objects.equals(player, that.player);
+        return id == that.id && Objects.equals(type, that.type);
     }
 
     @Override

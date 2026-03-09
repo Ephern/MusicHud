@@ -141,21 +141,21 @@ public class ServerApiMeta {
                 Set.of("uid"),
                 null,
                 false, false, true, String.class);
-        public static final UrlMeta<String> FAVOURITE_ARTISTS = new UrlMeta<>(
+        public static final UrlMeta<String> SUBSCRIBED_ARTISTS = new UrlMeta<>(
                 "/artist/sublist",
                 null,
                 Set.of("limit"/*default:25*/, "offset"),
-                false, false, true, String.class);
-        public static final UrlMeta<String> FAVOURITE_TOPICS = new UrlMeta<>(
+                true, false, true, String.class);
+        public static final UrlMeta<String> SIBSCRIBED_TOPICS = new UrlMeta<>(
                 "/topic/sublist",
                 null,
                 Set.of("limit"/*default:50*/, "offset"),
                 false, false, true, String.class);
-        public static final UrlMeta<String> FAVOURITE_ALBUMS = new UrlMeta<>(
+        public static final UrlMeta<String> SUBSCRIBED_ALBUMS = new UrlMeta<>(
                 "/album/sublist",
                 null,
-                Set.of("limit", "offset"),
-                false, false, true, String.class);
+                Set.of("limit"/*default:25*/, "offset"),
+                true, false, true, String.class);
         public static final UrlMeta<String> RECENTLY_PLAYED = new UrlMeta<>(
                 "/record/recent/song",
                 null,

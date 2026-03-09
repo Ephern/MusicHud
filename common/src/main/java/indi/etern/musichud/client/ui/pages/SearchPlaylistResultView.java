@@ -2,13 +2,13 @@ package indi.etern.musichud.client.ui.pages;
 
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.beans.music.Playlist;
-import indi.etern.musichud.client.ui.components.FlexWrapLayout;
+import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import lombok.Getter;
 
 import java.util.List;
 
-public class SearchPlaylistResultView extends FlexWrapLayout {
+public class SearchPlaylistResultView extends AutoFlowGridLayout {
     @Getter
     private static SearchPlaylistResultView instance;
     private static List<Playlist> result;
@@ -16,6 +16,7 @@ public class SearchPlaylistResultView extends FlexWrapLayout {
     public SearchPlaylistResultView(Context context) {
         super(context);
         instance = this;
+        setRowMinWidth(dp(143));
         refresh();
     }
 
@@ -27,9 +28,7 @@ public class SearchPlaylistResultView extends FlexWrapLayout {
     }
 
     public void refresh() {
-        clearFlexChildren();
-        setItemSpacing(0);
-        setLineSpacing(0);
+        removeAllViews();
         if (result != null) {
             for (Playlist playlist : result) {
                 addItem(getContext(), playlist);
