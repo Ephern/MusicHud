@@ -15,6 +15,7 @@ public class SearchAlbumResultView extends AutoFlowGridLayout {
 
     public SearchAlbumResultView(Context context) {
         super(context);
+        setRowMinWidth(dp(143));
         instance = this;
         refresh();
     }

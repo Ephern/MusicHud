@@ -112,11 +112,9 @@ public class SearchResultTabPage extends FrameLayout {
         @NonNull
         @Override
         public Object instantiateItem(@NonNull ViewGroup container, int position) {
-            final int maxWidth = dp(1000);
             var context = container.getContext();
 
             ClampingScrollView sv = new ClampingScrollView(context);
-            sv.setMaxWidth(maxWidth);
             sv.setTag(position);
 
             ProgressBar loadingMoreProgressBar = new ProgressBar(context);

@@ -106,18 +106,12 @@ public class FlexWrapLayout extends LinearLayout {
         return width;
     }
 
-    /**
-     * 清除所有子 View
-     */
-    public void clearFlexChildren() {
-        removeAllViews();
+    @Override
+    public void removeAllViews() {
         rows.clear();
+        super.removeAllViews();
     }
 
-    /**
-     * 重新布局所有子 View
-     * 当容器宽度变化时调用
-     */
     public void reflowChildren() {
         // 收集所有子 View
         List<View> allChildren = new ArrayList<>();
@@ -129,7 +123,7 @@ public class FlexWrapLayout extends LinearLayout {
         }
 
         // 清除现有布局
-        clearFlexChildren();
+        removeAllViews();
 
         // 重新添加所有子 View
         for (View child : allChildren) {

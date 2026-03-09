@@ -62,6 +62,8 @@ public class Theme {
     public static final int TEXT_SIZE_NORMAL = 12;
     public static final int TEXT_SIZE_LARGE = 15;
     public static final int TEXT_SIZE_LARGER = 18;
+    public static final int MAIN_LYRIC_SIZE = 24;
+    public static final int SUB_LYRIC_SIZE = 15;
 
     public static TextView getNotificationTextView(Context context, boolean enabled) {
         TextView textView = new TextView(context);

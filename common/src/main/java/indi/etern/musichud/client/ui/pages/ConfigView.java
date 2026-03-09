@@ -49,7 +49,9 @@ public class ConfigView extends LinearLayout {
             LinearLayout view = new LinearLayout(context);
             view.setOrientation(LinearLayout.VERTICAL);
             view.setGravity(Gravity.CENTER_HORIZONTAL);
-            scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params.setMargins(0, dp(24), 0, 0);
+            scrollView.addView(view, params);
 
             HudRendererManager hudRendererManager = HudRendererManager.getInstance();
 

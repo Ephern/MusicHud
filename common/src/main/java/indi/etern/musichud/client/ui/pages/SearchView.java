@@ -71,7 +71,7 @@ public class SearchView extends LinearLayout {
         LinearLayout top = new LinearLayout(context);
         top.setOrientation(HORIZONTAL);
         LayoutParams topParams = new LayoutParams(MATCH_PARENT, dp(38));
-        topParams.setMargins(0, dp(16), 0, 0);
+        topParams.setMargins(0, dp(24), 0, 0);
         addView(top, topParams);
 
         top.addView(new View(context), new LayoutParams(0, WRAP_CONTENT, 2));

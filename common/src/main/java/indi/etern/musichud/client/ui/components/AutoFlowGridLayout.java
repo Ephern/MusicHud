@@ -5,6 +5,8 @@ import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.GridLayout;
+import lombok.Getter;
+import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.ArrayList;
@@ -14,6 +16,9 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class AutoFlowGridLayout extends GridLayout {
     private int lastMeasuredWidth = -1;
+    @Setter
+    @Getter
+    private int rowMinWidth;
 
     public AutoFlowGridLayout(Context context) {
         super(context);
@@ -23,20 +28,18 @@ public class AutoFlowGridLayout extends GridLayout {
 
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        super.onLayout(changed, left, top, right, bottom);
+        int width = getWidth();
+        if (width != lastMeasuredWidth && width > 0) {
+            lastMeasuredWidth = width;
+            int availableWidth = width - getPaddingLeft() - getPaddingRight();
+            int newColumnCount = Math.max(1, availableWidth / calculateActualMinWidth());
 
-        post(() -> {
-            int width = getWidth();
-            if (width != lastMeasuredWidth && width > 0) {
-                lastMeasuredWidth = width;
-                int availableWidth = width - getPaddingLeft() - getPaddingRight();
-                int newColumnCount = Math.max(1, availableWidth / calculateActualMinWidth());
-
-                if (newColumnCount != getColumnCount()) {
-                    performRelayout(newColumnCount);
-                }
+            if (newColumnCount != getColumnCount()) {
+                performRelayout(newColumnCount);
             }
-        });
+        }
+
+        super.onLayout(changed, left, top, right, bottom);
     }
 
     private void performRelayout(int newColumnCount) {
@@ -71,7 +74,8 @@ public class AutoFlowGridLayout extends GridLayout {
             );
             minWidth = Math.min(minWidth, child.getMeasuredWidth());
         }
-        return minWidth == Integer.MAX_VALUE ? dp(200) : minWidth;
+        int i = minWidth == Integer.MAX_VALUE ? rowMinWidth : minWidth;
+        return i;
     }
 
     @Override
@@ -79,7 +83,8 @@ public class AutoFlowGridLayout extends GridLayout {
         GridLayout.LayoutParams params = new GridLayout.LayoutParams();
         params.width = WRAP_CONTENT;
         params.height = WRAP_CONTENT;
-        addView(view, params);
+        super.addView(view, params);
+        requestLayout();
     }
 
     public void addView(@NotNull View view, ViewGroup.LayoutParams params) {
@@ -87,6 +92,7 @@ public class AutoFlowGridLayout extends GridLayout {
         gridParams.width = params.width;
         gridParams.height = params.height;
         super.addView(view, gridParams);
+        requestLayout();
     }
 
     @Override

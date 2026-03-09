@@ -16,6 +16,7 @@ public class SearchPlaylistResultView extends AutoFlowGridLayout {
     public SearchPlaylistResultView(Context context) {
         super(context);
         instance = this;
+        setRowMinWidth(dp(143));
         refresh();
     }
 

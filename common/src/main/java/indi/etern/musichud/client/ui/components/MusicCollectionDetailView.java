@@ -8,20 +8,29 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.music.Artist;
+import indi.etern.musichud.beans.music.MusicCollection;
+import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import net.minecraft.client.resources.language.I18n;
 
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
+import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicCollectionDetailView extends LinearLayout {
+    private final MusicCollection musicCollection;
+    private final Button addToWaitingListButton;
+    private MusicService musicService = MusicService.getInstance();;
+
     public MusicCollectionDetailView(Context context, MusicCollection musicCollection) {
         super(context);
 
+        this.musicCollection = musicCollection;
         setOrientation(VERTICAL);
         String collectionNameI18n = musicCollection.getNameI18nKey();
 
@@ -44,14 +53,14 @@ public class MusicCollectionDetailView extends LinearLayout {
                 .padding(new ButtonInsetBackground.Padding(dp(16), 0, dp(16), 0))
                 .build().get();
         backButton.setBackground(drawable);
-        LayoutParams topBarParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
-        topBarParams.setMargins(0, 0, dp(4), 0);
-        topBar.addView(backButton, topBarParams);
+        LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
+        backButtonParams.setMargins(0, 0, dp(4), 0);
+        topBar.addView(backButton, backButtonParams);
 
         UrlImageView imageView = new UrlImageView(context);
-        LayoutParams imageParams = new LayoutParams(dp(60), dp(60));
+        LayoutParams imageParams = new LayoutParams(dp(72), dp(72));
         topBar.addView(imageView, imageParams);
-        imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp(128)));
+        imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp(72)));
         imageView.setCornerRadius(dp(8));
 
         LinearLayout texts = new LinearLayout(context);
@@ -76,7 +85,30 @@ public class MusicCollectionDetailView extends LinearLayout {
         name.setText(musicCollection.getName());
         texts.addView(name);
 
-        addView(topBar);
+        addToWaitingListButton = new Button(context);
+        updateButton();
+        addToWaitingListButton.setTextColor(Theme.PRIMARY_COLOR);
+        addToWaitingListButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        Drawable background1 = ButtonInsetBackground.builder()
+                .inset(0)
+                .cornerRadius(dp(8))
+                .padding(new ButtonInsetBackground.Padding(0, dp(4), 0, dp(4)))
+                .build().get();
+        addToWaitingListButton.setBackground(background1);
+        addToWaitingListButton.setOnClickListener((v) -> {
+            if (musicService.getIdlePlaySources().contains(musicCollection)) {
+                Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
+                musicService.removeFromIdlePlaySource(musicCollection);
+            } else {
+                Toast.makeText(context, I18n.get("music_hud.text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
+                musicService.addToIdlePlaySource(musicCollection);
+            }
+        });
+        texts.addView(addToWaitingListButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+        LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        topBarParams.setMargins(0, dp(24), 0, 0);
+        addView(topBar, topBarParams);
 
         ProgressBar progressBar = new ProgressBar(context);
         progressBar.setIndeterminate(true);
@@ -104,6 +136,24 @@ public class MusicCollectionDetailView extends LinearLayout {
                 }
             });
         }, MusicHud.EXECUTOR);
+
+        Consumer<MusicCollection> listener = playlist1 -> {
+            if (playlist1.equals(musicCollection)) {
+                MuiModApi.postToUiThread(this::updateButton);
+            }
+        };
+
+        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View v) {
+                musicService.getIdlePlaySourceChangeListeners().add(listener);
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View v) {
+                musicService.getIdlePlaySourceChangeListeners().remove(listener);
+            }
+        });
     }
 
     private void addItem(Context context, MusicDetail musicDetail, LinearLayout tracks) {
@@ -124,5 +174,13 @@ public class MusicCollectionDetailView extends LinearLayout {
             Toast.makeText(context, I18n.get("music_hud.text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT).show();
         });
         tracks.addView(musicLayout);
+    }
+
+    private void updateButton() {
+        if (musicService.getIdlePlaySources().contains(musicCollection)) {
+            addToWaitingListButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
+        } else {
+            addToWaitingListButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));
+        }
     }
 }

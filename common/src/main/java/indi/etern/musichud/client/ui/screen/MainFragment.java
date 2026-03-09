@@ -234,9 +234,7 @@ public class MainFragment extends Fragment {
             instance = this;
             var context = requireContext();
             var base = new LinearLayout(context);
-            int dp24 = base.dp(24);
-            int dp32 = base.dp(32);
-            base.setPadding(dp32, dp24, dp24, 0);
+            base.setPadding(base.dp(24), 0, base.dp(24), 0);
 
             var baseBackground = new ShapeDrawable();
             baseBackground.setColor(Theme.BASE_BACKGROUND_COLOR);
@@ -349,16 +347,21 @@ public class MainFragment extends Fragment {
 
                 musicInfo.addView(skipCurrentButton, buttonParams);
                 musicInfo.setMinimumHeight(side.dp(128));
+
+                side.addView(musicInfo, params1);
+                side.addView(sideMenu, params);
+
+                var sideParams = new LinearLayout.LayoutParams(widthDp, MATCH_PARENT);
+                sideParams.setMargins(0, side.dp(24), 0, 0);
+                base.addView(side, sideParams);
+
                 LayoutTransition transition1 = new LayoutTransition();
                 transition1.enableTransitionType(LayoutTransition.CHANGING);
                 musicInfo.setLayoutTransition(transition1);
 
-                side.addView(musicInfo, params1);
-                side.addView(sideMenu, params);
                 LayoutTransition transition2 = new LayoutTransition();
                 transition2.enableTransitionType(LayoutTransition.CHANGING);
-                side.setLayoutTransition(transition1);
-                base.addView(side, params);
+                side.setLayoutTransition(transition2);
 
                 switchMusic(currentlyPlayingMusicDetail, playingInfo.getLyricLines());
             }

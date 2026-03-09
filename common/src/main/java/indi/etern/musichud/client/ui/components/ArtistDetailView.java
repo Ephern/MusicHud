@@ -51,9 +51,9 @@ public class ArtistDetailView extends LinearLayout {
                 .padding(new ButtonInsetBackground.Padding(dp(16), 0, dp(16), 0))
                 .build().get();
         backButton.setBackground(drawable);
-        LayoutParams topBarParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
-        topBarParams.setMargins(0, 0, dp(4), 0);
-        topBar.addView(backButton, topBarParams);
+        LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
+        backButtonParams.setMargins(0, 0, dp(4), 0);
+        topBar.addView(backButton, backButtonParams);
 
         UrlImageView avatarImageView = new UrlImageView(context);
         avatarImageView.setLoading(true);
@@ -98,7 +98,9 @@ public class ArtistDetailView extends LinearLayout {
 
         texts.addView(descriptionScrollView);
 
-        addView(topBar);
+        LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        topBarParams.setMargins(0, dp(24), 0, 0);
+        addView(topBar, topBarParams);
 
         ProgressBar progressBar = new ProgressBar(context);
         progressBar.setIndeterminate(true);
