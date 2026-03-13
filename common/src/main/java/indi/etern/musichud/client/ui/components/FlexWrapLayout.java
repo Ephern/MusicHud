@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
+import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.LinearLayout;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,18 +18,34 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
  * 使用多个水平 LinearLayout 来实现多行布局
  */
 public class FlexWrapLayout extends LinearLayout {
+    final List<View> allChildren = new ArrayList<>();
     private final List<LinearLayout> rows = new ArrayList<>();
+    boolean attached = false;
 
     public FlexWrapLayout(Context context) {
         super(context);
         setOrientation(VERTICAL);  // 主容器垂直排列(多行)
-        addOnLayoutChangeListener((v, left, top, right, bottom,
-                                              oldLeft, oldTop, oldRight, oldBottom) -> {
+        addOnLayoutChangeListener((v1, left, top, right, bottom,
+                                   oldLeft, oldTop, oldRight, oldBottom) -> {
             int newWidth = right - left;
             int oldWidth = oldRight - oldLeft;
 
             if (newWidth != oldWidth && newWidth > 0) {
-                post(this::reflowChildren);
+                post(FlexWrapLayout.this::reflowChildren);
+            }
+        });
+        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View v) {
+                reflowChildren();
+                post(() -> {
+                    attached = true;
+                });
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View v) {
+                removeAllViews();
             }
         });
     }
@@ -39,23 +56,22 @@ public class FlexWrapLayout extends LinearLayout {
      */
     @Override
     public void addView(@NotNull View view) {
-        addView(view, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        // 测量子 View 的宽度
+        allChildren.add(view);
+        addViewInternal(view);
     }
 
-    /**
-     * 添加子 View 到布局中,带自定义 LayoutParams
-     */
-    void addView(View view, LayoutParams params) {
-        // 测量子 View 的宽度
+    private void addViewInternal(View view) {
         view.measure(
                 MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
                 MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
         );
         int childWidth = view.getMeasuredWidth();
-
-        // 查找可以容纳这个子 View 的行
-        LinearLayout targetRow = findOrCreateRowForChild(childWidth);
-        targetRow.addView(view, params);
+        if (attached && view.getParent() == null) {
+            // 查找可以容纳这个子 View 的行
+            LinearLayout targetRow = findOrCreateRowForChild(childWidth);
+            targetRow.addView(view);
+        }
     }
 
     /**
@@ -109,30 +125,29 @@ public class FlexWrapLayout extends LinearLayout {
     @Override
     public void removeAllViews() {
         rows.clear();
+        allChildren.clear();
         super.removeAllViews();
     }
 
     public void reflowChildren() {
-        // 收集所有子 View
-        List<View> allChildren = new ArrayList<>();
+        rows.forEach(ViewGroup::removeAllViews);
+        List<View> allChildren1 = List.copyOf(allChildren);
+        for (View child : allChildren1) {
+            addViewInternal(child);
+        }
+        List<LinearLayout> rowsToRemove = new ArrayList<>();
         for (LinearLayout row : rows) {
-            for (int i = 0; i < row.getChildCount(); i++) {
-                allChildren.add(row.getChildAt(i));
+            if (row.getChildCount() == 0) {
+                rowsToRemove.add(row);
+                super.removeView(row);
             }
-            row.removeAllViews();
         }
-
-        // 清除现有布局
-        removeAllViews();
-
-        // 重新添加所有子 View
-        for (View child : allChildren) {
-            addView(child);
-        }
+        rows.removeAll(rowsToRemove);
     }
 
     @Override
     public void removeView(@NotNull View view) {
+        allChildren.remove(view);
         rows.forEach(row -> {
             row.removeView(view);
         });

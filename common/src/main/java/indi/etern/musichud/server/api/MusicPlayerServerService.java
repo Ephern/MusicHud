@@ -137,10 +137,9 @@ public class MusicPlayerServerService {
                     }
                 }
             }
+            logger.info("Music Pusher stopped due to no more music");
             pusherThread = null;
-            if (haveSentMusic) {
-                MusicPlayerServerService.this.stopSendingMusic();
-            }
+            MusicPlayerServerService.this.stopSendingMusic();
         }
 
         private Optional<MusicDetail> getRandomMusicFromIdleSources() {
@@ -221,11 +220,13 @@ public class MusicPlayerServerService {
     private void stopSendingMusic() {
         this.continuable = false;
         currentMusicDetail = MusicDetail.NONE;
-        NetworkManager.sendToPlayers(
-                LoginApiService.getInstance().loginedPlayerInfoMap.keySet(),
-                new SwitchMusicMessage(MusicDetail.NONE, MusicDetail.NONE, "")
-        );
-        currentVoteInfo.resetTo(MusicDetail.NONE);
+        if (haveSentMusic) {
+            NetworkManager.sendToPlayers(
+                    LoginApiService.getInstance().loginedPlayerInfoMap.keySet(),
+                    new SwitchMusicMessage(MusicDetail.NONE, MusicDetail.NONE, "")
+            );
+            currentVoteInfo.resetTo(MusicDetail.NONE);
+        }
     }
 
     public void sendSyncPlayingStatusToPlayer(ServerPlayer serverPlayer) {

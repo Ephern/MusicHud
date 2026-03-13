@@ -24,8 +24,8 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicCollectionDetailView extends LinearLayout {
     private final MusicCollection musicCollection;
-    private final Button addToWaitingListButton;
-    private MusicService musicService = MusicService.getInstance();;
+    private final Button addToIdleSourceListButton;
+    private final MusicService musicService = MusicService.getInstance();
 
     public MusicCollectionDetailView(Context context, MusicCollection musicCollection) {
         super(context);
@@ -85,17 +85,17 @@ public class MusicCollectionDetailView extends LinearLayout {
         name.setText(musicCollection.getName());
         texts.addView(name);
 
-        addToWaitingListButton = new Button(context);
+        addToIdleSourceListButton = new Button(context);
         updateButton();
-        addToWaitingListButton.setTextColor(Theme.PRIMARY_COLOR);
-        addToWaitingListButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        addToIdleSourceListButton.setTextColor(Theme.PRIMARY_COLOR);
+        addToIdleSourceListButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         Drawable background1 = ButtonInsetBackground.builder()
                 .inset(0)
                 .cornerRadius(dp(8))
-                .padding(new ButtonInsetBackground.Padding(0, dp(4), 0, dp(4)))
+                .padding(new ButtonInsetBackground.Padding(0, dp(2), 0, dp(2)))
                 .build().get();
-        addToWaitingListButton.setBackground(background1);
-        addToWaitingListButton.setOnClickListener((v) -> {
+        addToIdleSourceListButton.setBackground(background1);
+        addToIdleSourceListButton.setOnClickListener((v) -> {
             if (musicService.getIdlePlaySources().contains(musicCollection)) {
                 Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
                 musicService.removeFromIdlePlaySource(musicCollection);
@@ -104,7 +104,7 @@ public class MusicCollectionDetailView extends LinearLayout {
                 musicService.addToIdlePlaySource(musicCollection);
             }
         });
-        texts.addView(addToWaitingListButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        texts.addView(addToIdleSourceListButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBarParams.setMargins(0, dp(24), 0, 0);
@@ -178,9 +178,9 @@ public class MusicCollectionDetailView extends LinearLayout {
 
     private void updateButton() {
         if (musicService.getIdlePlaySources().contains(musicCollection)) {
-            addToWaitingListButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
+            addToIdleSourceListButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
         } else {
-            addToWaitingListButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));
+            addToIdleSourceListButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));
         }
     }
 }

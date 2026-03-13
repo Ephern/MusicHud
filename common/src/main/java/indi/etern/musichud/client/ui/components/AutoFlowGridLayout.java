@@ -35,7 +35,9 @@ public class AutoFlowGridLayout extends GridLayout {
             int newColumnCount = Math.max(1, availableWidth / calculateActualMinWidth());
 
             if (newColumnCount != getColumnCount()) {
-                performRelayout(newColumnCount);
+                post(() -> {
+                    performRelayout(newColumnCount);
+                });
             }
         }
 
@@ -57,10 +59,7 @@ public class AutoFlowGridLayout extends GridLayout {
         setColumnCount(newColumnCount);
 
         for (View child : children) {
-            GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-            params.width = WRAP_CONTENT;
-            params.height = WRAP_CONTENT;
-            super.addView(child, params);
+            addViewInternal(WRAP_CONTENT, WRAP_CONTENT, child);
         }
     }
 
@@ -80,18 +79,20 @@ public class AutoFlowGridLayout extends GridLayout {
 
     @Override
     public void addView(@NotNull View view) {
-        GridLayout.LayoutParams params = new GridLayout.LayoutParams();
-        params.width = WRAP_CONTENT;
-        params.height = WRAP_CONTENT;
-        super.addView(view, params);
+        addViewInternal(WRAP_CONTENT, WRAP_CONTENT, view);
         requestLayout();
     }
 
+    private void addViewInternal(int width, int height, @NotNull View view) {
+        LayoutParams params = new LayoutParams();
+        params.width = width;
+        params.height = height;
+//        params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL, 1f);
+        super.addView(view, params);
+    }
+
     public void addView(@NotNull View view, ViewGroup.LayoutParams params) {
-        GridLayout.LayoutParams gridParams = new GridLayout.LayoutParams();
-        gridParams.width = params.width;
-        gridParams.height = params.height;
-        super.addView(view, gridParams);
+        addViewInternal(params.width, params.height, view);
         requestLayout();
     }
 
