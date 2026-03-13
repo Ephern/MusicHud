@@ -157,7 +157,7 @@ public class SearchView extends LinearLayout {
     }
 
     private void refreshSearchMeta(int offset, List<?> result, SearchType searchType) {
-        boolean mayHasMore = !result.isEmpty();
+        boolean mayHasMore = result.size() == 50;// see also: MusicApiService.searchXXX(...);
         SearchMeta searchMeta = searchMetas.getOrDefault(searchType, new SearchMeta(searchType, searchText));
         searchMeta.nextOffset = offset + result.size();
         searchMeta.mayHasMore = mayHasMore;

@@ -24,7 +24,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 @Slf4j
 public class MusicCollectionCard extends LinearLayout {
     private final MusicService musicService = MusicService.getInstance();
-    private final Button addToWaitingListButton;
+    private final Button addToIdleSourceButton;
     @Getter
     MusicCollection musicCollection;
 
@@ -38,8 +38,9 @@ public class MusicCollectionCard extends LinearLayout {
         setLayoutParams(params);
 
         UrlImageView imageView = new UrlImageView(context);
-        LayoutParams imageParams = new LayoutParams(dp(128), dp(128));
+        LayoutParams imageParams = new LinearLayout.LayoutParams(dp(128), dp(128), 1);
         imageParams.setMargins(0, 0, 0, dp(4));
+        imageView.setAspectRatio(1);
         addView(imageView, imageParams);
 
         imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp(128)));
@@ -53,17 +54,17 @@ public class MusicCollectionCard extends LinearLayout {
         params1.setMargins(dp(4), 0, 0, 0);
         addView(name, params1);
 
-        addToWaitingListButton = new Button(context);
+        addToIdleSourceButton = new Button(context);
         updateButton();
-        addToWaitingListButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        addToWaitingListButton.setTextSize(Theme.TEXT_SIZE_SMALL);
+        addToIdleSourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        addToIdleSourceButton.setTextSize(Theme.TEXT_SIZE_SMALL);
         Drawable background1 = ButtonInsetBackground.builder()
                 .inset(0)
                 .cornerRadius(dp(8))
                 .padding(new ButtonInsetBackground.Padding(dp(4), dp(8), dp(4), dp(8)))
                 .build().get();
-        addToWaitingListButton.setBackground(background1);
-        addToWaitingListButton.setOnClickListener((v) -> {
+        addToIdleSourceButton.setBackground(background1);
+        addToIdleSourceButton.setOnClickListener((v) -> {
             if (musicService.getIdlePlaySources().contains(musicCollection)) {
                 Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
                 musicService.removeFromIdlePlaySource(musicCollection);
@@ -72,7 +73,7 @@ public class MusicCollectionCard extends LinearLayout {
                 musicService.addToIdlePlaySource(musicCollection);
             }
         });
-        addView(addToWaitingListButton, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        addView(addToIdleSourceButton, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         setClickable(true);
         setFocusable(true);
@@ -112,9 +113,9 @@ public class MusicCollectionCard extends LinearLayout {
 
     private void updateButton() {
         if (musicService.getIdlePlaySources().contains(musicCollection)) {
-            addToWaitingListButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
+            addToIdleSourceButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
         } else {
-            addToWaitingListButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));
+            addToIdleSourceButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));
         }
     }
 }
