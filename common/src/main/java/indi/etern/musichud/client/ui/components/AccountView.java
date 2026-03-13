@@ -61,6 +61,7 @@ public class AccountView extends LinearLayout {
             textView.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
             LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             params1.setMargins(0, dp(64), 0, 0);
+            textView.setLayoutParams(params1);
 
             Button retryButton = new Button(context);
             retryButton.setFocusable(true);

@@ -26,7 +26,7 @@ public class MainTest {
     @Test
     public void testSearch() {
         LOGGER.info("test search");
-        List<MusicDetail> searchResult = musicApiService.search("Hideaway Feint", 0, SearchType.MUSIC, response -> JsonUtil.gson.fromJson(response, MusicApiService.SearchMusicResponseBody.class)).result().getMusicDetails();
+        List<MusicDetail> searchResult = musicApiService.search("Hideaway Feint", 0, 50, SearchType.MUSIC, response -> JsonUtil.gson.fromJson(response, MusicApiService.SearchMusicResponseBody.class)).result().getMusicDetails();
         assert !searchResult.isEmpty();
         LOGGER.info(JsonUtil.gson.toJson(searchResult));
     }

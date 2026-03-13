@@ -98,18 +98,28 @@ public class MusicApiService {
     }
 
     public List<AlbumInfo> searchAlbums(String keywords, int offset) {
-        SearchAlbumsResult result = search(keywords, offset, SearchType.ALBUM,
+        SearchAlbumsResult result = search(keywords, offset, 50, SearchType.ALBUM,
                 response -> gson.fromJson(response, SearchAlbumsResponseBody.class)
         ).result;
         if (result != null && result.albums != null) {
-            return result.albums;
+            List<AlbumInfo> albums = result.albums;
+            if (albums.size() > 50) {
+                if (albums.size() > offset) {
+                    albums.subList(0, offset).clear();
+                    return albums;
+                } else {
+                    return new ArrayList<>();
+                }
+            } else {
+                return albums;
+            }
         } else {
             return new ArrayList<>();
         }
     }
 
     public List<Artist> searchArtists(String keywords, int offset) {
-        SearchArtistsResult result = search(keywords, offset, SearchType.ARTIST,
+        SearchArtistsResult result = search(keywords, offset, 50, SearchType.ARTIST,
                 response -> gson.fromJson(response, SearchArtistsResponseBody.class)
         ).result;
         if (result != null && result.artists != null) {
@@ -120,7 +130,7 @@ public class MusicApiService {
     }
 
     public List<MusicDetail> searchMusic(String keywords, int offset) {
-        MusicDetailsResponse result = search(keywords, offset, SearchType.MUSIC,
+        MusicDetailsResponse result = search(keywords, offset, 50, SearchType.MUSIC,
                 response -> gson.fromJson(response, SearchMusicResponseBody.class)
         ).result;
         if (result != null) {
@@ -131,7 +141,7 @@ public class MusicApiService {
     }
 
     public List<Playlist> searchPlaylists(String keywords, int offset) {
-        SearchPlaylistsResult result = search(keywords, offset, SearchType.PLAYLIST,
+        SearchPlaylistsResult result = search(keywords, offset, 50, SearchType.PLAYLIST,
                 response -> gson.fromJson(response, SearchPlaylistsResponseBody.class)
         ).result;
         if (result != null && result.playlists != null) {
@@ -141,9 +151,9 @@ public class MusicApiService {
         }
     }
 
-    public <T> T search(String keywords, int offset, SearchType searchType, Function<String, T> transformer) {
+    public <T> T search(String keywords, int offset, int limit, SearchType searchType, Function<String, T> transformer) {
         try {
-            var requestBody = new SearchRequestBody(keywords, 50, offset, null, searchType);
+            var requestBody = new SearchRequestBody(keywords, limit, offset, null, searchType);
             var response = ApiClient.post(ServerApiMeta.Search.CLOUD, requestBody, null);
             return transformer.apply(response);
         } catch (Exception e) {

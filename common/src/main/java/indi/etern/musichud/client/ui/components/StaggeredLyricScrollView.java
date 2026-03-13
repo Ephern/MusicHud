@@ -32,7 +32,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private final Map<LyricLine, LyricLineView> lyricLines = new HashMap<>();
     private final LinearLayout container;
     private final float LYRIC_EMPHASIZE_SCALE = 1.03f;
-    private ScrollController scrollController = null;
+    private final ScrollController scrollController;
     private boolean isAutoScrolling = false;
     private boolean isUserManuallyScrolling = false;
     private long lastUserScrollTime = 0;
@@ -207,10 +207,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         scrollController.abortAnimation();
         int maxScroll = Math.max(0, container.getHeight() - getHeight());
         scrollController.setMaxScroll(maxScroll);
-        scrollController.scrollTo(currentScrollPosition, 0);
-        scrollController.abortAnimation();
-        scrollController.setStartValue(currentScrollPosition);
         scrollController.scrollTo(0, 0);
+        scrollController.setStartValue(currentScrollPosition);
         scrollController.abortAnimation();
         postDelayed(() -> isAutoScrolling = false, 50);
     }
@@ -230,10 +228,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         isAutoScrolling = true;
         scrollController.abortAnimation();
         scrollController.setMaxScroll(maxScroll);
-        scrollController.scrollTo(currentScrollPosition, 0);
-        scrollController.abortAnimation();
-        scrollController.setStartValue(currentScrollPosition);
         scrollController.scrollTo(targetScrollY, 0);
+        scrollController.setStartValue(currentScrollPosition);
         scrollController.abortAnimation();
         postDelayed(() -> isAutoScrolling = false, 50);
     }
@@ -254,13 +250,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             if (isRecenterScrolling) isRecenterScrolling = false;
             return;
         }
-        scrollController.scrollTo(currentY, 0);
-        scrollController.abortAnimation();
-        scrollController.setStartValue(currentY);
         scrollController.setMaxScroll(maxScroll);
         int duration = isRecenterScrolling ? Math.min(300 + Math.abs(targetScrollY - currentY) / 5, 600) : 300;
-        isAutoScrolling = true;
         scrollController.scrollTo(targetScrollY, duration);
+        scrollController.setStartValue(currentY);
+        isAutoScrolling = true;
         if (isRecenterScrolling) {
             postDelayed(() -> {
                 isRecenterScrolling = false;
