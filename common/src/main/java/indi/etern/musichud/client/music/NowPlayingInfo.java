@@ -9,6 +9,7 @@ import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.utils.lyrics.LyricParser;
 import lombok.Getter;
+import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -16,6 +17,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayDeque;
 import java.util.HashSet;
 import java.util.Set;
@@ -28,6 +30,9 @@ public class NowPlayingInfo {
     private final Logger logger = MusicHud.getLogger(NowPlayingInfo.class);
     @Getter
     private final Set<Consumer<LyricLine>> lyricLineUpdateListener = new HashSet<>();
+    @Setter
+    @Getter
+    private Duration updateInAdvanceDuration = Duration.of(200, ChronoUnit.MILLIS);
     @Getter
     private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
     @Getter
@@ -53,7 +58,7 @@ public class NowPlayingInfo {
             LyricLine line = lyricLines1.peek();
             if (line != null) {
                 if (line.getStartTime() != null) {
-                    if (ZonedDateTime.now().isAfter(this.musicStartTime.plus(line.getStartTime()))) {
+                    if (ZonedDateTime.now().isAfter(this.musicStartTime.plus(getCallTime(line)))) {
                         lyricLines1.poll();
                         currentLyricLine = line;
                         LyricLine next = lyricLines1.peek();
@@ -61,15 +66,14 @@ public class NowPlayingInfo {
                             callLyricsUpdateListeners(line);
                             logger.debug("lyricsUpdater stopped due to no more lyrics");
                             break;
-                        } else if (ZonedDateTime.now().isBefore(this.musicStartTime.plus(next.getStartTime()))) {
+                        } else if (ZonedDateTime.now().isBefore(this.musicStartTime.plus(getCallTime(next)))) {
                             callLyricsUpdateListeners(line);
-                            Duration startTime = next.getStartTime();
-                            if (sleepUntil(this.musicStartTime, startTime)) {
-                                logger.info("lyricsUpdater interruption");
+                            if (sleepUntil(this.musicStartTime, getCallTime(next))) {
+                                logger.debug("lyricsUpdater interruption");
                             }
                         }
-                    } else if (sleepUntil(this.musicStartTime, line.getStartTime())) {
-                        logger.info("lyricsUpdater interruption");
+                    } else if (sleepUntil(this.musicStartTime, getCallTime(line))) {
+                        logger.debug("lyricsUpdater interruption");
                     }
                 } else {
                     lyricLines1.poll();
@@ -78,6 +82,10 @@ public class NowPlayingInfo {
         }
         lyricUpdaterThread = null;
     };
+
+    private Duration getCallTime(LyricLine line) {
+        return line.getStartTime().minus(updateInAdvanceDuration);
+    }
 
     public static NowPlayingInfo getInstance() {
         if (instance == null) {

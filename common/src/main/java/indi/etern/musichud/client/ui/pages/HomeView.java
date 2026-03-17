@@ -41,8 +41,7 @@ public class HomeView extends LinearLayout {
     private static HomeView instance;
 
     private final HashMap<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new HashMap<>();
-
-    // 新歌词组件
+    @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
 
     public HomeView(Context context) {

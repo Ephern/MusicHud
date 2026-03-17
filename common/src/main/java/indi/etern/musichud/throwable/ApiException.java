@@ -13,6 +13,6 @@ public class ApiException extends RuntimeException {
 
     @Override
     public String getMessage() {
-        return "无法连接到 API 服务器";
+        return "Unable to connect to API server | 无法连接到 API 服务器";
     }
 }

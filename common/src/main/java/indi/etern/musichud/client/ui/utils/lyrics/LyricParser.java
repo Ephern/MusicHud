@@ -6,6 +6,7 @@ import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.ui.utils.lyrics.beans.MetaInfoLine;
 import org.apache.commons.lang3.function.TriConsumer;
+import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -21,6 +22,8 @@ public class LyricParser {
             .appendPattern("HH:mm:ss")
             .appendFraction(java.time.temporal.ChronoField.MILLI_OF_SECOND, 1, 3, true)
             .toFormatter();
+    private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(2);
+    private static Logger logger = MusicHud.getLogger(LyricParser.class);
 
     public static ArrayDeque<LyricLine> parse(LyricInfo lyricInfo) {
         String lyric = lyricInfo.getLrc().getLyric();
@@ -65,7 +68,38 @@ public class LyricParser {
         }
         ArrayDeque<LyricLine> lyricLines = new ArrayDeque<>(lyricLinesWithoutValidTimestamp);
         lyricLines.addAll(map.values());
-        return lyricLines.stream().sorted(Comparator.comparing(LyricLine::getStartTime)).collect(ArrayDeque::new, ArrayDeque::add, ArrayDeque::addAll);
+        List<LyricLine> list = lyricLines.stream().sorted(Comparator.comparing(LyricLine::getStartTime)).toList();
+        lyricLines.clear();
+        int nextIndex = 1;
+        LyricLine lastLyricLine = null;
+        for (LyricLine lyricLine : list) {
+            if (lastLyricLine != null) {
+                lastLyricLine.setDuration(lyricLine.getStartTime().minus(lastLyricLine.getStartTime()));
+            }
+            lastLyricLine = lyricLine;
+            String text = lyricLine.getText();
+            if (text == null || text.isEmpty()) {
+                String translatedText = lyricLine.getTranslatedText();
+                if (translatedText == null || translatedText.isEmpty()) {
+                    if (nextIndex < list.size()) {
+                        Duration minus = list.get(nextIndex).getStartTime().minus(lyricLine.getStartTime());
+                        if (minus.compareTo(emptyLineIgnoreDuration) > 0) {
+                            lyricLine.setType(LyricLine.Type.RHYTHM);
+                            lyricLine.setText("● ● ●");
+                            lyricLines.add(lyricLine);
+                        } else {
+                            logger.debug("An empty lyric line is ignored due to its duration ({} s)", minus.toSeconds());
+                        }
+                    } else {
+                        logger.debug("An empty lyric line is ignored due to its position (last one)");
+                    }
+                }
+            } else {
+                lyricLines.add(lyricLine);
+            }
+            nextIndex+=1;
+        }
+        return lyricLines;
     }
 
     static Duration parseToDuration(String timeString) {
@@ -123,7 +157,7 @@ public class LyricParser {
                     matchedConsumer.accept(null, lyricLineContent, LyricLine.Type.NORMAL);
                 }
             } catch (Exception e) {
-                MusicHud.getLogger(LyricParser.class).debug("failed to parse line \"{}\"", item);
+                logger.debug("failed to parse line \"{}\"", item);
             }
         }
     }

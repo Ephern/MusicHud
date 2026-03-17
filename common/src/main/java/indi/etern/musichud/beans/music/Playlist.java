@@ -6,6 +6,7 @@ import indi.etern.musichud.network.Codecs;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -45,6 +46,7 @@ public class Playlist implements MusicCollection {
     String coverImgId_str = "";
     String coverImgUrl = "";
     Profile creator = Profile.ANONYMOUS;
+    @Setter
     List<MusicDetail> tracks = List.of();
     List<PrivilegeInfo> privileges = List.of();
 

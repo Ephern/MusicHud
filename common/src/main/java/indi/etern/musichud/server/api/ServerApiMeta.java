@@ -202,19 +202,19 @@ public class ServerApiMeta {
                 false,
                 true, String.class);
         public static final UrlMeta<PlaylistResponse> DETAIL = new UrlMeta<>(
-                "/playlist/detail/all",
+                "/playlist/detail",
                 Set.of("id"),
                 Set.of("s"/*subscribers counts default:8*/),
                 true,
                 false,
                 true, PlaylistResponse.class);
-        public static final UrlMeta<String> ALL_SONGS = new UrlMeta<>(
+        public static final UrlMeta<MusicApiService.PlaylistTracksResponse> ALL_SONGS = new UrlMeta<>(
                 "/playlist/track/all",
                 Set.of("id"),
                 Set.of("limit"/*default:[all]*/, "offset"),
+                true,
                 false,
-                false,
-                true, String.class);
+                true, MusicApiService.PlaylistTracksResponse.class);
     }
     public static class Music {
         public static final UrlMeta<MusicApiService.GetDirectResourceUrlResponse> URL = new UrlMeta<>(
