@@ -10,11 +10,12 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class LyricLine {
     public enum Type {
-        NORMAL, META_DATA
+        NORMAL, META_DATA, RHYTHM
     }
     @Setter
     Type type;
     Duration startTime;
+    Duration duration;
     String text;
     String translatedText;
 

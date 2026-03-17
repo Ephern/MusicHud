@@ -9,11 +9,13 @@ import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.decoder.AudioDecoder;
 import indi.etern.musichud.client.music.decoder.AudioFormatDetector;
+import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.network.requestResponseCycle.GetMusicResourceRequest;
 import indi.etern.musichud.network.requestResponseCycle.GetMusicResourceResponse;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.sounds.SoundSource;
 import org.apache.logging.log4j.Logger;
 import org.lwjgl.openal.AL10;
@@ -598,7 +600,14 @@ public class StreamAudioPlayer {
 
     public CompletableFuture<MusicResourceInfo> getCurrentMusicResourceInfo(Quality quality, MusicResourceInfo previous) {
         CompletableFuture<MusicResourceInfo> future = new CompletableFuture<>();
-        GetMusicResourceResponse.setReceiver(currentMusicDetail.getId(), future::complete);
+        GetMusicResourceResponse.setReceiver(currentMusicDetail.getId(), value -> {
+            if (value == null || value == MusicResourceInfo.NONE) {
+                MusicService.getInstance().switchMusic(MusicDetail.NONE, null, I18n.get("music_hud.text.failedToLoadMusicResource"));
+                setStatus(Status.ERROR);
+            } else {
+                future.complete(value);
+            }
+        });
         String url = previous.getUrl() == null ? "" : previous.getUrl();
         NetworkManager.sendToServer(new GetMusicResourceRequest(currentMusicDetail.getId(), quality, url));
         return future;

@@ -88,6 +88,8 @@ public class MusicApiService {
             PlaylistResponse playlistResponse = ApiClient.post(ServerApiMeta.Playlist.DETAIL, new IdRequest(id), rawCookie);
             if (playlistResponse.getCode() == 200) {
                 Playlist playlist = playlistResponse.getPlaylist();
+//                PlaylistTracksResponse playlistTrackResponse = ApiClient.post(ServerApiMeta.Playlist.ALL_SONGS, new IdRequest(id), rawCookie);
+//                playlist.setTracks(playlistTrackResponse.songs);
                 playlistCache.put(id, playlist);
                 return playlist;
             } else {
@@ -406,6 +408,5 @@ public class MusicApiService {
     public record PagedRequestDataWithUID(long uid, int limit, int offset) {
     }
 
-    public record PagedRequestData(int limit, int offset) {
-    }
+    public record PlaylistTracksResponse(List<MusicDetail> songs) {}
 }

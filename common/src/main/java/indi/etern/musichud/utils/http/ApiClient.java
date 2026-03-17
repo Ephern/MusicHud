@@ -2,12 +2,14 @@ package indi.etern.musichud.utils.http;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonSyntaxException;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.server.api.ServerApiMeta;
 import indi.etern.musichud.throwable.ApiException;
 import indi.etern.musichud.utils.JsonUtil;
 import lombok.SneakyThrows;
+import org.apache.logging.log4j.Logger;
 
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
@@ -23,6 +25,7 @@ import java.util.concurrent.Executors;
 public class ApiClient {
     public static final HttpClient CLIENT;
     private static final int maxTrial = 5;
+    private static final Logger LOGGER = MusicHud.getLogger(ApiClient.class);
 
     static {
         CLIENT = HttpClient.newBuilder()
@@ -74,20 +77,27 @@ public class ApiClient {
                 }
                 HttpRequest request = requestBuilder
                         .build();
+                Class<?> currentlyParsing = null;
+                String responseBody = null;
                 try {
                     HttpResponse<?> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-                    String string = response.body().toString();
-                    var codeOnlyResponse = JsonUtil.gson.fromJson(string, CodeOnlyResponse.class);
+                    responseBody = response.body().toString();
+                    currentlyParsing = CodeOnlyResponse.class;
+                    var codeOnlyResponse = JsonUtil.gson.fromJson(responseBody, CodeOnlyResponse.class);
                     if (codeOnlyResponse.code == 200 || trial == maxTrial || !urlMeta.autoRetry()) {
                         if (urlMeta.responseType().equals(String.class)) {
                             //noinspection unchecked
-                            t = (T) string;
+                            t = (T) responseBody;
                         } else {
-                            t = JsonUtil.gson.fromJson(string, urlMeta.responseType());
+                            currentlyParsing = urlMeta.responseType();
+                            t = JsonUtil.gson.fromJson(responseBody, urlMeta.responseType());
                         }
                     }
+                } catch (JsonSyntaxException e) {
+                    LOGGER.error("Failed to parse response as:{}, original response:{}", currentlyParsing, responseBody, e);
+                    throw e;
                 } catch (ConnectException e) {
-                    MusicHud.getLogger(ApiClient.class).error("Please check Api server status");
+                    LOGGER.error("Please check Api server status | 请检查 Api 服务器状态");
                     throw e;
                 }
             } catch (ConnectException e) {

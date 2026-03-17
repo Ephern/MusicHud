@@ -26,6 +26,9 @@ public class MusicCollectionDetailView extends LinearLayout {
     private final MusicCollection musicCollection;
     private final Button addToIdleSourceListButton;
     private final MusicService musicService = MusicService.getInstance();
+    private final ProgressBar progressBar;
+    private final TextView type;
+    private final LinearLayout tracksListView;
 
     public MusicCollectionDetailView(Context context, MusicCollection musicCollection) {
         super(context);
@@ -63,27 +66,30 @@ public class MusicCollectionDetailView extends LinearLayout {
         imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp(72)));
         imageView.setCornerRadius(dp(8));
 
-        LinearLayout texts = new LinearLayout(context);
-        texts.setGravity(Gravity.CENTER_VERTICAL);
-        texts.setOrientation(VERTICAL);
+        LinearLayout briefInfo = new LinearLayout(context);
+        briefInfo.setGravity(Gravity.CENTER_VERTICAL);
+        briefInfo.setOrientation(VERTICAL);
         LayoutParams params1 = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
         params1.setMargins(dp(16), 0, 0, 0);
-        topBar.addView(texts, params1);
+        topBar.addView(briefInfo, params1);
 
-        TextView type = new TextView(context);
+        type = new TextView(context);
         type.setTextSize(Theme.TEXT_SIZE_LARGE);
         type.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         type.setText(I18n.get(collectionNameI18n));
         LayoutParams params2 = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         params2.setMargins(0, 0, 0, dp(4));
         type.setLayoutParams(params2);
-        texts.addView(type);
+        briefInfo.addView(type);
 
         TextView name = new TextView(context);
         name.setTextSize(Theme.TEXT_SIZE_LARGER);
         name.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         name.setText(musicCollection.getName());
-        texts.addView(name);
+        briefInfo.addView(name);
+
+        LinearLayout buttons = new LinearLayout(context);
+        buttons.setOrientation(HORIZONTAL);
 
         addToIdleSourceListButton = new Button(context);
         updateButton();
@@ -104,14 +110,24 @@ public class MusicCollectionDetailView extends LinearLayout {
                 musicService.addToIdlePlaySource(musicCollection);
             }
         });
-        texts.addView(addToIdleSourceListButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        buttons.addView(addToIdleSourceListButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+        Button refreshButton = new Button(context);
+        refreshButton.setText(I18n.get("music_hud.button.refresh"));
+        refreshButton.setTextColor(Theme.PRIMARY_COLOR);
+        refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        refreshButton.setOnClickListener((v) -> refreshData());
+        LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        params3.setMargins(dp(16), 0, 0, 0);
+        buttons.addView(refreshButton, params3);
+
+        briefInfo.addView(buttons, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBarParams.setMargins(0, dp(24), 0, 0);
         addView(topBar, topBarParams);
 
-        ProgressBar progressBar = new ProgressBar(context);
-        progressBar.setIndeterminate(true);
+        progressBar = new ProgressBar(context);
         LayoutParams progressParams = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
         progressParams.setMargins(0, dp(32), 0, 0);
         addView(progressBar, progressParams);
@@ -123,19 +139,11 @@ public class MusicCollectionDetailView extends LinearLayout {
         tracksParams.setMargins(0, dp(24), 0, 0);
         addView(scrollView, tracksParams);
 
-        LinearLayout tracks = new LinearLayout(context);
-        tracks.setOrientation(VERTICAL);
-        scrollView.addView(tracks, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        tracksListView = new LinearLayout(context);
+        tracksListView.setOrientation(VERTICAL);
+        scrollView.addView(tracksListView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-        musicCollection.loadMusicDetails().thenAcceptAsync(playlistDetail -> {
-            MuiModApi.postToUiThread(() -> {
-                type.setText(I18n.get(collectionNameI18n) + "  " + I18n.get("music_hud.text.totalCount").replace("{}", String.valueOf(playlistDetail.size())));
-                removeView(progressBar);
-                for (MusicDetail musicDetail : playlistDetail) {
-                    addItem(context, musicDetail, tracks);
-                }
-            });
-        }, MusicHud.EXECUTOR);
+        refreshData();
 
         Consumer<MusicCollection> listener = playlist1 -> {
             if (playlist1.equals(musicCollection)) {
@@ -156,7 +164,24 @@ public class MusicCollectionDetailView extends LinearLayout {
         });
     }
 
-    private void addItem(Context context, MusicDetail musicDetail, LinearLayout tracks) {
+    private void refreshData() {
+        Context context = getContext();
+        String collectionNameI18n = musicCollection.getNameI18nKey();
+        tracksListView.removeAllViews();
+        progressBar.setVisibility(View.VISIBLE);
+        progressBar.setIndeterminate(true);
+        musicCollection.loadMusicDetails().thenAcceptAsync(playlistDetail -> {
+            MuiModApi.postToUiThread(() -> {
+                type.setText(I18n.get(collectionNameI18n) + "  " + I18n.get("music_hud.text.totalCount").replace("{}", String.valueOf(playlistDetail.size())));
+                progressBar.setVisibility(View.GONE);
+                for (MusicDetail musicDetail : playlistDetail) {
+                    addItem(context, musicDetail);
+                }
+            });
+        }, MusicHud.EXECUTOR);
+    }
+
+    private void addItem(Context context, MusicDetail musicDetail) {
         var musicLayout = new MusicListItem(context);
         musicLayout.setShowPusherInfo(false);
         musicLayout.bindData(musicDetail);
@@ -173,7 +198,7 @@ public class MusicCollectionDetailView extends LinearLayout {
             MusicService.getInstance().sendPushMusicToQueue(musicDetail);
             Toast.makeText(context, I18n.get("music_hud.text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT).show();
         });
-        tracks.addView(musicLayout);
+        tracksListView.addView(musicLayout);
     }
 
     private void updateButton() {
