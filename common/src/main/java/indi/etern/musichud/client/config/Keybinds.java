@@ -18,23 +18,24 @@ import org.lwjgl.glfw.GLFW;
 @RegisterMark
 public class Keybinds implements ClientRegister {
     public void register() {
+        KeyMapping.Category category = KeyMapping.Category.register(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, MusicHud.MOD_ID));
         var mainMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".open_main",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_M,
-                KeyMapping.Category.register(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID,MusicHud.MOD_ID))
+                category
         );
         var voteMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".vote_skip",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_PERIOD,
-                KeyMapping.Category.register(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID,MusicHud.MOD_ID))
+                category
         );
         var toggleHudMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".toggle_hud",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_COMMA,
-                KeyMapping.Category.register(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID,MusicHud.MOD_ID))
+                category
         );
         KeyMappingRegistry.register(mainMapping);
         KeyMappingRegistry.register(voteMapping);
