@@ -34,7 +34,7 @@ public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail next, Stri
                         MusicHud.EXECUTOR.execute(() -> {
                             MusicService musicService = MusicService.getInstance();
                             String message1 = message.message;
-                            if (message1.startsWith("music_hud.")) {
+                            if (message1.startsWith(MusicHud.MOD_ID + ".")) {
                                 message1 = I18n.get(message1);
                             }
                             musicService.switchMusic(message.musicDetail, null, message1);

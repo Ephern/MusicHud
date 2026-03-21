@@ -12,6 +12,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import net.minecraft.client.resources.language.I18n;
 
@@ -228,7 +229,7 @@ public class ArtistDetailView extends LinearLayout {
                 .map(Artist::getName).collect(Collectors.joining(" / "));
         musicLayout.setOnClickListener((view) -> {
             MusicService.getInstance().sendPushMusicToQueue(musicDetail);
-            Toast.makeText(context, I18n.get("music_hud.text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT).show();
+            ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
         musicList.addView(musicLayout);
     }

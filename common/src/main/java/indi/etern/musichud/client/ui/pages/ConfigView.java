@@ -8,6 +8,7 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ScrollView;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.NowPlayingInfo;
@@ -55,9 +56,9 @@ public class ConfigView extends LinearLayout {
 
             HudRendererManager hudRendererManager = HudRendererManager.getInstance();
 
-            var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get("music_hud.config.category.common"));
+            var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
             PreferencesFragment.BooleanOption booleanOption = new PreferencesFragment.BooleanOption(context,
-                    I18n.get("music_hud.config.common.switch.enable"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.enable"),
                     ClientConfigDefinition.enable,
                     ClientConfigDefinition.enable::set);
             booleanOption.create(commonCategory);
@@ -73,17 +74,22 @@ public class ConfigView extends LinearLayout {
                 }
             });
             new PreferencesFragment.BooleanOption(context,
-                    I18n.get("music_hud.config.common.switch.showTranslatedCnLyrics"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.showTranslatedCnLyrics"),
                     ClientConfigDefinition.showTranslatedCnLyrics,
                     ClientConfigDefinition.showTranslatedCnLyrics::set)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
-                    I18n.get("music_hud.config.common.switch.disableVanillaMusicWhilePlaying"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.disableVanillaMusicWhilePlaying"),
                     ClientConfigDefinition.disableVanillaMusic,
                     ClientConfigDefinition.disableVanillaMusic::set)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
-                    I18n.get("music_hud.config.common.switch.autoHide"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.enableHud"),
+                    ClientConfigDefinition.enableHud,
+                    ClientConfigDefinition.enableHud::set)
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.autoHide"),
                     ClientConfigDefinition.hideHudWhenNotPlaying,
                     ClientConfigDefinition.hideHudWhenNotPlaying::set)
                     .create(commonCategory);
@@ -91,7 +97,7 @@ public class ConfigView extends LinearLayout {
             List<Quality> qualitiesList = Arrays.stream(qualities).toList();
             new PreferencesFragment.DropDownOption<>(
                     context,
-                    I18n.get("music_hud.config.common.primaryChosenQuality"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.primaryChosenQuality"),
                     qualities,
                     qualitiesList::indexOf,
                     () -> Quality.valueOf(ClientConfigDefinition.primaryChosenQuality.get()),
@@ -102,7 +108,7 @@ public class ConfigView extends LinearLayout {
             var positionCategory = PreferencesFragment.createCategoryList(view, I18n.get("music_hud.config.category.layout"));
             new PreferencesFragment.DropDownOption<>(
                     context,
-                    I18n.get("music_hud.config.layout.verticalAlign"),
+                    I18n.get(MusicHud.MOD_ID + ".config.layout.verticalAlign"),
                     VerticalAlign.values(),
                     VerticalAlign::ordinal,
                     () -> VerticalAlign.valueOf(ClientConfigDefinition.hudVerticalPosition.get()),
@@ -115,7 +121,7 @@ public class ConfigView extends LinearLayout {
                     .create(positionCategory);
             new PreferencesFragment.DropDownOption<>(
                     context,
-                    I18n.get("music_hud.config.layout.horizontalAlign"),
+                    I18n.get(MusicHud.MOD_ID + ".config.layout.horizontalAlign"),
                     HorizontalAlign.values(),
                     HorizontalAlign::ordinal,
                     () -> HorizontalAlign.valueOf(ClientConfigDefinition.hudHorizontalPosition.get()),
@@ -128,7 +134,7 @@ public class ConfigView extends LinearLayout {
                     .create(positionCategory);
             new PreferencesFragment.IntegerOption(
                     context,
-                    I18n.get("music_hud.config.layout.offsetX"),
+                    I18n.get(MusicHud.MOD_ID + ".config.layout.offsetX"),
                     ClientConfigDefinition.hudOffsetX,
                     ClientConfigDefinition.hudOffsetX::set)
                     .setOnChanged(() -> {
@@ -140,7 +146,7 @@ public class ConfigView extends LinearLayout {
                     .create(positionCategory);
             new PreferencesFragment.IntegerOption(
                     context,
-                    I18n.get("music_hud.config.layout.offsetY"),
+                    I18n.get(MusicHud.MOD_ID + ".config.layout.offsetY"),
                     ClientConfigDefinition.hudOffsetY,
                     ClientConfigDefinition.hudOffsetY::set)
                     .setRange(0, 1920)
@@ -152,7 +158,7 @@ public class ConfigView extends LinearLayout {
                     .create(positionCategory);
             DynamicIntegerOption cornerRadiusOption = new DynamicIntegerOption(
                     context,
-                    I18n.get("music_hud.config.layout.hudCornerRadius"),
+                    I18n.get(MusicHud.MOD_ID + ".config.layout.hudCornerRadius"),
                     ClientConfigDefinition.hudCornerRadius,
                     ClientConfigDefinition.hudCornerRadius::set);
             cornerRadiusOption.setRange(0, ClientConfigDefinition.hudHeight.get() / 2);
@@ -163,14 +169,14 @@ public class ConfigView extends LinearLayout {
             cornerRadiusOption.setDefaultValue(8);
             DynamicIntegerOption widthOption = new DynamicIntegerOption(
                     context,
-                    I18n.get("music_hud.config.layout.hudWidth"),
+                    I18n.get(MusicHud.MOD_ID + ".config.layout.hudWidth"),
                     ClientConfigDefinition.hudWidth,
                     ClientConfigDefinition.hudWidth::set);
             widthOption.setOnChanged(() -> {
                 hudRendererManager.updateLayoutFromConfig();
                 hudRendererManager.refreshStyle();
             });
-            widthOption.setRange(ClientConfigDefinition.hudHeight.get(), 256, 4);
+            widthOption.setRange(ClientConfigDefinition.hudHeight.get(), 512, 4);
             widthOption.setDefaultValue(150);
             PreferencesFragment.IntegerOption heightOption = new PreferencesFragment.IntegerOption(
                     context,
@@ -181,9 +187,9 @@ public class ConfigView extends LinearLayout {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                         cornerRadiusOption.updateRange(0, ClientConfigDefinition.hudHeight.get() / 2, 1);
-                        widthOption.updateRange(ClientConfigDefinition.hudHeight.get(), 256, 4);
+                        widthOption.updateRange(ClientConfigDefinition.hudHeight.get(), 512, 4);
                     })
-                    .setRange(28, 52)
+                    .setRange(16, 72)
                     .setDefaultValue(44);
             widthOption.create(positionCategory);
             heightOption.create(positionCategory);

@@ -38,5 +38,23 @@ public enum Easings implements TimeInterpolator{
         public float getInterpolation(float t) {
             return t < 0.5 ? 2 * t * t : (float) (1 - Math.pow(-2 * t + 2, 2) / 2);
         }
+    },
+    EASE_OUT_SINE {
+        @Override
+        public float getInterpolation(float t) {
+            return (float) (-(Math.cos(Math.PI * t) - 1) / 2);
+        }
+    },
+    EASE_IN_SINE {
+        @Override
+        public float getInterpolation(float t) {
+            return (float) (1 - Math.cos((t * Math.PI) / 2));
+        }
+    },
+    EASE_IN_OUT_SINE {
+        @Override
+        public float getInterpolation(float t) {
+            return (float) (-(Math.cos(Math.PI * t) - 1) / 2);
+        }
     }
 }

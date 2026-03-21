@@ -16,17 +16,16 @@ import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.music.StreamAudioPlayer;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.pushMessages.c2s.AddToIdlePlaySourceMessage;
-import indi.etern.musichud.network.pushMessages.c2s.ClientPushMusicToQueueMessage;
-import indi.etern.musichud.network.pushMessages.c2s.ClientRemoveMusicFromQueueMessage;
-import indi.etern.musichud.network.pushMessages.c2s.RemoveFromIdlePlaySourceMessage;
+import indi.etern.musichud.network.pushMessages.c2s.*;
 import indi.etern.musichud.network.requestResponseCycle.*;
 import indi.etern.musichud.throwable.ApiException;
 import lombok.Getter;
+import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
@@ -67,6 +66,7 @@ public class MusicService {
     private final List<Consumer<MusicDetail>> musicQueuePushListeners = new ArrayList<>();
     @Getter
     private final List<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = new ArrayList<>();
+    long lastPressTime = 0;
     @Getter
     private boolean idlePlaySourceLoaded = false;
 
@@ -243,7 +243,7 @@ public class MusicService {
                 MuiModApi.postToUiThread(() -> {
                     //noinspection UnstableApiUsage
                     Context context = UIManager.getInstance().getDecorView().getContext();
-                    Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+                    ToastUtil.show(Toast.makeText(context, message, Toast.LENGTH_SHORT));
                 });
             }
             if (!musicDetail.equals(MusicDetail.NONE)) {
@@ -273,8 +273,34 @@ public class MusicService {
         CompletableFuture<List<MusicDetail>> future = new CompletableFuture<>();
         GetArtistMoreMusicResponse.RequestData requestData = new GetArtistMoreMusicResponse.RequestData(id, offset);
         GetArtistMoreMusicResponse.setReceiver(requestData, future::complete);
-        NetworkManager.sendToServer(new GetArtistMoreMusicRequest(id ,offset));
+        NetworkManager.sendToServer(new GetArtistMoreMusicRequest(id, offset));
         return future;
+    }
+
+    public void voteForSkipCurrent() {
+        if (NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail() != null) {
+            NetworkManager.sendToServer(new VoteSkipCurrentMusicMessage(NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail().getId()));
+        }
+    }
+
+    public void keyBindsVoteSkipCurrent() {
+        long currentTimeMillis = System.currentTimeMillis();
+        if (currentTimeMillis - lastPressTime <= 3000) {
+            lastPressTime = 0;
+            voteForSkipCurrent();
+            MuiModApi.postToUiThread(() -> {
+                //noinspection UnstableApiUsage
+                Context context = UIManager.getInstance().getDecorView().getContext();
+                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed"), Toast.LENGTH_SHORT));
+            });
+        } else {
+            lastPressTime = currentTimeMillis;
+            MuiModApi.postToUiThread(() -> {
+                //noinspection UnstableApiUsage
+                Context context = UIManager.getInstance().getDecorView().getContext();
+                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip"), Toast.LENGTH_SHORT));
+            });
+        }
     }
 
     @RegisterMark

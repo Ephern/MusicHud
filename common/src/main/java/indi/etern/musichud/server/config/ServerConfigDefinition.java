@@ -1,5 +1,6 @@
 package indi.etern.musichud.server.config;
 
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.server.api.ServerApiMeta;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
@@ -12,7 +13,7 @@ public class ServerConfigDefinition {
     public ServerConfigDefinition(ModConfigSpec.Builder builder) {
         serverApiBaseUrl = builder
                 .comment("Server API Base URL configuration")
-                .translation("music_hud.serverApiBaseUrl")
+                .translation(MusicHud.MOD_ID + ".serverApiBaseUrl")
                 .define("serverApiBaseUrl", ServerApiMeta.DEFAULT_API_BASE_URL);
         pusherVoteAdditionalRate = builder
                 .comment("Music Pusher's vote additional rate when voting for skip music configuration (0.0 ~ 1.0, total rate larger than or equals to 0.5 means to skip)")
