@@ -122,7 +122,7 @@ public class MusicPlayerServerService {
                         Thread.sleep(switchedToPlay.getDurationMillis() + musicIntervalMillis);
                     } catch (InterruptedException ignored) {//When force switch
                         logger.info("Skip current, switch to next");
-                        message = "music_hud.text.votePassed";
+                        message = MusicHud.MOD_ID + ".text.votePassed";
                     }
                 } catch (Exception e) {
                     logger.error("Failed to push music: {} (id: {})",

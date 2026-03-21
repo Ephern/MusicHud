@@ -22,7 +22,7 @@ public class LyricParser {
             .appendPattern("HH:mm:ss")
             .appendFraction(java.time.temporal.ChronoField.MILLI_OF_SECOND, 1, 3, true)
             .toFormatter();
-    private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(2);
+    private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(3);
     private static Logger logger = MusicHud.getLogger(LyricParser.class);
 
     public static ArrayDeque<LyricLine> parse(LyricInfo lyricInfo) {
@@ -72,9 +72,34 @@ public class LyricParser {
         lyricLines.clear();
         int nextIndex = 1;
         LyricLine lastLyricLine = null;
+        LyricLine firstNormalLyricLine = null;
         for (LyricLine lyricLine : list) {
+            if (firstNormalLyricLine == null && lyricLine.getType() == LyricLine.Type.NORMAL) {
+                firstNormalLyricLine = lyricLine;
+                if (lastLyricLine == null || lastLyricLine.getType() == LyricLine.Type.META_DATA) {
+                    Duration oneSec = Duration.ofSeconds(1);
+                    Duration rhythmStartTime = lastLyricLine == null ? oneSec : lastLyricLine.getStartTime().plus(oneSec);
+                    Duration rhythmDuration = lyricLine.getStartTime().minus(rhythmStartTime);
+                    if (rhythmDuration.compareTo(emptyLineIgnoreDuration) > 0) {
+                        if (lastLyricLine != null) {
+                            lastLyricLine.setDuration(oneSec);
+                        }
+                        LyricLine rhythmLine = new LyricLine();
+                        rhythmLine.setStartTime(rhythmStartTime);
+//                        rhythmLine.setDuration(rhythmDuration);
+                        rhythmLine.setPrevious(lastLyricLine);
+//                        rhythmLine.setNext(lyricLine);
+                        lastLyricLine = rhythmLine;
+                        rhythmLine.setType(LyricLine.Type.RHYTHM);
+                        rhythmLine.setText("• • •");
+                        lyricLines.add(rhythmLine);
+                    }
+                }
+            }
             if (lastLyricLine != null) {
                 lastLyricLine.setDuration(lyricLine.getStartTime().minus(lastLyricLine.getStartTime()));
+                lastLyricLine.setNext(lyricLine);
+                lyricLine.setPrevious(lastLyricLine);
             }
             lastLyricLine = lyricLine;
             String text = lyricLine.getText();
@@ -85,7 +110,7 @@ public class LyricParser {
                         Duration minus = list.get(nextIndex).getStartTime().minus(lyricLine.getStartTime());
                         if (minus.compareTo(emptyLineIgnoreDuration) > 0) {
                             lyricLine.setType(LyricLine.Type.RHYTHM);
-                            lyricLine.setText("● ● ●");
+                            lyricLine.setText("• • •");
                             lyricLines.add(lyricLine);
                         } else {
                             logger.debug("An empty lyric line is ignored due to its duration ({} s)", minus.toSeconds());

@@ -8,6 +8,7 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
@@ -34,12 +35,12 @@ public class QRLoginView extends LinearLayout {
         TextView textView = new TextView(context);
         textView.setTextSize(Theme.TEXT_SIZE_LARGE);
         textView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-        textView.setText(I18n.get("music_hud.text.loginWithQRCode"));
+        textView.setText(I18n.get(MusicHud.MOD_ID + ".text.loginWithQRCode"));
         textView.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
         TextView textView1 = new TextView(context);
         textView1.setTextSize(Theme.TEXT_SIZE_NORMAL);
         textView1.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        textView1.setText(I18n.get("music_hud.text.loginDescription"));
+        textView1.setText(I18n.get(MusicHud.MOD_ID + ".text.loginDescription"));
         LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         params1.setMargins(0, dp(4), 0, 0);
         textView1.setLayoutParams(params1);
@@ -56,7 +57,7 @@ public class QRLoginView extends LinearLayout {
         loginButton.setHeight(dp(36));
         loginButton.setWidth(dp(84));
         loginButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        loginButton.setText(I18n.get("music_hud.button.loadQRCode"));
+        loginButton.setText(I18n.get(MusicHud.MOD_ID + ".button.loadQRCode"));
 
         messageTextView = new TextView(context);
         messageTextView.setTextSize(Theme.TEXT_SIZE_NORMAL);

@@ -73,12 +73,12 @@ public class Theme {
         textView.setTextColor(EMPHASIZE_TEXT_COLOR);
         if (enabled) {
             if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
-                textView.setText(I18n.get("music_hud.text.notConnected"));
+                textView.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
             } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.INCAPABLE) {
-                textView.setText(I18n.get("music_hud.text.incapableWithServer"));
+                textView.setText(I18n.get(MusicHud.MOD_ID + ".text.incapableWithServer"));
             }
         } else {
-            textView.setText(I18n.get("music_hud.text.disabled"));
+            textView.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
         }
         textView.setLayoutParams(new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
         return textView;

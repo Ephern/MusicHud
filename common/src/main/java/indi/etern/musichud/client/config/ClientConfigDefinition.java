@@ -13,6 +13,7 @@ public class ClientConfigDefinition {
     public static ModConfigSpec.ConfigValue<Boolean> showTranslatedCnLyrics;
     public static ModConfigSpec.ConfigValue<Boolean> disableVanillaMusic;
     public static ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
+    public static ModConfigSpec.ConfigValue<Boolean> enableHud;
     public static ModConfigSpec.ConfigValue<String> primaryChosenQuality;
     public static ModConfigSpec.ConfigValue<String> hudVerticalPosition;
     public static ModConfigSpec.ConfigValue<String> hudHorizontalPosition;
@@ -26,7 +27,8 @@ public class ClientConfigDefinition {
     public static final String ENABLE_KEY = MusicHud.MOD_ID + ".config.common.enable";
     public static final String SHOW_TRANSLATED_CN_LYRICS = MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics";
     public static final String DISABLE_VANILLA_MUSIC_KEY = MusicHud.MOD_ID + ".config.commmon.disableVanillaMusic";
-    public static final String HIDE_HUD_WHEN_NOT_PLAYING_KEY = MusicHud.MOD_ID + ".config.common.hideHudWhenNotPlaying";
+    public static final String HIDE_HUD_WHEN_NOT_PLAYING_KEY = MusicHud.MOD_ID + ".config.common.enableHud";
+    public static final String ENABLE_HUD_KEY = MusicHud.MOD_ID + ".config.common.hud.enable";
     public static final String PRIMARY_CHOSEN_QUALITY_KEY = MusicHud.MOD_ID + ".config.common.primaryChosenQuality";
     public static final String VERTICAL_POSITION_KEY = MusicHud.MOD_ID + ".config.layout.verticalAlign";
     public static final String HORIZONTAL_POSITION_KEY = MusicHud.MOD_ID + ".config.layout.horizontalAlign";
@@ -55,6 +57,10 @@ public class ClientConfigDefinition {
                 .comment("Hide hud when not playing music")
                 .translation(HIDE_HUD_WHEN_NOT_PLAYING_KEY)
                 .define("hideHudWhenNotPlaying", true);
+        ClientConfigDefinition.enableHud = builder
+                .comment("Enable hud")
+                .translation(ENABLE_HUD_KEY)
+                .define("enableHud", true);
         ClientConfigDefinition.primaryChosenQuality = builder
                 .comment("Primary chosen quality")
                 .translation(PRIMARY_CHOSEN_QUALITY_KEY)

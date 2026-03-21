@@ -1,6 +1,7 @@
 package indi.etern.musichud.beans.music;
 
 import com.google.gson.annotations.SerializedName;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.network.Codecs;
 import lombok.*;
@@ -55,7 +56,7 @@ public class AlbumInfo implements MusicCollection{
 
     @Override
     public String getNameI18nKey() {
-        return "music_hud.text.album";
+        return MusicHud.MOD_ID + ".text.album";
     }
 
     public String getPicUrl() {

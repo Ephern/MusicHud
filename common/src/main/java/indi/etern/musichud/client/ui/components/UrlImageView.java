@@ -43,36 +43,78 @@ public class UrlImageView extends FrameLayout {
     private String pendingUrl = null;
     private boolean hasLoadedImage = false;
     private boolean isAttachedToWindow = false;
+    private CompletableFuture<Void> loadFuture;
     // 滚动监听器
     private final ViewTreeObserver.OnScrollChangedListener scrollListener = this::checkVisibilityAndLoad;
     private final ViewTreeObserver.OnPreDrawListener preDrawListener = () -> {
         checkVisibilityAndLoad();
         return true;
     };
-    private CompletableFuture<Void> loadFuture;
     private float aspectRatio = 1.0f; // 默认长宽比
+
+    public UrlImageView(Context context) {
+        super(context);
+
+        if (cornerRadius == -1) {
+            cornerRadius = dp(20);
+        }
+        detectBorder = dp(128);
+
+        imageView = new ImageView(context);
+        nextImageView = new ImageView(context);
+        nextImageView.setAlpha(0f);
+        imageView.setAdjustViewBounds(true);
+        nextImageView.setAdjustViewBounds(true);
+        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        nextImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        addView(imageView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        addView(nextImageView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
+        progressRing = new ProgressBar(context);
+        progressRing.setIndeterminate(true);
+        progressRing.setIndeterminateTintList(ColorStateList.valueOf(Theme.PRIMARY_COLOR));
+        progressRing.setVisibility(GONE);
+
+        var params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        params.gravity = Gravity.CENTER;
+        addView(progressRing, params);
+
+        errorLayout = new LinearLayout(context);
+        errorLayout.setOrientation(LinearLayout.VERTICAL);
+        errorLayout.setGravity(Gravity.CENTER);
+        errorLayout.setVisibility(GONE);
+
+        errorText = new TextView(context);
+        errorText.setText(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
+        errorText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        errorText.setTextAlignment(TEXT_ALIGNMENT_CENTER);
+        errorText.setTextColor(Theme.ERROR_TEXT_COLOR);
+        errorText.setGravity(Gravity.CENTER);
+        errorLayout.addView(errorText, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+        Button retryButton = new Button(context);
+        retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
+        retryButton.setTextSize(Theme.TEXT_SIZE_SMALL);
+        retryButton.setTextColor(Theme.PRIMARY_COLOR);
+        var background = ButtonInsetBackground.builder()
+                .padding(new ButtonInsetBackground.Padding(retryButton.dp(2), retryButton.dp(1), retryButton.dp(2), retryButton.dp(1)))
+                .cornerRadius(retryButton.dp(4)).inset(dp(1)).build().get();
+        retryButton.setBackground(background);
+        retryButton.setOnClickListener(v -> {
+            if (currentURLString != null) {
+                loadUrl(currentURLString);
+            }
+        });
+        var retryParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        retryParams.setMargins(0, dp(4), 0, 0);
+        errorLayout.addView(retryButton, retryParams);
+
+        addView(errorLayout, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+    }
 
     public void setAspectRatio(float aspectRatio) {
         this.aspectRatio = aspectRatio;
         requestLayout();
-    }
-
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-
-        if (aspectRatio > 0) {
-            int width = getMeasuredWidth();
-            int height = (int) (width / aspectRatio);
-
-            // 设置测量尺寸
-            setMeasuredDimension(width, height);
-
-            // 同时设置内部ImageView的尺寸
-            LayoutParams params = new LayoutParams(width, height);
-            imageView.setLayoutParams(params);
-            nextImageView.setLayoutParams(params);
-        }
     }
 
 /*
@@ -161,64 +203,22 @@ public class UrlImageView extends FrameLayout {
     }
 */
 
-    public UrlImageView(Context context) {
-        super(context);
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
 
-        if (cornerRadius == -1) {
-            cornerRadius = dp(20);
+        if (aspectRatio > 0) {
+            int width = getMeasuredWidth();
+            int height = (int) (width / aspectRatio);
+
+            // 设置测量尺寸
+            setMeasuredDimension(width, height);
+
+            // 同时设置内部ImageView的尺寸
+            LayoutParams params = new LayoutParams(width, height);
+            imageView.setLayoutParams(params);
+            nextImageView.setLayoutParams(params);
         }
-        detectBorder = dp(128);
-
-        imageView = new ImageView(context);
-        nextImageView = new ImageView(context);
-        nextImageView.setAlpha(0f);
-        imageView.setAdjustViewBounds(true);
-        nextImageView.setAdjustViewBounds(true);
-        imageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        nextImageView.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        addView(imageView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-        addView(nextImageView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-
-        progressRing = new ProgressBar(context);
-        progressRing.setIndeterminate(true);
-        progressRing.setIndeterminateTintList(ColorStateList.valueOf(Theme.PRIMARY_COLOR));
-        progressRing.setVisibility(GONE);
-
-        var params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params.gravity = Gravity.CENTER;
-        addView(progressRing, params);
-
-        errorLayout = new LinearLayout(context);
-        errorLayout.setOrientation(LinearLayout.VERTICAL);
-        errorLayout.setGravity(Gravity.CENTER);
-        errorLayout.setVisibility(GONE);
-
-        errorText = new TextView(context);
-        errorText.setText(I18n.get("music_hud.button.loadingError"));
-        errorText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        errorText.setTextAlignment(TEXT_ALIGNMENT_CENTER);
-        errorText.setTextColor(Theme.ERROR_TEXT_COLOR);
-        errorText.setGravity(Gravity.CENTER);
-        errorLayout.addView(errorText, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
-        Button retryButton = new Button(context);
-        retryButton.setText(I18n.get("music_hud.button.retry"));
-        retryButton.setTextSize(Theme.TEXT_SIZE_SMALL);
-        retryButton.setTextColor(Theme.PRIMARY_COLOR);
-        var background = ButtonInsetBackground.builder()
-                .padding(new ButtonInsetBackground.Padding(retryButton.dp(2), retryButton.dp(1), retryButton.dp(2), retryButton.dp(1)))
-                .cornerRadius(retryButton.dp(4)).inset(dp(1)).build().get();
-        retryButton.setBackground(background);
-        retryButton.setOnClickListener(v -> {
-            if (currentURLString != null) {
-                loadUrl(currentURLString);
-            }
-        });
-        var retryParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        retryParams.setMargins(0, dp(4), 0, 0);
-        errorLayout.addView(retryButton, retryParams);
-
-        addView(errorLayout, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
     }
 
     @Override
@@ -336,7 +336,7 @@ public class UrlImageView extends FrameLayout {
                     ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
                     createDrawable(imageTextureData.convertToBitmap());
                 } catch (Exception e) {
-                    showError(I18n.get("music_hud.button.loadingError"));
+                    showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
                 }
             });
         }, MusicHud.EXECUTOR);
@@ -350,14 +350,14 @@ public class UrlImageView extends FrameLayout {
                         Bitmap bitmap = imageTextureData.convertToBitmap();
                         MuiModApi.postToUiThread(() -> createDrawable(bitmap));
                     } else {
-                        MuiModApi.postToUiThread(() -> showError(I18n.get("music_hud.button.downloadError")));
+                        MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.downloadError")));
                     }
                 }, MusicHud.EXECUTOR).exceptionally((e) -> {
-                    MuiModApi.postToUiThread(() -> showError(I18n.get("music_hud.button.loadingError")));
+                    MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
                     return null;
                 });
             } catch (Exception e) {
-                MuiModApi.postToUiThread(() -> showError(I18n.get("music_hud.button.loadingError")));
+                MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
             }
         }, MusicHud.EXECUTOR);
     }
@@ -380,6 +380,11 @@ public class UrlImageView extends FrameLayout {
             // 使用 OnLayoutChangeListener 确保在布局完成后设置圆角
             setImageWithAnimation(drawable);
             int bitmapHeight = bitmap.getHeight();
+            int height = getHeight();
+            if (height > 0) {
+                float actualCornerRadius = (float) (cornerRadius * bitmapHeight) / height;
+                drawable.setCornerRadius(actualCornerRadius);
+            }
             addOnLayoutChangeListener(new OnLayoutChangeListener() {
                 @Override
                 public void onLayoutChange(View v, int left, int top, int right, int bottom,

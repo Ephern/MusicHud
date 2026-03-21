@@ -41,7 +41,7 @@ public class ProgressRenderer {
     }
 
     public void render(GuiGraphics gr) {
-        if (currentData == null || currentData.getProgressBar() == null) {
+        if (currentData == null || currentData.getProgressBar() == null || currentData.getLayout().height <= 0) {
             return;
         }
 

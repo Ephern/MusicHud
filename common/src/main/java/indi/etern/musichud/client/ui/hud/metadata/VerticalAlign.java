@@ -1,13 +1,14 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
 import icyllis.modernui.view.Gravity;
+import indi.etern.musichud.MusicHud;
 import lombok.Getter;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.language.I18n;
 
 @Getter
 public enum VerticalAlign {
-    TOP("music_hud.config.layout.verticalAlign.TOP", Gravity.TOP) {
+    TOP(MusicHud.MOD_ID + ".config.layout.verticalAlign.TOP", Gravity.TOP) {
         @Override
         float calcY(float y, GuiGraphics graphics, Layout hudLayout) {
             return y;

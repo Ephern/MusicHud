@@ -73,7 +73,7 @@ public class HomeView extends LinearLayout {
 
 //            TextView title = new TextView(context);
 //            title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-//            title.setText(I18n.get("music_hud.text.lyrics"));
+//            title.setText(I18n.get(MusicHud.MOD_ID + ".text.lyrics"));
 //            LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
 //            params.setMargins(0, 0, 0, dp(16));
 //            lyricsView.addView(title, params);
@@ -103,7 +103,7 @@ public class HomeView extends LinearLayout {
 
             TextView title = new TextView(context);
             title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            title.setText(I18n.get("music_hud.text.playlist"));
+            title.setText(I18n.get(MusicHud.MOD_ID + ".text.playlist"));
             LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             params.setMargins(0, dp(24), 0, dp(32));
             scrollViewContainer.addView(title, params);
@@ -126,14 +126,14 @@ public class HomeView extends LinearLayout {
             TextView idlePlaySourceViewTitle = new TextView(context);
             idlePlaySourceViewTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             idlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
-            idlePlaySourceViewTitle.setText(I18n.get("music_hud.text.idlePlaySources"));
+            idlePlaySourceViewTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySources"));
             LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             idlePlaySourceView.addView(idlePlaySourceViewTitle, params2);
 
             TextView idlePlaySourceViewDescription = new TextView(context);
             idlePlaySourceViewDescription.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             idlePlaySourceViewDescription.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            idlePlaySourceViewDescription.setText(I18n.get("music_hud.text.idlePlaySourcesDescription"));
+            idlePlaySourceViewDescription.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
             LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             idlePlaySourceView.addView(idlePlaySourceViewDescription, params3);
 
@@ -216,7 +216,7 @@ public class HomeView extends LinearLayout {
         assert Minecraft.getInstance().player != null;
         if (musicDetail.getPusherInfo().playerUUID().equals(Minecraft.getInstance().player.getUUID())) {
             Button removeButton = new Button(getContext());
-            removeButton.setText(I18n.get("music_hud.button.remove"));
+            removeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.remove"));
             removeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             removeButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             Drawable background = ButtonInsetBackground.builder()
