@@ -77,14 +77,14 @@ public class SearchView extends LinearLayout {
         top.addView(new View(context), new LayoutParams(0, WRAP_CONTENT, 2));
         searchTextInput = new EditText(context, null, R.attr.editTextOutlinedStyle);
         searchTextInput.setTextAlignment(SearchView.TEXT_ALIGNMENT_CENTER);
-        searchTextInput.setHint(I18n.get("music_hud.field.hint.searchMusic"));
+        searchTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".field.hint.searchMusic"));
         searchTextInput.setSingleLine();
         LayoutParams params = new LayoutParams(0, WRAP_CONTENT, 6);
         params.setMargins(dp(52), 0, 0, 0);
         top.addView(searchTextInput, params);
 
         Button searchButton = new Button(context);
-        searchButton.setText(I18n.get("music_hud.button.searchMusic"));
+        searchButton.setText(I18n.get(MusicHud.MOD_ID + ".button.searchMusic"));
         LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
         Drawable background = ButtonInsetBackground.builder()
                 .inset(0).padding(new ButtonInsetBackground.Padding(dp(8), 0, dp(8), 0))

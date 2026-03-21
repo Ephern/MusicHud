@@ -1,18 +1,19 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
 import icyllis.modernui.view.Gravity;
+import indi.etern.musichud.MusicHud;
 import lombok.Getter;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.resources.language.I18n;
 
 @Getter
 public enum HorizontalAlign {
-    LEFT("music_hud.config.layout.horizontalAlign.LEFT", Gravity.LEFT) {
+    LEFT(MusicHud.MOD_ID + ".config.layout.horizontalAlign.LEFT", Gravity.LEFT) {
         @Override
         float calcX(float x, GuiGraphics graphics, Layout hudLayout) {
             return x;
         }
-    }, CENTER("music_hud.config.layout.horizontalAlign.CENTER", Gravity.CENTER) {
+    }, CENTER(MusicHud.MOD_ID + ".config.layout.horizontalAlign.CENTER", Gravity.CENTER) {
         @Override
         float calcX(float x, GuiGraphics graphics, Layout hudLayout) {
             return (float) graphics.guiWidth() / 2 + x - hudLayout.width / 2;

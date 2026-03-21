@@ -13,6 +13,7 @@ import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import net.minecraft.client.resources.language.I18n;
 
@@ -103,10 +104,10 @@ public class MusicCollectionDetailView extends LinearLayout {
         addToIdleSourceListButton.setBackground(background1);
         addToIdleSourceListButton.setOnClickListener((v) -> {
             if (musicService.getIdlePlaySources().contains(musicCollection)) {
-                Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
+                ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
                 musicService.removeFromIdlePlaySource(musicCollection);
             } else {
-                Toast.makeText(context, I18n.get("music_hud.text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
+                ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
                 musicService.addToIdlePlaySource(musicCollection);
             }
         });
@@ -196,7 +197,7 @@ public class MusicCollectionDetailView extends LinearLayout {
                 .map(Artist::getName).collect(Collectors.joining(" / "));
         musicLayout.setOnClickListener((view) -> {
             MusicService.getInstance().sendPushMusicToQueue(musicDetail);
-            Toast.makeText(context, I18n.get("music_hud.text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT).show();
+            ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
         tracksListView.addView(musicLayout);
     }

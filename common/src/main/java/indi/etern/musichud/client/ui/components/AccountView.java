@@ -57,7 +57,7 @@ public class AccountView extends LinearLayout {
             TextView textView = new TextView(context);
             textView.setTextSize(Theme.TEXT_SIZE_NORMAL);
             textView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            textView.setText(I18n.get("music_hud.error.getAccountInfo"));
+            textView.setText(I18n.get(MusicHud.MOD_ID + ".error.getAccountInfo"));
             textView.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
             LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             params1.setMargins(0, dp(64), 0, 0);
@@ -70,7 +70,7 @@ public class AccountView extends LinearLayout {
             retryButton.setHeight(dp(36));
             retryButton.setWidth(dp(84));
             retryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            retryButton.setText(I18n.get("music_hud.button.retry"));
+            retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
 
             ProgressBar progressRing = new ProgressBar(context);
             progressRing.setIndeterminate(true);
@@ -136,7 +136,7 @@ public class AccountView extends LinearLayout {
 
             LayoutParams logoutButtonParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             Button logoutButton = new Button(context);
-            logoutButton.setText(I18n.get("music_hud.button.logout"));
+            logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
             logoutButton.setTextColor(Theme.PRIMARY_COLOR);
             logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             Drawable background = ButtonInsetBackground.builder()
@@ -166,7 +166,7 @@ public class AccountView extends LinearLayout {
             TextView textView = new TextView(context);
             textView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             textView.setTextSize(Theme.TEXT_SIZE_LARGE);
-            textView.setText(I18n.get("music_hud.text.myPlaylists"));
+            textView.setText(I18n.get(MusicHud.MOD_ID + ".text.myPlaylists"));
             LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             layout1.addView(textView, params);
 

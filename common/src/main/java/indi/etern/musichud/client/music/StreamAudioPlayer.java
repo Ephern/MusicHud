@@ -602,7 +602,7 @@ public class StreamAudioPlayer {
         CompletableFuture<MusicResourceInfo> future = new CompletableFuture<>();
         GetMusicResourceResponse.setReceiver(currentMusicDetail.getId(), value -> {
             if (value == null || value == MusicResourceInfo.NONE) {
-                MusicService.getInstance().switchMusic(MusicDetail.NONE, null, I18n.get("music_hud.text.failedToLoadMusicResource"));
+                MusicService.getInstance().switchMusic(MusicDetail.NONE, null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                 setStatus(Status.ERROR);
             } else {
                 future.complete(value);

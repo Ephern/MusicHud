@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.hud.renderer;
 
 import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import lombok.Setter;
@@ -12,6 +13,7 @@ import net.minecraft.network.chat.Style;
 @Getter
 @Setter
 public class TextRenderer {
+    private ModernStringSplitter modernStringSplitter = null;
     private TextStyle currentTextData;
     private Layout layout;
     private int baseColor;
@@ -25,6 +27,11 @@ public class TextRenderer {
     private long lastUpdateTime = System.currentTimeMillis();
 
     public TextRenderer() {
+        try {
+            modernStringSplitter = TextLayoutEngine.getInstance().getStringSplitter();
+        } catch (Throwable t) {
+            MusicHud.getLogger(ScrollingLyricLineRenderer.class).debug("ModernTextEngine is disabled", t);
+        }
     }
 
     public void configureLayout(Layout layout, int baseColor, Position position) {
@@ -107,10 +114,7 @@ public class TextRenderer {
             return;
         }
 
-        float scale = layout.height / 8;
-
-        // 保存当前变换状态
-        gr.pose().pushMatrix();
+        float scale = layout.height / 9;
 
         // 应用位置和缩放
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(gr);
@@ -131,9 +135,6 @@ public class TextRenderer {
                 renderText(gr, nextTextData, absolutePosition, scale, newAlpha);
             }
         }
-
-        // 恢复变换状态
-        gr.pose().popMatrix();
     }
 
     private void renderText(GuiGraphics gr, TextStyle textData, Layout.AbsolutePosition absolutePosition,
@@ -149,14 +150,11 @@ public class TextRenderer {
 
         // 计算位置
         float x = position.computeX(absolutePosition.x(), scale, trimmedText, this::measureWidth);
+        gr.pose().pushMatrix();
         gr.pose().translate(x, absolutePosition.y());
         gr.pose().scale(scale, scale);
-
         gr.drawString(Minecraft.getInstance().font, trimmedText, 0, 0, color);
-
-        // 重置变换
         gr.pose().popMatrix();
-        gr.pose().pushMatrix();
     }
 
     private int getColorWithAlpha(int baseColor, float alpha) {
@@ -172,7 +170,7 @@ public class TextRenderer {
         if (currentTextData == null || currentTextData.text == null || currentTextData.text.isEmpty()) {
             return 0f;
         } else {
-            return measureWidth(currentTextData.text) * (layout.height / 8f);
+            return measureWidth(currentTextData.text) * (layout.height / Minecraft.getInstance().font.lineHeight);
         }
     }
 
@@ -221,9 +219,8 @@ public class TextRenderer {
     }
 
     private String trimToWidth(String text, float maxWidth) {
-        ModernStringSplitter splitter = tryGetSplitter();
-        if (splitter != null) {
-            int maxIndex = splitter.indexByWidth(text, maxWidth, Style.EMPTY);
+        if (modernStringSplitter != null) {
+            int maxIndex = modernStringSplitter.indexByWidth(text, maxWidth, Style.EMPTY);
             String trimmed = text.substring(0, maxIndex);
             if (maxIndex < text.length()) {
                 trimmed = addEllipsis(trimmed);
@@ -235,7 +232,6 @@ public class TextRenderer {
     }
 
     private String trimWithVanilla(String text, float maxWidth) {
-        var font = Minecraft.getInstance().font;
         float width = 0;
         int index = 0;
         final int len = text.length();
@@ -243,7 +239,7 @@ public class TextRenderer {
             int codePoint = text.codePointAt(index);
             int cpLen = Character.charCount(codePoint);
             String cpStr = new String(new int[]{codePoint}, 0, 1);
-            int w = font.width(cpStr);
+            int w = Minecraft.getInstance().font.width(cpStr);
             if (width + w > maxWidth) {
                 break;
             }

@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.screen;
 
-import dev.architectury.networking.NetworkManager;
 import icyllis.modernui.ModernUI;
 import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
@@ -17,9 +16,12 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.music.Artist;
+import indi.etern.musichud.beans.music.LyricLine;
+import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.NowPlayingInfo;
+import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
 import indi.etern.musichud.client.ui.pages.AccountBaseView;
@@ -27,7 +29,6 @@ import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.SearchView;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
-import indi.etern.musichud.network.pushMessages.c2s.VoteSkipCurrentMusicMessage;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -76,13 +77,13 @@ public class MainFragment extends Fragment {
         }
         if (instance != null && instance.titleText != null) {
             if (!ClientConfigDefinition.enable.get()) {
-                instance.titleText.setText(I18n.get("music_hud.text.disabled"));
+                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
             } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
-                instance.titleText.setText(I18n.get("music_hud.text.notConnected"));
+                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
             } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.INCAPABLE) {
-                instance.titleText.setText(I18n.get("music_hud.text.incapableWithServer"));
+                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.incapableWithServer"));
             } else {
-                instance.titleText.setText(I18n.get("music_hud.text.idle"));
+                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
             }
         }
     }
@@ -92,13 +93,13 @@ public class MainFragment extends Fragment {
             if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
                 instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
                 if (!ClientConfigDefinition.enable.get()) {
-                    instance.titleText.setText(I18n.get("music_hud.text.disabled"));
+                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
                 } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
-                    instance.titleText.setText(I18n.get("music_hud.text.notConnected"));
+                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
                 } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.INCAPABLE) {
-                    instance.titleText.setText(I18n.get("music_hud.text.incapableWithServer"));
+                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.incapableWithServer"));
                 } else {
-                    instance.titleText.setText(I18n.get("music_hud.text.idle"));
+                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
                 }
                 instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                 instance.artists.removeAllViews();
@@ -116,7 +117,7 @@ public class MainFragment extends Fragment {
                 if (name == null || name.isEmpty()) {
                     instance.pusherText.setText("");
                 } else {
-                    instance.pusherText.setText(I18n.get("music_hud.text.pusherSource") + name);
+                    instance.pusherText.setText(I18n.get(MusicHud.MOD_ID + ".text.pusherSource") + name);
                 }
                 Context context = ModernUI.getInstance();
                 instance.artists.removeAllViews();
@@ -178,7 +179,7 @@ public class MainFragment extends Fragment {
                 });
                 instance.albumContainer.addView(albumButton);
 
-                instance.skipCurrentButton.setText(I18n.get("music_hud.button.voteForSkip"));
+                instance.skipCurrentButton.setText(I18n.get(MusicHud.MOD_ID + ".button.voteForSkip"));
                 instance.skipCurrentButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 instance.skipCurrentButton.setEnabled(true);
                 instance.skipCurrentButton.setVisibility(ClientConfigDefinition.enable.get() ? View.VISIBLE : View.GONE);
@@ -249,10 +250,10 @@ public class MainFragment extends Fragment {
 
             {
                 var sideMenu = new SideMenu(context, routerContainer);
-                var homeNav = sideMenu.createNavigationPage(I18n.get("music_hud.text.page.home"), HomeView::new);
-                var searchNav = sideMenu.createNavigationPage(I18n.get("music_hud.text.page.search"), SearchView::new);
-                var accountNav = sideMenu.createNavigationPage(I18n.get("music_hud.text.page.account"), AccountBaseView::new);
-                var settingsNav = sideMenu.createNavigationPage(I18n.get("music_hud.text.page.setting"), ConfigView::new);
+                var homeNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
+                var searchNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.search"), SearchView::new);
+                var accountNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.account"), AccountBaseView::new);
+                var settingsNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
 
                 SideMenu.NavigationMeta defaultMeta = List.of(homeNav, searchNav, accountNav, settingsNav).get(defaultSelectedIndex);
                 defaultMeta.select();
@@ -275,13 +276,13 @@ public class MainFragment extends Fragment {
                 titleText.setTextSize(Theme.TEXT_SIZE_LARGE);
                 titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 if (!ClientConfigDefinition.enable.get()) {
-                    instance.titleText.setText(I18n.get("music_hud.text.disabled"));
+                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
                 } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
-                    instance.titleText.setText(I18n.get("music_hud.text.notConnected"));
+                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
                 } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.INCAPABLE) {
-                    instance.titleText.setText(I18n.get("music_hud.text.incapableWithServer"));
+                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.incapableWithServer"));
                 } else {
-                    instance.titleText.setText(I18n.get("music_hud.text.idle"));
+                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
                 }
                 musicInfo.addView(titleText);
 
@@ -319,7 +320,7 @@ public class MainFragment extends Fragment {
                 skipCurrentButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 skipCurrentButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 skipCurrentButton.setGravity(Gravity.CENTER);
-                skipCurrentButton.setText(I18n.get("music_hud.button.voteForSkip"));
+                skipCurrentButton.setText(I18n.get(MusicHud.MOD_ID + ".button.voteForSkip"));
 
                 MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
 
@@ -330,14 +331,12 @@ public class MainFragment extends Fragment {
                         .cornerRadius(skipCurrentButton.dp(4)).build().get();
                 skipCurrentButton.setBackground(background);
                 skipCurrentButton.setOnClickListener((v) -> {
-                    if (NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail() != null) {
-                        NetworkManager.sendToServer(new VoteSkipCurrentMusicMessage(NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail().getId()));
-                        MuiModApi.postToUiThread(() -> {
-                            skipCurrentButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                            skipCurrentButton.setText(I18n.get("music_hud.text.voted"));
-                            skipCurrentButton.setEnabled(false);
-                        });
-                    }
+                    MusicService.getInstance().voteForSkipCurrent();
+                    MuiModApi.postToUiThread(() -> {
+                        skipCurrentButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                        skipCurrentButton.setText(I18n.get(MusicHud.MOD_ID + ".text.voted"));
+                        skipCurrentButton.setEnabled(false);
+                    });
                 });
                 LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
                 buttonParams.setMargins(0, side.dp(2), 0, 0);

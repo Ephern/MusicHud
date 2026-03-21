@@ -8,9 +8,11 @@ import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import icyllis.modernui.widget.Toast;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -66,10 +68,10 @@ public class MusicCollectionCard extends LinearLayout {
         addToIdleSourceButton.setBackground(background1);
         addToIdleSourceButton.setOnClickListener((v) -> {
             if (musicService.getIdlePlaySources().contains(musicCollection)) {
-                Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
+                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
                 musicService.removeFromIdlePlaySource(musicCollection);
             } else {
-                Toast.makeText(context, I18n.get("music_hud.text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT).show();
+                ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
                 musicService.addToIdlePlaySource(musicCollection);
             }
         });
