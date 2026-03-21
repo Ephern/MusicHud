@@ -94,8 +94,9 @@ public class LoginService {
     }
 
     public boolean isLogined() {
-        return LoginCookieInfo.clientCurrentCookie().type() != LoginType.UNLOGGED &&
-                LoginCookieInfo.clientCurrentCookie().type() != LoginType.ANONYMOUS &&
+        LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
+        return loginCookieInfo.type() != LoginType.UNLOGGED &&
+                loginCookieInfo.type() != LoginType.ANONYMOUS &&
                 MusicHud.getStatus() ==  MusicHud.ConnectStatus.CONNECTED;
     }
 

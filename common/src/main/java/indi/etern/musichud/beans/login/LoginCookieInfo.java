@@ -36,8 +36,12 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
     );
     private static final Period refreshInterval = Period.of(0,0,1);
     public static LoginCookieInfo fromJson(String json) {
+        if (json == null || json.isBlank()) {
+            return LoginCookieInfo.UNLOGGED;
+        }
         try {
-            return JsonUtil.gson.fromJson(json, LoginCookieInfo.class);
+            LoginCookieInfo loginCookieInfo = JsonUtil.gson.fromJson(json, LoginCookieInfo.class);
+            return loginCookieInfo != null ? loginCookieInfo : LoginCookieInfo.UNLOGGED;
         } catch (RuntimeException e) {
             return LoginCookieInfo.UNLOGGED;
         }
@@ -53,7 +57,7 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
 
     public static void setClientCookie(LoginCookieInfo loginCookieInfo) {
         try {
-            ClientConfigDefinition.clientCookie.set(JsonUtil.gson.toJson(loginCookieInfo));
+            ClientConfigDefinition.clientCookie.set(JsonUtil.gson.toJson(loginCookieInfo != null ? loginCookieInfo : LoginCookieInfo.UNLOGGED));
             ClientConfigDefinition.clientCookie.save();
             logger.info("Login cookie saved");
         } catch (RuntimeException e) {
