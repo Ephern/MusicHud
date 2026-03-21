@@ -1,6 +1,8 @@
 {
   "key.category.music_hud.music_hud": "Music Hud",
   "music_hud.open_main": "Open main GUI",
+  "music_hud.vote_skip": "Vote for skip current music",
+  "music_hud.toggle_hud": "Toggle HUD display",
   "music_hud.text.disabled": "Music Hud is disabled",
   "music_hud.text.notConnected": "Not connected to available server",
   "music_hud.text.incapableWithServer": "Not capable with server version",

@@ -1,6 +1,8 @@
 {
   "key.category.music_hud.music_hud": "Music Hud",
   "music_hud.open_main": "打开主界面",
+  "music_hud.vote_skip": "投票切歌",
+  "music_hud.toggle_hud": "切换 HUD 显示",
   "music_hud.text.disabled": "已禁用 Music Hud",
   "music_hud.text.notConnected": "未连接",
   "music_hud.text.incapableWithServer": "与当前服务器版本不兼容",
