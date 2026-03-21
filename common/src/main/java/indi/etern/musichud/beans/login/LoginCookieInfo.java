@@ -32,14 +32,18 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
     public static final LoginCookieInfo UNLOGGED = new LoginCookieInfo(
             LoginType.UNLOGGED,
             "",
-            ZonedDateTime.of(114514, 1, 9, 19, 8, 10, 0, ZoneId.systemDefault())
+            ZonedDateTime.of(114514, 1, 9, 1, 9, 8, 10, ZoneId.systemDefault())
     );
     private static final Period refreshInterval = Period.of(0,0,1);
     public static LoginCookieInfo fromJson(String json) {
         try {
-            return JsonUtil.gson.fromJson(json, LoginCookieInfo.class);
+            LoginCookieInfo loginCookieInfo = JsonUtil.gson.fromJson(json, LoginCookieInfo.class);
+            if (loginCookieInfo == null) {
+                return UNLOGGED;
+            }
+            return loginCookieInfo;
         } catch (RuntimeException e) {
-            return LoginCookieInfo.UNLOGGED;
+            return UNLOGGED;
         }
     }
 
