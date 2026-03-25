@@ -81,21 +81,24 @@ public class MusicApiService {
 
     public Playlist getPlaylistDetail(long id, @Nullable ServerPlayer serverPlayer) {
         Playlist cached = playlistCache.getIfPresent(id);
+        Playlist playlist = Playlist.empty(id);
         if (cached != null) {
-            return cached;
+            playlist = cached;
         } else {
             String rawCookie = getRawCookie(serverPlayer);
             PlaylistResponse playlistResponse = ApiClient.post(ServerApiMeta.Playlist.DETAIL, new IdRequest(id), rawCookie);
             if (playlistResponse.getCode() == 200) {
-                Playlist playlist = playlistResponse.getPlaylist();
-//                PlaylistTracksResponse playlistTrackResponse = ApiClient.post(ServerApiMeta.Playlist.ALL_SONGS, new IdRequest(id), rawCookie);
-//                playlist.setTracks(playlistTrackResponse.songs);
+                playlist = playlistResponse.getPlaylist();
                 playlistCache.put(id, playlist);
-                return playlist;
             } else {
                 logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(serverPlayer).getName().getString(), playlistResponse.getCode());
-                return null;
             }
+        }
+        Profile profile = loginApiService.loginedPlayerInfoMap.get(serverPlayer).profile;
+        if (playlist.getPrivacy() == Privacy.PRIVATE && !playlist.getCreator().equals(profile)) {
+            return Playlist.privacyBlocked(id, playlist.getCreator());
+        } else {
+            return playlist;
         }
     }
 
@@ -286,7 +289,7 @@ public class MusicApiService {
         return MusicResourceInfo.from(unblockResponse.data, musicDetail);
     }
 
-    public List<Playlist> getPlayersUserSubsctibedPlaylists(ServerPlayer player) {
+    public List<Playlist> getPlayersUserSubscribedPlaylists(ServerPlayer player) {
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {
@@ -301,7 +304,7 @@ public class MusicApiService {
         }
     }
 
-    public List<Playlist> getPlayersUserSubscribedAlbums(ServerPlayer player) {
+    public List<Playlist> getPlayersUserSubscribedAlbums(ServerPlayer player) {//TODO
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {

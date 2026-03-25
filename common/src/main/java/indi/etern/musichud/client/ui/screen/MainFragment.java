@@ -62,7 +62,7 @@ public class MainFragment extends Fragment {
     }
 
     public static void refresh() {
-        switchMusic(null, null);
+        switchMusic(null, null, null);
         HomeView homeView = HomeView.getInstance();
         if (homeView != null) {
             homeView.refresh();
@@ -88,7 +88,7 @@ public class MainFragment extends Fragment {
         }
     }
 
-    public static void switchMusic(MusicDetail musicDetail, Queue<LyricLine> lyricLines) {
+    public static void switchMusic(MusicDetail musicDetail, MusicDetail nextToPlay, Queue<LyricLine> lyricLines) {
         if (instance != null) {
             if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
                 instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
@@ -189,7 +189,7 @@ public class MainFragment extends Fragment {
             }
             HomeView homeView = HomeView.getInstance();
             if (homeView != null) {
-                homeView.switchMusic(lyricLines);
+                homeView.switchMusic(musicDetail, nextToPlay, lyricLines);
             }
         }
     }
@@ -322,7 +322,9 @@ public class MainFragment extends Fragment {
                 skipCurrentButton.setGravity(Gravity.CENTER);
                 skipCurrentButton.setText(I18n.get(MusicHud.MOD_ID + ".button.voteForSkip"));
 
-                MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+                NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+                MusicDetail currentlyPlayingMusicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+                MusicDetail nextToPlayMusicDetail = nowPlayingInfo.getNextToPlayIdleMusicDetail();
 
                 skipCurrentButton.setHeight(skipCurrentButton.dp(40));
 
@@ -351,7 +353,7 @@ public class MainFragment extends Fragment {
                 side.addView(sideMenu, params);
 
                 var sideParams = new LinearLayout.LayoutParams(widthDp, MATCH_PARENT);
-                sideParams.setMargins(0, side.dp(24), 0, 0);
+                sideParams.setMargins(0, side.dp(32), 0, 0);
                 base.addView(side, sideParams);
 
                 LayoutTransition transition1 = new LayoutTransition();
@@ -362,7 +364,7 @@ public class MainFragment extends Fragment {
                 transition2.enableTransitionType(LayoutTransition.CHANGING);
                 side.setLayoutTransition(transition2);
 
-                switchMusic(currentlyPlayingMusicDetail, playingInfo.getLyricLines());
+                switchMusic(currentlyPlayingMusicDetail, nextToPlayMusicDetail, playingInfo.getLyricLines());
             }
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT, 0);
             params.setMargins(routerContainer.dp(80), 0, routerContainer.dp(64), 0);

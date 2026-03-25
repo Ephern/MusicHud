@@ -23,11 +23,10 @@ public class LyricLineView extends LinearLayout {
     private static final float LYRIC_EMPHASIZE_SCALE = 1.03f;
     private static final float RHYTHM_EMPHASIZE_ANIMATION_SCALE = 0.85f;
     private static final float RHYTHM_EMPHASIZE_MAX_SCALE = 1.12f;
-    private final FrameLayout topBlank;
     private final LinearLayout row;
     private final LyricLine lyricLine;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    TextView mainText;
+    View mainText;
     TextView subText;
     private AnimatorSet emphasizeAnimSet;
 
@@ -42,33 +41,55 @@ public class LyricLineView extends LinearLayout {
             LinearLayout mainLine = new LinearLayout(getContext());
             mainLine.setOrientation(LinearLayout.VERTICAL);
 
-            mainText = new TextView(getContext());
-            mainText.setText(lyricLine.getText());
-            mainText.setTextStyle(TextPaint.BOLD);
-            mainText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            mainText.setAlpha(Theme.FADE_LYRIC_ALPHA);
-            mainLine.addView(mainText);
+            if (lyricLine.getType() == LyricLine.Type.RHYTHM) {
+                row.setScaleX(RHYTHM_EMPHASIZE_ANIMATION_SCALE);
+                row.setScaleY(RHYTHM_EMPHASIZE_ANIMATION_SCALE);
+                LinearLayout rhythmLine = new LinearLayout(getContext());
+                rhythmLine.setOrientation(LinearLayout.HORIZONTAL);
+                rhythmLine.setAlpha(0);
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(WRAP_CONTENT, dp(30));
+                rhythmLine.setLayoutParams(params);
 
-            if (lyricLine.getType() == LyricLine.Type.META_DATA) {
-                mainText.setTextSize(Theme.SUB_LYRIC_SIZE);
+                for (int i = 0; i < 3; i++) {
+                    TextView dot = new TextView(getContext());
+                    dot.setText("●");
+                    LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+                    dotParams.setMargins(dp(2), 0, dp(2), 0);
+                    dot.setLayoutParams(dotParams);
+                    dot.setAlpha(Theme.FADE_LYRIC_ALPHA);
+                    dot.setId(i);
+                    rhythmLine.addView(dot);
+                }
+                this.mainText = rhythmLine;
+                mainLine.addView(rhythmLine);
             } else {
-                mainText.setTextSize(Theme.MAIN_LYRIC_SIZE);
+                TextView mainText = new TextView(getContext());
+                this.mainText = mainText;
+                mainText.setText(lyricLine.getText());
+                mainText.setTextStyle(TextPaint.BOLD);
+                mainText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+                mainText.setAlpha(Theme.FADE_LYRIC_ALPHA);
+                mainLine.addView(mainText);
+                if (lyricLine.getType() == LyricLine.Type.META_DATA) {
+                    mainText.setTextSize(Theme.SUB_LYRIC_SIZE);
+                } else {
+                    mainText.setTextSize(Theme.MAIN_LYRIC_SIZE);
 
-                String subLyric = lyricLine.getTranslatedText();
-                if (subLyric != null && !subLyric.isEmpty()) {
-                    subText = new TextView(getContext());
-                    subText.setText(subLyric);
-                    subText.setTextSize(Theme.SUB_LYRIC_SIZE);
-                    subText.setTextStyle(TextPaint.BOLD);
-                    subText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-                    subText.setAlpha(Theme.FADE_LYRIC_ALPHA);
-                    LayoutParams subParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-                    subParams.setMargins(0, dp(6), dp(32), 0);
-                    mainLine.addView(subText, subParams);
+                    String subLyric = lyricLine.getTranslatedText();
+                    if (subLyric != null && !subLyric.isEmpty()) {
+                        subText = new TextView(getContext());
+                        subText.setText(subLyric);
+                        subText.setTextSize(Theme.SUB_LYRIC_SIZE);
+                        subText.setTextStyle(TextPaint.BOLD);
+                        subText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+                        subText.setAlpha(Theme.FADE_LYRIC_ALPHA);
+                        LayoutParams subParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+                        subParams.setMargins(0, dp(6), dp(32), 0);
+                        mainLine.addView(subText, subParams);
+                    }
                 }
             }
-
-            LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0.9f);
+            LayoutParams params = new LayoutParams(0, WRAP_CONTENT, 0.9f);
             row.addView(mainLine, params);
         }
 
@@ -76,7 +97,7 @@ public class LyricLineView extends LinearLayout {
         LayoutParams blankParams = new LayoutParams(0, MATCH_PARENT, 0.1f);
         row.addView(blank, blankParams);
 
-        topBlank = new FrameLayout(context);
+        FrameLayout topBlank = new FrameLayout(context);
         topBlank.setLayoutParams(new LayoutParams(0, dp(32)));
         LayoutParams params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         setLayoutParams(params);
@@ -85,7 +106,6 @@ public class LyricLineView extends LinearLayout {
         LayoutParams rowParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         addView(row, rowParams);
         if (lyricLine.getType() == LyricLine.Type.RHYTHM) {
-            row.setAlpha(0);
             rowParams.setMargins(dp(2), 0, 0, 0);
             params.setMargins(0, 0, 0, -dp(64));
         }
@@ -124,19 +144,19 @@ public class LyricLineView extends LinearLayout {
                 }
 
                 emphasizeAnimSet = new AnimatorSet();
-                ObjectAnimator alpha = ObjectAnimator.ofFloat(row, View.ALPHA,
+                ObjectAnimator alpha = ObjectAnimator.ofFloat(mainText, View.ALPHA,
                         0, 1);
                 alpha.setDuration(400);
                 alpha.setStartDelay(800);
 
-                row.setPivotX(dp(22));
+                row.setPivotX((float) mainText.getWidth() / 2);
                 row.setPivotY(Math.max(row.getHeight() / 2, dp(12)));
-                ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, 1f, RHYTHM_EMPHASIZE_ANIMATION_SCALE);
+                ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, RHYTHM_EMPHASIZE_ANIMATION_SCALE, 1f);
                 scaleX.setRepeatCount(ObjectAnimator.INFINITE);
                 scaleX.setRepeatMode(ObjectAnimator.REVERSE);
                 scaleX.setDuration(2000);
                 scaleX.setStartDelay(1200);
-                ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, 1f, RHYTHM_EMPHASIZE_ANIMATION_SCALE);
+                ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, RHYTHM_EMPHASIZE_ANIMATION_SCALE, 1f);
                 scaleY.setRepeatCount(ObjectAnimator.INFINITE);
                 scaleY.setRepeatMode(ObjectAnimator.REVERSE);
                 scaleY.setDuration(2000);
@@ -145,7 +165,19 @@ public class LyricLineView extends LinearLayout {
                 emphasizeAnimSet.playTogether(alpha, scaleX, scaleY);
                 emphasizeAnimSet.start();
 
-                stayEmphasizeDuration = stayEmphasizeDuration.minus(Duration.ofMillis(1600));
+                long millis = stayEmphasizeDuration.minus(Duration.ofMillis(1800)).toMillis();
+//                millis = (millis - 400) / 1000 * 1000 + 400;//to ensure no animation cut
+                for (int i = 0; i < 3; i++) {
+                    View viewById = mainText.findViewById(i);
+                    if (viewById != null) {
+                        ObjectAnimator dotAlpha = ObjectAnimator.ofFloat(viewById, View.ALPHA,
+                                viewById.getAlpha(), Theme.EMPHASIZE_LYRIC_ALPHA);
+                        dotAlpha.setDuration(800);
+                        dotAlpha.setStartDelay(millis * (i + 1) / 4);
+                        dotAlpha.start();
+                    }
+                }
+                stayEmphasizeDuration = Duration.of(millis, ChronoUnit.MILLIS);
             }
         }
         if (stayEmphasizeDuration.isPositive()) {
@@ -178,7 +210,7 @@ public class LyricLineView extends LinearLayout {
             case RHYTHM -> {
                 {
                     AnimatorSet rhythmScaleSet1 = new AnimatorSet();
-                    row.setPivotX(dp(22));
+                    row.setPivotX((float) mainText.getWidth() / 2);
                     row.setPivotY(Math.max(row.getHeight() / 2, dp(12)));
                     ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, row.getScaleX(), RHYTHM_EMPHASIZE_MAX_SCALE);
                     ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, row.getScaleY(), RHYTHM_EMPHASIZE_MAX_SCALE);
@@ -208,7 +240,7 @@ public class LyricLineView extends LinearLayout {
 
     public float getTargetOffset(LyricLine activeLyricLine) {
         if (activeLyricLine != null && activeLyricLine.getType() == LyricLine.Type.RHYTHM && lyricLine.isAfter(activeLyricLine)) {
-            return dp(24);
+            return dp(30);
         } else {
             return 0;
         }

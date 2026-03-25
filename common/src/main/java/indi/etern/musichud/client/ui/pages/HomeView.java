@@ -16,6 +16,7 @@ import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
+import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
@@ -26,10 +27,12 @@ import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.HashMap;
 import java.util.Queue;
+import java.util.Set;
 import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -43,6 +46,12 @@ public class HomeView extends LinearLayout {
     private final HashMap<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new HashMap<>();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
+    private MusicListItem nextToPlayItem;
+    private TextView nextToPlayTitle;
+    private TextView queueTitle;
+    private LinearLayout playQueueListView;
+    private LinearLayout clientIdlePlaySourceView;
+    private LinearLayout serverIdlePlaySourceView;
 
     public HomeView(Context context) {
         super(context);
@@ -65,25 +74,15 @@ public class HomeView extends LinearLayout {
 
         setOrientation(HORIZONTAL);
         {
-            // 左侧歌词区域
             LinearLayout lyricsView = new LinearLayout(context);
             lyricsView.setOrientation(VERTICAL);
             LayoutParams lyricsViewParams = new LayoutParams(0, MATCH_PARENT, 3);
             addView(lyricsView, lyricsViewParams);
 
-//            TextView title = new TextView(context);
-//            title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-//            title.setText(I18n.get(MusicHud.MOD_ID + ".text.lyrics"));
-//            LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-//            params.setMargins(0, 0, 0, dp(16));
-//            lyricsView.addView(title, params);
-
-            // 使用新的歌词组件
             staggeredLyricScrollView = new StaggeredLyricScrollView(context);
             lyricsView.addView(staggeredLyricScrollView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
         }
         {
-            // 右侧播放列表区域（保持不变）
             LinearLayout queueView = new LinearLayout(context);
             queueView.setOrientation(VERTICAL);
             LayoutParams queueViewParams = new LayoutParams(0, MATCH_PARENT, 2);
@@ -101,78 +100,149 @@ public class HomeView extends LinearLayout {
             transition1.enableTransitionType(LayoutTransition.CHANGING);
             scrollViewContainer.setLayoutTransition(transition1);
 
-            TextView title = new TextView(context);
-            title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            title.setText(I18n.get(MusicHud.MOD_ID + ".text.playlist"));
-            LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            params.setMargins(0, dp(24), 0, dp(32));
-            scrollViewContainer.addView(title, params);
+            nextToPlayTitle = new TextView(context);
+            nextToPlayTitle.setVisibility(GONE);
+            nextToPlayTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            nextToPlayTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.nextToPlay"));
+            LayoutParams nextToPlayTitleParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            nextToPlayTitleParams.setMargins(0, dp(32), 0, dp(16));
+            scrollViewContainer.addView(nextToPlayTitle, nextToPlayTitleParams);
 
-            LinearLayout playQueueListView = new LinearLayout(context);
+            nextToPlayItem = new MusicListItem(context);
+            nextToPlayItem.setVisibility(GONE);
+            scrollViewContainer.addView(nextToPlayItem, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+            queueTitle = new TextView(context);
+            queueTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            queueTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.playQueue"));
+            LayoutParams queueTitleParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            queueTitleParams.setMargins(0, dp(32), 0, dp(16));
+            scrollViewContainer.addView(queueTitle, queueTitleParams);
+
+            playQueueListView = new LinearLayout(context);
             playQueueListView.setOrientation(VERTICAL);
             LayoutParams queueViewParams1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            queueViewParams1.setMargins(0, 0, 0, dp(48));
             playQueueListView.setMinimumHeight(dp(256));
             LayoutTransition transition = new LayoutTransition();
             transition.enableTransitionType(LayoutTransition.CHANGING);
             playQueueListView.setLayoutTransition(transition);
             scrollViewContainer.addView(playQueueListView, queueViewParams1);
 
-            LinearLayout idlePlaySourceView = new LinearLayout(context);
-            idlePlaySourceView.setOrientation(VERTICAL);
-            LayoutParams idlePlaylistViewParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            idlePlaySourceView.setLayoutParams(idlePlaylistViewParams);
 
-            TextView idlePlaySourceViewTitle = new TextView(context);
-            idlePlaySourceViewTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            idlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
-            idlePlaySourceViewTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySources"));
+            clientIdlePlaySourceView = new LinearLayout(context);
+            clientIdlePlaySourceView.setVisibility(GONE);
+            clientIdlePlaySourceView.setOrientation(VERTICAL);
+            clientIdlePlaySourceView.setLayoutParams(new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+            TextView clientIdlePlaySourceViewTitle = new TextView(context);
+            clientIdlePlaySourceViewTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            clientIdlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+            clientIdlePlaySourceViewTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySources"));
             LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            idlePlaySourceView.addView(idlePlaySourceViewTitle, params2);
+            params2.setMargins(0, dp(32), 0, 0);
+            clientIdlePlaySourceView.addView(clientIdlePlaySourceViewTitle, params2);
 
             TextView idlePlaySourceViewDescription = new TextView(context);
             idlePlaySourceViewDescription.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             idlePlaySourceViewDescription.setTextSize(Theme.TEXT_SIZE_NORMAL);
             idlePlaySourceViewDescription.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
-            LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            idlePlaySourceView.addView(idlePlaySourceViewDescription, params3);
+            clientIdlePlaySourceView.addView(idlePlaySourceViewDescription, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-            AutoFlowGridLayout idlePlaySourceCardsList = new AutoFlowGridLayout(context);
-            idlePlaySourceCardsList.setRowMinWidth(dp(143));
+            AutoFlowGridLayout clientIdlePlaySourceCardsList = new AutoFlowGridLayout(context);
+            clientIdlePlaySourceCardsList.setRowMinWidth(dp(143));
             LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params4.setMargins(0, dp(16), 0, 0);
-            idlePlaySourceView.addView(idlePlaySourceCardsList, params4);
+            clientIdlePlaySourceView.addView(clientIdlePlaySourceCardsList, params4);
+            scrollViewContainer.addView(clientIdlePlaySourceView, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-            scrollViewContainer.addView(idlePlaySourceView, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-            musicService.getIdlePlaySources().forEach(playlist -> {
-                MusicCollectionCard child = new MusicCollectionCard(context, playlist);
-                idlePlaySourceCardsList.addView(child);
-                idlePlaySourceCardMap.put(playlist, child);
+            serverIdlePlaySourceView = new LinearLayout(context);
+            serverIdlePlaySourceView.setVisibility(GONE);
+            serverIdlePlaySourceView.setOrientation(VERTICAL);
+            serverIdlePlaySourceView.setLayoutParams(new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+            TextView serverIdlePlaySourceViewTitle = new TextView(context);
+            serverIdlePlaySourceViewTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            serverIdlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+            serverIdlePlaySourceViewTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.othersIdlePlaySources"));
+            LayoutParams params5 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            params5.setMargins(0, dp(32), 0, 0);
+            serverIdlePlaySourceView.addView(serverIdlePlaySourceViewTitle, params5);
+
+            TextView idlePlaySourceViewDescription1 = new TextView(context);
+            idlePlaySourceViewDescription1.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            idlePlaySourceViewDescription1.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            idlePlaySourceViewDescription1.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
+            serverIdlePlaySourceView.addView(idlePlaySourceViewDescription1, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+            AutoFlowGridLayout serverIdlePlaySourceCardsList = new AutoFlowGridLayout(context);
+            serverIdlePlaySourceCardsList.setRowMinWidth(dp(143));
+            LayoutParams params6 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params6.setMargins(0, dp(16), 0, 0);
+            serverIdlePlaySourceView.addView(serverIdlePlaySourceCardsList, params6);
+            scrollViewContainer.addView(serverIdlePlaySourceView, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+            LocalPlayer localPlayer = Minecraft.getInstance().player;
+
+            Set<MusicCollection> clientIdlePlaySources = musicService.getLocalIdlePlaySources();
+            Set<MusicCollection> serverIdlePlaySources = musicService.getServerIdlePlaySources();
+            clientIdlePlaySources.forEach(collection -> {
+                MusicCollectionCard child = new MusicCollectionCard(context, collection);
+                clientIdlePlaySourceCardsList.addView(child);
+                idlePlaySourceCardMap.put(collection, child);
             });
-
-            Consumer<MusicCollection> addListener = collection -> {
-                MuiModApi.postToUiThread(() -> {
+            serverIdlePlaySources.forEach(collection -> {
+                if (localPlayer != null && !collection.getPusherInfo().playerUUID().equals(localPlayer.getUUID())) {
                     MusicCollectionCard child = new MusicCollectionCard(context, collection);
-                    idlePlaySourceCardsList.addView(child);
+                    serverIdlePlaySourceCardsList.addView(child);
                     idlePlaySourceCardMap.put(collection, child);
-                });
-            };
-            Consumer<MusicCollection> removeListener = collection -> {
+                }
+            });
+            checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
+            checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
+            checkQueue(musicService.getMusicQueue());
+
+            Queue<MusicDetail> queue = musicService.getMusicQueue();
+            musicService.getLocalIdlePlaySourceAddListeners().add(collection -> {
+                if (!idlePlaySourceCardMap.containsKey(collection)) {
+                    MuiModApi.postToUiThread(() -> {
+                        addIdlePlaySourceTo(collection, context, clientIdlePlaySourceCardsList);
+                        checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
+                    });
+                }
+            });
+            musicService.getLocalIdlePlaySourceRemoveListeners().add(collection -> {
                 MuiModApi.postToUiThread(() -> {
                     MusicCollectionCard view = idlePlaySourceCardMap.get(collection);
                     if (view != null) {
-                        idlePlaySourceCardsList.removeView(view);
+                        clientIdlePlaySourceCardsList.removeView(view);
                         idlePlaySourceCardMap.remove(collection);
                     }
+                    checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
                 });
-            };
-            musicService.getIdlePlaySourceAddListeners().add(addListener);
-            musicService.getIdlePlaylistRemoveListeners().add(removeListener);
+            });
+            musicService.getServerIdlePlaySourceAddListeners().add(collection -> {
+                if ((localPlayer != null && collection.getPusherInfo().playerUUID() != localPlayer.getUUID())
+                        && !idlePlaySourceCardMap.containsKey(collection)) {
+                    MuiModApi.postToUiThread(() -> {
+                        addIdlePlaySourceTo(collection, context, serverIdlePlaySourceCardsList);
+                        checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
+                    });
+                }
+            });
+            musicService.getServerIdlePlaySourceRemoveListeners().add(collection -> {
+                MuiModApi.postToUiThread(() -> {
+                    MusicCollectionCard view = idlePlaySourceCardMap.get(collection);
+                    if (view != null) {
+                        serverIdlePlaySourceCardsList.removeView(view);
+                        idlePlaySourceCardMap.remove(collection);
+                    }
+                    checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
+                });
+            });
 
             playQueueListView.removeAllViews();
 
-            Queue<MusicDetail> queue = musicService.getMusicQueue();
             for (MusicDetail musicDetail : queue) {
                 addMusicQueueItem(musicDetail, playQueueListView);
             }
@@ -180,6 +250,7 @@ public class HomeView extends LinearLayout {
             musicService.getMusicQueuePushListeners().add(musicDetail -> {
                 MuiModApi.postToUiThread(() -> {
                     addMusicQueueItem(musicDetail, playQueueListView);
+                    checkQueue(queue);
                 });
             });
             musicService.getMusicQueueRemoveListeners().add((removeIndex, musicDetail) -> {
@@ -187,22 +258,80 @@ public class HomeView extends LinearLayout {
                     if (removeIndex >= 0 && removeIndex < playQueueListView.getChildCount()) {
                         playQueueListView.removeViewAt(removeIndex);
                     }
+                    checkQueue(queue);
                 });
             });
 
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
                 @Override
                 public void onViewAttachedToWindow(View v) {
-                    // 组件内部会自行启动更新循环，无需额外操作
                 }
 
                 @Override
                 public void onViewDetachedFromWindow(View v) {
-                    musicService.getIdlePlaylistRemoveListeners().remove(removeListener);
-                    musicService.getIdlePlaySourceAddListeners().remove(addListener);
+                    musicService.getLocalIdlePlaySourceRemoveListeners().remove((Consumer<MusicCollection>) collection1 -> {
+                        MuiModApi.postToUiThread(() -> {
+                            MusicCollectionCard view = idlePlaySourceCardMap.get(collection1);
+                            if (view != null) {
+                                clientIdlePlaySourceCardsList.removeView(view);
+                                idlePlaySourceCardMap.remove(collection1);
+                            }
+                            checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
+                        });
+                    });
+                    musicService.getLocalIdlePlaySourceAddListeners().remove((Consumer<MusicCollection>) collection -> {
+                        if (!idlePlaySourceCardMap.containsKey(collection)) {
+                            MuiModApi.postToUiThread(() -> {
+                                addIdlePlaySourceTo(collection, context, clientIdlePlaySourceCardsList);
+                                checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
+                            });
+                        }
+                    });
                     instance = null;
                 }
             });
+        }
+    }
+
+    private void addIdlePlaySourceTo(MusicCollection idlePlaySource, Context context, AutoFlowGridLayout targetView) {
+        MusicCollectionCard child = new MusicCollectionCard(context, idlePlaySource);
+        targetView.addView(child);
+        idlePlaySourceCardMap.put(idlePlaySource, child);
+    }
+
+    private void checkQueue(Queue<MusicDetail> queue) {
+        if (queue.isEmpty()) {
+            queueTitle.setVisibility(View.GONE);
+            playQueueListView.setVisibility(View.GONE);
+            checkNextToPlay(NowPlayingInfo.getInstance().getNextToPlayIdleMusicDetail());
+        } else {
+            queueTitle.setVisibility(View.VISIBLE);
+            playQueueListView.setVisibility(View.VISIBLE);
+            checkNextToPlay(queue.peek());
+        }
+    }
+
+    private void checkIdlePlaySources(Set<MusicCollection> idlePlaySources, View targetView) {
+        if (idlePlaySources.isEmpty()) {
+            targetView.setVisibility(View.GONE);
+        } else {
+            targetView.setVisibility(View.VISIBLE);
+        }
+        checkQueue(MusicService.getInstance().getMusicQueue());
+    }
+
+    private void checkNextToPlay(MusicDetail nextIdle) {
+        MusicService musicService = MusicService.getInstance();
+        Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
+        boolean hasIdlePlaySources = !musicService.getLocalIdlePlaySources().isEmpty() || !musicService.getServerIdlePlaySources().isEmpty();
+        MusicDetail next = hasIdlePlaySources ? nextIdle : null;
+        if (musicQueue.isEmpty() && next != null && next != MusicDetail.NONE) {
+            nextToPlayTitle.setVisibility(VISIBLE);
+            nextToPlayItem.setVisibility(VISIBLE);
+            nextToPlayItem.bindData(next);
+        } else {
+            nextToPlayTitle.setVisibility(GONE);
+            nextToPlayItem.setVisibility(GONE);
         }
     }
 
@@ -235,10 +364,11 @@ public class HomeView extends LinearLayout {
         playQueueView.addView(musicListItem, layoutParams);
     }
 
-    public void switchMusic(Queue<LyricLine> lyricLines) {
+    public void switchMusic(MusicDetail musicDetail, MusicDetail next, Queue<LyricLine> lyricLines) {
         MuiModApi.postToUiThread(() -> {
             if (staggeredLyricScrollView != null) {
                 staggeredLyricScrollView.setLyrics(lyricLines);
+                checkNextToPlay(next);
             }
         });
     }

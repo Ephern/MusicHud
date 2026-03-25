@@ -26,7 +26,7 @@ public class ScrollingLyricLineRenderer {
     private boolean isTransitioning = false;
     private float transitionProgress = 1.0f;
     private long transitionStartTime = 0;
-    private long transitionDuration = 600;
+    private long transitionDuration = 800;
     private int cachedContainerWidth;
     @Setter
     private int lineSpacing = 0;
@@ -129,13 +129,6 @@ public class ScrollingLyricLineRenderer {
             line.isScrolling = false;
             line.scrollOffset = 0;
         }
-    }
-
-    private void stopScrolling(LineState line) {
-        line.isScrolling = false;
-        line.scrollOffset = 0;
-        line.scrollStartTime = 0;
-        line.scrollTarget = 0;
     }
 
     private void updateScrolling(LineState line, long now) {

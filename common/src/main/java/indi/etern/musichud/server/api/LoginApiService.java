@@ -93,6 +93,7 @@ public class LoginApiService {
     public void joinUnlogged(ServerPlayer serverPlayer) {
         loginedPlayerInfoMap.put(serverPlayer, PlayerLoginInfo.UNLOGGED);
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(loginedPlayerInfoMap));
+        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(serverPlayer));
     }
 
     public void logout(ServerPlayer player) {
@@ -102,7 +103,8 @@ public class LoginApiService {
         if (remove != null) {
             logger.warn("Polling v-thread stopped as player {} quit", player.getName());
         }
-        MusicPlayerServerService.getInstance().idlePlaySources.remove(player);
+        MusicPlayerServerService playerServerService = MusicPlayerServerService.getInstance();
+        playerServerService.removeAllIdlePlaySource(player);
     }
 
     @SneakyThrows
@@ -116,6 +118,7 @@ public class LoginApiService {
             loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, response.cookie, ZonedDateTime.now());
             AccountDetail accountDetail = loadUserProfile(player, loginCookieInfo);
             NetworkManager.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, accountDetail.getProfile()));
+            MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
         } else if (sendFail) {
             sendLoginFailResult(player, new RuntimeException("login failed"));
         }
@@ -190,6 +193,7 @@ public class LoginApiService {
                         LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.QR_CODE, qrLoginStatus.cookie, ZonedDateTime.now());
                         AccountDetail accountDetail = loadUserProfile(player, loginCookieInfo);
                         NetworkManager.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, accountDetail.getProfile()));
+                        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
                     }
                 } while (qrLoginStatus.code != QRLoginStatus.Code.EXPIRED && qrLoginStatus.code != QRLoginStatus.Code.SUCCEED);
             } catch (InterruptedException e) {

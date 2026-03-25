@@ -14,12 +14,14 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
-public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail next, String message) implements S2CPayload {
+import java.util.Queue;
+
+public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, String message) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, SwitchMusicMessage> CODEC = StreamCodec.composite(
             MusicDetail.CODEC,
             SwitchMusicMessage::musicDetail,
             MusicDetail.CODEC,
-            SwitchMusicMessage::next,
+            SwitchMusicMessage::nextIdle,
             ByteBufCodecs.STRING_UTF8,
             SwitchMusicMessage::message,
             SwitchMusicMessage::new
@@ -32,16 +34,22 @@ public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail next, Stri
                     SwitchMusicMessage.class, CODEC,
                     (message, context) -> {
                         MusicHud.EXECUTOR.execute(() -> {
+                            if (!ClientConfigDefinition.enable.get()) {
+                                return;
+                            }
                             MusicService musicService = MusicService.getInstance();
                             String message1 = message.message;
                             if (message1.startsWith(MusicHud.MOD_ID + ".")) {
                                 message1 = I18n.get(message1);
                             }
-                            musicService.switchMusic(message.musicDetail, null, message1);
-                            if (!message.next.equals(MusicDetail.NONE)) {
-                                if (ClientConfigDefinition.enable.get()) {
-                                    ImageUtils.downloadAsync(message.next.getAlbum().getThumbnailPicUrl(200));
+                            musicService.switchMusic(message.musicDetail, message.nextIdle, null, message1);
+                            Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
+                            if (musicQueue.isEmpty()) {
+                                if (!message.nextIdle.equals(MusicDetail.NONE)) {
+                                    ImageUtils.downloadAsync(message.nextIdle.getAlbum().getThumbnailPicUrl(200));
                                 }
+                            } else {
+                                ImageUtils.downloadAsync(musicQueue.peek().getAlbum().getThumbnailPicUrl(200));
                             }
                         });
                     }

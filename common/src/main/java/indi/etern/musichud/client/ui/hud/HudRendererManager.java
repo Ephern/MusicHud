@@ -35,8 +35,6 @@ public class HudRendererManager {
     private final PlayerHeadRenderer PLAYER_HEAD_RENDERER = PlayerHeadRenderer.getInstance();
     private final ProgressRenderer PROGRESS_RENDERER = ProgressRenderer.getInstance();
     private final TextRenderer TITLE_RENDERER = new TextRenderer();
-    private final TextRenderer LYRICS_RENDERER = new TextRenderer();
-    private final TextRenderer SUB_LYRICS_RENDERER = new TextRenderer();
     private final TextRenderer ARTISTS_AND_ALBUM_RENDERER = new TextRenderer();
     private final TextRenderer PLAY_TIME_RENDERER = new TextRenderer();
     private final ScrollingLyricLineRenderer LYRICS_LINE_RENDERER = new ScrollingLyricLineRenderer();
@@ -178,7 +176,7 @@ public class HudRendererManager {
         layout1.setParent(baseLayout);
         PLAYER_HEAD_RENDERER.configureLayout(layout1);
 
-        Layout titleLayout = Layout.ofTextLayout(mainContentX, titleY, progressWidth - titleSize, titleSize);
+        Layout titleLayout = Layout.ofTextLayout(mainContentX, titleY, progressWidth - titleSize - interval, titleSize);
         titleLayout.setParent(baseLayout);
         TITLE_RENDERER.configureLayout(titleLayout, Theme.EMPHASIZE_TEXT_COLOR, TextRenderer.Position.LEFT);
 

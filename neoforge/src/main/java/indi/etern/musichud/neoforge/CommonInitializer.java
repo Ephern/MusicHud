@@ -5,7 +5,6 @@ import dev.architectury.utils.Env;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.server.api.ServerApiMeta;
 import indi.etern.musichud.server.config.ServerConfigDefinition;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -24,17 +23,13 @@ public final class CommonInitializer {
     public CommonInitializer(IEventBus eventBus, ModContainer container) {
         eventBus.register(this);
 
-        // 根据环境注册配置
         if (Platform.getEnvironment() == Env.CLIENT) {
+            container.registerConfig(ModConfig.Type.COMMON, ServerConfigDefinition.configure.getRight());
             container.registerConfig(ModConfig.Type.CLIENT, ClientConfigDefinition.configure.getRight());
             container.registerExtensionPoint(IConfigScreenFactory.class, new ConfigScreenFactory());
         } else {
-            // 服务器环境
             container.registerConfig(ModConfig.Type.SERVER, ServerConfigDefinition.configure.getRight());
         }
-
-        // 也可以在这里执行一些初始化
-        MusicHud.init();
     }
 
     public static HudRendererManager hudRendererManager;
@@ -47,9 +42,7 @@ public final class CommonInitializer {
 
     void onConfigEvent(final ModConfigEvent configEvent) {
         ModConfig config = configEvent.getConfig();
-        if (config.getSpec() == ServerConfigDefinition.configure.getRight()) {
-            ServerApiMeta.reload();
-        } else if (config.getSpec() == ClientConfigDefinition.configure.getRight()) {
+        if (config.getSpec() == ClientConfigDefinition.configure.getRight()) {//TODO
             hudRendererManager = HudRendererManager.getInstance();
             NeoForge.EVENT_BUS.addListener(CommonInitializer::onRenderGui);
         }
@@ -62,5 +55,9 @@ public final class CommonInitializer {
     @SubscribeEvent
     void onConfigLoaded(final ModConfigEvent.Loading configEvent) {
         onConfigEvent(configEvent);
+        ModConfig config = configEvent.getConfig();
+        if (config.getModId().equals(MusicHud.MOD_ID)) {
+            MusicHud.checkConfigAndInit(config.getSpec());
+        }
     }
 }

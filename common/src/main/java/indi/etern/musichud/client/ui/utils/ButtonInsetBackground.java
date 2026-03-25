@@ -16,7 +16,9 @@ public class ButtonInsetBackground {
 
     public Drawable get() {
         ShapeDrawable background = new ShapeDrawable();
-        background.setPadding(padding.left,padding.top,padding.left,padding.bottom);
+        if (padding != null) {
+            background.setPadding(padding.left,padding.top,padding.left,padding.bottom);
+        }
         background.setCornerRadius(cornerRadius);
         background.setColor(Theme.GHOST_BUTTON_STATES);
 

@@ -1,13 +1,13 @@
 package indi.etern.musichud.client.ui.pages;
 
+import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.PreferencesFragment;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.widget.FrameLayout;
-import icyllis.modernui.widget.LinearLayout;
-import icyllis.modernui.widget.ScrollView;
+import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.config.ClientConfigDefinition;
@@ -15,21 +15,29 @@ import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.music.StreamAudioPlayer;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.DynamicIntegerOption;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.server.api.ServerApiMeta;
+import indi.etern.musichud.server.config.ServerConfigDefinition;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 import net.minecraft.Util;
 import net.minecraft.client.resources.language.I18n;
+import org.lwjgl.glfw.GLFW;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
+@Slf4j
 public class ConfigView extends LinearLayout {
     @Getter
     static volatile ConfigView instance;
@@ -51,7 +59,7 @@ public class ConfigView extends LinearLayout {
             view.setOrientation(LinearLayout.VERTICAL);
             view.setGravity(Gravity.CENTER_HORIZONTAL);
             LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params.setMargins(0, dp(24), 0, 0);
+            params.setMargins(0, dp(32), 0, 0);
             scrollView.addView(view, params);
 
             HudRendererManager hudRendererManager = HudRendererManager.getInstance();
@@ -176,7 +184,7 @@ public class ConfigView extends LinearLayout {
                 hudRendererManager.updateLayoutFromConfig();
                 hudRendererManager.refreshStyle();
             });
-            widthOption.setRange(ClientConfigDefinition.hudHeight.get(), 512, 4);
+            widthOption.setRange(ClientConfigDefinition.hudHeight.get(), 800, 4);
             widthOption.setDefaultValue(150);
             PreferencesFragment.IntegerOption heightOption = new PreferencesFragment.IntegerOption(
                     context,
@@ -187,15 +195,155 @@ public class ConfigView extends LinearLayout {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                         cornerRadiusOption.updateRange(0, ClientConfigDefinition.hudHeight.get() / 2, 1);
-                        widthOption.updateRange(ClientConfigDefinition.hudHeight.get(), 512, 4);
+                        widthOption.updateRange(ClientConfigDefinition.hudHeight.get(), 800, 4);
                     })
-                    .setRange(16, 72)
+                    .setRange(16, 256, 2)
                     .setDefaultValue(44);
             widthOption.create(positionCategory);
             heightOption.create(positionCategory);
             cornerRadiusOption.create(positionCategory);
-
             view.addView(positionCategory);
+
+            var embeddedServerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.embeddedServer"));
+
+            PreferencesFragment.BooleanOption enableEmbeddedServerOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.enable"),
+                    ClientConfigDefinition.enableEmbeddedServer,
+                    ClientConfigDefinition.enableEmbeddedServer::set)
+                    .setDefaultValue(true);
+            enableEmbeddedServerOption.create(embeddedServerCategory);
+
+            {
+                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.serverApiBaseUrl"));
+                EditText input = inputBox.findViewById(R.id.input);
+                if (input != null) {
+                    input.setMinimumWidth(dp(256));
+                    input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+                    input.setText(ServerConfigDefinition.serverApiBaseUrl.get());
+                    input.setOnKeyListener((v, c, e) -> {
+                        if (c == GLFW.GLFW_KEY_ENTER) {
+                            input.clearFocus();
+                            return true;
+                        }
+                        return false;
+                    });
+                    input.setOnFocusChangeListener((v, b) -> {
+                        if (!b) {
+                            ServerConfigDefinition.serverApiBaseUrl.set(input.getText().toString());
+                        }
+                    });
+                }
+                embeddedServerCategory.addView(inputBox);
+            }
+
+            PreferencesFragment.BooleanOption startupBinaryApiServerOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.startupBinaryApiServerWhenLaunch"),
+                    ServerConfigDefinition.startupBinaryApiServerWhenLaunch,
+                    ServerConfigDefinition.startupBinaryApiServerWhenLaunch::set)
+                    .setDefaultValue(true);
+            startupBinaryApiServerOption.create(embeddedServerCategory);
+
+            {
+                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.serverApiBinaryExecutablePath"));
+                EditText input = inputBox.findViewById(R.id.input);
+                if (input != null) {
+                    input.setMinimumWidth(dp(256));
+                    input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+                    input.setText(ServerConfigDefinition.serverApiBinaryExecutablePath.get());
+                    input.setOnKeyListener((v, c, e) -> {
+                        if (c == GLFW.GLFW_KEY_ENTER) {
+                            input.clearFocus();
+                            return true;
+                        }
+                        return false;
+                    });
+                    input.setOnFocusChangeListener((v, b) -> {
+                        if (!b) {
+                            ServerConfigDefinition.serverApiBinaryExecutablePath.set(input.getText().toString());
+                        }
+                    });
+                }
+                embeddedServerCategory.addView(inputBox);
+            }
+
+            LinearLayout layout = new LinearLayout(context);
+            layout.setOrientation(LinearLayout.HORIZONTAL);
+            layout.setGravity(Gravity.LEFT);
+            layout.setVerticalGravity(Gravity.CENTER);
+            LinearLayout.LayoutParams params2 = new LinearLayout.LayoutParams(MATCH_PARENT, dp(44));
+            params2.setMargins(dp(6), 0, dp(6), 0);
+            layout.setLayoutParams(params2);
+
+            TextView apiStatusLabel = new TextView(context);
+            apiStatusLabel.setTextSize(14);
+            String string = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
+            apiStatusLabel.setText(string.replace("{}", I18n.get(ServerApiMeta.Register.getBinaryApiServerStatus().i18nKey())));
+
+            Consumer<ServerApiMeta.Register.BinaryApiServerStatus> listener = (apiStatusListener) -> {
+                MuiModApi.postToUiThread(() -> {
+                    apiStatusLabel.setText(string.replace("{}", I18n.get(apiStatusListener.i18nKey())));
+                });
+            };
+            List<Consumer<ServerApiMeta.Register.BinaryApiServerStatus>> apiStatusListeners = ServerApiMeta.Register.getApiStatusListeners();
+            apiStatusListeners.add(listener);
+
+            Button stopApiServerButton = new Button(context);
+            stopApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.stopApiServer"));
+            stopApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
+            stopApiServerButton.setTextSize(14);
+            Drawable bg1 = ButtonInsetBackground.builder().inset(0).padding(new ButtonInsetBackground.Padding(dp(8), dp(4), dp(8), dp(4))).build().get();
+            stopApiServerButton.setBackground(bg1);
+            stopApiServerButton.setOnClickListener((v) -> {
+                ServerApiMeta.Register.stopApiServer();
+            });
+
+            Button restartApiServerButton = new Button(context);
+            restartApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.restartApiServer"));
+            restartApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
+            restartApiServerButton.setTextSize(14);
+            Drawable bg = ButtonInsetBackground.builder().inset(0).padding(new ButtonInsetBackground.Padding(dp(8), dp(4), dp(8), dp(4))).build().get();
+            restartApiServerButton.setBackground(bg);
+            restartApiServerButton.setOnClickListener((v) -> {
+                ServerApiMeta.Register.restartApiServer();
+            });
+
+            addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+                @Override
+                public void onViewAttachedToWindow(View v) {
+                }
+
+                @Override
+                public void onViewDetachedFromWindow(View v) {
+                    apiStatusListeners.remove(listener);
+                }
+            });
+
+            layout.addView(apiStatusLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+            layout.addView(stopApiServerButton);
+            layout.addView(restartApiServerButton);
+            embeddedServerCategory.addView(layout);
+
+            PreferencesFragment.FloatOption pusherVoteAdditionalRateOption = new PreferencesFragment.FloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.pusherVoteAdditionalRate"),
+                    ServerConfigDefinition.pusherVoteAdditionalRate,
+                    ServerConfigDefinition.pusherVoteAdditionalRate::set)
+                    .setRange(0, 1)
+                    .setDefaultValue(0.5);
+            pusherVoteAdditionalRateOption.create(embeddedServerCategory);
+
+            PreferencesFragment.BooleanOption useRandomCnIpOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.useRandomCnIp"),
+                    ServerConfigDefinition.useRandomCnIp,
+                    ServerConfigDefinition.useRandomCnIp::set)
+                    .setDefaultValue(true);
+            useRandomCnIpOption.create(embeddedServerCategory);
+            LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params1.setMargins(0, dp(6), 0, dp(128));
+            view.addView(embeddedServerCategory, params1);
 
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
                 @Override
@@ -206,6 +354,7 @@ public class ConfigView extends LinearLayout {
                 public void onViewDetachedFromWindow(View v) {
                     Util.ioPool().execute(() -> {
                         ClientConfigDefinition.configure.getRight().save();
+                        ServerConfigDefinition.configure.getRight().save();
                     });
                 }
             });

@@ -3,6 +3,7 @@ package indi.etern.musichud.network;
 import dev.architectury.networking.NetworkManager;
 import dev.architectury.platform.Platform;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.config.ClientConfigDefinition;
 import net.fabricmc.api.EnvType;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -20,7 +21,7 @@ public class NetworkRegisterUtil {
     ) {
         EnvType envType = Platform.getEnv();
         CustomPacketPayload.Type<T> type = getType(clazz);
-        if (envType == EnvType.CLIENT) {
+        if (envType == EnvType.CLIENT && !ClientConfigDefinition.enableEmbeddedServer.get()) {
             //客户端需注册一个空的Receiver
             NetworkManager.registerReceiver(
                     NetworkManager.Side.C2S,

@@ -1,6 +1,7 @@
 package indi.etern.musichud.utils;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.interfaces.*;
 import net.fabricmc.api.EnvType;
 
@@ -16,7 +17,8 @@ public class RegistrationManager {
 
     private static final String[] SERVER_REGISTRIES = new String[]{
             "indi.etern.musichud.server.api.LoginApiService$Register",
-            "indi.etern.musichud.server.api.MusicPlayerServerService$Register"
+            "indi.etern.musichud.server.api.MusicPlayerServerService$Register",
+            "indi.etern.musichud.server.api.ServerApiMeta$Register",
     };
 
     private static final String[] COMMON_REGISTRIES = new String[]{
@@ -48,6 +50,7 @@ public class RegistrationManager {
             "indi.etern.musichud.network.pushMessages.s2c.SwitchMusicMessage$RegisterImpl",
             "indi.etern.musichud.network.pushMessages.s2c.LoginResultMessage$RegisterImpl",
             "indi.etern.musichud.network.pushMessages.s2c.SyncCurrentPlayingMessage$RegisterImpl",
+            "indi.etern.musichud.network.pushMessages.s2c.UpdateAllIdlePlaySourcesMessage$RegisterImpl",
             "indi.etern.musichud.network.pushMessages.c2s.AddToIdlePlaySourceMessage$RegisterImpl",
             "indi.etern.musichud.network.pushMessages.c2s.RemoveFromIdlePlaySourceMessage$RegisterImpl",
             "indi.etern.musichud.network.pushMessages.c2s.ClientPushMusicToQueueMessage$RegisterImpl",
@@ -64,6 +67,9 @@ public class RegistrationManager {
         // 根据环境注册特定接口
         if (envType == EnvType.CLIENT) {
             registerClassesFromList(CLIENT_REGISTRIES, "client");
+            if (ClientConfigDefinition.enableEmbeddedServer.get()) {
+                registerClassesFromList(SERVER_REGISTRIES, "server");
+            }
         } else {
             registerClassesFromList(SERVER_REGISTRIES, "server");
         }

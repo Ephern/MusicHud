@@ -21,11 +21,12 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.Objects;
 
 public class MusicListItem extends LinearLayout {
+    public static final int imageSize = 54;
     private final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("mm:ss");
-    public static final int imageSize = 54;
     private UrlImageView albumImage;
     private TextView musicName;
     private LinearLayout musicArtistAndAlbum;
@@ -34,6 +35,8 @@ public class MusicListItem extends LinearLayout {
     @Setter
     @Getter
     private boolean showPusherInfo = true;
+    @Getter
+    private MusicDetail musicDetail;
 
     public MusicListItem(Context context) {
         super(context);
@@ -86,6 +89,10 @@ public class MusicListItem extends LinearLayout {
     }
 
     public void bindData(MusicDetail musicDetail) {
+        if (Objects.equals(this.musicDetail,musicDetail)) {
+            return;
+        }
+        this.musicDetail = musicDetail;
         albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(dp(imageSize)));
 
         musicName.setText(musicDetail.getName());
@@ -113,6 +120,7 @@ public class MusicListItem extends LinearLayout {
             artistButton.setClickable(true);
             artistButton.setTextColor(Theme.PRIMARY_COLOR);
             artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            artistButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
             artistButton.setText(artist.getName());
             artistButton.setOnClickListener(button -> {
                 RouterContainer routerContainer = RouterContainer.getInstance();
@@ -141,6 +149,7 @@ public class MusicListItem extends LinearLayout {
         albumButton.setTextColor(Theme.PRIMARY_COLOR);
         albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         albumButton.setText(musicDetail.getAlbum().getName());
+        albumButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
         albumButton.setOnClickListener(button -> {
             RouterContainer routerContainer = RouterContainer.getInstance();
             if (routerContainer != null) {
