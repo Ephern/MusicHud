@@ -457,7 +457,21 @@ public class StreamAudioPlayer {
         float musicVolume = Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC);
         if (lastVolume != musicVolume && source != 0 && AL10.alIsSource(source)) {
             AL10.alSourcef(source, AL10.AL_GAIN, musicVolume);
-            lastVolume = musicVolume;
+            int error = AL10.alGetError();
+            if (error != AL10.AL_NO_ERROR) {
+                LOGGER.warn("Failed to set source gain to {}: {} (source: {})", musicVolume, getALErrorString(error), source);
+                // 可选：如果错误表明源无效，可以尝试重新创建源或标记为无效
+                if (error == AL10.AL_INVALID_NAME) {
+                    // 源可能已被删除，标记为无效，后续播放会重建
+                    LOGGER.error("Source {} is invalid, will be reinitialized on nextIdle play", source);
+                    source = 0; // 让下次播放时重新生成
+                    setStatus(Status.ERROR);
+                } else {
+                    setStatus(Status.ERROR);
+                }
+            } else {
+                lastVolume = musicVolume;
+            }
         }
     }
 
@@ -533,45 +547,66 @@ public class StreamAudioPlayer {
     private void cleanup() {
         synchronized (StreamAudioPlayer.class) {
             try {
+                // 停止播放并清除源相关资源
                 if (source != 0 && AL10.alIsSource(source)) {
+                    // 1. 停止源
                     AL10.alSourceStop(source);
                     int error = AL10.alGetError();
                     if (error != AL10.AL_NO_ERROR) {
-                        LOGGER.warn("Error stopping source: {}", error);
+                        LOGGER.warn("Error stopping source {}: {}", source, getALErrorString(error));
                     }
 
-                    int processed = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
-                    //noinspection SpellCheckingInspection
-                    checkALError("alGetSourcei");
-                    while (processed-- > 0) {
+                    // 2. 获取已处理的缓冲区数量
+                    int processed;
+                    try {
+                        processed = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
+                        error = AL10.alGetError();
+                        if (error != AL10.AL_NO_ERROR) {
+                            LOGGER.warn("Error getting processed buffers: {}", getALErrorString(error));
+                            // 不清零 processed，后续循环尝试最大次数
+                            processed = BUFFER_COUNT; // 保守估计所有缓冲区都已处理
+                        }
+                    } catch (Exception e) {
+                        LOGGER.warn("Exception getting processed buffers", e);
+                        processed = BUFFER_COUNT;
+                    }
+
+                    // 3. 解绑所有已处理的缓冲区
+                    int unqueueCount = 0;
+                    for (int i = 0; i < processed; i++) {
                         int[] buffer = new int[1];
                         AL10.alSourceUnqueueBuffers(source, buffer);
-                        try {
-                            //noinspection SpellCheckingInspection
-                            checkALError("alSourceUnqueueBuffers");
-                        } catch (Exception ignored) {
-                            //noinspection SpellCheckingInspection
-                            LOGGER.warn("Failed to unqueue buffers: {}", processed);
+                        error = AL10.alGetError();
+                        if (error != AL10.AL_NO_ERROR) {
+                            LOGGER.warn("Failed to unqueue buffer (attempt {}): {}", i + 1, getALErrorString(error));
+                            // 错误后继续尝试，不清除缓冲区，但可能会残留
+                        } else {
+                            unqueueCount++;
+                            // 可选：标记该缓冲区可以被删除
                         }
                     }
+                    LOGGER.debug("Unqueued {} buffers", unqueueCount);
 
+                    // 4. 删除源
                     AL10.alDeleteSources(source);
-                    try {
-                        checkALError("alDeleteSources");
-                    } catch (Exception ignored) {
-                        LOGGER.warn("Failed to delete sources");
+                    error = AL10.alGetError();
+                    if (error != AL10.AL_NO_ERROR) {
+                        LOGGER.warn("Failed to delete source {}: {}", source, getALErrorString(error));
                     }
-
                     source = 0;
                 }
 
+                // 删除所有缓冲区
                 for (int i = 0; i < buffers.length; i++) {
-                    if (buffers[i] != 0 && AL10.alIsBuffer(buffers[i])) {
-                        AL10.alDeleteBuffers(buffers[i]);
-                        try {
-                            checkALError("alDeleteBuffers");
-                        } catch (Exception ignored) {
-                            LOGGER.warn("Failed to delete buffers: {}", i);
+                    if (buffers[i] != 0) {
+                        if (AL10.alIsBuffer(buffers[i])) {
+                            AL10.alDeleteBuffers(buffers[i]);
+                            int error = AL10.alGetError();
+                            if (error != AL10.AL_NO_ERROR) {
+                                LOGGER.warn("Failed to delete buffer {}: {}", buffers[i], getALErrorString(error));
+                            }
+                        } else {
+                            LOGGER.warn("Buffer {} is not a valid OpenAL buffer", buffers[i]);
                         }
                         buffers[i] = 0;
                     }
@@ -579,14 +614,13 @@ public class StreamAudioPlayer {
 
                 initialized.set(false);
                 lastVolume = 1;
-
-                // 清空缓冲区
                 audioBuffer.clear();
                 totalBufferedBytes.set(0);
-
                 LOGGER.debug("Cleanup completed");
             } catch (Exception e) {
-                LOGGER.error("Cleanup error", e);
+                LOGGER.error("Unexpected error during cleanup", e);
+                // 确保 OpenAL 错误状态被清除，防止污染
+                AL10.alGetError();
             }
         }
     }
@@ -602,7 +636,7 @@ public class StreamAudioPlayer {
         CompletableFuture<MusicResourceInfo> future = new CompletableFuture<>();
         GetMusicResourceResponse.setReceiver(currentMusicDetail.getId(), value -> {
             if (value == null || value == MusicResourceInfo.NONE) {
-                MusicService.getInstance().switchMusic(MusicDetail.NONE, null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
+                MusicService.getInstance().switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                 setStatus(Status.ERROR);
             } else {
                 future.complete(value);

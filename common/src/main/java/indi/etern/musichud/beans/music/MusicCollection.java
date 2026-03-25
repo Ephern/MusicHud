@@ -8,6 +8,8 @@ public interface MusicCollection {
     String getName();
     String getNameI18nKey();
     String getImageThumbnailUrl(int size);
+    PusherInfo getPusherInfo();
     Collection<MusicDetail> getMusicDetails();
-    CompletableFuture<Collection<MusicDetail>> loadMusicDetails();
+    CompletableFuture<Collection<MusicDetail>> loadMusicDetails(boolean ignoreCache);
+    MusicCollection copyWithPusherInfo(PusherInfo pusherInfo);
 }

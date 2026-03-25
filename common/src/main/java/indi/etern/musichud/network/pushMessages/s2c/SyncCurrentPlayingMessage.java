@@ -13,10 +13,12 @@ import net.minecraft.network.codec.StreamCodec;
 
 import java.time.ZonedDateTime;
 
-public record SyncCurrentPlayingMessage(MusicDetail currentPlaying, ZonedDateTime startTime) implements S2CPayload {
+public record SyncCurrentPlayingMessage(MusicDetail currentPlaying, MusicDetail nextIdle, ZonedDateTime startTime) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, SyncCurrentPlayingMessage> CODEC = StreamCodec.composite(
             MusicDetail.CODEC,
             SyncCurrentPlayingMessage::currentPlaying,
+            MusicDetail.CODEC,
+            SyncCurrentPlayingMessage::nextIdle,
             Codecs.ZONED_DATE_TIME,
             SyncCurrentPlayingMessage::startTime,
             SyncCurrentPlayingMessage::new
@@ -30,7 +32,7 @@ public record SyncCurrentPlayingMessage(MusicDetail currentPlaying, ZonedDateTim
                     (message, context) -> {
                         MusicHud.EXECUTOR.execute(() -> {
                             MusicService musicService = MusicService.getInstance();
-                            musicService.switchMusic(message.currentPlaying, message.startTime, "");
+                            musicService.switchMusic(message.currentPlaying, message.nextIdle, message.startTime, "");
                         });
                     }
             );

@@ -1,48 +1,51 @@
 package indi.etern.musichud.server.api;
 
+import dev.architectury.event.events.client.ClientLifecycleEvent;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.MusicDetailsResponse;
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.PlaylistResponse;
 import indi.etern.musichud.beans.music.PlaylistsResponse;
 import indi.etern.musichud.beans.user.AccountDetail;
 import indi.etern.musichud.beans.user.UserDetail;
+import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.interfaces.ServerRegister;
 import indi.etern.musichud.server.config.ServerConfigDefinition;
+import lombok.Getter;
+import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
-import static org.apache.logging.log4j.LogManager.getLogger;
+import java.util.function.Consumer;
 
 @SuppressWarnings("SpellCheckingInspection")
 public class ServerApiMeta {
-    public static final String DEFAULT_API_BASE_URL = "http://localhost:3000";
-    private static String apiBaseUrl = DEFAULT_API_BASE_URL;
-    static Logger logger = getLogger("MusicHud/ServerApiMeta");
-
-    public static void reload() {
-        apiBaseUrl = ServerConfigDefinition.configure.getLeft().serverApiBaseUrl.get();
-        logger.info("Server API Base URL set to: {}", apiBaseUrl);
-    }
-
     public record UrlMeta<T>(String url, Set<String> requiredParams, Set<String> optionalParams, boolean noCache,
                              boolean anonymous, boolean autoRetry, Class<T> responseType) {
         @Override
         public @NotNull String toString() {
-            return apiBaseUrl + url;
+            return ServerConfigDefinition.serverApiBaseUrl.get() + url;
         }
+
         public URI toURI() {
-            String uri = apiBaseUrl + url;
+            String uri = ServerConfigDefinition.serverApiBaseUrl.get() + url;
             List<String> query = new ArrayList<>();
-            if (ServerConfigDefinition.configure.getLeft().useRandomCnIp.get()) {
+            if (ServerConfigDefinition.useRandomCnIp.get()) {
                 //noinspection SpellCheckingInspection
                 query.add("randomCNIP=true");
             }
             if (noCache) {
-                query.add("timestamp="+System.currentTimeMillis());
+                query.add("timestamp=" + System.currentTimeMillis());
             }
             if (!query.isEmpty()) {
                 uri += "?" + String.join("&", query);
@@ -51,7 +54,143 @@ public class ServerApiMeta {
         }
     }
 
-    public static class Login {//Currently only QR code login and anonymous login are proved to be functional (2025/11/06)
+    @RegisterMark
+    public static class Register implements ServerRegister {
+        private static Register register;
+        private static final Logger ncmApiLogger = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/NCM-API");
+        private static Process process;
+        private static boolean continueRestart = true;
+        @Getter
+        private static BinaryApiServerStatus binaryApiServerStatus = BinaryApiServerStatus.STOPPED;
+        @Getter
+        private static final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
+        private static final int maxTries = 5;
+        private static int triedCount = 0;
+        public enum BinaryApiServerStatus {
+            STOPPED, LAUNCHING, RUNNING;
+
+            public String i18nKey() {
+                return MusicHud.MOD_ID + ".text.binaryApiServerStatus." + name();
+            }
+        }
+
+        public void log(String s, boolean error) {
+            if (error || s.contains("[ERROR]")) {
+                ncmApiLogger.error(s.replace("[ERROR]", ""));
+            } else {
+                ncmApiLogger.debug(s.replace("[INFO]", ""));
+            }
+        }
+
+        @Override
+        public void register() {
+            register = this;
+            if (ServerConfigDefinition.startupBinaryApiServerWhenLaunch.get()) {
+                triedCount = 0;
+                startEmbeddedApiServer();
+                ClientLifecycleEvent.CLIENT_STOPPING.register((minecraft) -> {
+                    stopApiServer();
+                });
+            }
+        }
+
+        public static void stopApiServer() {
+            if (process != null) {
+                continueRestart = false;
+                process.destroy();
+            }
+        }
+
+        public static void restartApiServer() {
+            if (register != null) {
+                triedCount = 0;
+                stopApiServer();
+                register.startEmbeddedApiServer();
+            }
+        }
+
+        private void startEmbeddedApiServer() {
+            if (triedCount >= maxTries) {
+                ncmApiLogger.error("Embedded API Server has been stopped due to maximum tries reached.");
+                return;
+            }
+            String binaryExecutableApiServerPathString = ServerConfigDefinition.serverApiBinaryExecutablePath.get();
+            Path binaryExecutableApiServerPath = Paths.get(binaryExecutableApiServerPathString);
+            Path windowsExePath = Paths.get(binaryExecutableApiServerPathString + ".exe");
+            boolean executable = Files.isExecutable(binaryExecutableApiServerPath) || Files.isExecutable(windowsExePath);
+            boolean exists = Files.exists(binaryExecutableApiServerPath) || Files.exists(windowsExePath);
+            if (exists) {
+                if (executable) {
+                    triedCount++;
+                    try {
+                        continueRestart = true;
+                        setApiStatus(BinaryApiServerStatus.LAUNCHING);
+                        process = Runtime.getRuntime().exec(new String[]{binaryExecutableApiServerPath.toString()});
+
+                        // 使用虚拟线程池分别读取 stdout 和 stderr
+                        MusicHud.EXECUTOR.execute(() -> {
+                            Thread.currentThread().setName("API Console");
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    if (line.contains("Server started successfully") && binaryApiServerStatus == BinaryApiServerStatus.LAUNCHING) {
+                                        setApiStatus(BinaryApiServerStatus.RUNNING);
+                                        ncmApiLogger.info("Api server started");
+                                    }
+                                    log(line, false);
+                                }
+                            } catch (IOException e) {
+                                ncmApiLogger.error("Error reading stdout", e);
+                            }
+                        });
+
+                        MusicHud.EXECUTOR.execute(() -> {
+                            Thread.currentThread().setName("API Console");
+                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                                String line;
+                                while ((line = reader.readLine()) != null) {
+                                    log(line, true);
+                                }
+                            } catch (IOException e) {
+                                ncmApiLogger.error("Error reading stderr", e);
+                            }
+                        });
+
+                        // 在另一个虚拟线程中等待进程结束，并处理重启逻辑
+                        MusicHud.EXECUTOR.execute(() -> {
+                            Thread.currentThread().setName("API Daemon");
+                            try {
+                                int exitCode = process.waitFor();
+                                setApiStatus(BinaryApiServerStatus.STOPPED);
+                                if (continueRestart) {
+                                    ncmApiLogger.warn("Api server unexpectedly stopped with code:{}, restarting...", exitCode);
+                                    startEmbeddedApiServer();
+                                } else {
+                                    ncmApiLogger.info("Api server stopped with code:{}", exitCode);
+                                }
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                ncmApiLogger.error("Process wait interrupted", e);
+                            }
+                        });
+                    } catch (Exception e) {
+                        MusicHud.LOGGER.error("Failed to call binary server at path: \"{}\"", binaryExecutableApiServerPathString, e);
+                    }
+                }
+            }
+        }
+
+        private void setApiStatus(BinaryApiServerStatus status) {
+            binaryApiServerStatus = status;
+            apiStatusListeners.forEach(l -> l.accept(status));
+        }
+    }
+
+    /**
+     * Currently only QR code login and anonymous login are proved to be functional (2025/11/06)
+     *
+     */
+    public static class Login {
         public static final UrlMeta<String> PHONE = new UrlMeta<>(
                 "/login/cellphone",
                 Set.of("phone", "md5_password"),
@@ -76,6 +215,9 @@ public class ServerApiMeta {
                 true,
                 true,
                 true, LoginApiService.AnonymousLoginData.class);
+        public static final UrlMeta<String> STATUS = new UrlMeta<>("/login/status", null, null, true, false, true, String.class);
+        public static final UrlMeta<String> LOGOUT = new UrlMeta<>("/logout", null, null, true, false, true, String.class);
+        
         public static class QrCode {
             public static final UrlMeta<LoginApiService.QRLoginResponseInfo> KEY = new UrlMeta<>(
                     "/login/qr/key",
@@ -97,6 +239,7 @@ public class ServerApiMeta {
                     true, false,
                     false, LoginApiService.QRLoginStatus.class);
         }
+
         public static class DeviceCode {
             public static final UrlMeta<String> SENT = new UrlMeta<>(
                     "/captcha/sent",
@@ -109,9 +252,8 @@ public class ServerApiMeta {
                     Set.of("ctcode"),
                     true, false, true, String.class);
         }
-        public static final UrlMeta<String> STATUS = new UrlMeta<>("/login/status", null, null, true, false, true, String.class);
     }
-    public static final UrlMeta<String> LOGOUT = new UrlMeta<>("/logout", null, null, true, false, true, String.class);
+
     public static class User {
         public static final UrlMeta<UserDetail> UID_DETAIL = new UrlMeta<>(
                 "/user/detail",
@@ -162,6 +304,7 @@ public class ServerApiMeta {
                 Set.of("limit"/*default:100*/),
                 true, false, true, String.class);
     }
+
     public static class Artist {
         public static final UrlMeta<String> DESCRIPTION = new UrlMeta<>(
                 "/artist/desc",
@@ -184,6 +327,7 @@ public class ServerApiMeta {
                 Set.of("limit"/*default:50*/, "offset", "order"/* hot|time */),
                 true, false, true, MusicApiService.GetArtistMusicResponse.class);
     }
+
     public static class Playlist {
         public static final UrlMeta<String> CATEGORIES = new UrlMeta<>("/playlist/catlist", null, null, false, false, true, String.class);
         public static final UrlMeta<String> HOT_CATEGORIES = new UrlMeta<>("/playlist/hot", null, null, false, false, true, String.class);
@@ -200,7 +344,8 @@ public class ServerApiMeta {
                 Set.of("cat", "limit"/*default:50*/, "before"),
                 false,
                 false,
-                true, String.class);
+                true
+                , String.class);
         public static final UrlMeta<PlaylistResponse> DETAIL = new UrlMeta<>(
                 "/playlist/detail",
                 Set.of("id"),
@@ -216,10 +361,11 @@ public class ServerApiMeta {
                 false,
                 true, MusicApiService.PlaylistTracksResponse.class);
     }
+
     public static class Music {
         public static final UrlMeta<MusicApiService.GetDirectResourceUrlResponse> URL = new UrlMeta<>(
                 "/song/url/v1",
-                Set.of("id", "unblock"/*true|false*/ ,"level"/* standard|higher|exhigh|lossless|hires|jyeffect|sky|dolby|jymaster */),
+                Set.of("id", "unblock"/*true|false*/, "level"/* standard|higher|exhigh|lossless|hires|jyeffect|sky|dolby|jymaster */),
                 null,
                 true,
                 false,
@@ -243,7 +389,7 @@ public class ServerApiMeta {
                 true, MusicDetailsResponse.class);
         public static final UrlMeta<LyricInfo> LYRIC = new UrlMeta<>("/lyric",
                 Set.of("id")
-                ,null,
+                , null,
                 true, false, true, LyricInfo.class);
         public static final UrlMeta<LyricInfo> WORD_BY_WORD_LYRIC = new UrlMeta<>(
                 "/lyric/new",
@@ -251,6 +397,7 @@ public class ServerApiMeta {
                 null,
                 true, false, true, LyricInfo.class);
     }
+
     public static class Album {
         public static final UrlMeta<MusicApiService.GetAlbumDetailResult> DETAIL = new UrlMeta<>(
                 "/album",
@@ -258,6 +405,7 @@ public class ServerApiMeta {
                 null,
                 true, false, true, MusicApiService.GetAlbumDetailResult.class);
     }
+
     public static class Search {
         public static final UrlMeta<String> CLOUD = new UrlMeta<>(
                 "/cloudsearch",

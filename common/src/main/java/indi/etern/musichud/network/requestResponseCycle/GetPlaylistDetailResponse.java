@@ -32,10 +32,10 @@ public record GetPlaylistDetailResponse(Playlist playlist) implements S2CPayload
         public void register() {
             NetworkRegisterUtil.autoRegisterPayload(
                     GetPlaylistDetailResponse.class, CODEC,
-                    (playlistDetailRequest, context) -> {
-                        Consumer<Playlist> consumer = consumerMap.remove(playlistDetailRequest.playlist().getId());
+                    (playlistDetailResponse, context) -> {
+                        Consumer<Playlist> consumer = consumerMap.remove(playlistDetailResponse.playlist().getId());
                         if (consumer != null) {
-                            consumer.accept(playlistDetailRequest.playlist);
+                            consumer.accept(playlistDetailResponse.playlist);
                         }
                     }
             );

@@ -35,6 +35,22 @@ public class ApiClient {
                 .build();
     }
 
+    /*public static boolean checkAvailable() {
+        HttpRequest request = HttpRequest.newBuilder()
+                .uri(URI.create(ServerConfigDefinition.serverApiBaseUrl.get()))
+                .timeout(Duration.ofSeconds(10))
+                .build();
+        try {
+            HttpResponse<InputStream> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
+            try (InputStream is = response.body()) {
+                int statusCode = response.statusCode();
+                return statusCode >= 200 && statusCode < 400;
+            }
+        } catch (Exception e) {
+            return false;
+        }
+    }*/
+
     @SneakyThrows
     public static <T> T post(ServerApiMeta.UrlMeta<T> urlMeta, Object requestBody, String formattedUserCookie) {
         T t = null;
@@ -157,10 +173,6 @@ public class ApiClient {
         return t;
     }
 
-//    @JsonIgnoreProperties(ignoreUnknown = true)
-    private record CodeOnlyResponse(int code) {
-    }
-
     public static boolean checkUrlAvailable(String urlString, int timeoutMillis) {
         HttpURLConnection connection = null;
         try {
@@ -180,5 +192,9 @@ public class ApiClient {
                 connection.disconnect();
             }
         }
+    }
+
+    //    @JsonIgnoreProperties(ignoreUnknown = true)
+    private record CodeOnlyResponse(int code) {
     }
 }

@@ -71,7 +71,7 @@ public class SearchView extends LinearLayout {
         LinearLayout top = new LinearLayout(context);
         top.setOrientation(HORIZONTAL);
         LayoutParams topParams = new LayoutParams(MATCH_PARENT, dp(38));
-        topParams.setMargins(0, dp(24), 0, 0);
+        topParams.setMargins(0, dp(32), 0, 0);
         addView(top, topParams);
 
         top.addView(new View(context), new LayoutParams(0, WRAP_CONTENT, 2));
@@ -149,8 +149,7 @@ public class SearchView extends LinearLayout {
         String text = searchTextInput.getText().toString();
         if (searchMeta != null && searchMeta.pendingFuture == null && searchMeta.mayHasMore) {
             int offset = searchMeta.nextOffset;
-            CompletableFuture<CompletingType> completableFuture = new CompletableFuture<>();
-            searchMeta.pendingFuture = completableFuture;
+            searchMeta.pendingFuture = new CompletableFuture<>();
             searchRefreshListeners.forEach(listener -> listener.accept(searchMeta));
             NetworkManager.sendToServer(new SearchRequest(text, searchType, offset));
         }

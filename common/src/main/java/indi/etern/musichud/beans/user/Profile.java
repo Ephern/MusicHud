@@ -24,6 +24,7 @@ public class Profile {
                     Profile::new
             );
     public static final Profile ANONYMOUS = new Profile("anonymous", "", "", 0);
+    public static final Profile PRIVATE_MASK = new Profile("private_mask", "", "", 0);
     @Getter
     @Setter
     private static volatile Profile current;
@@ -40,5 +41,15 @@ public class Profile {
     }
     private String getBackgroundUrl() {
         return Objects.requireNonNullElse(backgroundUrl, "");
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(userId);
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof Profile profile && profile.userId == userId;
     }
 }
