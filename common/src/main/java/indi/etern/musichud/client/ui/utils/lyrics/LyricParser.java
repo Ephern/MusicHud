@@ -23,7 +23,7 @@ public class LyricParser {
             .appendFraction(java.time.temporal.ChronoField.MILLI_OF_SECOND, 1, 3, true)
             .toFormatter();
     private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(3);
-    private static Logger logger = MusicHud.getLogger(LyricParser.class);
+    private static final Logger logger = MusicHud.getLogger(LyricParser.class);
 
     public static ArrayDeque<LyricLine> parse(LyricInfo lyricInfo) {
         String lyric = lyricInfo.getLrc().getLyric();
@@ -91,7 +91,7 @@ public class LyricParser {
 //                        rhythmLine.setNext(lyricLine);
                         lastLyricLine = rhythmLine;
                         rhythmLine.setType(LyricLine.Type.RHYTHM);
-                        rhythmLine.setText("• • •");
+                        rhythmLine.setText("");
                         lyricLines.add(rhythmLine);
                     }
                 }
@@ -110,7 +110,7 @@ public class LyricParser {
                         Duration minus = list.get(nextIndex).getStartTime().minus(lyricLine.getStartTime());
                         if (minus.compareTo(emptyLineIgnoreDuration) > 0) {
                             lyricLine.setType(LyricLine.Type.RHYTHM);
-                            lyricLine.setText("• • •");
+                            lyricLine.setText("");
                             lyricLines.add(lyricLine);
                         } else {
                             logger.debug("An empty lyric line is ignored due to its duration ({} s)", minus.toSeconds());

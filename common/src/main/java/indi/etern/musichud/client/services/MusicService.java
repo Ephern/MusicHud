@@ -25,6 +25,8 @@ import indi.etern.musichud.network.pushMessages.c2s.*;
 import indi.etern.musichud.network.requestResponseCycle.*;
 import indi.etern.musichud.throwable.ApiException;
 import lombok.Getter;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 
@@ -51,13 +53,21 @@ public class MusicService {
     private static final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
     private static volatile MusicService instance;
     @Getter
-    private final Set<MusicCollection> idlePlaySources = new HashSet<>();
+    private final Set<MusicCollection> localIdlePlaySources = new HashSet<>();
     @Getter
-    private final List<Consumer<MusicCollection>> idlePlaySourceAddListeners = new ArrayList<>();
+    private final List<Consumer<MusicCollection>> localIdlePlaySourceAddListeners = new ArrayList<>();
     @Getter
-    private final List<Consumer<MusicCollection>> idlePlaylistRemoveListeners = new ArrayList<>();
+    private final List<Consumer<MusicCollection>> localIdlePlaySourceRemoveListeners = new ArrayList<>();
     @Getter
-    private final List<Consumer<MusicCollection>> idlePlaySourceChangeListeners = new ArrayList<>();
+    private final List<Consumer<MusicCollection>> localIdlePlaySourceChangeListeners = new ArrayList<>();
+    @Getter
+    private final Set<MusicCollection> serverIdlePlaySources = new HashSet<>();
+    @Getter
+    private final List<Consumer<MusicCollection>> serverIdlePlaySourceAddListeners = new ArrayList<>();
+    @Getter
+    private final List<Consumer<MusicCollection>> serverIdlePlaySourceRemoveListeners = new ArrayList<>();
+    @Getter
+    private final List<Consumer<MusicCollection>> serverIdlePlaySourceChangeListeners = new ArrayList<>();
     @Getter
     private final Queue<MusicDetail> musicQueue = new ArrayDeque<>();
     @Getter
@@ -89,8 +99,8 @@ public class MusicService {
                 MusicHud.EXECUTOR.execute(() -> {
                     for (IdlePlaySource idlePlaySource : idlePlaySources) {
                         try {
-                            NetworkManager.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
                             loadIdlePlaySource(idlePlaySource.getType(), idlePlaySource.getId()).thenAcceptAsync(musicCollection -> {
+                                NetworkManager.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
                                 getInstance().addToIdlePlaySource(musicCollection);
                             }, MusicHud.EXECUTOR);
                         } catch (Exception e) {
@@ -104,65 +114,62 @@ public class MusicService {
 
     public CompletableFuture<? extends MusicCollection> loadIdlePlaySource(Class<?> type, long id) {
         if (type.equals(AlbumInfo.class)) {
-            return loadAlbumDetail(id);
+            return loadAlbumDetail(id, false);
         } else if (type.equals(Playlist.class)) {
-            return loadPlaylistDetail(id);
+            return loadPlaylistDetail(id, false);
         }
         return null;
     }
 
-    public CompletableFuture<Playlist> loadPlaylistDetail(long id) {
-        Playlist cachedPlaylist = playlistCache.getIfPresent(id);
-        if (cachedPlaylist != null) {
-            return CompletableFuture.completedFuture(cachedPlaylist);
+    public CompletableFuture<Playlist> loadPlaylistDetail(long id, boolean ignoreCache) {
+        if (!ignoreCache) {
+            Playlist cachedPlaylist = playlistCache.getIfPresent(id);
+            if (cachedPlaylist != null) {
+                return CompletableFuture.completedFuture(cachedPlaylist);
+            }
         }
         CompletableFuture<Playlist> completableFuture = new CompletableFuture<>();
         MusicHud.EXECUTOR.execute(() -> {
-            NetworkManager.sendToServer(new GetPlaylistDetailRequest(id));
-            Thread pendingThread = Thread.currentThread();
             GetPlaylistDetailResponse.setReceiver(id, playlist -> {
                 if (playlist != null) {
                     playlistCache.put(id, playlist);
                     completableFuture.complete(playlist);
-                    pendingThread.interrupt();
                 }
             });
-            try {
-                Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
-                completableFuture.completeExceptionally(new ApiException());
-            } catch (InterruptedException ignored) {
-            }
+            NetworkManager.sendToServer(new GetPlaylistDetailRequest(id));
         });
-        return completableFuture;
+        return completableFuture.orTimeout(5, TimeUnit.SECONDS);
     }
 
-    public CompletableFuture<AlbumInfo> loadAlbumDetail(long id) {
-        AlbumInfo cachedPlaylist = albumCache.getIfPresent(id);
-        if (cachedPlaylist != null) {
-            return CompletableFuture.completedFuture(cachedPlaylist);
+    public CompletableFuture<AlbumInfo> loadAlbumDetail(long id, boolean ignoreCache) {
+        if (!ignoreCache) {
+            AlbumInfo cachedPlaylist = albumCache.getIfPresent(id);
+            if (cachedPlaylist != null) {
+                return CompletableFuture.completedFuture(cachedPlaylist);
+            }
         }
         CompletableFuture<AlbumInfo> completableFuture = new CompletableFuture<>();
         MusicHud.EXECUTOR.execute(() -> {
-            NetworkManager.sendToServer(new GetAlbumDetailRequest(id));
-            Thread pendingThread = Thread.currentThread();
             GetAlbumDetailResponse.setReceiver(id, albumInfo -> {
                 albumCache.put(id, albumInfo);
                 completableFuture.complete(albumInfo);
-                pendingThread.interrupt();
             });
-            try {
-                Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
-                completableFuture.completeExceptionally(new ApiException());
-            } catch (InterruptedException ignored) {
-            }
+            NetworkManager.sendToServer(new GetAlbumDetailRequest(id));
         });
-        return completableFuture;
+        return completableFuture.orTimeout(5, TimeUnit.SECONDS);
     }
 
-    public void addToIdlePlaySource(MusicCollection collection) {
-        idlePlaySources.add(collection);
-        idlePlaySourceAddListeners.forEach(l -> l.accept(collection));
-        idlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
+    public void addToIdlePlaySource(MusicCollection idlePlaySourceCollection) {
+        PusherInfo pusherInfo = idlePlaySourceCollection.getPusherInfo();
+        MusicCollection collection;
+        if (pusherInfo != null && pusherInfo != PusherInfo.EMPTY) {
+            collection = idlePlaySourceCollection.copyWithPusherInfo(PusherInfo.EMPTY);
+        } else {
+            collection = idlePlaySourceCollection;
+        }
+        localIdlePlaySources.add(collection);
+        localIdlePlaySourceAddListeners.forEach(l -> l.accept(collection));
+        localIdlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
         IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
         profileConfigData.getIdlePlaySources().add(idlePlaySource);
         profileConfigData.saveToConfig();
@@ -170,9 +177,9 @@ public class MusicService {
     }
 
     public void removeFromIdlePlaySource(MusicCollection collection) {
-        idlePlaySources.remove(collection);
-        idlePlaylistRemoveListeners.forEach(l -> l.accept(collection));
-        idlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
+        localIdlePlaySources.removeIf(c -> c.getId() == collection.getId());
+        localIdlePlaySourceRemoveListeners.forEach(l -> l.accept(collection));
+        localIdlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
         IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
         profileConfigData.getIdlePlaySources().remove(idlePlaySource);
         profileConfigData.saveToConfig();
@@ -237,7 +244,7 @@ public class MusicService {
         NetworkManager.sendToServer(new ClientRemoveMusicFromQueueMessage(index, musicDetail.getId()));
     }
 
-    public synchronized void switchMusic(MusicDetail musicDetail, ZonedDateTime serverStartTime, String message) {
+    public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         if (ClientConfigDefinition.enable.get()) {
             if (!message.isEmpty()) {
                 MuiModApi.postToUiThread(() -> {
@@ -250,12 +257,12 @@ public class MusicService {
                 ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 streamAudioPlayer.playAsync(musicDetail, serverStartTime).thenAccept(zonedDateTime -> {
-                    NowPlayingInfo.getInstance().switchMusic(musicDetail, zonedDateTime);
+                    NowPlayingInfo.getInstance().switchMusic(musicDetail, nextIdleMusicDetail, zonedDateTime);
                 }).exceptionally(e -> {
                     return null;//TODO display error in hud
                 });
             } else {
-                NowPlayingInfo.getInstance().switchMusic(MusicDetail.NONE, null);
+                NowPlayingInfo.getInstance().switchMusic(MusicDetail.NONE,MusicDetail.NONE,null);
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 streamAudioPlayer.stop();
             }
@@ -303,16 +310,68 @@ public class MusicService {
         }
     }
 
+    public void updateAllIdlePlaySources(List<Playlist> playlistSources, List<AlbumInfo> albumSources) {
+        Set<MusicCollection> toRemove = new HashSet<>();
+        Set<MusicCollection> toAdd = new HashSet<>();
+        Set<MusicCollection> serverIdlePlaySources = Set.copyOf(this.serverIdlePlaySources);
+        for (MusicCollection musicCollection : serverIdlePlaySources) {
+            //noinspection SuspiciousMethodCalls
+            if (!playlistSources.contains(musicCollection) && !albumSources.contains(musicCollection)) {
+                toRemove.add(musicCollection);
+                serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
+                serverIdlePlaySourceRemoveListeners.forEach((listener) -> listener.accept(musicCollection));
+            }
+        }
+        LocalPlayer localPlayer = Minecraft.getInstance().player;
+        for (MusicCollection musicCollection : playlistSources) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().playerUUID().equals(localPlayer.getUUID()))) {
+                toAdd.add(musicCollection);
+                serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
+                serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
+            }
+        }
+        for (MusicCollection musicCollection : albumSources) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().playerUUID().equals(localPlayer.getUUID()))) {
+                toAdd.add(musicCollection);
+                serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
+                serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
+            }
+        }
+        this.serverIdlePlaySources.removeAll(toRemove);
+        this.serverIdlePlaySources.addAll(toAdd);
+    }
+
+    public CompletableFuture<List<Playlist>> loadUserPlaylist() {
+        CompletableFuture<List<Playlist>> completableFuture = new CompletableFuture<>();
+        if (LoginService.getInstance().isLogined()) {
+            MusicHud.EXECUTOR.execute(() -> {
+                NetworkManager.sendToServer(GetUserPlaylistRequest.REQUEST);
+                Thread pendingThread = Thread.currentThread();
+                GetUserPlaylistResponse.setConsumer(value -> {
+                    completableFuture.complete(value);
+                    pendingThread.interrupt();
+                });
+                try {
+                    Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
+                    completableFuture.completeExceptionally(new ApiException());
+                } catch (InterruptedException ignored) {}
+            });
+        } else {
+            completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserPlaylist when logined as anonymous"));
+        }
+        return completableFuture;
+    }
+
     @RegisterMark
     public static class RegisterImpl implements ClientRegister {
         public static void reset() {
             if (instance != null) {
-                instance.switchMusic(MusicDetail.NONE, null, "");
+                instance.switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
                 instance.idlePlaySourceLoaded = false;
                 instance.musicQueue.clear();
-                instance.idlePlaySourceAddListeners.clear();
-                instance.idlePlaylistRemoveListeners.clear();
-                instance.idlePlaySourceChangeListeners.clear();
+                instance.localIdlePlaySourceAddListeners.clear();
+                instance.localIdlePlaySourceRemoveListeners.clear();
+                instance.localIdlePlaySourceChangeListeners.clear();
                 instance.musicQueueRefreshListeners.clear();
                 instance.musicQueuePushListeners.clear();
                 instance.musicQueueRemoveListeners.clear();
@@ -320,7 +379,7 @@ public class MusicService {
             if (HudRendererManager.isLoaded()) {
                 HudRendererManager.getInstance().reset();
             }
-            NowPlayingInfo.getInstance().switchMusic(MusicDetail.NONE, null);
+            NowPlayingInfo.getInstance().switchMusic(MusicDetail.NONE, MusicDetail.NONE, null);
         }
 
         @Override

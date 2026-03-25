@@ -29,10 +29,10 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final int AUTO_RECENTER_DELAY_MILLIS = 1000;
-    public static final float MAX_DELAY_MILLIS = 250;
-    public static final float LOG_DELAY_FACTOR = 19;
+    public static final float MAX_DELAY_MILLIS = 150;
+    public static final float MAX_STRETCH_MILLIS = 300;
+    public static final float LOG_DELAY_FACTOR = 9;
     public static final float STAGGERED_BASE_DURATION_MILLIS = 800;
-
     private final Map<LyricLine, LyricLineView> lyricLines = new LinkedHashMap<>();
     private final List<LyricLineView> lineList = new ArrayList<>();
     private final LinearLayout container;
@@ -41,6 +41,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     Set<LyricLineView> staggeringLyricViews = new HashSet<>();
     Runnable staggeringEndListener = null;
     boolean firstStagger = true;
+    boolean scrollFinished = false;
     @Getter
     private volatile ScrollStatus scrollStatus = ScrollStatus.FOLLOW_LYRICS;
     @Getter
@@ -55,6 +56,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     @Getter
     private boolean staggeredActive;
     private float[] delayMillis;
+    private float[] stretchMillis;
     @Getter
     private float lastTargetScrollPosition;
     private float startScrollPosition;
@@ -65,7 +67,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             if (scrollStatus == ScrollStatus.MANUAL) {
                 if (MuiModApi.getElapsedTime() - lastUserScrollTime >= AUTO_RECENTER_DELAY_MILLIS) {
                     scrollStatus = ScrollStatus.IDLE;
-                    lastHighlightedLyricLine = justHighlightedLyricLine;
                     recenter();
                 } else {
                     postDelayed(this, 50);
@@ -117,7 +118,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             ObjectAnimator slideOut = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0, -getWidth());
             slideOut.setInterpolator(Easings.EASE_IN_OUT_QUINT);
             slideOut.setDuration(300);
-//            slideOut.setStartDelay(150);
             slideOut.addListener(new AnimatorListener() {
                 @Override
                 public void onAnimationEnd(@NonNull Animator animation) {
@@ -127,7 +127,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                     ObjectAnimator slideIn = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0);
                     slideIn.setInterpolator(Easings.EASE_IN_OUT_QUINT);
                     slideIn.setDuration(300);
-//                    slideIn.setStartDelay(150);
                     slideIn.start();
                 }
             });
@@ -205,6 +204,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     private void recenter() {
+        lastHighlightedLyricLine = justHighlightedLyricLine;
         if (scrollStatus == ScrollStatus.RECENTER) return;
         scrollStatus = ScrollStatus.RECENTER;
         LyricLine targetLine = justHighlightedLyricLine;
@@ -319,7 +319,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
     }
 
-    boolean scrollFinished = false;
     private void startUpdateLoop() {
         continueUpdate = true;
         scrollFinished = false;
@@ -330,7 +329,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                     scrollFinished = false;
                 }
                 if (((!scrollController.isScrolling() && !scrollFinished) || scrollController.getCurrValue() == lastTargetScrollPosition)
-                    && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
+                        && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
                     scrollFinished = true;
                     if (!staggeredActive || staggeringLyricViews.isEmpty()) {
                         scrollStatus = ScrollStatus.IDLE;
@@ -355,12 +354,14 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private void calcLoggedDelay(int targetIndex) {
         int totalLines = lineList.size();
         delayMillis = new float[totalLines];
+        stretchMillis = new float[totalLines];
 
         for (int i = 0; i < totalLines; i++) {
             int distance = (int) (Math.abs(i - targetIndex + 0.5f) - 0.5f);
             float normalized = (float) distance / (float) totalLines;
             float delayFactor = (float) Math.min(1.0, Math.log(1 + normalized * LOG_DELAY_FACTOR) / Math.log(1 + LOG_DELAY_FACTOR));
-            delayMillis[i] = delayFactor * MAX_DELAY_MILLIS;
+            delayMillis[i] = delayFactor * MAX_DELAY_MILLIS * (i < targetIndex ? 0.3f : 1);
+            stretchMillis[i] = delayFactor * MAX_STRETCH_MILLIS;
         }
     }
 
@@ -377,6 +378,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         for (int i = 0; i < lineList.size(); i++) {
             LyricLineView line = lineList.get(i);
             float delay = delayMillis == null ? 0 : delayMillis[i >= delayMillis.length ? delayMillis.length - 1 : i];
+            float stretch = stretchMillis == null ? 0 : stretchMillis[i >= stretchMillis.length ? stretchMillis.length - 1 : i];
             if (scrollStatus == ScrollStatus.RECENTER) {
                 delay /= 2;
             }
@@ -388,7 +390,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 anyActive = true;
             } else {
                 float t = elapsedMillis - delay;
-                float duration = STAGGERED_BASE_DURATION_MILLIS + delay / 2;
+                float duration = STAGGERED_BASE_DURATION_MILLIS + stretch;
                 if (t <= duration) {
                     pushStaggering(line);
                     float progress = t / duration; // [0,1)

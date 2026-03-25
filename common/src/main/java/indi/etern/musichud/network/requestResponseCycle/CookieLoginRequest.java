@@ -11,10 +11,13 @@ import indi.etern.musichud.network.C2SPayload;
 import indi.etern.musichud.network.NetworkRegisterUtil;
 import indi.etern.musichud.network.pushMessages.s2c.LoginResultMessage;
 import indi.etern.musichud.server.api.LoginApiService;
+import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
+
+import java.util.Collections;
 
 public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRefresh) implements C2SPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, CookieLoginRequest> CODEC =
@@ -66,6 +69,7 @@ public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRef
                                 );
                             }
                         }
+                        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(serverPlayer));
                     })
             );
         }

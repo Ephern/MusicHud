@@ -13,8 +13,8 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.user.Profile;
-import indi.etern.musichud.client.services.AccountService;
 import indi.etern.musichud.client.services.LoginService;
+import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import lombok.Getter;
@@ -26,7 +26,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class AccountView extends LinearLayout {
     @Getter
     private static AccountView instance;
-    private final AccountService accountService = AccountService.getInstance();
 
     public AccountView(Context context) {
         super(context);
@@ -106,7 +105,7 @@ public class AccountView extends LinearLayout {
 
             UrlImageView avatar = new UrlImageView(context);
             avatar.setCircular(true);
-            LayoutParams layoutParams = new LayoutParams(dp(64), dp(64));
+            LayoutParams layoutParams = new LayoutParams(dp(68), dp(68));
             avatar.setLayoutParams(layoutParams);
             topPanel.addView(avatar);
             avatar.loadUrl(currentProfile.getAvatarUrl());
@@ -141,7 +140,7 @@ public class AccountView extends LinearLayout {
             logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             Drawable background = ButtonInsetBackground.builder()
                     .inset(0).cornerRadius(dp(4))
-                    .padding(new ButtonInsetBackground.Padding(0, dp(4), 0, dp(4)))
+                    .padding(new ButtonInsetBackground.Padding(0, dp(2), 0, dp(2)))
                     .build().get();
             logoutButton.setBackground(background);
             texts.addView(logoutButton, logoutButtonParam);
@@ -151,7 +150,7 @@ public class AccountView extends LinearLayout {
             });
 
             LayoutParams topPanelLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            topPanelLayoutParams.setMargins(0, dp(24), 0, dp(32));
+            topPanelLayoutParams.setMargins(0, dp(32), 0, dp(32));
             addView(topPanel, topPanelLayoutParams);
 
             ProgressBar progressBar = new ProgressBar(context);
@@ -176,7 +175,7 @@ public class AccountView extends LinearLayout {
             params1.setMargins(0, dp(16), 0, 0);
             layout1.addView(playlistCards, params1);
 
-            accountService.loadUserPlaylist().thenAcceptAsync(playlists -> {
+            MusicService.getInstance().loadUserPlaylist().thenAcceptAsync(playlists -> {
                 MuiModApi.postToUiThread(() -> {
                     for (Playlist playlist : playlists) {
                         playlistCards.addView(new MusicCollectionCard(context, playlist));

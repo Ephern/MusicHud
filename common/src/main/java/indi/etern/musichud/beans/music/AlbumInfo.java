@@ -31,6 +31,8 @@ public class AlbumInfo implements MusicCollection{
             AlbumInfo::getMusicDetails,
             Codecs.ofList(() -> Artist.CODEC),
             AlbumInfo::getArtists,
+            PusherInfo.CODEC,
+            AlbumInfo::getPusherInfo,
             AlbumInfo::new
     );
     public static final AlbumInfo NONE = new AlbumInfo();
@@ -45,6 +47,10 @@ public class AlbumInfo implements MusicCollection{
     @Setter
     List<MusicDetail> musicDetails = new ArrayList<>();
     List<Artist> artists = new ArrayList<>();
+
+    // Not contained in the original API response, set separately
+    @Getter
+    PusherInfo pusherInfo = PusherInfo.EMPTY;
 
     public String getThumbnailPicUrl(int size) {
         return picUrl + "?param=" + size + "y" + size;
@@ -75,9 +81,9 @@ public class AlbumInfo implements MusicCollection{
     }
 
     @Override
-    public CompletableFuture<Collection<MusicDetail>> loadMusicDetails() {
+    public CompletableFuture<Collection<MusicDetail>> loadMusicDetails(boolean ignoreCache) {
         CompletableFuture<Collection<MusicDetail>> future = new CompletableFuture<>();
-        MusicService.getInstance().loadAlbumDetail(id).thenAccept(albumInfo -> future.complete(albumInfo.musicDetails));
+        MusicService.getInstance().loadAlbumDetail(id, ignoreCache).thenAccept(albumInfo -> future.complete(albumInfo.musicDetails));
         return future;
     }
 
@@ -92,5 +98,22 @@ public class AlbumInfo implements MusicCollection{
         albumInfo.picUrl = this.picUrl;
         albumInfo.picSize = this.picSize;
         return albumInfo;
+    }
+
+    @Override
+    public AlbumInfo copyWithPusherInfo(PusherInfo pusherInfo) {
+        AlbumInfo albumInfo = shallowCopyBriefInfo();
+        albumInfo.pusherInfo = pusherInfo;
+        return albumInfo;
+    }
+
+    @Override
+    public boolean equals(Object obj) {
+        return obj instanceof AlbumInfo albumInfo && id == albumInfo.id && pusherInfo.equals(albumInfo.pusherInfo);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(id, pusherInfo.playerUUID());
     }
 }

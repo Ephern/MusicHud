@@ -8,6 +8,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
 public class ClientConfigDefinition {
+    public static boolean configured = false;
     public static Pair<ClientConfigDefinition, ModConfigSpec> configure;
     public static ModConfigSpec.ConfigValue<Boolean> enable;
     public static ModConfigSpec.ConfigValue<Boolean> showTranslatedCnLyrics;
@@ -24,6 +25,7 @@ public class ClientConfigDefinition {
     public static ModConfigSpec.ConfigValue<Integer> hudCornerRadius;
     public static ModConfigSpec.ConfigValue<String> clientCookie;
     public static ModConfigSpec.ConfigValue<String> clientAccountConfig;
+    public static ModConfigSpec.ConfigValue<Boolean> enableEmbeddedServer;
     public static final String ENABLE_KEY = MusicHud.MOD_ID + ".config.common.enable";
     public static final String SHOW_TRANSLATED_CN_LYRICS = MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics";
     public static final String DISABLE_VANILLA_MUSIC_KEY = MusicHud.MOD_ID + ".config.commmon.disableVanillaMusic";
@@ -39,68 +41,73 @@ public class ClientConfigDefinition {
     public static final String HUD_CORNER_RADIUS_KEY = MusicHud.MOD_ID + ".config.layout.hudCornerRadius";
     public static final String CLIENT_COOKIE_KEY = MusicHud.MOD_ID + ".internal.clientCookie";
     public static final String CLIENT_ACCOUNT_CONFIG = MusicHud.MOD_ID + ".internal.clientAccountConfig";
+    public static final String ENABLE_EMBEDDED_SERVER_KEY = MusicHud.MOD_ID + ".config.embeddedServer.enable";
 
     ClientConfigDefinition(ModConfigSpec.Builder builder) {
-        ClientConfigDefinition.enable = builder
+        enable = builder
                 .comment("Enable Music Hud Functions")
                 .translation(ENABLE_KEY)
                 .define("enable", true);
-        ClientConfigDefinition.showTranslatedCnLyrics = builder
+        showTranslatedCnLyrics = builder
                 .comment("Show translated Chinese lyrics")
                 .translation(SHOW_TRANSLATED_CN_LYRICS)
                 .define("showTranslatedCnLyrics", true);
-        ClientConfigDefinition.disableVanillaMusic = builder
+        disableVanillaMusic = builder
                 .comment("Disable vanilla game music")
                 .translation(DISABLE_VANILLA_MUSIC_KEY)
                 .define("disableVanillaMusic", true);
-        ClientConfigDefinition.hideHudWhenNotPlaying = builder
+        hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(HIDE_HUD_WHEN_NOT_PLAYING_KEY)
                 .define("hideHudWhenNotPlaying", true);
-        ClientConfigDefinition.enableHud = builder
+        enableHud = builder
                 .comment("Enable hud")
                 .translation(ENABLE_HUD_KEY)
                 .define("enableHud", true);
-        ClientConfigDefinition.primaryChosenQuality = builder
+        primaryChosenQuality = builder
                 .comment("Primary chosen quality")
                 .translation(PRIMARY_CHOSEN_QUALITY_KEY)
                 .define("primaryChosenQuality", Quality.LOSSLESS.name());
-        ClientConfigDefinition.hudVerticalPosition = builder
+        hudVerticalPosition = builder
                 .comment("Vertical position (TOP|CENTER|BOTTOM)")
                 .translation(VERTICAL_POSITION_KEY)
                 .define("verticalPosition", VerticalAlign.TOP.name());
-        ClientConfigDefinition.hudHorizontalPosition = builder
+        hudHorizontalPosition = builder
                 .comment("Horizontal position (LEFT|CENTER|RIGHT)")
                 .translation(HORIZONTAL_POSITION_KEY)
                 .define("horizontalPosition", HorizontalAlign.LEFT.name());
-        ClientConfigDefinition.hudOffsetX = builder
+        hudOffsetX = builder
                 .comment("Hud offset x")
                 .translation(OFFSET_X_KEY)
                 .define("hudOffsetX", 16);
-        ClientConfigDefinition.hudOffsetY = builder
+        hudOffsetY = builder
                 .comment("Hud offset y")
                 .translation(OFFSET_Y_KEY)
                 .define("hudOffsetY", 16);
-        ClientConfigDefinition.hudWidth = builder
+        hudWidth = builder
                 .comment("Hud width")
                 .translation(HUD_WIDTH_KEY)
                 .define("hudWidth", 150);
-        ClientConfigDefinition.hudHeight = builder
+        hudHeight = builder
                 .comment("Hud height")
                 .translation(HUD_HEIGHT_KEY)
                 .define("hudHeight", 44);
-        ClientConfigDefinition.hudCornerRadius = builder
+        hudCornerRadius = builder
                 .comment("Hud rounded corner radius")
                 .translation(HUD_CORNER_RADIUS_KEY)
                 .define("hudCornerRadius", 8);
-        ClientConfigDefinition.clientCookie = builder
+        clientCookie = builder
                 .comment("Client NCM cookie json")
                 .translation(CLIENT_COOKIE_KEY)
                 .define("clientCookie", "");
-        ClientConfigDefinition.clientAccountConfig = builder
+        clientAccountConfig = builder
                 .comment("Client account config json")
                 .translation(CLIENT_ACCOUNT_CONFIG)
                 .define("clientAccountConfig", "");
+        enableEmbeddedServer = builder
+                .comment("Enable embedded server (To enable Music HUD in singleplayer or LAN multiplayer)")
+                .translation(ENABLE_EMBEDDED_SERVER_KEY)
+                .define("enableEmbeddedServer", true);
     }
 
     public static void configure() {

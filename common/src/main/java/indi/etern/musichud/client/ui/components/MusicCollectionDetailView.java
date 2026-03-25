@@ -92,7 +92,15 @@ public class MusicCollectionDetailView extends LinearLayout {
         LinearLayout buttons = new LinearLayout(context);
         buttons.setOrientation(HORIZONTAL);
 
+        Button refreshButton = new Button(context);
+        refreshButton.setText(I18n.get("music_hud.button.refresh"));
+        refreshButton.setTextColor(Theme.PRIMARY_COLOR);
+        refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        refreshButton.setOnClickListener((v) -> refreshData(true));
+        buttons.addView(refreshButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
         addToIdleSourceListButton = new Button(context);
+        addToIdleSourceListButton.setVisibility(GONE);
         updateButton();
         addToIdleSourceListButton.setTextColor(Theme.PRIMARY_COLOR);
         addToIdleSourceListButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
@@ -103,7 +111,7 @@ public class MusicCollectionDetailView extends LinearLayout {
                 .build().get();
         addToIdleSourceListButton.setBackground(background1);
         addToIdleSourceListButton.setOnClickListener((v) -> {
-            if (musicService.getIdlePlaySources().contains(musicCollection)) {
+            if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
                 ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
                 musicService.removeFromIdlePlaySource(musicCollection);
             } else {
@@ -111,16 +119,9 @@ public class MusicCollectionDetailView extends LinearLayout {
                 musicService.addToIdlePlaySource(musicCollection);
             }
         });
-        buttons.addView(addToIdleSourceListButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-
-        Button refreshButton = new Button(context);
-        refreshButton.setText(I18n.get("music_hud.button.refresh"));
-        refreshButton.setTextColor(Theme.PRIMARY_COLOR);
-        refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        refreshButton.setOnClickListener((v) -> refreshData());
-        LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params3.setMargins(dp(16), 0, 0, 0);
-        buttons.addView(refreshButton, params3);
+        LayoutParams addToIdleButtonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        addToIdleButtonParams.setMargins(dp(16), 0, 0, 0);
+        buttons.addView(addToIdleSourceListButton, addToIdleButtonParams);
 
         briefInfo.addView(buttons, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
@@ -144,10 +145,10 @@ public class MusicCollectionDetailView extends LinearLayout {
         tracksListView.setOrientation(VERTICAL);
         scrollView.addView(tracksListView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-        refreshData();
+        refreshData(false);
 
         Consumer<MusicCollection> listener = playlist1 -> {
-            if (playlist1.equals(musicCollection)) {
+            if (playlist1.getId() == musicCollection.getId()) {
                 MuiModApi.postToUiThread(this::updateButton);
             }
         };
@@ -155,25 +156,28 @@ public class MusicCollectionDetailView extends LinearLayout {
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
             public void onViewAttachedToWindow(View v) {
-                musicService.getIdlePlaySourceChangeListeners().add(listener);
+                musicService.getLocalIdlePlaySourceChangeListeners().add(listener);
             }
 
             @Override
             public void onViewDetachedFromWindow(View v) {
-                musicService.getIdlePlaySourceChangeListeners().remove(listener);
+                musicService.getLocalIdlePlaySourceChangeListeners().remove(listener);
             }
         });
     }
 
-    private void refreshData() {
+    private void refreshData(boolean ignoreCache) {
         Context context = getContext();
         String collectionNameI18n = musicCollection.getNameI18nKey();
         tracksListView.removeAllViews();
         progressBar.setVisibility(View.VISIBLE);
         progressBar.setIndeterminate(true);
-        musicCollection.loadMusicDetails().thenAcceptAsync(playlistDetail -> {
+        musicCollection.loadMusicDetails(ignoreCache).thenAcceptAsync(playlistDetail -> {
             MuiModApi.postToUiThread(() -> {
                 type.setText(I18n.get(collectionNameI18n) + "  " + I18n.get("music_hud.text.totalCount").replace("{}", String.valueOf(playlistDetail.size())));
+                if (!playlistDetail.isEmpty()) {
+                    addToIdleSourceListButton.setVisibility(View.VISIBLE);
+                }
                 progressBar.setVisibility(View.GONE);
                 for (MusicDetail musicDetail : playlistDetail) {
                     addItem(context, musicDetail);
@@ -203,7 +207,7 @@ public class MusicCollectionDetailView extends LinearLayout {
     }
 
     private void updateButton() {
-        if (musicService.getIdlePlaySources().contains(musicCollection)) {
+        if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
             addToIdleSourceListButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
         } else {
             addToIdleSourceListButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));

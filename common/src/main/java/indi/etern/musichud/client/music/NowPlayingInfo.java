@@ -5,6 +5,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.utils.lyrics.LyricParser;
@@ -37,6 +38,7 @@ public class NowPlayingInfo {
     private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
     @Getter
     private MusicDetail currentlyPlayingMusicDetail;
+    private MusicDetail nextToPlayIdleMusicDetail;
     @Getter
     private volatile Duration musicDuration = null;
     @Getter
@@ -105,9 +107,10 @@ public class NowPlayingInfo {
         return (float) Duration.between(musicStartTime, ZonedDateTime.now()).toMillis() / musicDuration.toMillis();
     }
 
-    public void switchMusic(MusicDetail musicDetail, ZonedDateTime musicStartTime) {
+    public void switchMusic(MusicDetail musicDetail, MusicDetail idleNextToPlay, ZonedDateTime musicStartTime) {
         MusicDetail previous = currentlyPlayingMusicDetail;
         currentlyPlayingMusicDetail = musicDetail;
+        nextToPlayIdleMusicDetail = idleNextToPlay;
         if (!musicDetail.equals(MusicDetail.NONE)) {
             musicDuration = Duration.ofMillis(musicDetail.getDurationMillis());
             this.musicStartTime = musicStartTime;
@@ -129,7 +132,7 @@ public class NowPlayingInfo {
             this.lyricLines = null;
             this.atomicLyricLines.set(null);
         }
-        MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, this.lyricLines));
+        MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, idleNextToPlay, this.lyricLines));
         HudRendererManager.getInstance().switchMusic(musicDetail);
         if (lyricLines != null && !lyricLines.isEmpty()) {
             if (lyricUpdaterThread == null) {
@@ -144,7 +147,7 @@ public class NowPlayingInfo {
     }
 
     private void callLyricsUpdateListeners(LyricLine line) {
-        lyricLineUpdateListener.forEach(c -> {
+         Set.copyOf(lyricLineUpdateListener).forEach(c -> {
             try {
                 c.accept(line);
             } catch (Exception e) {
@@ -198,12 +201,21 @@ public class NowPlayingInfo {
         }
     }
 
+    public MusicDetail getNextToPlayIdleMusicDetail() {
+        if (!MusicService.getInstance().getMusicQueue().isEmpty()) {
+            return MusicService.getInstance().getMusicQueue().peek();
+        } else {
+            return nextToPlayIdleMusicDetail;
+        }
+    }
+
     public void stop() {
         if (lyricUpdaterThread != null) {
             lyricUpdaterThread.interrupt();
         }
         lyricUpdaterThread = null;
-        currentlyPlayingMusicDetail = null;
+        currentlyPlayingMusicDetail = MusicDetail.NONE;
+        nextToPlayIdleMusicDetail = MusicDetail.NONE;
         musicDuration = null;
         musicStartTime = null;
         lyricLines = null;
