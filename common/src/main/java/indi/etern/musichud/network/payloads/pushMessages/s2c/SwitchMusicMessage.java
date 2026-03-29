@@ -8,7 +8,9 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.platform.Environment;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -29,32 +31,35 @@ public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, 
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
-        private static final ClientConfig clientConfig = ClientConfig.getInstance();
-
         public void register() {
+            NetworkReceiver<SwitchMusicMessage> receiver = NetworkReceiver.noop();
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                ClientConfig clientConfig = ClientConfig.getInstance();
+                receiver = (message, player) -> {
+                    MusicHud.EXECUTOR.execute(() -> {
+                        if (!clientConfig.getEnable()) {
+                            return;
+                        }
+                        MusicService musicService = MusicService.getInstance();
+                        String message1 = message.message;
+                        if (message1.startsWith(MusicHud.MOD_ID + ".")) {
+                            message1 = I18n.get(message1);
+                        }
+                        musicService.switchMusic(message.musicDetail, message.nextIdle, null, message1);
+                        Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
+                        if (musicQueue.isEmpty()) {
+                            if (!message.nextIdle.equals(MusicDetail.NONE)) {
+                                ImageUtils.downloadAsync(message.nextIdle.getAlbum().getThumbnailPicUrl(200));
+                            }
+                        } else {
+                            ImageUtils.downloadAsync(musicQueue.peek().getAlbum().getThumbnailPicUrl(200));
+                        }
+                    });
+                };
+            }
             INetworkRegister.getInstance().autoRegisterPayload(
                     SwitchMusicMessage.class, CODEC,
-                    (message, player) -> {
-                        MusicHud.EXECUTOR.execute(() -> {
-                            if (!clientConfig.getEnable()) {
-                                return;
-                            }
-                            MusicService musicService = MusicService.getInstance();
-                            String message1 = message.message;
-                            if (message1.startsWith(MusicHud.MOD_ID + ".")) {
-                                message1 = I18n.get(message1);
-                            }
-                            musicService.switchMusic(message.musicDetail, message.nextIdle, null, message1);
-                            Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
-                            if (musicQueue.isEmpty()) {
-                                if (!message.nextIdle.equals(MusicDetail.NONE)) {
-                                    ImageUtils.downloadAsync(message.nextIdle.getAlbum().getThumbnailPicUrl(200));
-                                }
-                            } else {
-                                ImageUtils.downloadAsync(musicQueue.peek().getAlbum().getThumbnailPicUrl(200));
-                            }
-                        });
-                    }
+                    receiver
             );
         }
     }
