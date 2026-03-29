@@ -2,5 +2,7 @@ name: MusicHud
 version: '${version}'
 main: indi.etern.musichud.paper.CommonInitializer
 api-version: '${apiVersion}'
-description: Native Paper server adapter for MusicHud
-authors: [Etern-34520, Lotus]
+description: A plugin allow to play music from NCM in whole server
+website: https://github.com/Etern-34520/MusicHud
+authors: [Etern]
+contributors: [Lotus (Paper adapter)]

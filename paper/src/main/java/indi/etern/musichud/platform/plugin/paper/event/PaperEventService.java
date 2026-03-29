@@ -16,11 +16,31 @@ import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
 public final class PaperEventService implements IEventService, Listener {
+    private static volatile PaperEventService instance;
     private final Logger logger = MusicHud.getLogger(PaperEventService.class);
     private final List<Consumer<ServerPlayer>> commonPlayerQuitListeners = new CopyOnWriteArrayList<>();
     private final List<Runnable> serverLifecycleStoppingListeners = new CopyOnWriteArrayList<>();
+    private JavaPlugin plugin;
 
-    public PaperEventService(JavaPlugin plugin) {
+    private PaperEventService() {
+    }
+
+    public static PaperEventService getInstance() {
+        if (instance == null) {
+            synchronized (PaperEventService.class) {
+                if (instance == null) {
+                    instance = new PaperEventService();
+                }
+            }
+        }
+        return instance;
+    }
+
+    public void initialize(JavaPlugin plugin) {
+        if (this.plugin == plugin) {
+            return;
+        }
+        this.plugin = plugin;
         plugin.getServer().getPluginManager().registerEvents(this, plugin);
     }
 
