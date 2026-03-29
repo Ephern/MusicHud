@@ -1,0 +1,5 @@
+serverApiBaseUrl: "http://localhost:3000"
+startupBinaryApiServerWhenLaunch: true
+serverApiBinaryExecutablePath: "music-hud/api"
+pusherVoteAdditionalRate: 0.5
+useRandomCnIp: true

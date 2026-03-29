@@ -1,5 +1,8 @@
 package indi.etern.musichud.network;
 
+import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.mod.architectury.network.ModNetworkManager;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -11,11 +14,16 @@ public interface IServerNetworkService {
     void sendToPlayers(Collection<ServerPlayer> players, S2CPayload payload);
 
     static IServerNetworkService getInstance() {
-        try {
-            Class.forName("dev.architectury.networking.NetworkManager");
-            return ModNetworkManager.getInstance();
-        } catch (ClassNotFoundException e) {
-            throw new RuntimeException(e);
+        IServerNetworkService registered = PlatformServiceRegistry.getServerNetworkService();
+        if (registered != null) {
+            return registered;
         }
+        Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
+        switch (platform) {
+            case FABRIC, NEOFORGE -> {
+                return ModNetworkManager.getInstance();
+            }
+        }
+        throw new UnsupportedOperationException();
     }
 }
