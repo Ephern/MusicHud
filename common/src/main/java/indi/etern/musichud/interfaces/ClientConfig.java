@@ -7,7 +7,6 @@ import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.platform.Environment;
-import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.mod.forgeConfig.config.ClientConfigDefinition;
 
 public interface ClientConfig {
@@ -50,8 +49,12 @@ public interface ClientConfig {
     void setConfigured(boolean configured);
     boolean isConfigured();
 
+    static void setInstance(ClientConfig clientConfig) {
+        InstanceHolder.instance = clientConfig;
+    }
+
     static ClientConfig getInstance() {
-        ClientConfig registered = PlatformServiceRegistry.getClientConfig();
+        ClientConfig registered = InstanceHolder.instance;
         if (registered != null) {
             return registered;
         }
@@ -62,5 +65,12 @@ public interface ClientConfig {
             }
         }
         throw new UnsupportedOperationException();
+    }
+
+    final class InstanceHolder {
+        private static ClientConfig instance;
+
+        private InstanceHolder() {
+        }
     }
 }

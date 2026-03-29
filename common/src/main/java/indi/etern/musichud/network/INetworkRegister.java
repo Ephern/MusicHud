@@ -1,7 +1,6 @@
 package indi.etern.musichud.network;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.mod.architectury.network.ModNetworkManager;
 import indi.etern.musichud.network.payloads.IPayload;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -26,8 +25,12 @@ public interface INetworkRegister {
     );
     <T extends IPayload> CustomPacketPayload.Type<T> getType(Class<T> customPacketPayloadClass);
 
+    static void setInstance(INetworkRegister networkRegister) {
+        InstanceHolder.instance = networkRegister;
+    }
+
     static INetworkRegister getInstance() {
-        INetworkRegister registered = PlatformServiceRegistry.getNetworkRegister();
+        INetworkRegister registered = InstanceHolder.instance;
         if (registered != null) {
             return registered;
         }
@@ -37,5 +40,12 @@ public interface INetworkRegister {
             }
         }
         throw new UnsupportedOperationException();
+    }
+
+    final class InstanceHolder {
+        private static INetworkRegister instance;
+
+        private InstanceHolder() {
+        }
     }
 }

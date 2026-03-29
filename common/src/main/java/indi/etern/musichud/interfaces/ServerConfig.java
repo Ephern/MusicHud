@@ -2,7 +2,6 @@ package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.platform.Environment;
-import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.mod.forgeConfig.config.ServerConfigDefinition;
 
 public interface ServerConfig {
@@ -22,8 +21,12 @@ public interface ServerConfig {
     void setConfigured(boolean configured);
     boolean isConfigured();
 
+    static void setInstance(ServerConfig serverConfig) {
+        InstanceHolder.instance = serverConfig;
+    }
+
     static ServerConfig getInstance() {
-        ServerConfig registered = PlatformServiceRegistry.getServerConfig();
+        ServerConfig registered = InstanceHolder.instance;
         if (registered != null) {
             return registered;
         }
@@ -34,5 +37,12 @@ public interface ServerConfig {
             }
         }
         throw new UnsupportedOperationException();
+    }
+
+    final class InstanceHolder {
+        private static ServerConfig instance;
+
+        private InstanceHolder() {
+        }
     }
 }

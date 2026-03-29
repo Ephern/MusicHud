@@ -1,17 +1,18 @@
 package indi.etern.musichud.paper;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.interfaces.IEventService;
+import indi.etern.musichud.interfaces.ServerConfig;
+import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.platform.Environment;
-import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.plugin.paper.config.ServerConfigDefinition;
 import indi.etern.musichud.platform.plugin.paper.event.PaperEventService;
 import indi.etern.musichud.platform.plugin.paper.network.PaperNetworkManager;
 import indi.etern.musichud.server.api.ServerApiMeta;
-import org.apache.logging.log4j.Logger;
 import org.bukkit.plugin.java.JavaPlugin;
 
 public final class CommonInitializer extends JavaPlugin {
-    private final Logger logger = MusicHud.getLogger(CommonInitializer.class);
     private PaperEventService eventService;
     private PaperNetworkManager networkManager;
 
@@ -24,13 +25,13 @@ public final class CommonInitializer extends JavaPlugin {
         eventService = new PaperEventService(this);
         networkManager = new PaperNetworkManager(this);
 
-        PlatformServiceRegistry.setEventService(eventService);
-        PlatformServiceRegistry.setNetworkRegister(networkManager);
-        PlatformServiceRegistry.setServerNetworkService(networkManager);
+        IEventService.setInstance(eventService);
+        INetworkRegister.setInstance(networkManager);
+        IServerNetworkService.setInstance(networkManager);
 
         ServerConfigDefinition serverConfig = ServerConfigDefinition.getInstance();
         serverConfig.initialize(this);
-        PlatformServiceRegistry.setServerConfig(serverConfig);
+        ServerConfig.setInstance(serverConfig);
 
         try {
             MusicHud.init();
@@ -38,14 +39,11 @@ public final class CommonInitializer extends JavaPlugin {
             shutdownServices();
             throw e;
         }
-
-        logger.info("MusicHud native Paper adapter enabled");
     }
 
     @Override
     public void onDisable() {
         shutdownServices();
-        logger.info("MusicHud native Paper adapter disabled");
     }
 
     private void shutdownServices() {
@@ -58,6 +56,9 @@ public final class CommonInitializer extends JavaPlugin {
             networkManager = null;
         }
         eventService = null;
-        PlatformServiceRegistry.clear();
+        IEventService.setInstance(null);
+        INetworkRegister.setInstance(null);
+        IServerNetworkService.setInstance(null);
+        ServerConfig.setInstance(null);
     }
 }

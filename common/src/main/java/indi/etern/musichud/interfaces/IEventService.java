@@ -2,7 +2,6 @@ package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.platform.Environment;
-import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.mod.architectury.event.ModEventService;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.server.level.ServerPlayer;
@@ -10,8 +9,12 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.function.Consumer;
 
 public interface IEventService {
+    static void setInstance(IEventService eventService) {
+        InstanceHolder.instance = eventService;
+    }
+
     static IEventService getInstance() {
-        IEventService registered = PlatformServiceRegistry.getEventService();
+        IEventService registered = InstanceHolder.instance;
         if (registered != null) {
             return registered;
         }
@@ -36,4 +39,11 @@ public interface IEventService {
     void registerClientLifecycleStopping(Runnable listener);
     void registerCommonPlayerQuit(Consumer<ServerPlayer> listener);
     void registerServerLifecycleStopping(Runnable listener);
+
+    final class InstanceHolder {
+        private static IEventService instance;
+
+        private InstanceHolder() {
+        }
+    }
 }
