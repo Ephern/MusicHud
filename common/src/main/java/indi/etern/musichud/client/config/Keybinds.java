@@ -1,17 +1,16 @@
 package indi.etern.musichud.client.config;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import dev.architectury.event.events.client.ClientTickEvent;
-import dev.architectury.registry.client.keymappings.KeyMappingRegistry;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
+import indi.etern.musichud.interfaces.IKeyRegistryService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.neoforged.neoforge.common.ModConfigSpec;
 import org.lwjgl.glfw.GLFW;
 
 @RegisterMark
@@ -35,20 +34,17 @@ public class Keybinds implements ClientRegister {
                 GLFW.GLFW_KEY_COMMA,
                 "key.category." + MusicHud.MOD_ID + "." + MusicHud.MOD_ID
         );
-        KeyMappingRegistry.register(mainMapping);
-        KeyMappingRegistry.register(voteMapping);
-        KeyMappingRegistry.register(toggleHudMapping);
-        ClientTickEvent.CLIENT_POST.register(instance -> {
-            while (mainMapping.consumeClick()) {
-                Minecraft.getInstance().setScreen(MuiModApi.get().createScreen(new MainFragment()));
-            }
-            while (voteMapping.consumeClick()) {
-                MusicService.getInstance().keyBindsVoteSkipCurrent();
-            }
-            while (toggleHudMapping.consumeClick()) {
-                ModConfigSpec.ConfigValue<Boolean> enableHud = ClientConfigDefinition.enableHud;
-                enableHud.set(!enableHud.get());
-            }
+        IKeyRegistryService service = IKeyRegistryService.getInstance();
+        service.register(mainMapping, () -> {
+            Minecraft.getInstance().setScreen(MuiModApi.get().createScreen(new MainFragment()));
+        });
+        service.register(voteMapping, () -> {
+            MusicService.getInstance().keyBindsVoteSkipCurrent();
+        });
+        service.register(toggleHudMapping, () -> {
+            ClientConfig clientConfig = ClientConfig.getInstance();
+            clientConfig.setEnableHud(!clientConfig.getEnableHud());
+            clientConfig.save();
         });
     }
 }

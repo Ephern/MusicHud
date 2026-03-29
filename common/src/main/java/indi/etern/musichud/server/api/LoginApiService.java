@@ -1,17 +1,17 @@
 package indi.etern.musichud.server.api;
 
-import dev.architectury.event.events.common.PlayerEvent;
-import dev.architectury.networking.NetworkManager;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.user.AccountDetail;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
+import indi.etern.musichud.interfaces.IEventService;
 import indi.etern.musichud.interfaces.IntegerCodeEnum;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerRegister;
-import indi.etern.musichud.network.pushMessages.s2c.LoginResultMessage;
+import indi.etern.musichud.network.IServerNetworkService;
+import indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.*;
 import net.minecraft.server.level.ServerPlayer;
@@ -28,6 +28,7 @@ import java.util.function.Supplier;
 public class LoginApiService {
     private static final Logger logger = MusicHud.getLogger(LoginApiService.class);
     private static volatile LoginApiService loginApiService;
+    private static final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     Map<ServerPlayer, Runnable> pollingMap = new HashMap<>();
     @Getter
     Map<ServerPlayer, PlayerLoginInfo> loginedPlayerInfoMap = new HashMap<>();
@@ -51,7 +52,7 @@ public class LoginApiService {
         String message;
         String eMessage = e.getMessage();
         message = e.getClass().getSimpleName() + (eMessage != null ? ":" + eMessage : "");
-        NetworkManager.sendToPlayer(player,
+        serverNetworkService.sendToPlayer(player,
                 new LoginResultMessage(
                         false,
                         message,
@@ -117,7 +118,7 @@ public class LoginApiService {
         if (response.code == 200) {
             loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, response.cookie, ZonedDateTime.now());
             AccountDetail accountDetail = loadUserProfile(player, loginCookieInfo);
-            NetworkManager.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, accountDetail.getProfile()));
+            serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, accountDetail.getProfile()));
             MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
         } else if (sendFail) {
             sendLoginFailResult(player, new RuntimeException("login failed"));
@@ -131,10 +132,10 @@ public class LoginApiService {
         if (cookieResponse.code == 200) {
             refreshedLoginCookieInfo = new LoginCookieInfo(loginCookieInfo.type(), cookieResponse.cookie, ZonedDateTime.now());
             AccountDetail accountDetail = loadUserProfile(player, refreshedLoginCookieInfo);
-            NetworkManager.sendToPlayer(player, new LoginResultMessage(true, "", refreshedLoginCookieInfo, accountDetail.getProfile()));
+            serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", refreshedLoginCookieInfo, accountDetail.getProfile()));
         } else {
             AccountDetail accountDetail = loadUserProfile(player, loginCookieInfo);
-            NetworkManager.sendToPlayer(player, new LoginResultMessage(true, "warning: refresh cookie failed", loginCookieInfo, accountDetail.getProfile()));
+            serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "warning: refresh cookie failed", loginCookieInfo, accountDetail.getProfile()));
             logger.warn("refresh for player \"{}\" failed, response code: {}", player.getName(), cookieResponse.code);
         }
     }
@@ -192,7 +193,7 @@ public class LoginApiService {
                         logger.info("QR login polling v-thread pushing successful result to player: {}", player.getName());
                         LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.QR_CODE, qrLoginStatus.cookie, ZonedDateTime.now());
                         AccountDetail accountDetail = loadUserProfile(player, loginCookieInfo);
-                        NetworkManager.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, accountDetail.getProfile()));
+                        serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, accountDetail.getProfile()));
                         MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
                     }
                 } while (qrLoginStatus.code != QRLoginStatus.Code.EXPIRED && qrLoginStatus.code != QRLoginStatus.Code.SUCCEED);
@@ -255,7 +256,7 @@ public class LoginApiService {
     public static class Register implements ServerRegister {
         @Override
         public void register() {
-            PlayerEvent.PLAYER_QUIT.register(player -> {
+            IEventService.getInstance().registerCommonPlayerQuit(player -> {
                 LoginApiService.getInstance().logout(player);
             });
         }

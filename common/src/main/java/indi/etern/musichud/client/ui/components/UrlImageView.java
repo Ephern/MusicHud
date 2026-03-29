@@ -334,7 +334,11 @@ public class UrlImageView extends FrameLayout {
             MuiModApi.postToUiThread(() -> {
                 try {
                     ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
-                    createDrawable(imageTextureData.convertToBitmap());
+                    Bitmap bitmap = imageTextureData.convertToBitmap();
+                    if (bitmap == null) {
+                        throw new RuntimeException("failed to load image from base64 string");
+                    }
+                    createDrawable(bitmap);
                 } catch (Exception e) {
                     showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
                 }
@@ -348,6 +352,9 @@ public class UrlImageView extends FrameLayout {
                 ImageUtils.downloadAsync(urlString).thenAcceptAsync(imageTextureData -> {
                     if (imageTextureData != null) {
                         Bitmap bitmap = imageTextureData.convertToBitmap();
+                        if (bitmap == null) {
+                            throw new RuntimeException("failed to load image");
+                        }
                         MuiModApi.postToUiThread(() -> createDrawable(bitmap));
                     } else {
                         MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.downloadError")));

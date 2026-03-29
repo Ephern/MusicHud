@@ -1,7 +1,7 @@
 package indi.etern.musichud.mixin;
 
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.StreamAudioPlayer;
+import indi.etern.musichud.interfaces.ClientConfig;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.sounds.SoundSource;
@@ -15,9 +15,10 @@ public class SoundEngineMixin {
     @Inject(method = "play(Lnet/minecraft/client/resources/sounds/SoundInstance;)Lnet/minecraft/client/sounds/SoundEngine$PlayResult;",
             at = @At("HEAD"), cancellable = true)
     private void onPlaySound(SoundInstance soundInstance, CallbackInfoReturnable<SoundEngine.PlayResult> cir) {
-        if (ClientConfigDefinition.configure.getRight().isLoaded()
+        ClientConfig clientConfig = ClientConfig.getInstance();
+        if (clientConfig.isConfigured()
                 && soundInstance.getSource() == SoundSource.MUSIC
-                && ClientConfigDefinition.disableVanillaMusic.get()
+                && clientConfig.getDisableVanillaMusic()
                 && StreamAudioPlayer.getInstance().getStatus() == StreamAudioPlayer.Status.PLAYING) {
             cir.cancel();
             cir.setReturnValue(SoundEngine.PlayResult.NOT_STARTED);

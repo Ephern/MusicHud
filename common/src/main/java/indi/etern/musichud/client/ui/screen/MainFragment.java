@@ -9,6 +9,7 @@ import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.util.DataSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.LayoutInflater;
@@ -19,8 +20,8 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.NowPlayingInfo;
+import indi.etern.musichud.client.music.StreamAudioPlayer;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
@@ -29,6 +30,7 @@ import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.SearchView;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.multiplayer.PlayerInfo;
@@ -40,11 +42,13 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Queue;
+import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MainFragment extends Fragment {
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static volatile MainFragment instance = null;
     private final NowPlayingInfo playingInfo = NowPlayingInfo.getInstance();
     private UrlImageView albumImage;
@@ -76,7 +80,7 @@ public class MainFragment extends Fragment {
             accountBaseView.refresh();
         }
         if (instance != null && instance.titleText != null) {
-            if (!ClientConfigDefinition.enable.get()) {
+            if (!clientConfig.getEnable()) {
                 instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
             } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                 instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
@@ -92,7 +96,7 @@ public class MainFragment extends Fragment {
         if (instance != null) {
             if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
                 instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
-                if (!ClientConfigDefinition.enable.get()) {
+                if (!clientConfig.getEnable()) {
                     instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
                 } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                     instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
@@ -182,7 +186,7 @@ public class MainFragment extends Fragment {
                 instance.skipCurrentButton.setText(I18n.get(MusicHud.MOD_ID + ".button.voteForSkip"));
                 instance.skipCurrentButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 instance.skipCurrentButton.setEnabled(true);
-                instance.skipCurrentButton.setVisibility(ClientConfigDefinition.enable.get() ? View.VISIBLE : View.GONE);
+                instance.skipCurrentButton.setVisibility(clientConfig.getEnable() ? View.VISIBLE : View.GONE);
                 instance.progressBar.setVisibility(View.VISIBLE);
                 instance.skipCurrentButton.setVisibility(View.VISIBLE);
                 startProgressUpdater(musicDetail);
@@ -249,6 +253,12 @@ public class MainFragment extends Fragment {
             routerContainer.setAnimationDuration(300);
 
             {
+                var sideScrollView = new ClampingScrollView(context);
+                base.addView(sideScrollView);
+
+                var side = new LinearLayout(context);
+                side.setOrientation(LinearLayout.VERTICAL);
+
                 var sideMenu = new SideMenu(context, routerContainer);
                 var homeNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
                 var searchNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.search"), SearchView::new);
@@ -261,8 +271,6 @@ public class MainFragment extends Fragment {
                 int widthDp = base.dp(160);
                 var params = new LinearLayout.LayoutParams(widthDp, MATCH_PARENT);
                 params.gravity = Gravity.CENTER;
-                var side = new LinearLayout(context);
-                side.setOrientation(LinearLayout.VERTICAL);
                 albumImage = new UrlImageView(context);
                 albumImage.loadUrl(MusicHud.ICON_BASE64);
                 //noinspection SuspiciousNameCombination
@@ -275,7 +283,7 @@ public class MainFragment extends Fragment {
                 titleText = new TextView(context);
                 titleText.setTextSize(Theme.TEXT_SIZE_LARGE);
                 titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                if (!ClientConfigDefinition.enable.get()) {
+                if (!clientConfig.getEnable()) {
                     instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
                 } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                     instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
@@ -303,6 +311,22 @@ public class MainFragment extends Fragment {
                 progressBar.setMin(0);
                 progressBar.setMax(100);
                 progressBar.setVisibility(View.GONE);
+                StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
+                StreamAudioPlayer.Status status = streamAudioPlayer.getStatus();
+                checkAudioPlayerStatus(status);
+                Consumer<StreamAudioPlayer.Status> statusListener = newStatus -> MuiModApi.postToUiThread(() -> {
+                    checkAudioPlayerStatus(newStatus);
+                });
+                streamAudioPlayer.getStatusChangeListener().add(statusListener);
+                base.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                    @Override
+                    public void onViewAttachedToWindow(View v) {}
+
+                    @Override
+                    public void onViewDetachedFromWindow(View v) {
+                        streamAudioPlayer.getStatusChangeListener().remove(statusListener);
+                    }
+                });
                 LinearLayout.LayoutParams params2 = new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(4));
                 params2.setMargins(0, side.dp(1), 0, side.dp(-4));
                 musicInfo.addView(progressBar, params2);
@@ -352,9 +376,14 @@ public class MainFragment extends Fragment {
                 side.addView(musicInfo, params1);
                 side.addView(sideMenu, params);
 
-                var sideParams = new LinearLayout.LayoutParams(widthDp, MATCH_PARENT);
+                var blank = new FrameLayout(context);
+                side.addView(blank, new FrameLayout.LayoutParams(MATCH_PARENT, base.dp(128)));
+
+                var sideParams = new LinearLayout.LayoutParams(widthDp, WRAP_CONTENT);
                 sideParams.setMargins(0, side.dp(32), 0, 0);
-                base.addView(side, sideParams);
+
+                sideScrollView.addView(side, sideParams);
+
 
                 LayoutTransition transition1 = new LayoutTransition();
                 transition1.enableTransitionType(LayoutTransition.CHANGING);
@@ -375,6 +404,10 @@ public class MainFragment extends Fragment {
             instance = null;
             throw e;
         }
+    }
+
+    private void checkAudioPlayerStatus(StreamAudioPlayer.Status status) {
+        progressBar.setIndeterminate(status == StreamAudioPlayer.Status.BUFFERING || status == StreamAudioPlayer.Status.RETRYING);
     }
 
     @Override

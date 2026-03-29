@@ -1,8 +1,7 @@
 package indi.etern.musichud.beans.music;
 
-import dev.architectury.platform.Platform;
-import dev.architectury.utils.Env;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.interfaces.AliasEnum;
 import indi.etern.musichud.network.Codecs;
 import net.minecraft.client.resources.language.I18n;
@@ -29,7 +28,8 @@ public enum Quality implements AliasEnum {
 
     @Override
     public String toString() {
-        if (Platform.getEnvironment() == Env.CLIENT) {
+        Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
+        if (side == Environment.Side.CLIENT) {
             return I18n.get(MusicHud.MOD_ID + ".config.common.primaryChosenQuality." + this.name());
         } else {
             return this.name();

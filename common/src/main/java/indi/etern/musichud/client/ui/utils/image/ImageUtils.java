@@ -298,15 +298,15 @@ public class ImageUtils {
         byte[] imageBytes = Base64.getDecoder().decode(base64Data);
         Bitmap source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
         NativeImage nativeImage = convertBitmapToNativeImage(source);
+        if (nativeImage == null) {
+            throw new RuntimeException("Failed to convert Bitmap to NativeImage");
+        }
         return getImageTextureData(data, source, nativeImage);
     }
 
     @NotNull
     private static ImageTextureData getImageTextureData(String data, Bitmap source, NativeImage nativeImage) {
-        ResourceLocation imageLocation = ResourceLocation.fromNamespaceAndPath(
-                MusicHud.MOD_ID,
-                "image_" + nativeImage.hashCode()
-        );
+        ResourceLocation imageLocation = MusicHud.location("image_" + nativeImage.hashCode());
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
         Minecraft.getInstance().submit(() -> {
             texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), nativeImage));

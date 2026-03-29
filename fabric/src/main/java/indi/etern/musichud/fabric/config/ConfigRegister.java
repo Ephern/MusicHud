@@ -2,8 +2,8 @@ package indi.etern.musichud.fabric.config;
 
 import fuzs.forgeconfigapiport.fabric.api.v5.ConfigRegistry;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
-import indi.etern.musichud.server.config.ServerConfigDefinition;
+import indi.etern.musichud.platform.mod.forgeConfig.config.ClientConfigDefinition;
+import indi.etern.musichud.platform.mod.forgeConfig.config.ServerConfigDefinition;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.api.DedicatedServerModInitializer;
 import net.neoforged.fml.config.ModConfig;
