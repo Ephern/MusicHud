@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.pages;
 
-import dev.architectury.networking.NetworkManager;
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
@@ -17,10 +16,11 @@ import indi.etern.musichud.beans.music.AlbumInfo;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
-import indi.etern.musichud.network.requestResponseCycle.SearchRequest;
+import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.payloads.requestResponseCycle.SearchRequest;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -44,10 +44,12 @@ public class SearchView extends LinearLayout {
     private final Map<SearchType, SearchMeta> searchMetas = new HashMap<>();
     @Getter
     private final HashSet<Consumer<SearchMeta>> searchRefreshListeners = new HashSet<>();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private EditText searchTextInput;
     private SearchResultTabPage searchResultTabPage;
     @Getter
     private String searchText;
+    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
 
     public SearchView(Context context) {
         super(context);
@@ -60,7 +62,7 @@ public class SearchView extends LinearLayout {
         removeAllViews();
         setOrientation(VERTICAL);
 
-        boolean enabled = ClientConfigDefinition.enable.get();
+        boolean enabled = clientConfig.getEnable();
         if (MusicHud.getStatus() != MusicHud.ConnectStatus.CONNECTED || !enabled) {
             setGravity(Gravity.CENTER);
             TextView textView = Theme.getNotificationTextView(context, enabled);
@@ -137,7 +139,7 @@ public class SearchView extends LinearLayout {
             searchMeta1.pendingFuture = new CompletableFuture<>();
             searchMetas.put(searchType, searchMeta1);
             searchRefreshListeners.forEach(listener -> listener.accept(searchMeta1));
-            NetworkManager.sendToServer(new SearchRequest(searchText, searchType, 0));
+            clientNetworkService.sendToServer(new SearchRequest(searchText, searchType, 0));
         }
     }
 
@@ -151,7 +153,7 @@ public class SearchView extends LinearLayout {
             int offset = searchMeta.nextOffset;
             searchMeta.pendingFuture = new CompletableFuture<>();
             searchRefreshListeners.forEach(listener -> listener.accept(searchMeta));
-            NetworkManager.sendToServer(new SearchRequest(text, searchType, offset));
+            clientNetworkService.sendToServer(new SearchRequest(text, searchType, offset));
         }
     }
 

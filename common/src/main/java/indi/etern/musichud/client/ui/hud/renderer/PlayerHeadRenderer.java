@@ -11,6 +11,7 @@ import net.minecraft.resources.Identifier;
 
 public class PlayerHeadRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
+    @Getter
     private Layout layout;
     @Getter
     @Setter
@@ -20,7 +21,7 @@ public class PlayerHeadRenderer {
 
     public static PlayerHeadRenderer getInstance() {
         if (instance == null) {
-            synchronized (AlbumImageRenderer.class) {
+            synchronized (PlayerHeadRenderer.class) {
                 if (instance == null)
                     instance = new PlayerHeadRenderer();
             }

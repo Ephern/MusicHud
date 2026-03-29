@@ -1,9 +1,7 @@
 package indi.etern.musichud;
 
-import dev.architectury.event.EventHandler;
-import dev.architectury.platform.Platform;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
-import indi.etern.musichud.server.config.ServerConfigDefinition;
+import indi.etern.musichud.interfaces.IEventService;
+import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.utils.RegistrationManager;
 import lombok.Getter;
 import lombok.Setter;
@@ -25,9 +23,12 @@ public final class MusicHud {
     public static final String LOGGER_BASE_NAME = "MusicHud";
     public static final Logger LOGGER = LogManager.getLogger(LOGGER_BASE_NAME);
     public static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
-    @Setter
     @Getter
+    @Setter
     private static ConnectStatus status = ConnectStatus.NOT_CONNECTED;
+    @Getter
+    @Setter
+    private static Environment currentEnvironment;
 
     public static Logger getLogger(Class<?> clazz) {
         Logger logger = LogManager.getLogger(LOGGER_BASE_NAME + "/" + clazz.getSimpleName());
@@ -35,18 +36,13 @@ public final class MusicHud {
         return logger;
     }
 
-    public static void checkConfigAndInit(IConfigSpec modConfigSpec) {
-        if (modConfigSpec.equals(ServerConfigDefinition.configure.getRight())) {
-            ServerConfigDefinition.configured = true;
-        } else if (modConfigSpec.equals(ClientConfigDefinition.configure.getRight())) {
-            ClientConfigDefinition.configured = true;
+    public static void init() {
+        if (currentEnvironment == null) {
+            throw new IllegalStateException("Current environment is not set");
         }
-        if ((Platform.getEnv() == EnvType.CLIENT && ClientConfigDefinition.configured && ServerConfigDefinition.configured)
-                || (Platform.getEnv() == EnvType.SERVER && ServerConfigDefinition.configured)) {
-            LOGGER.atLevel(Level.ALL);
-            EventHandler.init();
-            RegistrationManager.performAutoRegistration(Platform.getEnv());
-        }
+        LOGGER.atLevel(Level.ALL);
+        IEventService.init();
+        RegistrationManager.performAutoRegistration();
     }
 
     public static Identifier location(String s) {

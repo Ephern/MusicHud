@@ -10,7 +10,6 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.music.StreamAudioPlayer;
 import indi.etern.musichud.client.services.LoginService;
@@ -22,8 +21,9 @@ import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.ServerApiMeta;
-import indi.etern.musichud.server.config.ServerConfigDefinition;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.util.Util;
@@ -64,15 +64,17 @@ public class ConfigView extends LinearLayout {
 
             HudRendererManager hudRendererManager = HudRendererManager.getInstance();
 
+            ClientConfig clientConfig = ClientConfig.getInstance();
+
             var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
             PreferencesFragment.BooleanOption booleanOption = new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.enable"),
-                    ClientConfigDefinition.enable,
-                    ClientConfigDefinition.enable::set);
+                    clientConfig::getEnable,
+                    clientConfig::setEnable);
             booleanOption.create(commonCategory);
             booleanOption.setOnChanged(() -> {
                 MuiModApi.postToUiThread(MainFragment::refresh);
-                if (ClientConfigDefinition.enable.get()) {
+                if (clientConfig.getEnable()) {
                     LoginService.getInstance().sendConnectMessageToServer();
                 } else {
                     MusicService.RegisterImpl.reset();
@@ -83,23 +85,23 @@ public class ConfigView extends LinearLayout {
             });
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.showTranslatedCnLyrics"),
-                    ClientConfigDefinition.showTranslatedCnLyrics,
-                    ClientConfigDefinition.showTranslatedCnLyrics::set)
+                    clientConfig::getShowTranslatedCnLyrics,
+                    clientConfig::setShowTranslatedCnLyrics)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.disableVanillaMusicWhilePlaying"),
-                    ClientConfigDefinition.disableVanillaMusic,
-                    ClientConfigDefinition.disableVanillaMusic::set)
+                    clientConfig::getDisableVanillaMusic,
+                    clientConfig::setDisableVanillaMusic)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.enableHud"),
-                    ClientConfigDefinition.enableHud,
-                    ClientConfigDefinition.enableHud::set)
+                    clientConfig::getEnableHud,
+                    clientConfig::setEnableHud)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.autoHide"),
-                    ClientConfigDefinition.hideHudWhenNotPlaying,
-                    ClientConfigDefinition.hideHudWhenNotPlaying::set)
+                    clientConfig::getHideHudWhenNotPlaying,
+                    clientConfig::setHideHudWhenNotPlaying)
                     .create(commonCategory);
             Quality[] qualities = {Quality.STANDARD, Quality.EX_HIGH, Quality.LOSSLESS, Quality.HIRES, Quality.JY_EFFECT, Quality.DOLBY, Quality.JY_MASTER, Quality.SKY};
             List<Quality> qualitiesList = Arrays.stream(qualities).toList();
@@ -108,8 +110,8 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.common.primaryChosenQuality"),
                     qualities,
                     qualitiesList::indexOf,
-                    () -> Quality.valueOf(ClientConfigDefinition.primaryChosenQuality.get()),
-                    (quality) -> ClientConfigDefinition.primaryChosenQuality.set(quality.name()))
+                    clientConfig::getPrimaryChosenQuality,
+                    clientConfig::setPrimaryChosenQuality)
                     .setDefaultValue(Quality.LOSSLESS)
                     .create(commonCategory);
             view.addView(commonCategory);
@@ -119,8 +121,8 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.layout.verticalAlign"),
                     VerticalAlign.values(),
                     VerticalAlign::ordinal,
-                    () -> VerticalAlign.valueOf(ClientConfigDefinition.hudVerticalPosition.get()),
-                    (verticalAlign) -> ClientConfigDefinition.hudVerticalPosition.set(verticalAlign.name()))
+                    clientConfig::getHudVerticalPosition,
+                    clientConfig::setHudVerticalPosition)
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
@@ -132,8 +134,8 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.layout.horizontalAlign"),
                     HorizontalAlign.values(),
                     HorizontalAlign::ordinal,
-                    () -> HorizontalAlign.valueOf(ClientConfigDefinition.hudHorizontalPosition.get()),
-                    (hPosition) -> ClientConfigDefinition.hudHorizontalPosition.set(hPosition.name()))
+                    clientConfig::getHudHorizontalPosition,
+                    clientConfig::setHudHorizontalPosition)
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
@@ -143,8 +145,8 @@ public class ConfigView extends LinearLayout {
             new PreferencesFragment.IntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.offsetX"),
-                    ClientConfigDefinition.hudOffsetX,
-                    ClientConfigDefinition.hudOffsetX::set)
+                    clientConfig::getHudOffsetX,
+                    clientConfig::setHudOffsetX)
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
@@ -155,8 +157,8 @@ public class ConfigView extends LinearLayout {
             new PreferencesFragment.IntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.offsetY"),
-                    ClientConfigDefinition.hudOffsetY,
-                    ClientConfigDefinition.hudOffsetY::set)
+                    clientConfig::getHudOffsetY,
+                    clientConfig::setHudOffsetY)
                     .setRange(0, 1920)
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
@@ -167,9 +169,9 @@ public class ConfigView extends LinearLayout {
             DynamicIntegerOption cornerRadiusOption = new DynamicIntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.hudCornerRadius"),
-                    ClientConfigDefinition.hudCornerRadius,
-                    ClientConfigDefinition.hudCornerRadius::set);
-            cornerRadiusOption.setRange(0, ClientConfigDefinition.hudHeight.get() / 2);
+                    clientConfig::getHudCornerRadius,
+                    clientConfig::setHudCornerRadius);
+            cornerRadiusOption.setRange(0, clientConfig.getHudHeight() / 2);
             cornerRadiusOption.setOnChanged(() -> {
                 hudRendererManager.updateLayoutFromConfig();
                 hudRendererManager.refreshStyle();
@@ -178,24 +180,24 @@ public class ConfigView extends LinearLayout {
             DynamicIntegerOption widthOption = new DynamicIntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.hudWidth"),
-                    ClientConfigDefinition.hudWidth,
-                    ClientConfigDefinition.hudWidth::set);
+                    clientConfig::getHudWidth,
+                    clientConfig::setHudWidth);
             widthOption.setOnChanged(() -> {
                 hudRendererManager.updateLayoutFromConfig();
                 hudRendererManager.refreshStyle();
             });
-            widthOption.setRange(ClientConfigDefinition.hudHeight.get(), 800, 4);
+            widthOption.setRange(clientConfig.getHudHeight(), 800, 4);
             widthOption.setDefaultValue(150);
             PreferencesFragment.IntegerOption heightOption = new PreferencesFragment.IntegerOption(
                     context,
                     I18n.get("music_hud.config.layout.hudHeight"),
-                    ClientConfigDefinition.hudHeight,
-                    ClientConfigDefinition.hudHeight::set)
+                    clientConfig::getHudHeight,
+                    clientConfig::setHudHeight)
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
-                        cornerRadiusOption.updateRange(0, ClientConfigDefinition.hudHeight.get() / 2, 1);
-                        widthOption.updateRange(ClientConfigDefinition.hudHeight.get(), 800, 4);
+                        cornerRadiusOption.updateRange(0, clientConfig.getHudHeight() / 2, 1);
+                        widthOption.updateRange(clientConfig.getHudHeight(), 800, 4);
                     })
                     .setRange(16, 256, 2)
                     .setDefaultValue(44);
@@ -209,18 +211,19 @@ public class ConfigView extends LinearLayout {
             PreferencesFragment.BooleanOption enableEmbeddedServerOption = new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.enable"),
-                    ClientConfigDefinition.enableEmbeddedServer,
-                    ClientConfigDefinition.enableEmbeddedServer::set)
+                    clientConfig::getEnableEmbeddedServer,
+                    clientConfig::setEnableEmbeddedServer)
                     .setDefaultValue(true);
             enableEmbeddedServerOption.create(embeddedServerCategory);
 
+            ServerConfig serverConfig = ServerConfig.getInstance();
             {
                 LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.serverApiBaseUrl"));
                 EditText input = inputBox.findViewById(R.id.input);
                 if (input != null) {
                     input.setMinimumWidth(dp(256));
                     input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-                    input.setText(ServerConfigDefinition.serverApiBaseUrl.get());
+                    input.setText(serverConfig.getServerApiBaseUrl());
                     input.setOnKeyListener((v, c, e) -> {
                         if (c == GLFW.GLFW_KEY_ENTER) {
                             input.clearFocus();
@@ -230,7 +233,7 @@ public class ConfigView extends LinearLayout {
                     });
                     input.setOnFocusChangeListener((v, b) -> {
                         if (!b) {
-                            ServerConfigDefinition.serverApiBaseUrl.set(input.getText().toString());
+                            serverConfig.setServerApiBaseUrl(input.getText().toString());
                         }
                     });
                 }
@@ -240,8 +243,8 @@ public class ConfigView extends LinearLayout {
             PreferencesFragment.BooleanOption startupBinaryApiServerOption = new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.startupBinaryApiServerWhenLaunch"),
-                    ServerConfigDefinition.startupBinaryApiServerWhenLaunch,
-                    ServerConfigDefinition.startupBinaryApiServerWhenLaunch::set)
+                    serverConfig::getStartupBinaryApiServerWhenLaunch,
+                    serverConfig::setStartupBinaryApiServerWhenLaunch)
                     .setDefaultValue(true);
             startupBinaryApiServerOption.create(embeddedServerCategory);
 
@@ -251,7 +254,7 @@ public class ConfigView extends LinearLayout {
                 if (input != null) {
                     input.setMinimumWidth(dp(256));
                     input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-                    input.setText(ServerConfigDefinition.serverApiBinaryExecutablePath.get());
+                    input.setText(serverConfig.getServerApiBinaryExecutablePath());
                     input.setOnKeyListener((v, c, e) -> {
                         if (c == GLFW.GLFW_KEY_ENTER) {
                             input.clearFocus();
@@ -261,7 +264,7 @@ public class ConfigView extends LinearLayout {
                     });
                     input.setOnFocusChangeListener((v, b) -> {
                         if (!b) {
-                            ServerConfigDefinition.serverApiBinaryExecutablePath.set(input.getText().toString());
+                            serverConfig.setServerApiBinaryExecutablePath(input.getText().toString());
                         }
                     });
                 }
@@ -328,8 +331,8 @@ public class ConfigView extends LinearLayout {
             PreferencesFragment.FloatOption pusherVoteAdditionalRateOption = new PreferencesFragment.FloatOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.pusherVoteAdditionalRate"),
-                    ServerConfigDefinition.pusherVoteAdditionalRate,
-                    ServerConfigDefinition.pusherVoteAdditionalRate::set)
+                    serverConfig::getPusherVoteAdditionalRate,
+                    serverConfig::setPusherVoteAdditionalRate)
                     .setRange(0, 1)
                     .setDefaultValue(0.5);
             pusherVoteAdditionalRateOption.create(embeddedServerCategory);
@@ -337,8 +340,8 @@ public class ConfigView extends LinearLayout {
             PreferencesFragment.BooleanOption useRandomCnIpOption = new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.useRandomCnIp"),
-                    ServerConfigDefinition.useRandomCnIp,
-                    ServerConfigDefinition.useRandomCnIp::set)
+                    serverConfig::getUseRandomCnIp,
+                    serverConfig::setUseRandomCnIp)
                     .setDefaultValue(true);
             useRandomCnIpOption.create(embeddedServerCategory);
             LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
@@ -353,8 +356,8 @@ public class ConfigView extends LinearLayout {
                 @Override
                 public void onViewDetachedFromWindow(View v) {
                     Util.ioPool().execute(() -> {
-                        ClientConfigDefinition.configure.getRight().save();
-                        ServerConfigDefinition.configure.getRight().save();
+                        clientConfig.save();
+                        serverConfig.save();
                     });
                 }
             });

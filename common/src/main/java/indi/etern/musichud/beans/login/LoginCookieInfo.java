@@ -1,14 +1,12 @@
 package indi.etern.musichud.beans.login;
 
-import dev.architectury.networking.NetworkManager;
-import dev.architectury.platform.Platform;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
+import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.Codecs;
-import indi.etern.musichud.network.requestResponseCycle.CookieLoginRequest;
-import indi.etern.musichud.utils.JsonUtil;
+import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.payloads.requestResponseCycle.CookieLoginRequest;
+import indi.etern.musichud.platform.Environment;
 import io.netty.buffer.ByteBuf;
-import net.fabricmc.api.EnvType;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import org.apache.logging.log4j.Logger;
@@ -19,6 +17,8 @@ import java.time.ZonedDateTime;
 
 public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime generateTime) {
     private static final Logger logger = MusicHud.getLogger(LoginCookieInfo.class);
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static LoginCookieInfo current;
     public static final StreamCodec<ByteBuf, LoginCookieInfo> STREAM_CODEC =
             StreamCodec.composite(
                     LoginType.PACKET_CODEC,
@@ -35,21 +35,19 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
             ZonedDateTime.of(114514, 1, 9, 1, 9, 8, 10, ZoneId.systemDefault())
     );
     private static final Period refreshInterval = Period.of(0,0,1);
-    public static LoginCookieInfo fromJson(String json) {
-        try {
-            LoginCookieInfo loginCookieInfo = JsonUtil.gson.fromJson(json, LoginCookieInfo.class);
-            if (loginCookieInfo == null) {
-                return UNLOGGED;
-            }
-            return loginCookieInfo;
-        } catch (RuntimeException e) {
-            return UNLOGGED;
-        }
-    }
 
     public static LoginCookieInfo clientCurrentCookie() {
-        if (Platform.getEnv() == EnvType.CLIENT) {
-            return fromJson(ClientConfigDefinition.clientCookie.get());
+        Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
+        if (side == Environment.Side.CLIENT) {
+            try {
+                LoginCookieInfo loginCookieInfo = clientConfig.getClientCookie();
+                if (loginCookieInfo == null) {
+                    return UNLOGGED;
+                }
+                return loginCookieInfo;
+            } catch (RuntimeException e) {
+                return UNLOGGED;
+            }
         } else {
             throw new IllegalStateException("Cannot invoke \"LoginCookieInfo.getClientCookie\" in server");
         }
@@ -57,8 +55,8 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
 
     public static void setClientCookie(LoginCookieInfo loginCookieInfo) {
         try {
-            ClientConfigDefinition.clientCookie.set(JsonUtil.gson.toJson(loginCookieInfo));
-            ClientConfigDefinition.clientCookie.save();
+            clientConfig.setClientCookie(loginCookieInfo);
+            clientConfig.save();
             logger.info("Login cookie saved");
         } catch (RuntimeException e) {
             logger.error("Exception occurred when serializing login cookie and save", e);
@@ -69,9 +67,9 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         if (loginCookieInfo.generateTime.plus(refreshInterval).isBefore(ZonedDateTime.now())) {
             logger.info("Refreshing Login Cookie");
-            NetworkManager.sendToServer(new CookieLoginRequest(loginCookieInfo, true));
+            IClientNetworkService.getInstance().sendToServer(new CookieLoginRequest(loginCookieInfo, true));
         } else {
-            NetworkManager.sendToServer(new CookieLoginRequest(loginCookieInfo, false));
+            IClientNetworkService.getInstance().sendToServer(new CookieLoginRequest(loginCookieInfo, false));
         }
     }
 

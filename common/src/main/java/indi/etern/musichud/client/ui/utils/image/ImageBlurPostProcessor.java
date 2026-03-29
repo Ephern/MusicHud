@@ -28,8 +28,7 @@ public class ImageBlurPostProcessor {
 
             NativeImage nativeImage = convertBitmapToNativeImage(result);
             assert nativeImage != null;
-            Identifier imageBlurredLocation = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID,
-                    "image_blurred_" + radius + "_" + bitmap.hashCode());
+            Identifier imageBlurredLocation = MusicHud.location("image_blurred_" + radius + "_" + bitmap.hashCode());
             AtomicReference<DynamicTexture> texture = new AtomicReference<>();
             Minecraft.getInstance().submit(() -> {
                 texture.set(new DynamicTexture(() -> "downloaded_blurred_" + originalImageData.getSource().hashCode(), nativeImage));

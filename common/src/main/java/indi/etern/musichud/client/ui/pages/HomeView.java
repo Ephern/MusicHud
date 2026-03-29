@@ -15,7 +15,6 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
@@ -24,6 +23,7 @@ import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicListItem;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.client.Minecraft;
@@ -44,6 +44,7 @@ public class HomeView extends LinearLayout {
     private static HomeView instance;
 
     private final HashMap<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new HashMap<>();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
     private MusicListItem nextToPlayItem;
@@ -64,7 +65,7 @@ public class HomeView extends LinearLayout {
         removeAllViews();
         MusicService musicService = MusicService.getInstance();
 
-        boolean enabled = ClientConfigDefinition.enable.get();
+        boolean enabled = clientConfig.getEnable();
         if (MusicHud.getStatus() != MusicHud.ConnectStatus.CONNECTED || !enabled) {
             setGravity(Gravity.CENTER);
             TextView textView = Theme.getNotificationTextView(context, enabled);

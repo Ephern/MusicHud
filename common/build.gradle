@@ -9,6 +9,17 @@ repositories {
     }
 }
 
+processResources {
+    inputs.property("version", rootProject.version)
+    filteringCharset "UTF-8"
+
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    from(sourceSets.main.resources.srcDirs) {
+        exclude "META-INF/mods.toml"
+        exclude "fabric.mod.json"
+    }
+}
+
 dependencies {
     // We depend on Fabric Loader here to use the Fabric @Environment annotations,
     // which get remapped to the correct annotations on each platform.

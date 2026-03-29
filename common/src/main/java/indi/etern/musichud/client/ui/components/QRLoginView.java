@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.components;
 
-import dev.architectury.networking.NetworkManager;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
@@ -12,8 +11,9 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
-import indi.etern.musichud.network.requestResponseCycle.CancelQRLoginRequest;
-import indi.etern.musichud.network.requestResponseCycle.StartQRLoginRequest;
+import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.payloads.requestResponseCycle.CancelQRLoginRequest;
+import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginRequest;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.client.resources.language.I18n;
@@ -27,6 +27,7 @@ public class QRLoginView extends LinearLayout {
     private final Button loginButton;
     private final UrlImageView urlImageView;
     private final TextView messageTextView;
+    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
 
     public QRLoginView(Context context) {
         super(context);
@@ -88,7 +89,7 @@ public class QRLoginView extends LinearLayout {
                     urlImageView.loadUrl(qrLoginResponse.base64QRImg());
                 });
             });
-            NetworkManager.sendToServer(StartQRLoginRequest.REQUEST);
+            clientNetworkService.sendToServer(StartQRLoginRequest.REQUEST);
         });
 
         addView(textView);
@@ -104,7 +105,7 @@ public class QRLoginView extends LinearLayout {
 
             @Override
             public void onViewDetachedFromWindow(View v) {
-                NetworkManager.sendToServer(CancelQRLoginRequest.REQUEST);
+                clientNetworkService.sendToServer(CancelQRLoginRequest.REQUEST);
                 instance = null;
             }
         });

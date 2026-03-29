@@ -2,13 +2,14 @@ package indi.etern.musichud.client.config;
 
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.user.Profile;
-import indi.etern.musichud.utils.JsonUtil;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.AccessLevel;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 
 import java.util.HashSet;
+import java.util.Objects;
 import java.util.Set;
 
 @Data
@@ -17,11 +18,12 @@ public class ProfileConfigData {
     private static volatile ProfileConfigData instance;
     Profile profile;
     Set<IdlePlaySource> idlePlaySources = new HashSet<>();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     @SneakyThrows
     public void saveToConfig() {
-        ClientConfigDefinition.clientAccountConfig.set(JsonUtil.gson.toJson(this));
-        ClientConfigDefinition.clientAccountConfig.save();
+        clientConfig.setClientAccountConfig(this);
+        clientConfig.save();
     }
 
     @SneakyThrows
@@ -29,12 +31,8 @@ public class ProfileConfigData {
         if (instance == null) {
             synchronized (ProfileConfigData.class) {
                 if (instance == null) {
-                    String json = ClientConfigDefinition.clientAccountConfig.get();
-                    if (json == null || json.isEmpty()) {
-                        instance = new ProfileConfigData();
-                    } else {
-                        instance = JsonUtil.gson.fromJson(json, ProfileConfigData.class);
-                    }
+                    ProfileConfigData clientAccountConfig = clientConfig.getClientAccountConfig();
+                    instance = Objects.requireNonNullElseGet(clientAccountConfig, ProfileConfigData::new);
                 }
             }
         }
