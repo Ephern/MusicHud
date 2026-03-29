@@ -17,6 +17,7 @@ public final class ServerConfigDefinition implements ServerConfig {
 
     private static final String DEFAULT_SERVER_API_BASE_URL = "http://localhost:3000";
     private static final boolean DEFAULT_STARTUP_BINARY_API_SERVER = true;
+    private static final String LEGACY_SERVER_API_BINARY_EXECUTABLE_PATH = "music-hud/api";
     private static final String DEFAULT_SERVER_API_BINARY_EXECUTABLE_PATH = "api";
     private static final double DEFAULT_PUSHER_VOTE_ADDITIONAL_RATE = 0.5D;
     private static final boolean DEFAULT_USE_RANDOM_CN_IP = true;
@@ -57,12 +58,22 @@ public final class ServerConfigDefinition implements ServerConfig {
         changed |= ensureDefault(config, KEY_SERVER_API_BINARY_EXECUTABLE_PATH, DEFAULT_SERVER_API_BINARY_EXECUTABLE_PATH);
         changed |= ensureDefault(config, KEY_PUSHER_VOTE_ADDITIONAL_RATE, DEFAULT_PUSHER_VOTE_ADDITIONAL_RATE);
         changed |= ensureDefault(config, KEY_USE_RANDOM_CN_IP, DEFAULT_USE_RANDOM_CN_IP);
+        changed |= migrateLegacyBinaryExecutablePath(config);
         return changed;
     }
 
     private boolean ensureDefault(FileConfiguration config, String key, Object value) {
         if (!config.contains(key)) {
             config.set(key, value);
+            return true;
+        }
+        return false;
+    }
+
+    private boolean migrateLegacyBinaryExecutablePath(FileConfiguration config) {
+        String configuredPath = config.getString(KEY_SERVER_API_BINARY_EXECUTABLE_PATH);
+        if (LEGACY_SERVER_API_BINARY_EXECUTABLE_PATH.equals(configuredPath)) {
+            config.set(KEY_SERVER_API_BINARY_EXECUTABLE_PATH, DEFAULT_SERVER_API_BINARY_EXECUTABLE_PATH);
             return true;
         }
         return false;
