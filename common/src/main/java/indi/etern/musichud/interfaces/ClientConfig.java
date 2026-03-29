@@ -7,6 +7,7 @@ import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.mod.forgeConfig.config.ClientConfigDefinition;
 
 public interface ClientConfig {
@@ -50,6 +51,10 @@ public interface ClientConfig {
     boolean isConfigured();
 
     static ClientConfig getInstance() {
+        ClientConfig registered = PlatformServiceRegistry.getClientConfig();
+        if (registered != null) {
+            return registered;
+        }
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         switch (platform) {
             case FABRIC, NEOFORGE -> {

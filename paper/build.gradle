@@ -1,0 +1,93 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'com.gradleup.shadow'
+    id 'io.papermc.paperweight.userdev'
+}
+
+base {
+    archivesName = "$rootProject.archives_name-$project.name"
+}
+
+configurations {
+    common {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+    compileClasspath.extendsFrom common
+    runtimeClasspath.extendsFrom common
+    shadowBundle {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = 'PaperMC'
+        url = 'https://repo.papermc.io/repository/maven-public/'
+    }
+}
+
+dependencies {
+    paperweight.paperDevBundle("${rootProject.minecraft_version}-R0.1-SNAPSHOT")
+
+    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+    shadowBundle(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+
+    compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+    testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+    testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.release = 21
+    options.encoding = 'UTF-8'
+}
+
+tasks.withType(Test).configureEach {
+    useJUnitPlatform()
+}
+
+tasks.processResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    filesMatching('paper-plugin.yml') {
+        expand(
+                version: project.version,
+                apiVersion: rootProject.minecraft_version
+        )
+    }
+}
+
+tasks.shadowJar {
+    configurations = [project.configurations.shadowBundle]
+    archiveClassifier = 'dev-shadow'
+}
+
+tasks.reobfJar {
+    inputJar.set(tasks.shadowJar.archiveFile)
+    dependsOn(tasks.shadowJar)
+}
+
+tasks.assemble {
+    dependsOn tasks.reobfJar
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = base.archivesName.get()
+            from components.java
+        }
+    }
+}

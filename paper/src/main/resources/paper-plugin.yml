@@ -1,0 +1,6 @@
+name: MusicHud
+version: '${version}'
+main: indi.etern.musichud.paper.CommonInitializer
+api-version: '${apiVersion}'
+description: Native Paper server adapter for MusicHud
+authors: [Etern-34520, Lotus]
