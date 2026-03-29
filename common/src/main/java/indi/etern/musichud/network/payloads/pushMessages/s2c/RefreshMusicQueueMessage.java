@@ -7,7 +7,9 @@ import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.platform.Environment;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 
@@ -24,13 +26,15 @@ public record RefreshMusicQueueMessage(Queue<MusicDetail> queue) implements S2CP
     public static class RegisterImpl implements CommonRegister {
         @Override
         public void register() {
+            NetworkReceiver<RefreshMusicQueueMessage> receiver = NetworkReceiver.noop();
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                receiver = (message, context) -> MusicHud.EXECUTOR.execute(() ->
+                        MusicService.getInstance().refreshQueue(message.queue)
+                );
+            }
             INetworkRegister.getInstance().autoRegisterPayload(
                     RefreshMusicQueueMessage.class, CODEC,
-                    (message,context) -> {
-                        MusicHud.EXECUTOR.execute(() -> {
-                            MusicService.getInstance().refreshQueue(message.queue);
-                        });
-                    }
+                    receiver
             );
         }
     }

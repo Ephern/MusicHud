@@ -6,7 +6,9 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.platform.Environment;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
@@ -26,22 +28,26 @@ public record ConnectResponse(boolean accepted, Version serverVersion) implement
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
         public void register() {
-            INetworkRegister.getInstance().autoRegisterPayload(
-                    ConnectResponse.class, CODEC,
-                    (payload, player) -> {
-                        LOGGER.info("Connecting {}", payload.accepted() ? "accepted" : "denied");
-                        if (payload.accepted()) {
-                            if (Version.capableWith(payload.serverVersion)) {
-                                MusicHud.setStatus(MusicHud.ConnectStatus.CONNECTED);
-                                LoginService.getInstance().loginToServer();
-                            } else {
-                                LoginService.getInstance().logout();
-                                MusicHud.setStatus(MusicHud.ConnectStatus.INCAPABLE);
-                            }
+            NetworkReceiver<ConnectResponse> receiver = NetworkReceiver.noop();
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                receiver = (payload, player) -> {
+                    LOGGER.info("Connecting {}", payload.accepted() ? "accepted" : "denied");
+                    if (payload.accepted()) {
+                        if (Version.capableWith(payload.serverVersion)) {
+                            MusicHud.setStatus(MusicHud.ConnectStatus.CONNECTED);
+                            LoginService.getInstance().loginToServer();
                         } else {
+                            LoginService.getInstance().logout();
                             MusicHud.setStatus(MusicHud.ConnectStatus.INCAPABLE);
                         }
+                    } else {
+                        MusicHud.setStatus(MusicHud.ConnectStatus.INCAPABLE);
                     }
+                };
+            }
+            INetworkRegister.getInstance().autoRegisterPayload(
+                    ConnectResponse.class, CODEC,
+                    receiver
             );
         }
     }

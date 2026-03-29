@@ -7,7 +7,9 @@ import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.platform.Environment;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 
@@ -28,14 +30,14 @@ public record SyncCurrentPlayingMessage(MusicDetail currentPlaying, MusicDetail 
     public static class RegisterImpl implements CommonRegister {
         @Override
         public void register() {
-            INetworkRegister.getInstance().autoRegisterPayload(SyncCurrentPlayingMessage.class, CODEC,
-                    (message, player) -> {
-                        MusicHud.EXECUTOR.execute(() -> {
-                            MusicService musicService = MusicService.getInstance();
-                            musicService.switchMusic(message.currentPlaying, message.nextIdle, message.startTime, "");
-                        });
-                    }
-            );
+            NetworkReceiver<SyncCurrentPlayingMessage> receiver = NetworkReceiver.noop();
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                receiver = (message, player) -> MusicHud.EXECUTOR.execute(() -> {
+                    MusicService musicService = MusicService.getInstance();
+                    musicService.switchMusic(message.currentPlaying, message.nextIdle, message.startTime, "");
+                });
+            }
+            INetworkRegister.getInstance().autoRegisterPayload(SyncCurrentPlayingMessage.class, CODEC, receiver);
         }
     }
 }
