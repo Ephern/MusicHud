@@ -27,8 +27,8 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public final class PaperNetworkManager implements INetworkRegister, IServerNetworkService, AutoCloseable {
     private static final int MAX_PLUGIN_MESSAGE_RETRY_TICKS = 40;
+    private static volatile PaperNetworkManager instance;
 
-    private final JavaPlugin plugin;
     private final Logger logger = MusicHud.getLogger(PaperNetworkManager.class);
     private final Map<Class<? extends IPayload>, CustomPacketPayload.Type<? extends IPayload>> typeMap = new ConcurrentHashMap<>();
     private final Map<String, RegisteredReceiver<?>> c2sReceivers = new ConcurrentHashMap<>();
@@ -36,8 +36,26 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
             new ConcurrentHashMap<>();
     private final Set<String> incomingChannels = ConcurrentHashMap.newKeySet();
     private final Set<String> outgoingChannels = ConcurrentHashMap.newKeySet();
+    private JavaPlugin plugin;
 
-    public PaperNetworkManager(JavaPlugin plugin) {
+    private PaperNetworkManager() {
+    }
+
+    public static PaperNetworkManager getInstance() {
+        if (instance == null) {
+            synchronized (PaperNetworkManager.class) {
+                if (instance == null) {
+                    instance = new PaperNetworkManager();
+                }
+            }
+        }
+        return instance;
+    }
+
+    public void initialize(JavaPlugin plugin) {
+        if (this.plugin == plugin) {
+            return;
+        }
         this.plugin = plugin;
     }
 
@@ -121,6 +139,9 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
 
     @Override
     public void close() {
+        if (plugin == null) {
+            return;
+        }
         Messenger messenger = plugin.getServer().getMessenger();
         for (String channel : incomingChannels) {
             messenger.unregisterIncomingPluginChannel(plugin, channel);
@@ -133,6 +154,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
         c2sReceivers.clear();
         s2cCodecs.clear();
         typeMap.clear();
+        plugin = null;
     }
 
     private void ensureIncomingChannelRegistered(String channel) {
