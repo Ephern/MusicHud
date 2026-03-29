@@ -15,7 +15,8 @@ public class Environment {
     }
     public enum Platform {
         FABRIC,
-        NEOFORGE
+        NEOFORGE,
+        PAPER
     }
     private Side side;
     private Platform platform;

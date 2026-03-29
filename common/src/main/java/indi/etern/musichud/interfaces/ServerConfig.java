@@ -2,6 +2,7 @@ package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.mod.forgeConfig.config.ServerConfigDefinition;
 
 public interface ServerConfig {
@@ -22,6 +23,10 @@ public interface ServerConfig {
     boolean isConfigured();
 
     static ServerConfig getInstance() {
+        ServerConfig registered = PlatformServiceRegistry.getServerConfig();
+        if (registered != null) {
+            return registered;
+        }
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         switch (platform) {
             case FABRIC, NEOFORGE -> {

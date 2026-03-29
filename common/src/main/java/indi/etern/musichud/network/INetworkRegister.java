@@ -1,6 +1,7 @@
 package indi.etern.musichud.network;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.platform.PlatformServiceRegistry;
 import indi.etern.musichud.platform.mod.architectury.network.ModNetworkManager;
 import indi.etern.musichud.network.payloads.IPayload;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -26,6 +27,10 @@ public interface INetworkRegister {
     <T extends IPayload> CustomPacketPayload.Type<T> getType(Class<T> customPacketPayloadClass);
 
     static INetworkRegister getInstance() {
+        INetworkRegister registered = PlatformServiceRegistry.getNetworkRegister();
+        if (registered != null) {
+            return registered;
+        }
         switch (MusicHud.getCurrentEnvironment().getPlatform()) {
             case FABRIC, NEOFORGE -> {
                 return ModNetworkManager.getInstance();

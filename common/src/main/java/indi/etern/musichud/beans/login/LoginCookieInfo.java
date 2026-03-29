@@ -17,7 +17,6 @@ import java.time.ZonedDateTime;
 
 public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime generateTime) {
     private static final Logger logger = MusicHud.getLogger(LoginCookieInfo.class);
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static LoginCookieInfo current;
     public static final StreamCodec<ByteBuf, LoginCookieInfo> STREAM_CODEC =
             StreamCodec.composite(
@@ -40,6 +39,7 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
         if (side == Environment.Side.CLIENT) {
             try {
+                ClientConfig clientConfig = ClientConfig.getInstance();
                 LoginCookieInfo loginCookieInfo = clientConfig.getClientCookie();
                 if (loginCookieInfo == null) {
                     return UNLOGGED;
@@ -55,6 +55,7 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
 
     public static void setClientCookie(LoginCookieInfo loginCookieInfo) {
         try {
+            ClientConfig clientConfig = ClientConfig.getInstance();
             clientConfig.setClientCookie(loginCookieInfo);
             clientConfig.save();
             logger.info("Login cookie saved");
