@@ -4,6 +4,8 @@ import indi.etern.musichud.interfaces.ServerConfig;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.Objects;
 
 public final class ServerConfigDefinition implements ServerConfig {
@@ -15,7 +17,7 @@ public final class ServerConfigDefinition implements ServerConfig {
 
     private static final String DEFAULT_SERVER_API_BASE_URL = "http://localhost:3000";
     private static final boolean DEFAULT_STARTUP_BINARY_API_SERVER = true;
-    private static final String DEFAULT_SERVER_API_BINARY_EXECUTABLE_PATH = "music-hud/api";
+    private static final String DEFAULT_SERVER_API_BINARY_EXECUTABLE_PATH = "api";
     private static final double DEFAULT_PUSHER_VOTE_ADDITIONAL_RATE = 0.5D;
     private static final boolean DEFAULT_USE_RANDOM_CN_IP = true;
 
@@ -119,7 +121,12 @@ public final class ServerConfigDefinition implements ServerConfig {
 
     @Override
     public String getServerApiBinaryExecutablePath() {
-        return serverApiBinaryExecutablePath;
+        Path configuredPath = Paths.get(serverApiBinaryExecutablePath);
+        if (configuredPath.isAbsolute()) {
+            return configuredPath.normalize().toString();
+        }
+        JavaPlugin initializedPlugin = Objects.requireNonNull(plugin, "Paper server config is not initialized");
+        return initializedPlugin.getDataFolder().toPath().resolve(configuredPath).normalize().toString();
     }
 
     @Override
