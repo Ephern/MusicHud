@@ -19,9 +19,7 @@ import org.apache.logging.log4j.Logger;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayDeque;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -48,13 +46,16 @@ public class NowPlayingInfo {
     private final AtomicReference<ArrayDeque<LyricLine>> atomicLyricLines = new AtomicReference<>();
     @Getter
     private LyricLine currentLyricLine;
-    private Thread lyricUpdaterThread;
+    private Thread lyricUpdaterVThread;
 
     Runnable lyricUpdater = () -> {
         Thread thread = Thread.currentThread();
-        lyricUpdaterThread = thread;
+        lyricUpdaterVThread = thread;
         thread.setName("Lyrics Updater");
         while (true) {
+            if (this.musicStartTime == null) {
+                break;
+            }
             ArrayDeque<LyricLine> lyricLines1 = this.atomicLyricLines.get();
             if (lyricLines1 == null || lyricLines1.isEmpty()) break;
             LyricLine line = lyricLines1.peek();
@@ -82,7 +83,7 @@ public class NowPlayingInfo {
                 }
             }
         }
-        lyricUpdaterThread = null;
+        lyricUpdaterVThread = null;
     };
 
     private Duration getCallTime(LyricLine line) {
@@ -107,19 +108,18 @@ public class NowPlayingInfo {
         return (float) Duration.between(musicStartTime, ZonedDateTime.now()).toMillis() / musicDuration.toMillis();
     }
 
-    public void switchMusic(MusicDetail musicDetail, MusicDetail idleNextToPlay, ZonedDateTime musicStartTime) {
+    public void switchMusicInfo(MusicDetail musicDetail, MusicDetail idleNextToPlay) {
         MusicDetail previous = currentlyPlayingMusicDetail;
         currentlyPlayingMusicDetail = musicDetail;
         nextToPlayIdleMusicDetail = idleNextToPlay;
         if (!musicDetail.equals(MusicDetail.NONE)) {
             musicDuration = Duration.ofMillis(musicDetail.getDurationMillis());
-            this.musicStartTime = musicStartTime;
         } else {
             musicDuration = null;
-            this.musicStartTime = null;
         }
+        musicStartTime = null;
         LyricInfo lyricInfo = musicDetail.getLyricInfo();
-        ArrayDeque<LyricLine> lyricLines = null;
+        ArrayDeque<LyricLine> lyricLines;
         if (!lyricInfo.equals(LyricInfo.NONE)) {
             try {
                 lyricLines = LyricParser.parse(lyricInfo);
@@ -134,15 +134,19 @@ public class NowPlayingInfo {
         }
         MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, idleNextToPlay, this.lyricLines));
         HudRendererManager.getInstance().switchMusic(musicDetail);
+        List.copyOf(musicSwitchListener).forEach(consumer -> {
+            consumer.accept(previous, musicDetail);
+        });
+    }
+
+    public void startAt(ZonedDateTime zonedDateTime) {
+        musicStartTime = Objects.requireNonNullElseGet(zonedDateTime, ZonedDateTime::now);
         if (lyricLines != null && !lyricLines.isEmpty()) {
-            if (lyricUpdaterThread == null) {
+            if (lyricUpdaterVThread == null) {
                 MusicHud.EXECUTOR.execute(lyricUpdater);
             } else {
-                lyricUpdaterThread.interrupt();
+                lyricUpdaterVThread.interrupt();
             }
-            musicSwitchListener.forEach(consumer -> {
-                consumer.accept(previous, musicDetail);
-            });
         }
     }
 
@@ -173,7 +177,7 @@ public class NowPlayingInfo {
             return Duration.ZERO;
         }
         Duration startedPlayingDuration = Duration.between(musicStartTime, ZonedDateTime.now());
-        if (startedPlayingDuration.compareTo(musicDuration) > 0) {
+        if (musicDuration != null && startedPlayingDuration.compareTo(musicDuration) > 0) {
             return musicDuration;
         } else {
             return startedPlayingDuration;
@@ -210,10 +214,10 @@ public class NowPlayingInfo {
     }
 
     public void stop() {
-        if (lyricUpdaterThread != null) {
-            lyricUpdaterThread.interrupt();
+        if (lyricUpdaterVThread != null) {
+            lyricUpdaterVThread.interrupt();
         }
-        lyricUpdaterThread = null;
+        lyricUpdaterVThread = null;
         currentlyPlayingMusicDetail = MusicDetail.NONE;
         nextToPlayIdleMusicDetail = MusicDetail.NONE;
         musicDuration = null;

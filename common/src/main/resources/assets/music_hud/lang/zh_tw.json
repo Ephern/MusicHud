@@ -97,9 +97,6 @@
   "music_hud.text.binaryApiServerStatus.RUNNING": "運作中",
   "music_hud.config.embeddedServer.pusherVoteAdditionalRate": "為點歌者投票切歌時提供的額外比率",
   "music_hud.config.embeddedServer.useRandomCnIp": "使用 API 伺服器提供的國內 IP 池",
-  "music_hud.hud.append.retrying": " （重試中...）",
-  "music_hud.hud.append.error": " （播放錯誤）",
-  "music_hud.hud.append.buffering": " （緩衝中...）",
   "music_hud.internal.clientCookie": "客戶端內部 Cookie",
   "music_hud.internal.clientAccountConfig": "客戶端內部帳戶資訊"
 }

@@ -3,8 +3,8 @@ package indi.etern.musichud.client.ui.utils.lyrics;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.LyricLine;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.ui.utils.lyrics.beans.MetaInfoLine;
+import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.commons.lang3.function.TriConsumer;
 import org.apache.logging.log4j.Logger;
 
@@ -24,6 +24,7 @@ public class LyricParser {
             .toFormatter();
     private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(3);
     private static final Logger logger = MusicHud.getLogger(LyricParser.class);
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     public static ArrayDeque<LyricLine> parse(LyricInfo lyricInfo) {
         String lyric = lyricInfo.getLrc().getLyric();
@@ -47,7 +48,7 @@ public class LyricParser {
                 lyricLine.setText(lyricLine.getText() + "\n" + lyricString);
             }
         });
-        if (ClientConfigDefinition.showTranslatedCnLyrics.get()) {
+        if (clientConfig.getShowTranslatedCnLyrics()) {
             matchLine(translatedLyric, (duration, s, type) -> {
                 LyricLine lyricLine = map.get(duration);
                 if (lyricLine == null) {

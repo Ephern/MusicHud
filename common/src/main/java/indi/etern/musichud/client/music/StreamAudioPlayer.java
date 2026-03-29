@@ -1,17 +1,17 @@
 package indi.etern.musichud.client.music;
 
-import dev.architectury.networking.NetworkManager;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.FormatType;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.music.decoder.AudioDecoder;
 import indi.etern.musichud.client.music.decoder.AudioFormatDetector;
 import indi.etern.musichud.client.services.MusicService;
-import indi.etern.musichud.network.requestResponseCycle.GetMusicResourceRequest;
-import indi.etern.musichud.network.requestResponseCycle.GetMusicResourceResponse;
+import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceRequest;
+import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceResponse;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
@@ -49,6 +49,7 @@ public class StreamAudioPlayer {
     @Getter
     private final Set<Consumer<Status>> statusChangeListener = new HashSet<>();
     private final AtomicLong totalBufferedBytes = new AtomicLong(0);
+    private final static ClientConfig clientConfig = ClientConfig.getInstance();
     ZonedDateTime currentStartTime;
     private int source = 0;
     private float lastVolume;
@@ -120,7 +121,8 @@ public class StreamAudioPlayer {
             try {
                 currentMusicDetail = musicDetail;
                 currentStartTime = startTime == null ? ZonedDateTime.now() : startTime;
-                stop(); // 先停止之前的播放
+                stopInternal(); // 先停止之前的播放
+                setStatus(Status.BUFFERING);
 
                 source = AL10.alGenSources();
                 checkALError("alGenSources");
@@ -221,7 +223,7 @@ public class StreamAudioPlayer {
 
                             totalBufferedBytes.addAndGet(-audioData.length);
                         }
-                        if (ClientConfigDefinition.disableVanillaMusic.get())
+                        if (clientConfig.getDisableVanillaMusic())
                             Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC);
                         startPlayingFuture.complete(serverStartTime);
                         setStatus(Status.PLAYING);
@@ -342,7 +344,7 @@ public class StreamAudioPlayer {
         while (shouldContinueDownloading) {
             try {
                 if (musicResourceInfo.equals(MusicResourceInfo.NONE) || localRetryCount % 3 == 0) {
-                    musicResourceInfo = getCurrentMusicResourceInfo(Quality.valueOf(ClientConfigDefinition.primaryChosenQuality.get()), musicResourceInfo).get();
+                    musicResourceInfo = getCurrentMusicResourceInfo(clientConfig.getPrimaryChosenQuality(), musicResourceInfo).get();
                 }
                 LOGGER.debug("Starting audio download (attempt {})", localRetryCount + 1);
 
@@ -516,6 +518,11 @@ public class StreamAudioPlayer {
 
     @SneakyThrows
     public void stop() {
+        stopInternal();
+        setStatus(Status.IDLE);
+    }
+
+    private void stopInternal() {
         shouldContinuePlaying = false;
         shouldContinueDownloading = false;
 
@@ -540,7 +547,6 @@ public class StreamAudioPlayer {
         }
 
         lastVolume = 1;
-        setStatus(Status.IDLE);
         cleanup();
     }
 
@@ -643,7 +649,7 @@ public class StreamAudioPlayer {
             }
         });
         String url = previous.getUrl() == null ? "" : previous.getUrl();
-        NetworkManager.sendToServer(new GetMusicResourceRequest(currentMusicDetail.getId(), quality, url));
+        IClientNetworkService.getInstance().sendToServer(new GetMusicResourceRequest(currentMusicDetail.getId(), quality, url));
         return future;
     }
 

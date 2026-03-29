@@ -1,26 +1,27 @@
 package indi.etern.musichud.client.services;
 
-import dev.architectury.event.events.client.ClientPlayerEvent;
-import dev.architectury.networking.NetworkManager;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.user.Profile;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.ui.components.AccountView;
 import indi.etern.musichud.client.ui.components.QRLoginView;
 import indi.etern.musichud.client.ui.pages.AccountBaseView;
+import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.IEventService;
 import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.pushMessages.c2s.LogoutMessage;
-import indi.etern.musichud.network.pushMessages.s2c.LoginResultMessage;
-import indi.etern.musichud.network.requestResponseCycle.AnonymousLoginRequest;
-import indi.etern.musichud.network.requestResponseCycle.ConnectRequest;
-import indi.etern.musichud.network.requestResponseCycle.CookieLoginRequest;
-import indi.etern.musichud.network.requestResponseCycle.StartQRLoginResponse;
+import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.NetworkReceiver;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.LogoutMessage;
+import indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage;
+import indi.etern.musichud.network.payloads.requestResponseCycle.AnonymousLoginRequest;
+import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
+import indi.etern.musichud.network.payloads.requestResponseCycle.CookieLoginRequest;
+import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse;
 import lombok.Getter;
 import lombok.Setter;
 import org.apache.logging.log4j.Logger;
@@ -31,18 +32,20 @@ import java.util.function.Consumer;
 
 public class LoginService {
     private static volatile LoginService instance = null;
+    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
+    private final static ClientConfig clientConfig = ClientConfig.getInstance();
     @Setter
     private Consumer<StartQRLoginResponse> loginResponseHandler;
     @Getter
     private final List<Consumer<LoginCookieInfo>> loginCompleteListeners = new ArrayList<>();
     @Getter
-    NetworkManager.NetworkReceiver<StartQRLoginResponse> qrLoginResponseReceiver = (qrLoginResponse, context) -> {
+    NetworkReceiver<StartQRLoginResponse> qrLoginResponseReceiver = (qrLoginResponse, player) -> {
         if (loginResponseHandler != null)
             loginResponseHandler.accept(qrLoginResponse);
     };
     private static final Logger logger = MusicHud.getLogger(LoginService.class);
     @Getter
-    NetworkManager.NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, context) -> {
+    NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, player) -> {
         MusicHud.EXECUTOR.submit(() -> {
             Thread.currentThread().setName("Login Processor");
             LoginCookieInfo loginCookieInfo = loginResult.loginCookieInfo();
@@ -101,31 +104,32 @@ public class LoginService {
     }
 
     public void logout() {
-        NetworkManager.sendToServer(LogoutMessage.MESSAGE);
+        clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
     }
 
     @RegisterMark
     public static final class RegisterImpl implements ClientRegister {
         @Override
         public void register() {
-            ClientPlayerEvent.CLIENT_PLAYER_JOIN.register((player) -> {
+            IEventService eventService = IEventService.getInstance();
+            eventService.registerClientPlayerJoin((player) -> {
                 getInstance().sendConnectMessageToServer();
             });
-            ClientPlayerEvent.CLIENT_PLAYER_QUIT.register((player) -> {
+            eventService.registerClientPlayerQuit((player) -> {
                 getInstance().setDisconnected();
             });
         }
     }
 
     public void setDisconnected() {
-        if (ClientConfigDefinition.enable.get()) {
+        if (clientConfig.getEnable()) {
             MusicHud.setStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
         }
     }
 
     public void sendConnectMessageToServer() {
-        if (ClientConfigDefinition.enable.get()) {
-            NetworkManager.sendToServer(new ConnectRequest(Version.current));
+        if (clientConfig.getEnable()) {
+            clientNetworkService.sendToServer(new ConnectRequest(Version.current));
         }
     }
 
@@ -142,9 +146,9 @@ public class LoginService {
     public void loginAsAnonymousToServer() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         if (loginCookieInfo.type() == LoginType.ANONYMOUS) {
-            NetworkManager.sendToServer(new CookieLoginRequest(loginCookieInfo, false));
+            clientNetworkService.sendToServer(new CookieLoginRequest(loginCookieInfo, false));
         } else {
-            NetworkManager.sendToServer(AnonymousLoginRequest.REQUEST);
+            clientNetworkService.sendToServer(AnonymousLoginRequest.REQUEST);
         }
     }
 }

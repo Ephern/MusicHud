@@ -5,12 +5,14 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.PostProcessable;
+import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.ServerApiMeta;
 import indi.etern.musichud.throwable.ApiException;
 import indi.etern.musichud.utils.JsonUtil;
 import lombok.SneakyThrows;
 import org.apache.logging.log4j.Logger;
 
+import java.io.InputStream;
 import java.net.ConnectException;
 import java.net.HttpURLConnection;
 import java.net.URI;
@@ -26,6 +28,7 @@ public class ApiClient {
     public static final HttpClient CLIENT;
     private static final int maxTrial = 5;
     private static final Logger LOGGER = MusicHud.getLogger(ApiClient.class);
+    private static final ServerConfig serverConfig = ServerConfig.getInstance();
 
     static {
         CLIENT = HttpClient.newBuilder()
@@ -35,21 +38,21 @@ public class ApiClient {
                 .build();
     }
 
-    /*public static boolean checkAvailable() {
+    public static boolean checkAvailable() {
         HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(ServerConfigDefinition.serverApiBaseUrl.get()))
-                .timeout(Duration.ofSeconds(10))
+                .uri(URI.create(serverConfig.getServerApiBaseUrl()))
+                .timeout(Duration.ofSeconds(5))
                 .build();
         try {
             HttpResponse<InputStream> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
             try (InputStream is = response.body()) {
                 int statusCode = response.statusCode();
-                return statusCode >= 200 && statusCode < 400;
+                return statusCode == 200;
             }
         } catch (Exception e) {
             return false;
         }
-    }*/
+    }
 
     @SneakyThrows
     public static <T> T post(ServerApiMeta.UrlMeta<T> urlMeta, Object requestBody, String formattedUserCookie) {

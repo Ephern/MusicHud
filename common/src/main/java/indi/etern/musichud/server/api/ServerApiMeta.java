@@ -1,6 +1,5 @@
 package indi.etern.musichud.server.api;
 
-import dev.architectury.event.events.client.ClientLifecycleEvent;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.MusicDetailsResponse;
 import indi.etern.musichud.beans.music.LyricInfo;
@@ -8,9 +7,12 @@ import indi.etern.musichud.beans.music.PlaylistResponse;
 import indi.etern.musichud.beans.music.PlaylistsResponse;
 import indi.etern.musichud.beans.user.AccountDetail;
 import indi.etern.musichud.beans.user.UserDetail;
+import indi.etern.musichud.interfaces.IEventService;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.interfaces.ServerRegister;
-import indi.etern.musichud.server.config.ServerConfigDefinition;
+import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -30,17 +32,19 @@ import java.util.function.Consumer;
 
 @SuppressWarnings("SpellCheckingInspection")
 public class ServerApiMeta {
+    private static final ServerConfig serverConfig = ServerConfig.getInstance();
+
     public record UrlMeta<T>(String url, Set<String> requiredParams, Set<String> optionalParams, boolean noCache,
                              boolean anonymous, boolean autoRetry, Class<T> responseType) {
         @Override
         public @NotNull String toString() {
-            return ServerConfigDefinition.serverApiBaseUrl.get() + url;
+            return serverConfig.getServerApiBaseUrl() + url;
         }
 
         public URI toURI() {
-            String uri = ServerConfigDefinition.serverApiBaseUrl.get() + url;
+            String uri = serverConfig.getServerApiBaseUrl() + url;
             List<String> query = new ArrayList<>();
-            if (ServerConfigDefinition.useRandomCnIp.get()) {
+            if (serverConfig.getUseRandomCnIp()) {
                 //noinspection SpellCheckingInspection
                 query.add("randomCNIP=true");
             }
@@ -85,13 +89,23 @@ public class ServerApiMeta {
         @Override
         public void register() {
             register = this;
-            if (ServerConfigDefinition.startupBinaryApiServerWhenLaunch.get()) {
-                triedCount = 0;
-                startEmbeddedApiServer();
-                ClientLifecycleEvent.CLIENT_STOPPING.register((minecraft) -> {
-                    stopApiServer();
-                });
-            }
+            MusicHud.EXECUTOR.execute(() -> {
+                Thread.currentThread().setName("API Server Launcher");
+                boolean apiAvailable = ApiClient.checkAvailable();
+                if (serverConfig.getStartupBinaryApiServerWhenLaunch() && !apiAvailable) {
+                    triedCount = 0;
+                    startEmbeddedApiServer();
+                    Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
+                    IEventService eventService = IEventService.getInstance();
+                    if (side == Environment.Side.CLIENT) {
+                        eventService.registerClientLifecycleStopping(Register::stopApiServer);
+                    } else if (side == Environment.Side.SERVER) {
+                        eventService.registerServerLifecycleStopping(Register::stopApiServer);
+                    }
+                } else if (apiAvailable){
+                    ncmApiLogger.info("API Server has been launched externally");
+                }
+            });
         }
 
         public static void stopApiServer() {
@@ -114,7 +128,7 @@ public class ServerApiMeta {
                 ncmApiLogger.error("Embedded API Server has been stopped due to maximum tries reached.");
                 return;
             }
-            String binaryExecutableApiServerPathString = ServerConfigDefinition.serverApiBinaryExecutablePath.get();
+            String binaryExecutableApiServerPathString = serverConfig.getServerApiBinaryExecutablePath();
             Path binaryExecutableApiServerPath = Paths.get(binaryExecutableApiServerPathString);
             Path windowsExePath = Paths.get(binaryExecutableApiServerPathString + ".exe");
             boolean executable = Files.isExecutable(binaryExecutableApiServerPath) || Files.isExecutable(windowsExePath);

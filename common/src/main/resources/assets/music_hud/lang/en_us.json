@@ -97,9 +97,6 @@
   "music_hud.button.restartApiServer": "Restart",
   "music_hud.config.embeddedServer.pusherVoteAdditionalRate": "Voting-for-switch additional rate when voter is who requires the music",
   "music_hud.config.embeddedServer.useRandomCnIp": "Use random CN IP from IP pool provided by api server",
-  "music_hud.hud.append.retrying": " (Retrying...)",
-  "music_hud.hud.append.error": " (Playing error)",
-  "music_hud.hud.append.buffering": " (Buffering...)",
   "music_hud.internal.clientCookie": "Client internal cookie",
   "music_hud.internal.clientAccountConfig": "Client internal Account Config"
 }

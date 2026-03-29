@@ -8,11 +8,11 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ScrollView;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.AccountView;
 import indi.etern.musichud.client.ui.components.QRLoginView;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -21,6 +21,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class AccountBaseView extends LinearLayout {
     @Getter
     static volatile AccountBaseView instance;
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     public AccountBaseView(Context context) {
         super(context);
@@ -51,7 +52,7 @@ public class AccountBaseView extends LinearLayout {
         view.setGravity(Gravity.CENTER_HORIZONTAL);
         scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-        boolean enabled = ClientConfigDefinition.enable.get();
+        boolean enabled = clientConfig.getEnable();
         if (MusicHud.getStatus() != MusicHud.ConnectStatus.CONNECTED || !enabled) {
             view.setGravity(Gravity.CENTER);
             TextView textView = Theme.getNotificationTextView(context, enabled);

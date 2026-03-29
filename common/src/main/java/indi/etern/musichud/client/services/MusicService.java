@@ -2,8 +2,6 @@ package indi.etern.musichud.client.services;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
-import dev.architectury.event.events.client.ClientPlayerEvent;
-import dev.architectury.networking.NetworkManager;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.UIManager;
@@ -12,17 +10,19 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.music.*;
-import indi.etern.musichud.client.config.ClientConfigDefinition;
 import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.music.NowPlayingInfo;
 import indi.etern.musichud.client.music.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.IEventService;
 import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.pushMessages.c2s.*;
-import indi.etern.musichud.network.requestResponseCycle.*;
+import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.*;
+import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import indi.etern.musichud.throwable.ApiException;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
@@ -50,6 +50,7 @@ public class MusicService {
             .expireAfterAccess(5, TimeUnit.MINUTES)
             .maximumSize(20)
             .build();
+    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private static final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
     private static volatile MusicService instance;
     @Getter
@@ -76,6 +77,7 @@ public class MusicService {
     private final List<Consumer<MusicDetail>> musicQueuePushListeners = new ArrayList<>();
     @Getter
     private final List<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = new ArrayList<>();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     long lastPressTime = 0;
     @Getter
     private boolean idlePlaySourceLoaded = false;
@@ -100,7 +102,7 @@ public class MusicService {
                     for (IdlePlaySource idlePlaySource : idlePlaySources) {
                         try {
                             loadIdlePlaySource(idlePlaySource.getType(), idlePlaySource.getId()).thenAcceptAsync(musicCollection -> {
-                                NetworkManager.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
+                                clientNetworkService.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
                                 getInstance().addToIdlePlaySource(musicCollection);
                             }, MusicHud.EXECUTOR);
                         } catch (Exception e) {
@@ -136,7 +138,7 @@ public class MusicService {
                     completableFuture.complete(playlist);
                 }
             });
-            NetworkManager.sendToServer(new GetPlaylistDetailRequest(id));
+            clientNetworkService.sendToServer(new GetPlaylistDetailRequest(id));
         });
         return completableFuture.orTimeout(5, TimeUnit.SECONDS);
     }
@@ -154,7 +156,7 @@ public class MusicService {
                 albumCache.put(id, albumInfo);
                 completableFuture.complete(albumInfo);
             });
-            NetworkManager.sendToServer(new GetAlbumDetailRequest(id));
+            clientNetworkService.sendToServer(new GetAlbumDetailRequest(id));
         });
         return completableFuture.orTimeout(5, TimeUnit.SECONDS);
     }
@@ -173,7 +175,7 @@ public class MusicService {
         IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
         profileConfigData.getIdlePlaySources().add(idlePlaySource);
         profileConfigData.saveToConfig();
-        NetworkManager.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
+        clientNetworkService.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
     }
 
     public void removeFromIdlePlaySource(MusicCollection collection) {
@@ -183,7 +185,7 @@ public class MusicService {
         IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
         profileConfigData.getIdlePlaySources().remove(idlePlaySource);
         profileConfigData.saveToConfig();
-        NetworkManager.sendToServer(new RemoveFromIdlePlaySourceMessage(idlePlaySource));
+        clientNetworkService.sendToServer(new RemoveFromIdlePlaySourceMessage(idlePlaySource));
     }
 
     public synchronized void refreshQueue(Queue<MusicDetail> queue) {
@@ -237,15 +239,15 @@ public class MusicService {
     }
 
     public void sendPushMusicToQueue(MusicDetail musicDetail) {
-        NetworkManager.sendToServer(new ClientPushMusicToQueueMessage(musicDetail.getId()));
+        clientNetworkService.sendToServer(new ClientPushMusicToQueueMessage(musicDetail.getId()));
     }
 
     public void sendRemoveMusicFromQueue(int index, MusicDetail musicDetail) {
-        NetworkManager.sendToServer(new ClientRemoveMusicFromQueueMessage(index, musicDetail.getId()));
+        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(index, musicDetail.getId()));
     }
 
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
-        if (ClientConfigDefinition.enable.get()) {
+        if (clientConfig.getEnable()) {
             if (!message.isEmpty()) {
                 MuiModApi.postToUiThread(() -> {
                     //noinspection UnstableApiUsage
@@ -253,16 +255,20 @@ public class MusicService {
                     ToastUtil.show(Toast.makeText(context, message, Toast.LENGTH_SHORT));
                 });
             }
+            NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             if (!musicDetail.equals(MusicDetail.NONE)) {
                 ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
-                streamAudioPlayer.playAsync(musicDetail, serverStartTime).thenAccept(zonedDateTime -> {
-                    NowPlayingInfo.getInstance().switchMusic(musicDetail, nextIdleMusicDetail, zonedDateTime);
-                }).exceptionally(e -> {
+                nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
+                streamAudioPlayer.playAsync(musicDetail, serverStartTime)
+                        .thenAccept(nowPlayingInfo::startAt)
+                        .exceptionally(e -> {
                     return null;//TODO display error in hud
                 });
             } else {
-                NowPlayingInfo.getInstance().switchMusic(MusicDetail.NONE,MusicDetail.NONE,null);
+                nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
+                nowPlayingInfo.startAt(null);
+//                nowPlayingInfo.switchMusic(MusicDetail.NONE,MusicDetail.NONE,null);
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 streamAudioPlayer.stop();
             }
@@ -272,7 +278,7 @@ public class MusicService {
     public CompletableFuture<Artist> loadArtist(long id) {
         CompletableFuture<Artist> future = new CompletableFuture<>();
         GetArtistDetailResponse.setReceiver(id, future::complete);
-        NetworkManager.sendToServer(new GetArtistDetailRequest(id));
+        clientNetworkService.sendToServer(new GetArtistDetailRequest(id));
         return future;
     }
 
@@ -280,13 +286,13 @@ public class MusicService {
         CompletableFuture<List<MusicDetail>> future = new CompletableFuture<>();
         GetArtistMoreMusicResponse.RequestData requestData = new GetArtistMoreMusicResponse.RequestData(id, offset);
         GetArtistMoreMusicResponse.setReceiver(requestData, future::complete);
-        NetworkManager.sendToServer(new GetArtistMoreMusicRequest(id, offset));
+        clientNetworkService.sendToServer(new GetArtistMoreMusicRequest(id, offset));
         return future;
     }
 
     public void voteForSkipCurrent() {
         if (NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail() != null) {
-            NetworkManager.sendToServer(new VoteSkipCurrentMusicMessage(NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail().getId()));
+            clientNetworkService.sendToServer(new VoteSkipCurrentMusicMessage(NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail().getId()));
         }
     }
 
@@ -345,7 +351,7 @@ public class MusicService {
         CompletableFuture<List<Playlist>> completableFuture = new CompletableFuture<>();
         if (LoginService.getInstance().isLogined()) {
             MusicHud.EXECUTOR.execute(() -> {
-                NetworkManager.sendToServer(GetUserPlaylistRequest.REQUEST);
+                clientNetworkService.sendToServer(GetUserPlaylistRequest.REQUEST);
                 Thread pendingThread = Thread.currentThread();
                 GetUserPlaylistResponse.setConsumer(value -> {
                     completableFuture.complete(value);
@@ -379,7 +385,7 @@ public class MusicService {
             if (HudRendererManager.isLoaded()) {
                 HudRendererManager.getInstance().reset();
             }
-            NowPlayingInfo.getInstance().switchMusic(MusicDetail.NONE, MusicDetail.NONE, null);
+            NowPlayingInfo.getInstance().switchMusicInfo(MusicDetail.NONE, MusicDetail.NONE);
         }
 
         @Override
@@ -389,7 +395,7 @@ public class MusicService {
                     MusicService.getInstance().loadIdlePlaySourceFromConfig();
                 }
             });
-            ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(player -> {
+            IEventService.getInstance().registerClientPlayerQuit((player) -> {
                 reset();
             });
         }
