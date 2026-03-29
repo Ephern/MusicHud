@@ -1,10 +1,6 @@
 package indi.etern.musichud.paper;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.interfaces.IEventService;
-import indi.etern.musichud.interfaces.ServerConfig;
-import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.platform.plugin.paper.config.ServerConfigDefinition;
 import indi.etern.musichud.platform.plugin.paper.event.PaperEventService;
@@ -22,16 +18,13 @@ public final class CommonInitializer extends JavaPlugin {
 
         saveDefaultConfig();
 
-        eventService = new PaperEventService(this);
-        networkManager = new PaperNetworkManager(this);
-
-        IEventService.setInstance(eventService);
-        INetworkRegister.setInstance(networkManager);
-        IServerNetworkService.setInstance(networkManager);
+        eventService = PaperEventService.getInstance();
+        eventService.initialize(this);
+        networkManager = PaperNetworkManager.getInstance();
+        networkManager.initialize(this);
 
         ServerConfigDefinition serverConfig = ServerConfigDefinition.getInstance();
         serverConfig.initialize(this);
-        ServerConfig.setInstance(serverConfig);
 
         try {
             MusicHud.init();
@@ -56,9 +49,5 @@ public final class CommonInitializer extends JavaPlugin {
             networkManager = null;
         }
         eventService = null;
-        IEventService.setInstance(null);
-        INetworkRegister.setInstance(null);
-        IServerNetworkService.setInstance(null);
-        ServerConfig.setInstance(null);
     }
 }

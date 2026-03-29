@@ -49,15 +49,7 @@ public interface ClientConfig {
     void setConfigured(boolean configured);
     boolean isConfigured();
 
-    static void setInstance(ClientConfig clientConfig) {
-        InstanceHolder.instance = clientConfig;
-    }
-
     static ClientConfig getInstance() {
-        ClientConfig registered = InstanceHolder.instance;
-        if (registered != null) {
-            return registered;
-        }
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         switch (platform) {
             case FABRIC, NEOFORGE -> {
@@ -65,12 +57,5 @@ public interface ClientConfig {
             }
         }
         throw new UnsupportedOperationException();
-    }
-
-    final class InstanceHolder {
-        private static ClientConfig instance;
-
-        private InstanceHolder() {
-        }
     }
 }

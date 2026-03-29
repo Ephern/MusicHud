@@ -21,28 +21,30 @@ public interface ServerConfig {
     void setConfigured(boolean configured);
     boolean isConfigured();
 
-    static void setInstance(ServerConfig serverConfig) {
-        InstanceHolder.instance = serverConfig;
-    }
-
     static ServerConfig getInstance() {
-        ServerConfig registered = InstanceHolder.instance;
-        if (registered != null) {
-            return registered;
-        }
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         switch (platform) {
             case FABRIC, NEOFORGE -> {
                 return ServerConfigDefinition.getInstance();
             }
+            case PAPER -> {
+                return ReflectionHolder.load("indi.etern.musichud.platform.plugin.paper.config.ServerConfigDefinition", ServerConfig.class);
+            }
         }
         throw new UnsupportedOperationException();
     }
 
-    final class InstanceHolder {
-        private static ServerConfig instance;
+    final class ReflectionHolder {
+        private ReflectionHolder() {
+        }
 
-        private InstanceHolder() {
+        static <T> T load(String className, Class<T> expectedType) {
+            try {
+                Object instance = Class.forName(className).getMethod("getInstance").invoke(null);
+                return expectedType.cast(instance);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }

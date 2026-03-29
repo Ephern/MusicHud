@@ -9,19 +9,14 @@ import net.minecraft.server.level.ServerPlayer;
 import java.util.function.Consumer;
 
 public interface IEventService {
-    static void setInstance(IEventService eventService) {
-        InstanceHolder.instance = eventService;
-    }
-
     static IEventService getInstance() {
-        IEventService registered = InstanceHolder.instance;
-        if (registered != null) {
-            return registered;
-        }
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         switch (platform) {
             case FABRIC, NEOFORGE -> {
                 return ModEventService.getInstance();
+            }
+            case PAPER -> {
+                return ReflectionHolder.load("indi.etern.musichud.platform.plugin.paper.event.PaperEventService", IEventService.class);
             }
         }
         throw new UnsupportedOperationException();
@@ -40,10 +35,17 @@ public interface IEventService {
     void registerCommonPlayerQuit(Consumer<ServerPlayer> listener);
     void registerServerLifecycleStopping(Runnable listener);
 
-    final class InstanceHolder {
-        private static IEventService instance;
+    final class ReflectionHolder {
+        private ReflectionHolder() {
+        }
 
-        private InstanceHolder() {
+        static <T> T load(String className, Class<T> expectedType) {
+            try {
+                Object instance = Class.forName(className).getMethod("getInstance").invoke(null);
+                return expectedType.cast(instance);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }

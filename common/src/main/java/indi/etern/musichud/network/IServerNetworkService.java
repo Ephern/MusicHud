@@ -12,28 +12,30 @@ public interface IServerNetworkService {
     void sendToPlayer(ServerPlayer player, S2CPayload payload);
     void sendToPlayers(Collection<ServerPlayer> players, S2CPayload payload);
 
-    static void setInstance(IServerNetworkService serverNetworkService) {
-        InstanceHolder.instance = serverNetworkService;
-    }
-
     static IServerNetworkService getInstance() {
-        IServerNetworkService registered = InstanceHolder.instance;
-        if (registered != null) {
-            return registered;
-        }
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         switch (platform) {
             case FABRIC, NEOFORGE -> {
                 return ModNetworkManager.getInstance();
             }
+            case PAPER -> {
+                return ReflectionHolder.load("indi.etern.musichud.platform.plugin.paper.network.PaperNetworkManager", IServerNetworkService.class);
+            }
         }
         throw new UnsupportedOperationException();
     }
 
-    final class InstanceHolder {
-        private static IServerNetworkService instance;
+    final class ReflectionHolder {
+        private ReflectionHolder() {
+        }
 
-        private InstanceHolder() {
+        static <T> T load(String className, Class<T> expectedType) {
+            try {
+                Object instance = Class.forName(className).getMethod("getInstance").invoke(null);
+                return expectedType.cast(instance);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }

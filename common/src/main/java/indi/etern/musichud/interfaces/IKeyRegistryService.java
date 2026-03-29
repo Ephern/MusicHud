@@ -8,15 +8,7 @@ import net.minecraft.client.KeyMapping;
 public interface IKeyRegistryService {
     void register(KeyMapping keyMapping, Runnable action);
 
-    static void setInstance(IKeyRegistryService keyRegistryService) {
-        InstanceHolder.instance = keyRegistryService;
-    }
-
     static IKeyRegistryService getInstance() {
-        IKeyRegistryService registered = InstanceHolder.instance;
-        if (registered != null) {
-            return registered;
-        }
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         switch (platform) {
             case FABRIC,NEOFORGE -> {
@@ -24,12 +16,5 @@ public interface IKeyRegistryService {
             }
         }
         throw new UnsupportedOperationException();
-    }
-
-    final class InstanceHolder {
-        private static IKeyRegistryService instance;
-
-        private InstanceHolder() {
-        }
     }
 }

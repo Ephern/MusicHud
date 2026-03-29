@@ -25,27 +25,29 @@ public interface INetworkRegister {
     );
     <T extends IPayload> CustomPacketPayload.Type<T> getType(Class<T> customPacketPayloadClass);
 
-    static void setInstance(INetworkRegister networkRegister) {
-        InstanceHolder.instance = networkRegister;
-    }
-
     static INetworkRegister getInstance() {
-        INetworkRegister registered = InstanceHolder.instance;
-        if (registered != null) {
-            return registered;
-        }
         switch (MusicHud.getCurrentEnvironment().getPlatform()) {
             case FABRIC, NEOFORGE -> {
                 return ModNetworkManager.getInstance();
+            }
+            case PAPER -> {
+                return ReflectionHolder.load("indi.etern.musichud.platform.plugin.paper.network.PaperNetworkManager", INetworkRegister.class);
             }
         }
         throw new UnsupportedOperationException();
     }
 
-    final class InstanceHolder {
-        private static INetworkRegister instance;
+    final class ReflectionHolder {
+        private ReflectionHolder() {
+        }
 
-        private InstanceHolder() {
+        static <T> T load(String className, Class<T> expectedType) {
+            try {
+                Object instance = Class.forName(className).getMethod("getInstance").invoke(null);
+                return expectedType.cast(instance);
+            } catch (ReflectiveOperationException e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 }
