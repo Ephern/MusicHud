@@ -11,14 +11,12 @@ import indi.etern.musichud.interfaces.IKeyRegistryService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
-import net.neoforged.neoforge.common.ModConfigSpec;
-import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFW;
 
 @RegisterMark
 public class Keybinds implements ClientRegister {
     public void register() {
-        KeyMapping.Category category = KeyMapping.Category.register(MusicHud.location(MusicHud.MOD_ID));
+        String category = "key.category.music_hud.music_hud";
         var mainMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".open_main",
                 InputConstants.Type.KEYSYM,
