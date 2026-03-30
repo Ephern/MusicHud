@@ -7,8 +7,8 @@ import dev.architectury.event.events.client.ClientTickEvent;
 import dev.architectury.event.events.common.LifecycleEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import indi.etern.musichud.interfaces.IEventService;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.function.Consumer;
 
@@ -21,12 +21,12 @@ public class ModEventService implements IEventService {
     }
 
     @Override
-    public void registerClientPlayerJoin(Consumer<LocalPlayer> listener) {
+    public void registerClientPlayerJoin(Consumer<Player> listener) {
         ClientPlayerEvent.CLIENT_PLAYER_JOIN.register(listener::accept);
     }
 
     @Override
-    public void registerClientPlayerQuit(Consumer<LocalPlayer> listener) {
+    public void registerClientPlayerQuit(Consumer<Player> listener) {
         ClientPlayerEvent.CLIENT_PLAYER_QUIT.register(listener::accept);
     }
 
