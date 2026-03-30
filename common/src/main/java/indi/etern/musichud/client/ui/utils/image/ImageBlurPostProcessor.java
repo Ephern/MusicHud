@@ -6,7 +6,7 @@ import icyllis.modernui.graphics.Bitmap;
 import indi.etern.musichud.MusicHud;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
 import java.util.concurrent.atomic.AtomicReference;
 
@@ -28,7 +28,7 @@ public class ImageBlurPostProcessor {
 
             NativeImage nativeImage = convertBitmapToNativeImage(result);
             assert nativeImage != null;
-            Identifier imageBlurredLocation = MusicHud.location("image_blurred_" + radius + "_" + bitmap.hashCode());
+            ResourceLocation imageBlurredLocation = MusicHud.location("image_blurred_" + radius + "_" + bitmap.hashCode());
             AtomicReference<DynamicTexture> texture = new AtomicReference<>();
             Minecraft.getInstance().submit(() -> {
                 texture.set(new DynamicTexture(() -> "downloaded_blurred_" + originalImageData.getSource().hashCode(), nativeImage));

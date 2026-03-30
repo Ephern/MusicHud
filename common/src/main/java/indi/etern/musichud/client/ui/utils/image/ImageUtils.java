@@ -12,7 +12,7 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -306,7 +306,7 @@ public class ImageUtils {
 
     @NotNull
     private static ImageTextureData getImageTextureData(String data, Bitmap source, NativeImage nativeImage) {
-        Identifier imageLocation = MusicHud.location("image_" + nativeImage.hashCode());
+        ResourceLocation imageLocation = MusicHud.location("image_" + nativeImage.hashCode());
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
         Minecraft.getInstance().submit(() -> {
             texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), nativeImage));

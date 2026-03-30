@@ -6,7 +6,7 @@ import indi.etern.musichud.utils.RegistrationManager;
 import lombok.Getter;
 import lombok.Setter;
 import net.fabricmc.api.EnvType;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.fml.config.IConfigSpec;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
@@ -45,8 +45,8 @@ public final class MusicHud {
         RegistrationManager.performAutoRegistration();
     }
 
-    public static Identifier location(String s) {
-        return Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, s);
+    public static ResourceLocation location(String s) {
+        return ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, s);
     }
 
     public enum ConnectStatus {

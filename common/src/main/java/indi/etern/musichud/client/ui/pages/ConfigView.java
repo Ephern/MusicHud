@@ -26,7 +26,7 @@ import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.ServerApiMeta;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-import net.minecraft.util.Util;
+import net.minecraft.Util;
 import net.minecraft.client.resources.language.I18n;
 import org.lwjgl.glfw.GLFW;
 
