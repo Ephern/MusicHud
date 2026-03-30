@@ -53,6 +53,7 @@ dependencies {
         exclude group: "org.jetbrains", module: "annotations"
         exclude group: "com.ibm.icu", module: "icu4j"
         exclude group: "it.unimi.dsi", module: "fastutil"
+//        exclude group: "org.commonmark"
     }
 
     modImplementation("icyllis.modernui:ModernUI-Markflow:${modernui_version}") {
@@ -63,6 +64,7 @@ dependencies {
         exclude group: "org.jetbrains", module: "annotations"
         exclude group: "com.ibm.icu", module: "icu4j"
         exclude group: "it.unimi.dsi", module: "fastutil"
+        exclude group: "org.commonmark"
     }
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
@@ -90,7 +92,6 @@ remapJar {
     inputFile.set shadowJar.archiveFile
     dependsOn shadowJar
 }
-
 
 loom {
     runs {

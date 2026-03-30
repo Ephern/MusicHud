@@ -39,7 +39,7 @@ public class PlayerHeadRenderer {
 
         if (playerInfo == null) return;
 
-        ResourceLocation skinLocation = playerInfo.getSkin().texture();
+        ResourceLocation skinLocation = playerInfo.getSkin().body().texturePath();
 
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(guiGraphics);
         guiGraphics.pose().pushMatrix();

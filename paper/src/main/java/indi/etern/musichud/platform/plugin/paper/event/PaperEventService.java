@@ -2,8 +2,8 @@ package indi.etern.musichud.platform.plugin.paper.event;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.IEventService;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.event.EventHandler;
@@ -49,12 +49,12 @@ public final class PaperEventService implements IEventService, Listener {
     }
 
     @Override
-    public void registerClientPlayerJoin(Consumer<LocalPlayer> listener) {
+    public void registerClientPlayerJoin(Consumer<Player> listener) {
         throw unsupportedClientOperation();
     }
 
     @Override
-    public void registerClientPlayerQuit(Consumer<LocalPlayer> listener) {
+    public void registerClientPlayerQuit(Consumer<Player> listener) {
         throw unsupportedClientOperation();
     }
 

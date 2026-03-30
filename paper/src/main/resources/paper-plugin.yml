@@ -6,3 +6,4 @@ description: A plugin allow to play music from NCM in whole server
 website: https://github.com/Etern-34520/MusicHud
 authors: [Etern]
 contributors: [Lotus (Paper adapter)]
+folia-supported: true

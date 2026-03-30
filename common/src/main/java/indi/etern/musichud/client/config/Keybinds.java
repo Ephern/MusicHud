@@ -11,28 +11,31 @@ import indi.etern.musichud.interfaces.IKeyRegistryService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
+import net.neoforged.neoforge.common.ModConfigSpec;
+import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFW;
 
 @RegisterMark
 public class Keybinds implements ClientRegister {
     public void register() {
+        KeyMapping.Category category = KeyMapping.Category.register(MusicHud.location(MusicHud.MOD_ID));
         var mainMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".open_main",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_M,
-                "key.category." + MusicHud.MOD_ID + "." + MusicHud.MOD_ID
+                category
         );
         var voteMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".vote_skip",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_PERIOD,
-                "key.category." + MusicHud.MOD_ID + "." + MusicHud.MOD_ID
+                category
         );
         var toggleHudMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".toggle_hud",
                 InputConstants.Type.KEYSYM,
                 GLFW.GLFW_KEY_COMMA,
-                "key.category." + MusicHud.MOD_ID + "." + MusicHud.MOD_ID
+                category
         );
         IKeyRegistryService service = IKeyRegistryService.getInstance();
         service.register(mainMapping, () -> {

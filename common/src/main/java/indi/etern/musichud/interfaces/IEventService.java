@@ -3,8 +3,8 @@ package indi.etern.musichud.interfaces;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.platform.mod.architectury.event.ModEventService;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.function.Consumer;
 
@@ -28,8 +28,8 @@ public interface IEventService {
 
     void initialize();
 
-    void registerClientPlayerJoin(Consumer<LocalPlayer> listener);
-    void registerClientPlayerQuit(Consumer<LocalPlayer> listener);
+    void registerClientPlayerJoin(Consumer<Player> listener);
+    void registerClientPlayerQuit(Consumer<Player> listener);
     void registerClientTickPost(Runnable listener);
     void registerClientLifecycleStopping(Runnable listener);
     void registerCommonPlayerQuit(Consumer<ServerPlayer> listener);
