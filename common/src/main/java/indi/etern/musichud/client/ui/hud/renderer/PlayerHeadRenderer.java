@@ -7,7 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public class PlayerHeadRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
@@ -39,7 +39,7 @@ public class PlayerHeadRenderer {
 
         if (playerInfo == null) return;
 
-        ResourceLocation skinLocation = playerInfo.getSkin().body().texturePath();
+        Identifier skinLocation = playerInfo.getSkin().body().texturePath();
 
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(guiGraphics);
         guiGraphics.pose().pushMatrix();

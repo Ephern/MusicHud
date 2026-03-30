@@ -8,6 +8,7 @@ import indi.etern.musichud.platform.plugin.paper.network.PaperNetworkManager;
 import indi.etern.musichud.server.api.ServerApiMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
+@SuppressWarnings("unused")
 public final class CommonInitializer extends JavaPlugin {
     private PaperEventService eventService;
     private PaperNetworkManager networkManager;

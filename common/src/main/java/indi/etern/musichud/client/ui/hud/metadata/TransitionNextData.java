@@ -1,10 +1,10 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public record TransitionNextData(
-        ResourceLocation nextBlurred,
-        ResourceLocation nextUnblurred,
+        Identifier nextBlurred,
+        Identifier nextUnblurred,
         float nextAspect
 ) {
 }

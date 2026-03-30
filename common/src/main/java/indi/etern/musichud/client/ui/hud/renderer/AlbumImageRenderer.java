@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.hud.renderer;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
-import com.mojang.blaze3d.textures.GpuTextureView;
 import icyllis.modernui.mc.GradientRectangleRenderState;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
@@ -19,12 +18,12 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
 
 public class AlbumImageRenderer {
     private static volatile AlbumImageRenderer instance;
-    private ResourceLocation defaultImageLocation;
+    private Identifier defaultImageLocation;
     private GpuBufferSlice gpuBufferSlice;
     private final HudUniformWriter uniformWriter = new HudUniformWriter();
     private HudRenderData currentData;
@@ -55,17 +54,19 @@ public class AlbumImageRenderer {
 
         var transitionStatus = HudRenderData.getTransitionStatus();
         var nextData = transitionStatus.getNextData();
-        ResourceLocation nextUnblurredLocation = nextData == null ? null : nextData.nextUnblurred();
-        GpuTextureView currentTextureView = getTextureView(bgImage.currentUnblurredLocation);
-        GpuTextureView nextTextureView = getTextureView(nextUnblurredLocation);
-        GpuTextureView nextView = transitionStatus.isTransitioning() ?
-                nextTextureView : currentTextureView;
+        Identifier nextUnblurredLocation = nextData == null ? null : nextData.nextUnblurred();
+        DynamicTexture currentTexture = getDynamicTexture(bgImage.currentUnblurredLocation);
+        DynamicTexture nextTexture = getDynamicTexture(nextUnblurredLocation);
+        DynamicTexture transitionTexture = transitionStatus.isTransitioning() ?
+                nextTexture : currentTexture;
 
         TextureSetup textureSetup;
-        if (currentTextureView != null) {
-            textureSetup = nextView != null ?
-                    TextureSetup.doubleTexture(currentTextureView, nextView) :
-                    TextureSetup.singleTexture(currentTextureView);
+        if (currentTexture != null) {
+            textureSetup = transitionTexture != null ?
+                    TextureSetup.doubleTexture(
+                            currentTexture.getTextureView(), currentTexture.getSampler(),
+                            transitionTexture.getTextureView(), transitionTexture.getSampler()
+                    ) : TextureSetup.singleTexture(currentTexture.getTextureView(), currentTexture.getSampler());
         } else {
             textureSetup = TextureSetup.noTexture();
         }
@@ -85,7 +86,7 @@ public class AlbumImageRenderer {
                 ));
     }
 
-    private GpuTextureView getTextureView(ResourceLocation imageLocation) {
+    private DynamicTexture getDynamicTexture(Identifier imageLocation) {
         if (imageLocation == null) {
             if (defaultImageLocation == null) {
                 String greyImageBase64 = MusicHud.ICON_BASE64;
@@ -93,14 +94,14 @@ public class AlbumImageRenderer {
                 imageTextureData.register().join();
                 defaultImageLocation = imageTextureData.getLocation();
             }
-            return getTextureView(defaultImageLocation);
+            return getDynamicTexture(defaultImageLocation);
         }
 
         AbstractTexture texture = Minecraft.getInstance()
                 .getTextureManager()
                 .getTexture(imageLocation);
         if (texture instanceof DynamicTexture dynamicTexture) {
-            return dynamicTexture.getTextureView();
+            return dynamicTexture;
         }
         return null;
     }

@@ -127,7 +127,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
         byte[] networkPayload = encodePayload(codec, payload, player);
         String channel = payload.type().id().toString();
         ensureOutgoingChannelRegistered(channel);
-        runOnPrimaryThread(() -> sendPluginMessageWhenReady(bukkitPlayer, channel, networkPayload, 0));
+        MusicHud.EXECUTOR.execute(() -> sendPluginMessageWhenReady(bukkitPlayer, channel, networkPayload, 0));
     }
 
     @Override
@@ -185,14 +185,6 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
                 logger.error("Failed to process payload on channel {}", channel, e);
             }
         };
-    }
-
-    private void runOnPrimaryThread(Runnable runnable) {
-        if (Bukkit.isPrimaryThread()) {
-            runnable.run();
-        } else {
-            Bukkit.getScheduler().runTask(plugin, runnable);
-        }
     }
 
     private void sendPluginMessageWhenReady(Player player, String channel, byte[] payload, int attempt) {

@@ -93,7 +93,6 @@ remapJar {
     dependsOn shadowJar
 }
 
-
 loom {
     runs {
         client {

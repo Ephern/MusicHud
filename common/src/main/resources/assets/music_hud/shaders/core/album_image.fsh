@@ -8,7 +8,7 @@ layout(std140) uniform HudAlbumParams {
     vec4 u_RectParam;  // (halfWidth, halfHeight, radius, unused)
     vec3 u_TransitionParam;  // (fadeProgress, nextImageAspect, imageAspect)
     mat4 u_BgColors;
-    float u_Progress;
+//    float u_Progress; removed after 1.21.11
 };
 
 in vec2 f_Position;

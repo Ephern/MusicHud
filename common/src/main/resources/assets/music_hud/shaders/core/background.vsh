@@ -12,10 +12,10 @@ layout(std140) uniform Projection {
 };
 layout(std140) uniform HudBackgroundParams {
     mat4 u_Translation;
-    vec4 u_RectParam;  // (halfWidth, halfHeight, radius, padding)
-    vec3 u_TransitionParam;
+    vec4 u_RectParam;  // (halfWidth, halfHeight, radius, unused)
+    vec3 u_TransitionParam;  // (fadeProgress, nextImageAspect, imageAspect)
     mat4 u_BgColors;
-    float u_Progress;
+//    float u_Progress; removed after 1.21.11
 };
 
 in vec3 Position;

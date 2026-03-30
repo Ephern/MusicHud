@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.hud.metadata;
 
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
-import indi.etern.musichud.client.music.NowPlayingInfo;
 import net.minecraft.client.gui.GuiGraphics;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
@@ -51,8 +50,7 @@ public class HudUniformWriter {
                 transformMat4,
                 appearanceData,
                 backgroundImageTransitionData,
-                colorMatrix,
-                NowPlayingInfo.getInstance().getProgressRate()
+                colorMatrix
         );
     }
 

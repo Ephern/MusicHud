@@ -6,9 +6,9 @@
 layout(std140) uniform HudProgressParams {
     mat4 u_LocalMat;
     vec4 u_ProgressData;  // (halfWidth, halfHeight, radius, progress)
-    vec3 u_GradientOffsets;  // (gradientLength, rightOffset, unused)
-    mat4 u_GradientColors;  // (fillColorLeft, fillColorRight, bgColor, unused)
-    float u_TransitionBorderRate;
+    vec3 u_GradientOffsets;  // (gradientLength, rightOffset, transitionBorderRate)
+    mat4 u_GradientColors;  // 四个角的颜色 (RGBA Vector4f)
+//    float u_TransitionBorderRate; removed after 1.21.11
 };
 
 in vec3 Position;

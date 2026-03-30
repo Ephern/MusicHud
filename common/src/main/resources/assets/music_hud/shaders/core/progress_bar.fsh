@@ -3,9 +3,9 @@
 layout(std140) uniform HudProgressParams {
     mat4 u_LocalMat;
     vec4 u_ProgressData;  // (halfWidth, halfHeight, radius, progress)
-    vec3 u_GradientOffsets;  // (gradientLength, rightOffset, unused)
+    vec3 u_GradientOffsets;  // (gradientLength, rightOffset, transitionBorderRate)
     mat4 u_GradientColors;  // 四个角的颜色 (RGBA Vector4f)
-    float u_TransitionBorderRate;
+//    float u_TransitionBorderRate; removed after 1.21.11
 };
 
 in vec2 f_Position;
@@ -74,10 +74,10 @@ void main() {
     float normalizedFillPos = (fillPos.x + fillWidth) / (2.0 * fillWidth);  // 范围 [0, 1]
 
     float indicatorAlpha;
-    if (progress < u_TransitionBorderRate) {
-        indicatorAlpha = progress / u_TransitionBorderRate;
-    } else if (progress > 1 - u_TransitionBorderRate) {
-        indicatorAlpha = (1 - progress) / u_TransitionBorderRate;
+    if (progress < u_GradientOffsets.z) {
+        indicatorAlpha = progress / u_GradientOffsets.z;
+    } else if (progress > 1 - u_GradientOffsets.z) {
+        indicatorAlpha = (1 - progress) / u_GradientOffsets.z;
     } else {
         indicatorAlpha = 1.0;
     }

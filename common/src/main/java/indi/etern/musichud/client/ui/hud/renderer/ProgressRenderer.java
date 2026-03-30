@@ -99,7 +99,7 @@ public class ProgressRenderer {
         Vector3f gradientOffsets = new Vector3f(
                 progressBar.gradientLength,
                 progressBar.gradientRightOffset,
-                0
+                data.getProgressBar().transitionBorderRate
         );
 
         Matrix4f gradientColorsMatrix = new Matrix4f();
@@ -113,8 +113,7 @@ public class ProgressRenderer {
                 new Matrix4f().mul(localMatrix),
                 progressData,
                 gradientOffsets,
-                gradientColorsMatrix,
-                data.getProgressBar().transitionBorderRate // transition border
+                gradientColorsMatrix
         );
     }
 }
