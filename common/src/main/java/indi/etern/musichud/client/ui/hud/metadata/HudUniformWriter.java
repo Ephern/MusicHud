@@ -50,8 +50,7 @@ public class HudUniformWriter {
                 transformMat4,
                 appearanceData,
                 backgroundImageTransitionData,
-                colorMatrix,
-                0
+                colorMatrix
         );
     }
 

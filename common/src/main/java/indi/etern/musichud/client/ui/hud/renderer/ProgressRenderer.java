@@ -113,8 +113,7 @@ public class ProgressRenderer {
                 new Matrix4f().mul(localMatrix),
                 progressData,
                 gradientOffsets,
-                gradientColorsMatrix,
-                0
+                gradientColorsMatrix
         );
     }
 }

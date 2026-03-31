@@ -17,13 +17,13 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
 
 public class BackgroundRenderer {
     private static volatile BackgroundRenderer instance;
     private final HudUniformWriter uniformWriter = new HudUniformWriter();
-    private ResourceLocation defaultImageLocation;
+    private Identifier defaultImageLocation;
     private GpuBufferSlice gpuBufferSlice;
     private HudRenderData currentData;
 
@@ -53,7 +53,7 @@ public class BackgroundRenderer {
 
         var transitionStatus = HudRenderData.getTransitionStatus();
         var nextData = transitionStatus.getNextData();
-        ResourceLocation nextBlurredLocation = nextData == null ? null : nextData.nextBlurred();
+        Identifier nextBlurredLocation = nextData == null ? null : nextData.nextBlurred();
         DynamicTexture currentTexture = getDynamicTexture(bgImage.currentBlurredLocation);
         DynamicTexture nextTexture = getDynamicTexture(nextBlurredLocation);
         DynamicTexture transitionTexture = transitionStatus.isTransitioning() ?
@@ -63,9 +63,9 @@ public class BackgroundRenderer {
         if (currentTexture != null) {
             textureSetup = transitionTexture != null ?
                     TextureSetup.doubleTexture(
-                            currentTexture.getTextureView(),
-                            transitionTexture.getTextureView()
-                    ) : TextureSetup.singleTexture(currentTexture.getTextureView());
+                            currentTexture.getTextureView(), currentTexture.getSampler(),
+                            transitionTexture.getTextureView(), transitionTexture.getSampler()
+                    ) : TextureSetup.singleTexture(currentTexture.getTextureView(),  currentTexture.getSampler());
         } else {
             textureSetup = TextureSetup.noTexture();
         }
@@ -85,7 +85,7 @@ public class BackgroundRenderer {
                 ));
     }
 
-    private DynamicTexture getDynamicTexture(ResourceLocation imageLocation) {
+    private DynamicTexture getDynamicTexture(Identifier imageLocation) {
         if (imageLocation == null) {
             if (defaultImageLocation == null) {
                 String greyImageBase64 = "data:bitmap/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAGElEQVQYV2OMiYn5z0AEYBxViC+UqB88ABNsFMnD0ASTAAAAAElFTkSuQmCC";

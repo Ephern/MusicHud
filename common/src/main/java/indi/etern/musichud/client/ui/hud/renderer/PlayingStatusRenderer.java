@@ -7,12 +7,12 @@ import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public class PlayingStatusRenderer {
-    public static final ResourceLocation LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
-    public static final ResourceLocation RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
-    public static final ResourceLocation ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
+    public static final Identifier LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
+    public static final Identifier RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
+    public static final Identifier ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
     private static volatile PlayingStatusRenderer instance;
 
     @Getter
@@ -21,7 +21,7 @@ public class PlayingStatusRenderer {
     @Setter
     private boolean visibility = true;
     StreamAudioPlayer.Status status;
-    private ResourceLocation currentResourceLocation;
+    private Identifier currentIdentifier;
 
     public static PlayingStatusRenderer getInstance() {
         if (instance == null) {
@@ -39,7 +39,7 @@ public class PlayingStatusRenderer {
 
     public void setStatus(StreamAudioPlayer.Status status) {
         this.status = status;
-        currentResourceLocation = switch (status) {
+        currentIdentifier = switch (status) {
             case BUFFERING -> LOADING_ICON_LOCATION;
             case RETRYING -> RETRYING_ICON_LOCATION;
             case ERROR -> ERROR_ICON_LOCATION;
@@ -48,8 +48,8 @@ public class PlayingStatusRenderer {
     }
 
     public void render(GuiGraphics gr) {
-        if (currentResourceLocation != null && visibility) {
-            if (currentResourceLocation == ERROR_ICON_LOCATION) {
+        if (currentIdentifier != null && visibility) {
+            if (currentIdentifier == ERROR_ICON_LOCATION) {
                 rotationRadians = 0;
             } else {
                 rotationRadians = (float) ((Math.PI * 2) * ((float) (System.currentTimeMillis() % 1000) / 1000));
@@ -74,7 +74,7 @@ public class PlayingStatusRenderer {
 
             // 绘制图片（注意：此时坐标已经过变换）
             // 使用 blit 方法，RenderPipeline 选择 GUI_TEXTURED（标准纹理渲染）
-            gr.blit(RenderPipelines.GUI_TEXTURED, currentResourceLocation, screenX, screenY, 0, 0, width, height, width, height);
+            gr.blit(RenderPipelines.GUI_TEXTURED, currentIdentifier, screenX, screenY, 0, 0, width, height, width, height);
 
             // 恢复变换
             gr.pose().popMatrix();
@@ -82,6 +82,6 @@ public class PlayingStatusRenderer {
     }
 
     public boolean isVisible() {
-        return visibility && currentResourceLocation != null;
+        return visibility && currentIdentifier != null;
     }
 }

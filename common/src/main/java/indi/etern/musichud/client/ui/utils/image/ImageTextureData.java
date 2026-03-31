@@ -8,7 +8,7 @@ import indi.etern.musichud.client.music.NowPlayingInfo;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.apache.logging.log4j.Logger;
 
 import java.io.Closeable;
@@ -21,12 +21,12 @@ import java.util.function.BiConsumer;
 public final class ImageTextureData implements Closeable {
     private static final Logger logger = MusicHud.getLogger(ImageTextureData.class);
     private final String source;
-    private final ResourceLocation location;
+    private final Identifier location;
     private final DynamicTexture texture;
     private volatile boolean registered;
 
     public ImageTextureData(
-            String source, ResourceLocation location, DynamicTexture texture, boolean registered
+            String source, Identifier location, DynamicTexture texture, boolean registered
     ) {
         this.source = source;
         this.location = location;
