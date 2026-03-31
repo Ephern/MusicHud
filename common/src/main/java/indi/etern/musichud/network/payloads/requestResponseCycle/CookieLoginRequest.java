@@ -2,7 +2,6 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
-import indi.etern.musichud.beans.user.AccountDetail;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -10,7 +9,8 @@ import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage;
-import indi.etern.musichud.server.api.LoginApiService;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -35,11 +35,11 @@ public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRef
             INetworkRegister.getInstance().autoRegisterPayload(
                     CookieLoginRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((loginRequest, serverPlayer) -> {
-                        LoginApiService loginApiService = LoginApiService.getInstance();
+                        ILoginApiService ILoginApiService = indi.etern.musichud.server.api.ILoginApiService.getInstance(ApiProvider.NCM);
                         IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
                         if (loginRequest.tryRefresh) {
                             try {
-                                loginApiService.refreshAndSend(serverPlayer, loginRequest.loginCookieInfo);
+                                ILoginApiService.refreshAndSend(serverPlayer, loginRequest.loginCookieInfo);
                             } catch (Exception e) {
                                 serverNetworkService.sendToPlayer(serverPlayer,
                                         new LoginResultMessage(false,
@@ -51,13 +51,13 @@ public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRef
                             }
                         } else if (loginRequest.loginCookieInfo.type() != LoginType.ANONYMOUS) {
                             try {
-                                AccountDetail accountDetail =
-                                        loginApiService.loadUserProfile(serverPlayer, loginRequest.loginCookieInfo);
+                                Profile profile =
+                                        ILoginApiService.loadUserProfile(serverPlayer, loginRequest.loginCookieInfo);
                                 serverNetworkService.sendToPlayer(serverPlayer,
                                         new LoginResultMessage(true,
                                                 "",
                                                 loginRequest.loginCookieInfo,
-                                                accountDetail.getProfile()
+                                                profile
                                         )
                                 );
                             } catch (Exception e) {

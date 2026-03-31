@@ -7,55 +7,89 @@ import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.platform.Environment;
-import indi.etern.musichud.platform.mod.forgeConfig.config.ClientConfigDefinition;
+
+import java.util.function.Supplier;
 
 public interface ClientConfig {
-    void setEnable(boolean enable);
-    void setShowTranslatedCnLyrics(boolean showTranslatedCnLyrics);
-    void setDisableVanillaMusic(boolean disableVanillaMusic);
-    void setHideHudWhenNotPlaying(boolean hideHudWhenNotPlaying);
-    void setEnableHud(boolean enableHud);
-    void setPrimaryChosenQuality(Quality primaryChosenQuality);
-    void setHudVerticalPosition(VerticalAlign hudVerticalPosition);
-    void setHudHorizontalPosition(HorizontalAlign hudHorizontalPosition);
-    void setHudOffsetX(int hudOffsetX);
-    void setHudOffsetY(int hudOffsetY);
-    void setHudWidth(int hudWidth);
-    void setHudHeight(int hudHeight);
-    void setHudCornerRadius(int hudCornerRadius);
-    void setClientCookie(LoginCookieInfo clientCookie);
-    void setClientAccountConfig(ProfileConfigData clientAccountConfig);
-    void setEnableEmbeddedServer(boolean enableEmbeddedServer);
-
-    boolean getEnable();
-    boolean getShowTranslatedCnLyrics();
-    boolean getDisableVanillaMusic();
-    boolean getHideHudWhenNotPlaying();
-    boolean getEnableHud();
-    Quality getPrimaryChosenQuality();
-    VerticalAlign getHudVerticalPosition();
-    HorizontalAlign getHudHorizontalPosition();
-    int getHudOffsetX();
-    int getHudOffsetY();
-    int getHudWidth();
-    int getHudHeight();
-    int getHudCornerRadius();
-    LoginCookieInfo getClientCookie();
-    ProfileConfigData getClientAccountConfig();
-    boolean getEnableEmbeddedServer();
-
-    void save();
-
-    void setConfigured(boolean configured);
-    boolean isConfigured();
-
     static ClientConfig getInstance() {
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
-        switch (platform) {
-            case FABRIC, NEOFORGE -> {
-                return ClientConfigDefinition.getInstance();
+        Supplier<ClientConfig> supplier = platform.getClientConfigSupplier();
+        if (supplier != null) {
+            ClientConfig clientConfig = supplier.get();
+            if (clientConfig != null) {
+                return clientConfig;
             }
         }
         throw new UnsupportedOperationException();
     }
+
+    boolean getEnable();
+
+    void setEnable(boolean enable);
+
+    boolean getShowTranslatedCnLyrics();
+
+    void setShowTranslatedCnLyrics(boolean showTranslatedCnLyrics);
+
+    boolean getDisableVanillaMusic();
+
+    void setDisableVanillaMusic(boolean disableVanillaMusic);
+
+    boolean getHideHudWhenNotPlaying();
+
+    void setHideHudWhenNotPlaying(boolean hideHudWhenNotPlaying);
+
+    boolean getEnableHud();
+
+    void setEnableHud(boolean enableHud);
+
+    Quality getPrimaryChosenQuality();
+
+    void setPrimaryChosenQuality(Quality primaryChosenQuality);
+
+    VerticalAlign getHudVerticalPosition();
+
+    void setHudVerticalPosition(VerticalAlign hudVerticalPosition);
+
+    HorizontalAlign getHudHorizontalPosition();
+
+    void setHudHorizontalPosition(HorizontalAlign hudHorizontalPosition);
+
+    int getHudOffsetX();
+
+    void setHudOffsetX(int hudOffsetX);
+
+    int getHudOffsetY();
+
+    void setHudOffsetY(int hudOffsetY);
+
+    int getHudWidth();
+
+    void setHudWidth(int hudWidth);
+
+    int getHudHeight();
+
+    void setHudHeight(int hudHeight);
+
+    int getHudCornerRadius();
+
+    void setHudCornerRadius(int hudCornerRadius);
+
+    LoginCookieInfo getClientCookie();
+
+    void setClientCookie(LoginCookieInfo clientCookie);
+
+    ProfileConfigData getClientAccountConfig();
+
+    void setClientAccountConfig(ProfileConfigData clientAccountConfig);
+
+    boolean getEnableEmbeddedServer();
+
+    void setEnableEmbeddedServer(boolean enableEmbeddedServer);
+
+    void save();
+
+    boolean isConfigured();
+
+    void setConfigured(boolean configured);
 }

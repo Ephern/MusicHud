@@ -5,7 +5,8 @@ import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.server.api.LoginApiService;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import lombok.EqualsAndHashCode;
 import net.minecraft.network.codec.StreamCodec;
@@ -21,7 +22,7 @@ public class StartQRLoginRequest implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     StartQRLoginRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((startQRLoginRequest, serverPlayer) -> {
-                        var qrLoginInfo = LoginApiService.getInstance().startQRLoginByPlayer(serverPlayer);
+                        var qrLoginInfo = ILoginApiService.getInstance(ApiProvider.NCM).startQRLoginByPlayer(serverPlayer);
                         IServerNetworkService.getInstance().sendToPlayer(serverPlayer,new StartQRLoginResponse(qrLoginInfo.data().qrimg()));
                     })
             );

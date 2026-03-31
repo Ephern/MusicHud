@@ -1,205 +1,14 @@
-package indi.etern.musichud.server.api;
+package indi.etern.musichud.server.api.impl.ncm;
 
-import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.MusicDetailsResponse;
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.PlaylistResponse;
-import indi.etern.musichud.beans.music.PlaylistsResponse;
-import indi.etern.musichud.beans.user.AccountDetail;
-import indi.etern.musichud.beans.user.UserDetail;
-import indi.etern.musichud.interfaces.IEventService;
-import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.interfaces.ServerConfig;
-import indi.etern.musichud.interfaces.ServerRegister;
-import indi.etern.musichud.platform.Environment;
-import indi.etern.musichud.utils.http.ApiClient;
-import lombok.Getter;
-import org.apache.logging.log4j.LogManager;
-import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
+import indi.etern.musichud.server.api.UrlMeta;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
-import java.util.function.Consumer;
 
 @SuppressWarnings("SpellCheckingInspection")
 public class ServerApiMeta {
-    private static final ServerConfig serverConfig = ServerConfig.getInstance();
-
-    public record UrlMeta<T>(String url, Set<String> requiredParams, Set<String> optionalParams, boolean noCache,
-                             boolean anonymous, boolean autoRetry, Class<T> responseType) {
-        @Override
-        public @NotNull String toString() {
-            return serverConfig.getServerApiBaseUrl() + url;
-        }
-
-        public URI toURI() {
-            String uri = serverConfig.getServerApiBaseUrl() + url;
-            List<String> query = new ArrayList<>();
-            if (serverConfig.getUseRandomCnIp()) {
-                //noinspection SpellCheckingInspection
-                query.add("randomCNIP=true");
-            }
-            if (noCache) {
-                query.add("timestamp=" + System.currentTimeMillis());
-            }
-            if (!query.isEmpty()) {
-                uri += "?" + String.join("&", query);
-            }
-            return URI.create(uri);
-        }
-    }
-
-    @RegisterMark
-    public static class Register implements ServerRegister {
-        private static Register register;
-        private static final Logger ncmApiLogger = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/NCM-API");
-        private static Process process;
-        private static boolean continueRestart = true;
-        @Getter
-        private static BinaryApiServerStatus binaryApiServerStatus = BinaryApiServerStatus.STOPPED;
-        @Getter
-        private static final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
-        private static final int maxTries = 5;
-        private static int triedCount = 0;
-        public enum BinaryApiServerStatus {
-            STOPPED, LAUNCHING, RUNNING;
-
-            public String i18nKey() {
-                return MusicHud.MOD_ID + ".text.binaryApiServerStatus." + name();
-            }
-        }
-
-        public void log(String s, boolean error) {
-            if (error || s.contains("[ERROR]")) {
-                ncmApiLogger.error(s.replace("[ERROR]", ""));
-            } else {
-                ncmApiLogger.debug(s.replace("[INFO]", ""));
-            }
-        }
-
-        @Override
-        public void register() {
-            register = this;
-            MusicHud.EXECUTOR.execute(() -> {
-                Thread.currentThread().setName("API Server Launcher");
-                boolean apiAvailable = ApiClient.checkAvailable();
-                if (serverConfig.getStartupBinaryApiServerWhenLaunch() && !apiAvailable) {
-                    triedCount = 0;
-                    startEmbeddedApiServer();
-                    Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
-                    IEventService eventService = IEventService.getInstance();
-                    if (side == Environment.Side.CLIENT) {
-                        eventService.registerClientLifecycleStopping(Register::stopApiServer);
-                    } else if (side == Environment.Side.SERVER) {
-                        eventService.registerServerLifecycleStopping(Register::stopApiServer);
-                    }
-                } else if (apiAvailable){
-                    ncmApiLogger.info("API Server has been launched externally");
-                }
-            });
-        }
-
-        public static void stopApiServer() {
-            if (process != null) {
-                continueRestart = false;
-                process.destroy();
-            }
-        }
-
-        public static void restartApiServer() {
-            if (register != null) {
-                triedCount = 0;
-                stopApiServer();
-                register.startEmbeddedApiServer();
-            }
-        }
-
-        private void startEmbeddedApiServer() {
-            if (triedCount >= maxTries) {
-                ncmApiLogger.error("Embedded API Server has been stopped due to maximum tries reached.");
-                return;
-            }
-            String binaryExecutableApiServerPathString = serverConfig.getServerApiBinaryExecutablePath();
-            Path binaryExecutableApiServerPath = Paths.get(binaryExecutableApiServerPathString);
-            Path windowsExePath = Paths.get(binaryExecutableApiServerPathString + ".exe");
-            boolean executable = Files.isExecutable(binaryExecutableApiServerPath) || Files.isExecutable(windowsExePath);
-            boolean exists = Files.exists(binaryExecutableApiServerPath) || Files.exists(windowsExePath);
-            if (exists) {
-                if (executable) {
-                    triedCount++;
-                    try {
-                        continueRestart = true;
-                        setApiStatus(BinaryApiServerStatus.LAUNCHING);
-                        process = Runtime.getRuntime().exec(new String[]{binaryExecutableApiServerPath.toString()});
-
-                        // 使用虚拟线程池分别读取 stdout 和 stderr
-                        MusicHud.EXECUTOR.execute(() -> {
-                            Thread.currentThread().setName("API Console");
-                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-                                String line;
-                                while ((line = reader.readLine()) != null) {
-                                    if (line.contains("Server started successfully") && binaryApiServerStatus == BinaryApiServerStatus.LAUNCHING) {
-                                        setApiStatus(BinaryApiServerStatus.RUNNING);
-                                        ncmApiLogger.info("Api server started");
-                                    }
-                                    log(line, false);
-                                }
-                            } catch (IOException e) {
-                                ncmApiLogger.error("Error reading stdout", e);
-                            }
-                        });
-
-                        MusicHud.EXECUTOR.execute(() -> {
-                            Thread.currentThread().setName("API Console");
-                            try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
-                                String line;
-                                while ((line = reader.readLine()) != null) {
-                                    log(line, true);
-                                }
-                            } catch (IOException e) {
-                                ncmApiLogger.error("Error reading stderr", e);
-                            }
-                        });
-
-                        // 在另一个虚拟线程中等待进程结束，并处理重启逻辑
-                        MusicHud.EXECUTOR.execute(() -> {
-                            Thread.currentThread().setName("API Daemon");
-                            try {
-                                int exitCode = process.waitFor();
-                                setApiStatus(BinaryApiServerStatus.STOPPED);
-                                if (continueRestart) {
-                                    ncmApiLogger.warn("Api server unexpectedly stopped with code:{}, restarting...", exitCode);
-                                    startEmbeddedApiServer();
-                                } else {
-                                    ncmApiLogger.info("Api server stopped with code:{}", exitCode);
-                                }
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                ncmApiLogger.error("Process wait interrupted", e);
-                            }
-                        });
-                    } catch (Exception e) {
-                        MusicHud.LOGGER.error("Failed to call binary server at path: \"{}\"", binaryExecutableApiServerPathString, e);
-                    }
-                }
-            }
-        }
-
-        private void setApiStatus(BinaryApiServerStatus status) {
-            binaryApiServerStatus = status;
-            apiStatusListeners.forEach(l -> l.accept(status));
-        }
-    }
-
     /**
      * Currently only QR code login and anonymous login are proved to be functional (2025/11/06)
      *
@@ -269,49 +78,49 @@ public class ServerApiMeta {
     }
 
     public static class User {
-        public static final UrlMeta<UserDetail> UID_DETAIL = new UrlMeta<>(
+        public static final UrlMeta<LoginApiService.ProfileResponse> UID_DETAIL = new UrlMeta<>(
                 "/user/detail",
                 Set.of("uid"),
                 null,
                 true,
                 false,
-                true, UserDetail.class);
-        public static final UrlMeta<AccountDetail> ACCOUNT = new UrlMeta<>(
+                true, LoginApiService.ProfileResponse.class);
+        public static final UrlMeta<LoginApiService.AccountDetail> ACCOUNT = new UrlMeta<>(
                 "/user/account",
                 null,
                 null,
                 false,
                 false,
-                true, AccountDetail.class);
+                true, LoginApiService.AccountDetail.class);
         public static final UrlMeta<String> SUBCOUNT = new UrlMeta<>("/user/subcount", null, null, true, false, true, String.class);
         public static final UrlMeta<String> LEVEL = new UrlMeta<>("/user/level", null, null, true, false, true, String.class);
-        public static final UrlMeta<PlaylistsResponse> PLAYLIST = new UrlMeta<>(
+        public static final UrlMeta<MusicApiService.PlaylistsResponse> PLAYLIST = new UrlMeta<>(
                 "/user/playlist",
                 Set.of("uid"),
                 Set.of("limit"/*default:30*/, "offset"),
                 true,
                 false,
-                true, PlaylistsResponse.class);
+                true, MusicApiService.PlaylistsResponse.class);
         public static final UrlMeta<String> DJ = new UrlMeta<>(
                 "/user/dj",
                 Set.of("uid"),
                 null,
                 false, false, true, String.class);
-        public static final UrlMeta<String> SUBSCRIBED_ARTISTS = new UrlMeta<>(
+        public static final UrlMeta<MusicApiService.UserSubscribedArtistResponse> SUBSCRIBED_ARTISTS = new UrlMeta<>(
                 "/artist/sublist",
                 null,
                 Set.of("limit"/*default:25*/, "offset"),
-                true, false, true, String.class);
+                true, false, true, MusicApiService.UserSubscribedArtistResponse.class);
         public static final UrlMeta<String> SIBSCRIBED_TOPICS = new UrlMeta<>(
                 "/topic/sublist",
                 null,
                 Set.of("limit"/*default:50*/, "offset"),
                 false, false, true, String.class);
-        public static final UrlMeta<String> SUBSCRIBED_ALBUMS = new UrlMeta<>(
+        public static final UrlMeta<MusicApiService.UserSubscribedAlbumResponse> SUBSCRIBED_ALBUMS = new UrlMeta<>(
                 "/album/sublist",
                 null,
                 Set.of("limit"/*default:25*/, "offset"),
-                true, false, true, String.class);
+                true, false, true, MusicApiService.UserSubscribedAlbumResponse.class);
         public static final UrlMeta<String> RECENTLY_PLAYED = new UrlMeta<>(
                 "/record/recent/song",
                 null,

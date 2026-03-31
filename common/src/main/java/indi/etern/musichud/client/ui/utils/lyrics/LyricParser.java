@@ -27,8 +27,8 @@ public class LyricParser {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     public static ArrayDeque<LyricLine> parse(LyricInfo lyricInfo) {
-        String lyric = lyricInfo.getLrc().getLyric();
-        String translatedLyric = lyricInfo.getTlyric().getLyric();
+        String lyric = lyricInfo.getLyric().getLyric();
+        String translatedLyric = lyricInfo.getTranslatedLyric().getLyric();
         LinkedHashMap<Duration, LyricLine> map = new LinkedHashMap<>();
         List<LyricLine> lyricLinesWithoutValidTimestamp = new ArrayList<>(0);
         matchLine(lyric, (duration, s, type) -> {

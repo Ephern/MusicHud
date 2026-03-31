@@ -1,18 +1,19 @@
 package indi.etern.musichud.platform.mod.architectury.registry;
 
 import dev.architectury.registry.client.keymappings.KeyMappingRegistry;
-import indi.etern.musichud.interfaces.IEventService;
+import indi.etern.musichud.interfaces.IClientEventService;
 import indi.etern.musichud.interfaces.IKeyRegistryService;
 import net.minecraft.client.KeyMapping;
 
 import java.util.LinkedHashMap;
 
+@SuppressWarnings("unused")
 public class ModKeyRegistryService implements IKeyRegistryService {
     private static volatile ModKeyRegistryService instance;
     private final LinkedHashMap<KeyMapping, Runnable> bindings = new LinkedHashMap<>();
 
     private ModKeyRegistryService() {
-        IEventService.getInstance().registerClientTickPost(() -> {
+        IClientEventService.getInstance().registerClientTickPost(() -> {
             bindings.forEach((mapping, runnable) -> {
                 while (mapping.consumeClick()) {
                     runnable.run();

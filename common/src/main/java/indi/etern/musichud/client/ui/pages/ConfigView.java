@@ -23,7 +23,7 @@ import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
-import indi.etern.musichud.server.api.ServerApiMeta;
+import indi.etern.musichud.server.api.ApiServerManager;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.Util;
@@ -282,14 +282,14 @@ public class ConfigView extends LinearLayout {
             TextView apiStatusLabel = new TextView(context);
             apiStatusLabel.setTextSize(14);
             String string = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
-            apiStatusLabel.setText(string.replace("{}", I18n.get(ServerApiMeta.Register.getBinaryApiServerStatus().i18nKey())));
+            apiStatusLabel.setText(string.replace("{}", I18n.get(ApiServerManager.getBinaryApiServerStatus().i18nKey())));
 
-            Consumer<ServerApiMeta.Register.BinaryApiServerStatus> listener = (apiStatusListener) -> {
+            Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiStatusListener) -> {
                 MuiModApi.postToUiThread(() -> {
                     apiStatusLabel.setText(string.replace("{}", I18n.get(apiStatusListener.i18nKey())));
                 });
             };
-            List<Consumer<ServerApiMeta.Register.BinaryApiServerStatus>> apiStatusListeners = ServerApiMeta.Register.getApiStatusListeners();
+            List<Consumer<ApiServerManager.BinaryApiServerStatus>> apiStatusListeners = ApiServerManager.getApiStatusListeners();
             apiStatusListeners.add(listener);
 
             Button stopApiServerButton = new Button(context);
@@ -299,7 +299,7 @@ public class ConfigView extends LinearLayout {
             Drawable bg1 = ButtonInsetBackground.builder().inset(0).padding(new ButtonInsetBackground.Padding(dp(8), dp(4), dp(8), dp(4))).build().get();
             stopApiServerButton.setBackground(bg1);
             stopApiServerButton.setOnClickListener((v) -> {
-                ServerApiMeta.Register.stopApiServer();
+                ApiServerManager.stopApiServer();
             });
 
             Button restartApiServerButton = new Button(context);
@@ -309,7 +309,7 @@ public class ConfigView extends LinearLayout {
             Drawable bg = ButtonInsetBackground.builder().inset(0).padding(new ButtonInsetBackground.Padding(dp(8), dp(4), dp(8), dp(4))).build().get();
             restartApiServerButton.setBackground(bg);
             restartApiServerButton.setOnClickListener((v) -> {
-                ServerApiMeta.Register.restartApiServer();
+                ApiServerManager.restartApiServer();
             });
 
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {

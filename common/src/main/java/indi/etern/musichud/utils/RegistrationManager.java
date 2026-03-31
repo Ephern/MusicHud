@@ -16,9 +16,9 @@ public class RegistrationManager {
     };
 
     private static final String[] SERVER_REGISTRIES = new String[]{
-            "indi.etern.musichud.server.api.LoginApiService$Register",
+            "indi.etern.musichud.server.api.ILoginApiService$Register",
             "indi.etern.musichud.server.api.MusicPlayerServerService$Register",
-            "indi.etern.musichud.server.api.ServerApiMeta$Register",
+            "indi.etern.musichud.server.api.ApiServerManager",
     };
 
     private static final String[] COMMON_REGISTRIES = new String[]{
@@ -26,6 +26,10 @@ public class RegistrationManager {
             "indi.etern.musichud.network.payloads.requestResponseCycle.GetPlaylistDetailResponse$RegisterImpl",
             "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserPlaylistRequest$RegisterImpl",
             "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserPlaylistResponse$RegisterImpl",
+            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserAlbumsRequest$RegisterImpl",
+            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserAlbumsResponse$RegisterImpl",
+            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserArtistsRequest$RegisterImpl",
+            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserArtistsResponse$RegisterImpl",
             "indi.etern.musichud.network.payloads.requestResponseCycle.SearchRequest$RegisterImpl",
             "indi.etern.musichud.network.payloads.requestResponseCycle.SearchAlbumsResponse$RegisterImpl",
             "indi.etern.musichud.network.payloads.requestResponseCycle.SearchArtistsResponse$RegisterImpl",
@@ -62,7 +66,6 @@ public class RegistrationManager {
     private static final Set<Class<?>> registeredSet = new HashSet<>();
 
     public static void performAutoRegistration() {
-        Environment currentEnvironment = MusicHud.getCurrentEnvironment();
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
         MusicHud.LOGGER.info("Starting explicit auto-registration in environment: {}", side.name());
 

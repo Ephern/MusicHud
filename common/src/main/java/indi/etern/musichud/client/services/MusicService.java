@@ -16,10 +16,7 @@ import indi.etern.musichud.client.music.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
-import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.interfaces.IEventService;
-import indi.etern.musichud.interfaces.ClientRegister;
-import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.*;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
@@ -46,7 +43,7 @@ public class MusicService {
             .expireAfterAccess(5, TimeUnit.MINUTES)
             .maximumSize(20)
             .build();
-    private static final Cache<Long, AlbumInfo> albumCache = CacheBuilder.newBuilder()
+    private static final Cache<Long, Album> albumCache = CacheBuilder.newBuilder()
             .expireAfterAccess(5, TimeUnit.MINUTES)
             .maximumSize(20)
             .build();
@@ -115,7 +112,7 @@ public class MusicService {
     }
 
     public CompletableFuture<? extends MusicCollection> loadIdlePlaySource(Class<?> type, long id) {
-        if (type.equals(AlbumInfo.class)) {
+        if (type.equals(Album.class)) {
             return loadAlbumDetail(id, false);
         } else if (type.equals(Playlist.class)) {
             return loadPlaylistDetail(id, false);
@@ -143,14 +140,14 @@ public class MusicService {
         return completableFuture.orTimeout(5, TimeUnit.SECONDS);
     }
 
-    public CompletableFuture<AlbumInfo> loadAlbumDetail(long id, boolean ignoreCache) {
+    public CompletableFuture<Album> loadAlbumDetail(long id, boolean ignoreCache) {
         if (!ignoreCache) {
-            AlbumInfo cachedPlaylist = albumCache.getIfPresent(id);
+            Album cachedPlaylist = albumCache.getIfPresent(id);
             if (cachedPlaylist != null) {
                 return CompletableFuture.completedFuture(cachedPlaylist);
             }
         }
-        CompletableFuture<AlbumInfo> completableFuture = new CompletableFuture<>();
+        CompletableFuture<Album> completableFuture = new CompletableFuture<>();
         MusicHud.EXECUTOR.execute(() -> {
             GetAlbumDetailResponse.setReceiver(id, albumInfo -> {
                 albumCache.put(id, albumInfo);
@@ -316,7 +313,7 @@ public class MusicService {
         }
     }
 
-    public void updateAllIdlePlaySources(List<Playlist> playlistSources, List<AlbumInfo> albumSources) {
+    public void updateAllIdlePlaySources(List<Playlist> playlistSources, List<Album> albumSources) {
         Set<MusicCollection> toRemove = new HashSet<>();
         Set<MusicCollection> toAdd = new HashSet<>();
         Set<MusicCollection> serverIdlePlaySources = Set.copyOf(this.serverIdlePlaySources);
@@ -347,7 +344,7 @@ public class MusicService {
         this.serverIdlePlaySources.addAll(toAdd);
     }
 
-    public CompletableFuture<List<Playlist>> loadUserPlaylist() {
+    public CompletableFuture<List<Playlist>> loadUserPlaylists() {
         CompletableFuture<List<Playlist>> completableFuture = new CompletableFuture<>();
         if (LoginService.getInstance().isLogined()) {
             MusicHud.EXECUTOR.execute(() -> {
@@ -363,7 +360,49 @@ public class MusicService {
                 } catch (InterruptedException ignored) {}
             });
         } else {
-            completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserPlaylist when logined as anonymous"));
+            completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserPlaylists when logined as anonymous"));
+        }
+        return completableFuture;
+    }
+
+    public CompletableFuture<List<Album>> loadUserAlbums() {
+        CompletableFuture<List<Album>> completableFuture = new CompletableFuture<>();
+        if (LoginService.getInstance().isLogined()) {
+            MusicHud.EXECUTOR.execute(() -> {
+                clientNetworkService.sendToServer(GetUserAlbumsRequest.REQUEST);
+                Thread pendingThread = Thread.currentThread();
+                GetUserAlbumsResponse.setConsumer(value -> {
+                    completableFuture.complete(value);
+                    pendingThread.interrupt();
+                });
+                try {
+                    Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
+                    completableFuture.completeExceptionally(new ApiException());
+                } catch (InterruptedException ignored) {}
+            });
+        } else {
+            completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserAlbums when logined as anonymous"));
+        }
+        return completableFuture;
+    }
+
+    public CompletableFuture<List<Artist>> loadUserArtists() {
+        CompletableFuture<List<Artist>> completableFuture = new CompletableFuture<>();
+        if (LoginService.getInstance().isLogined()) {
+            MusicHud.EXECUTOR.execute(() -> {
+                clientNetworkService.sendToServer(GetUserArtistsRequest.REQUEST);
+                Thread pendingThread = Thread.currentThread();
+                GetUserArtistsResponse.setConsumer(value -> {
+                    completableFuture.complete(value);
+                    pendingThread.interrupt();
+                });
+                try {
+                    Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
+                    completableFuture.completeExceptionally(new ApiException());
+                } catch (InterruptedException ignored) {}
+            });
+        } else {
+            completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserArtists when logined as anonymous"));
         }
         return completableFuture;
     }
@@ -395,7 +434,7 @@ public class MusicService {
                     MusicService.getInstance().loadIdlePlaySourceFromConfig();
                 }
             });
-            IEventService.getInstance().registerClientPlayerQuit((player) -> {
+            IClientEventService.getInstance().registerClientPlayerQuit((player) -> {
                 reset();
             });
         }

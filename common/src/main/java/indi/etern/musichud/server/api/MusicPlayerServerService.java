@@ -15,6 +15,7 @@ import indi.etern.musichud.network.payloads.pushMessages.s2c.RefreshMusicQueueMe
 import indi.etern.musichud.network.payloads.pushMessages.s2c.SwitchMusicMessage;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.SyncCurrentPlayingMessage;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.UpdateAllIdlePlaySourcesMessage;
+import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
@@ -32,7 +33,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class MusicPlayerServerService {
     private static volatile MusicPlayerServerService instance;
-    private final MusicApiService musicApiService = MusicApiService.getInstance();
+    private final IMusicApiService IMusicApiService = indi.etern.musichud.server.api.IMusicApiService.getInstance(ApiProvider.NCM);
     private final CurrentVoteInfo currentVoteInfo = new CurrentVoteInfo();
     private final Logger logger = MusicHud.getLogger(MusicPlayerServerService.class);
     private final Cache<CacheKey, MusicResourceInfo> musicResourceInfoCache = CacheBuilder.newBuilder()
@@ -66,7 +67,7 @@ public class MusicPlayerServerService {
             while (MusicPlayerServerService.this.continuable) {
                 MusicDetail switchedToPlay = null;
                 try {
-                    Map<ServerPlayer, LoginApiService.PlayerLoginInfo> loginedPlayerInfoMap = LoginApiService.getInstance().loginedPlayerInfoMap;
+                    Map<ServerPlayer, LoginApiService.PlayerLoginInfo> loginedPlayerInfoMap = ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap();
                     if (musicQueue.isEmpty()) {
                         Optional<MusicDetail> optionalMusicDetail = getRandomMusicFromIdleSources();
                         if (optionalMusicDetail.isEmpty()) {
@@ -105,13 +106,13 @@ public class MusicPlayerServerService {
 
                     nextIdleMusicDetail = preloadMusicDetail != null ? preloadMusicDetail : MusicDetail.NONE;
 
-                    LoginApiService loginApiService = LoginApiService.getInstance();
-                    MusicResourceInfo resourceInfo = musicApiService.getResourceInfo(switchedToPlay, Quality.STANDARD, loginApiService.randomVipCookieOr(loginApiService::getAnonymousCookie));
+                    ILoginApiService ILoginApiService = indi.etern.musichud.server.api.ILoginApiService.getInstance(ApiProvider.NCM);
+                    MusicResourceInfo resourceInfo = IMusicApiService.getResourceInfo(switchedToPlay, Quality.STANDARD, ILoginApiService.randomVipCookieOr(ILoginApiService::getAnonymousCookie));
                     if (resourceInfo.equals(MusicResourceInfo.NONE)) {
                         continue;
                     }
                     if (switchedToPlay.getLyricInfo() == null || switchedToPlay.getLyricInfo().equals(LyricInfo.NONE)) {
-                        switchedToPlay.setLyricInfo(musicApiService.getLyricInfo(switchedToPlay));
+                        switchedToPlay.setLyricInfo(IMusicApiService.getLyricInfo(switchedToPlay));
                     }
                     serverNetworkService.sendToPlayers(
                             loginedPlayerInfoMap.keySet(),
@@ -179,10 +180,10 @@ public class MusicPlayerServerService {
             MusicDetail randomTrack = allTracks.get(MusicHud.RANDOM.nextInt(allTracks.size()));
 
             LoginApiService.PlayerLoginInfo loginInfo =
-                    LoginApiService.getInstance().getLoginInfoByServerPlayer(sourcePlayer);
+                    ILoginApiService.getInstance(ApiProvider.NCM).getLoginInfoByServerPlayer(sourcePlayer);
             if (loginInfo != null) {
                 PusherInfo pusherInfo = new PusherInfo(
-                        loginInfo.profile.getUserId(),
+                        loginInfo.getProfile().getUserId(),
                         sourcePlayer.getUUID(),
                         sourcePlayer.getName().getString()
                 );
@@ -195,7 +196,7 @@ public class MusicPlayerServerService {
     };
 
     public MusicPlayerServerService() {
-        updateContinuable(!LoginApiService.getInstance().getLoginStateChangeListeners().isEmpty());
+        updateContinuable(!ILoginApiService.getInstance(ApiProvider.NCM).getLoginStateChangeListeners().isEmpty());
     }
 
     public static MusicPlayerServerService getInstance() {
@@ -210,11 +211,11 @@ public class MusicPlayerServerService {
     }
 
     private static PusherInfo getPusherInfo(ServerPlayer pusher) {
-        LoginApiService.PlayerLoginInfo loginInfo = LoginApiService.getInstance().loginedPlayerInfoMap.get(pusher);
+        LoginApiService.PlayerLoginInfo loginInfo = ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().get(pusher);
         PusherInfo pusherInfo = PusherInfo.EMPTY;
         if (loginInfo != null) {
             pusherInfo = new PusherInfo(
-                    loginInfo.profile == null ? 0 : loginInfo.profile.getUserId(),
+                    loginInfo.getProfile() == null ? 0 : loginInfo.getProfile().getUserId(),
                     pusher.getUUID(),
                     pusher.getName().getString()
             );
@@ -246,7 +247,7 @@ public class MusicPlayerServerService {
         if (haveSentMusic) {
             haveSentMusic = false;
             serverNetworkService.sendToPlayers(
-                    LoginApiService.getInstance().loginedPlayerInfoMap.keySet(),
+                    ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet(),
                     new SwitchMusicMessage(MusicDetail.NONE, MusicDetail.NONE, "")
             );
             currentVoteInfo.resetTo(MusicDetail.NONE);
@@ -267,7 +268,7 @@ public class MusicPlayerServerService {
     public void sendUpdateAllIdlePlaySourcesMessageTo(Collection<ServerPlayer> players) {
         List<Playlist> publicPlaylists = new ArrayList<>();
         List<Playlist> privatePlaylists = new ArrayList<>();
-        List<AlbumInfo> albumInfos = new ArrayList<>();
+        List<Album> albums = new ArrayList<>();
         for (IdlePlaySource playSource : idlePlaySources.values().stream().flatMap(Collection::stream).toList()) {
             MusicCollection musicCollection = playSource.getMusicCollection();
             PusherInfo pusherInfo = getPusherInfo(playSource.getPlayer());
@@ -277,14 +278,14 @@ public class MusicPlayerServerService {
                 } else {
                     privatePlaylists.add(playlist.copyWithPusherInfo(pusherInfo));
                 }
-            } else if (musicCollection instanceof AlbumInfo albumInfo) {
-                albumInfos.add(albumInfo.copyWithPusherInfo(pusherInfo));
+            } else if (musicCollection instanceof Album album) {
+                albums.add(album.copyWithPusherInfo(pusherInfo));
             } else {
                 throw new IllegalArgumentException("Invalid music collection type");
             }
         }
 
-        Map<ServerPlayer, LoginApiService.PlayerLoginInfo> loginedPlayerInfoMap = LoginApiService.getInstance().loginedPlayerInfoMap;
+        Map<ServerPlayer, LoginApiService.PlayerLoginInfo> loginedPlayerInfoMap = ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap();
         for (ServerPlayer player : players) {
             Profile playerProfile = loginedPlayerInfoMap.get(player).getProfile();
             List<Playlist> processedPrivatePlaylists = new ArrayList<>();
@@ -296,12 +297,12 @@ public class MusicPlayerServerService {
                 }
             }
             processedPrivatePlaylists.addAll(publicPlaylists);
-            serverNetworkService.sendToPlayer(player, new UpdateAllIdlePlaySourcesMessage(processedPrivatePlaylists, albumInfos));
+            serverNetworkService.sendToPlayer(player, new UpdateAllIdlePlaySourcesMessage(processedPrivatePlaylists, albums));
         }
     }
 
     public void pushMusicToQueue(long musicDetailId, ServerPlayer pusher) {
-        List<MusicDetail> musicDetailByIds = musicApiService.getMusicDetailByIds(List.of(musicDetailId));
+        List<MusicDetail> musicDetailByIds = IMusicApiService.getMusicDetailByIds(List.of(musicDetailId));
         if (musicDetailByIds.size() != 1) {
             throw new IllegalStateException();
         }
@@ -309,7 +310,7 @@ public class MusicPlayerServerService {
         PusherInfo pusherInfo = getPusherInfo(pusher);
         musicDetail.setPusherInfo(pusherInfo);
         musicQueue.add(musicDetail);
-        serverNetworkService.sendToPlayers(LoginApiService.getInstance().loginedPlayerInfoMap.keySet(),
+        serverNetworkService.sendToPlayers(ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet(),
                 new RefreshMusicQueueMessage(musicQueue));
         updateContinuable(true);
     }
@@ -354,7 +355,7 @@ public class MusicPlayerServerService {
         if (musicDetail.getPusherInfo().playerUUID().equals(player.getUUID())) {
             AtomicInteger index1 = new AtomicInteger(0);
             musicQueue.removeIf(musicDetail1 -> index == index1.getAndIncrement() && musicDetail.equals(musicDetail1));
-            serverNetworkService.sendToPlayers(LoginApiService.getInstance().loginedPlayerInfoMap.keySet(),
+            serverNetworkService.sendToPlayers(ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet(),
                     new RefreshMusicQueueMessage(musicQueue));
         } else {
             throw new IllegalAccessException();
@@ -364,7 +365,7 @@ public class MusicPlayerServerService {
     private void trySimplyRemove(MusicDetail musicDetail, ServerPlayer serverPlayer) {
         if (musicDetail.getPusherInfo().playerUUID().equals(serverPlayer.getUUID())) {
             musicQueue.remove(musicDetail);
-            serverNetworkService.sendToPlayers(LoginApiService.getInstance().loginedPlayerInfoMap.keySet(),
+            serverNetworkService.sendToPlayers(ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet(),
                     new RefreshMusicQueueMessage(musicQueue));
         }
     }
@@ -377,7 +378,7 @@ public class MusicPlayerServerService {
         musicCollections.add(idlePlaySource);
         idlePlaySources.put(player, musicCollections);
         updateContinuable(true);
-        sendUpdateAllIdlePlaySourcesMessageTo(LoginApiService.getInstance().loginedPlayerInfoMap.keySet());
+        sendUpdateAllIdlePlaySourcesMessageTo(ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet());
     }
 
     public void removeIdlePlaySource(long id, Class<?> musicCollectionClass, ServerPlayer player) {
@@ -389,7 +390,7 @@ public class MusicPlayerServerService {
             if (musicCollections.isEmpty()) {
                 idlePlaySources.remove(player);
             }
-            sendUpdateAllIdlePlaySourcesMessageTo(LoginApiService.getInstance().loginedPlayerInfoMap.keySet());
+            sendUpdateAllIdlePlaySourcesMessageTo(ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet());
         }
     }
 
@@ -399,7 +400,7 @@ public class MusicPlayerServerService {
 
     public MusicResourceInfo getMusicResourceInfo(long id, Quality quality, String retryFor, ServerPlayer serverPlayer) {
         try {
-            List<MusicDetail> musicDetails = MusicApiService.getInstance().getMusicDetailByIds(List.of(id));
+            List<MusicDetail> musicDetails = indi.etern.musichud.server.api.IMusicApiService.getInstance(ApiProvider.NCM).getMusicDetailByIds(List.of(id));
             if (musicDetails.size() == 1) {
                 MusicDetail musicDetail = musicDetails.getFirst();
                 try {
@@ -430,15 +431,15 @@ public class MusicPlayerServerService {
     }
 
     private @NotNull MusicResourceInfo getMusicResourceInfoWithoutCache(Quality quality, MusicDetail musicDetail, ServerPlayer serverPlayer) {
-        LoginApiService loginApiService = LoginApiService.getInstance();
-        var loginInfo = loginApiService.getLoginInfoByServerPlayer(serverPlayer);
+        ILoginApiService ILoginApiService = indi.etern.musichud.server.api.ILoginApiService.getInstance(ApiProvider.NCM);
+        var loginInfo = ILoginApiService.getLoginInfoByServerPlayer(serverPlayer);
         String cookie;
-        if (loginInfo.vipType == VipType.VIP) {
+        if (loginInfo.getVipType() == VipType.VIP) {
             cookie = loginInfo.getLoginCookieInfo().rawCookie();
         } else {
-            cookie = loginApiService.randomVipCookieOr(() -> loginInfo.getLoginCookieInfo().rawCookie());
+            cookie = ILoginApiService.randomVipCookieOr(() -> loginInfo.getLoginCookieInfo().rawCookie());
         }
-        MusicResourceInfo resourceInfo = musicApiService.getResourceInfo(musicDetail, quality, cookie);
+        MusicResourceInfo resourceInfo = IMusicApiService.getResourceInfo(musicDetail, quality, cookie);
         if (resourceInfo != null && !resourceInfo.equals(MusicResourceInfo.NONE)) {
             return resourceInfo;
         } else {
@@ -448,7 +449,7 @@ public class MusicPlayerServerService {
 
     public void removeAllIdlePlaySource(ServerPlayer player) {
         idlePlaySources.remove(player);
-        sendUpdateAllIdlePlaySourcesMessageTo(LoginApiService.getInstance().loginedPlayerInfoMap.keySet());
+        sendUpdateAllIdlePlaySourcesMessageTo(ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet());
     }
 
     private record CacheKey(long musicId, Quality quality) {
@@ -458,7 +459,7 @@ public class MusicPlayerServerService {
     public static class Register implements ServerRegister {
         @Override
         public void register() {
-            LoginApiService.getInstance().getLoginStateChangeListeners().add((map) -> {
+            ILoginApiService.getInstance(ApiProvider.NCM).getLoginStateChangeListeners().add((map) -> {
                 if (instance != null) {
                     instance.updateContinuable(!map.isEmpty());
                 }
@@ -476,7 +477,7 @@ public class MusicPlayerServerService {
         public void vote(long id, ServerPlayer player) {
             if (!votedPlayers.contains(player) && musicDetail.getId() == id) {
                 votedPlayers.add(player);
-                voteRate += 1.0f / LoginApiService.getInstance().loginedPlayerInfoMap.size();
+                voteRate += 1.0f / ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().size();
                 if (musicDetail.getPusherInfo().playerUUID().equals(player.getUUID())) {
                     voteRate += (float) ServerConfig.getInstance().getPusherVoteAdditionalRate();
                     logger.info("Pusher player \"{}\" voted for skip current music {}:{}", player.getName().getString(), id, musicDetail.getName());

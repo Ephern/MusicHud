@@ -5,23 +5,29 @@ import indi.etern.musichud.Version;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.server.api.ApiProvider;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
+import java.util.List;
+
 import static indi.etern.musichud.MusicHud.LOGGER;
 
-public record ConnectResponse(boolean accepted, Version serverVersion) implements S2CPayload {
+public record ConnectResponse(boolean accepted, Version serverVersion, List<ApiProvider> availableApis) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, ConnectResponse> CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.BOOL,
                     ConnectResponse::accepted,
                     Version.PACKET_CODEC,
                     ConnectResponse::serverVersion,
+                    Codecs.ofList(() -> Codecs.ofEnum(ApiProvider.class)),
+                    ConnectResponse::availableApis,
                     ConnectResponse::new
             );
 

@@ -10,10 +10,7 @@ import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.ui.components.AccountView;
 import indi.etern.musichud.client.ui.components.QRLoginView;
 import indi.etern.musichud.client.ui.pages.AccountBaseView;
-import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.interfaces.IEventService;
-import indi.etern.musichud.interfaces.ClientRegister;
-import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.LogoutMessage;
@@ -111,7 +108,7 @@ public class LoginService {
     public static final class RegisterImpl implements ClientRegister {
         @Override
         public void register() {
-            IEventService eventService = IEventService.getInstance();
+            IClientEventService eventService = IClientEventService.getInstance();
             eventService.registerClientPlayerJoin((player) -> {
                 getInstance().sendConnectMessageToServer();
             });

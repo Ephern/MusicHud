@@ -11,6 +11,8 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ProgressBar;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.music.Album;
+import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.LoginService;
@@ -19,6 +21,8 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
+
+import java.util.concurrent.CompletableFuture;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -157,32 +161,77 @@ public class AccountView extends LinearLayout {
             progressBar.setIndeterminate(true);
             addView(progressBar, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-            LinearLayout layout1 = new LinearLayout(context);
-            layout1.setOrientation(VERTICAL);
-            layout1.setLayoutParams(new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-            addView(layout1);
+            LinearLayout content = new LinearLayout(context);
+            content.setOrientation(VERTICAL);
+            content.setLayoutParams(new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            addView(content);
 
-            TextView textView = new TextView(context);
-            textView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            textView.setTextSize(Theme.TEXT_SIZE_LARGE);
-            textView.setText(I18n.get(MusicHud.MOD_ID + ".text.myPlaylists"));
-            LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            layout1.addView(textView, params);
+            TextView myPlaylistText = new TextView(context);
+            myPlaylistText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            myPlaylistText.setTextSize(Theme.TEXT_SIZE_LARGE);
+            myPlaylistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myPlaylists"));
+            content.addView(myPlaylistText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
             AutoFlowGridLayout playlistCards = new AutoFlowGridLayout(context);
             playlistCards.setRowMinWidth(dp(143));
-            LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(0, dp(16), 0, 0);
-            layout1.addView(playlistCards, params1);
+            LayoutParams playlistsParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            playlistsParams.setMargins(0, dp(16), 0, dp(32));
+            content.addView(playlistCards, playlistsParams);
 
-            MusicService.getInstance().loadUserPlaylist().thenAcceptAsync(playlists -> {
+            TextView albumText = new TextView(context);
+            albumText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            albumText.setTextSize(Theme.TEXT_SIZE_LARGE);
+            albumText.setText(I18n.get(MusicHud.MOD_ID + ".text.myAlbums"));
+            content.addView(albumText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+            AutoFlowGridLayout albumCards = new AutoFlowGridLayout(context);
+            albumCards.setRowMinWidth(dp(143));
+            LayoutParams albumParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            albumParams.setMargins(0, dp(16), 0, dp(32));
+            content.addView(albumCards, albumParams);
+
+            TextView artistText = new TextView(context);
+            artistText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            artistText.setTextSize(Theme.TEXT_SIZE_LARGE);
+            artistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myArtists"));
+            content.addView(artistText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+            AutoFlowGridLayout artistCards = new AutoFlowGridLayout(context);
+            artistCards.setRowMinWidth(dp(143));
+            LayoutParams artistParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            artistParams.setMargins(0, dp(16), 0, dp(32));
+            content.addView(artistCards, artistParams);
+
+            MusicService musicService = MusicService.getInstance();
+            CompletableFuture.allOf(
+                    musicService.loadUserPlaylists().thenAcceptAsync(playlists -> {
+                        MuiModApi.postToUiThread(() -> {
+                            for (Playlist playlist : playlists) {
+                                playlistCards.addView(new MusicCollectionCard(context, playlist));
+                            }
+                        });
+                    }, MusicHud.EXECUTOR),
+                    musicService.loadUserAlbums().thenAcceptAsync(albums -> {
+                        MuiModApi.postToUiThread(() -> {
+                            for (Album playlist : albums) {
+                                albumCards.addView(new MusicCollectionCard(context, playlist));
+                            }
+                        });
+                    }),
+                    musicService.loadUserArtists().thenAcceptAsync(artists -> {
+                        MuiModApi.postToUiThread(() -> {
+                            for (Artist artist : artists) {
+                                ArtistCard artistCard = new ArtistCard(context);
+                                artistCard.bindData(artist);
+                                artistCards.addView(artistCard);
+                            }
+                        });
+                    })
+            ).thenAccept((v) -> {
                 MuiModApi.postToUiThread(() -> {
-                    for (Playlist playlist : playlists) {
-                        playlistCards.addView(new MusicCollectionCard(context, playlist));
-                    }
                     removeView(progressBar);
                 });
-            }, MusicHud.EXECUTOR);
+            });
         }
     }
 }

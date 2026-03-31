@@ -6,7 +6,7 @@ import com.google.gson.JsonSyntaxException;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.interfaces.ServerConfig;
-import indi.etern.musichud.server.api.ServerApiMeta;
+import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.throwable.ApiException;
 import indi.etern.musichud.utils.JsonUtil;
 import lombok.SneakyThrows;
@@ -45,7 +45,7 @@ public class ApiClient {
                 .build();
         try {
             HttpResponse<InputStream> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofInputStream());
-            try (InputStream is = response.body()) {
+            try (InputStream ignored = response.body()) {
                 int statusCode = response.statusCode();
                 return statusCode == 200;
             }
@@ -55,7 +55,7 @@ public class ApiClient {
     }
 
     @SneakyThrows
-    public static <T> T post(ServerApiMeta.UrlMeta<T> urlMeta, Object requestBody, String formattedUserCookie) {
+    public static <T> T post(UrlMeta<T> urlMeta, Object requestBody, String formattedUserCookie) {
         T t = null;
         int trial = 0;
         do {
@@ -130,7 +130,7 @@ public class ApiClient {
     }
 
     @SneakyThrows
-    public static <T> T get(ServerApiMeta.UrlMeta<T> urlMeta, String formattedUserCookie) {
+    public static <T> T get(UrlMeta<T> urlMeta, String formattedUserCookie) {
         T t = null;
         int trial = 0;
         do {

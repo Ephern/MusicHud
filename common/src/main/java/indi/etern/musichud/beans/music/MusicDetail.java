@@ -24,7 +24,7 @@ public class MusicDetail {
             MusicDetail::getArtists,
             Codecs.ofList(() -> ByteBufCodecs.STRING_UTF8),
             MusicDetail::getAlias,
-            AlbumInfo.CODEC,
+            Album.CODEC,
             MusicDetail::getAlbum,
             ByteBufCodecs.INT,
             MusicDetail::getDurationMillis,
@@ -37,8 +37,6 @@ public class MusicDetail {
             MusicDetail::new
     );
     public static final MusicDetail NONE = new MusicDetail();
-    @Setter
-    PrivilegeInfo privilege = PrivilegeInfo.NONE;
     String name = "";
     @Getter
     long id;
@@ -57,7 +55,7 @@ public class MusicDetail {
     int musicVersion;
     @SerializedName("al")
     @Setter
-    AlbumInfo album = AlbumInfo.NONE;
+    Album album = Album.NONE;
     @SerializedName("dt")
     @Getter
     int durationMillis;
@@ -73,7 +71,6 @@ public class MusicDetail {
     QualityInfo low = QualityInfo.NONE;
     @Getter
     long mark; // bit mask
-    OriginCoverType originCoverType;
     @SerializedName("tns")
     List<String> translations = List.of();
 
@@ -88,7 +85,7 @@ public class MusicDetail {
             long id,
             List<Artist> artists,
             List<String> alias,
-            AlbumInfo album,
+            Album album,
             int durationMillis,
             List<String> translations,
             PusherInfo pusherInfo,
@@ -125,14 +122,6 @@ public class MusicDetail {
         return Objects.requireNonNullElse(low, QualityInfo.NONE);
     }
 
-    public OriginCoverType getOriginCoverType() {
-        return Objects.requireNonNullElse(originCoverType, OriginCoverType.UNKNOWN);
-    }
-
-    public PrivilegeInfo getPrivilege() {
-        return Objects.requireNonNullElse(privilege, PrivilegeInfo.NONE);
-    }
-
     public String getName() {
         return Objects.requireNonNullElse(name, "");
     }
@@ -151,8 +140,8 @@ public class MusicDetail {
         return alias.stream().filter(Objects::nonNull).toList();
     }
 
-    public AlbumInfo getAlbum() {
-        return Objects.requireNonNullElse(album, AlbumInfo.NONE);
+    public Album getAlbum() {
+        return Objects.requireNonNullElse(album, Album.NONE);
     }
 
     public List<String> getTranslations() {

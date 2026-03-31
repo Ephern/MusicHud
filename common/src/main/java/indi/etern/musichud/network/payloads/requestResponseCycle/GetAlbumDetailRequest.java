@@ -1,12 +1,13 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
-import indi.etern.musichud.beans.music.AlbumInfo;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.server.api.MusicApiService;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -25,9 +26,9 @@ public record GetAlbumDetailRequest(long id) implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetAlbumDetailRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((playlistDetailRequest, player) -> {
-                        AlbumInfo albumInfo = MusicApiService.getInstance().getAlbumInfoDetail(playlistDetailRequest.id, player);
-                        if (albumInfo != null) {
-                            IServerNetworkService.getInstance().sendToPlayer(player,new GetAlbumDetailResponse(albumInfo));
+                        Album album = IMusicApiService.getInstance(ApiProvider.NCM).getAlbumInfoDetail(playlistDetailRequest.id, player);
+                        if (album != null) {
+                            IServerNetworkService.getInstance().sendToPlayer(player,new GetAlbumDetailResponse(album));
                         }
                     })
             );

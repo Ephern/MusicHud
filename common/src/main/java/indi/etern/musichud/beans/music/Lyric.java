@@ -12,15 +12,11 @@ import java.util.Objects;
 @EqualsAndHashCode
 public class Lyric {
     public static final StreamCodec<RegistryFriendlyByteBuf, Lyric> CODEC = StreamCodec.composite(
-            ByteBufCodecs.INT,
-            Lyric::getVersion,
             ByteBufCodecs.STRING_UTF8,
             Lyric::getLyric,
             Lyric::new
     );
-    public static final Lyric NONE = new Lyric(-1, "");
-    @Getter
-    int version;
+    public static final Lyric NONE = new Lyric("");
     String lyric;
 
     public String getLyric() {

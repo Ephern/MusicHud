@@ -54,7 +54,6 @@ public class Playlist implements MusicCollection {
     Privacy privacy = Privacy.PUBLIC;
     @Setter
     List<MusicDetail> tracks = List.of();
-    List<PrivilegeInfo> privileges = List.of();
 
     // Not contained in the original API response, set separately
     @Getter
@@ -177,7 +176,6 @@ public class Playlist implements MusicCollection {
         playlist.tracks = tracks;
         playlist.creator = creator;
         playlist.privacy = privacy;
-        playlist.privileges = privileges;
         playlist.pusherInfo = pusherInfo;
         return playlist;
     }

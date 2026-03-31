@@ -1,6 +1,6 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
-import indi.etern.musichud.beans.music.AlbumInfo;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.INetworkRegister;
@@ -12,16 +12,16 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
-public record GetAlbumDetailResponse(AlbumInfo albumInfo) implements S2CPayload {
+public record GetAlbumDetailResponse(Album album) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, GetAlbumDetailResponse> CODEC =
             StreamCodec.composite(
-                    AlbumInfo.CODEC,
-                    GetAlbumDetailResponse::albumInfo,
+                    Album.CODEC,
+                    GetAlbumDetailResponse::album,
                     GetAlbumDetailResponse::new
             );
 
-    static Map<Long, Consumer<AlbumInfo>> consumerMap = new HashMap<>();
-    public static void setReceiver(long id, Consumer<AlbumInfo> consumer) {
+    static Map<Long, Consumer<Album>> consumerMap = new HashMap<>();
+    public static void setReceiver(long id, Consumer<Album> consumer) {
         if (consumerMap.containsKey(id)) {
             consumerMap.get(id).accept(null);
         }
@@ -34,9 +34,9 @@ public record GetAlbumDetailResponse(AlbumInfo albumInfo) implements S2CPayload 
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetAlbumDetailResponse.class, CODEC,
                     (response, player) -> {
-                        Consumer<AlbumInfo> consumer = consumerMap.remove(response.albumInfo.getId());
+                        Consumer<Album> consumer = consumerMap.remove(response.album.getId());
                         if (consumer != null) {
-                            consumer.accept(response.albumInfo);
+                            consumer.accept(response.album);
                         }
                     }
             );

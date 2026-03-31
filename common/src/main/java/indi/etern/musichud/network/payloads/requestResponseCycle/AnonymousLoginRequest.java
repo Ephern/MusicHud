@@ -4,7 +4,8 @@ import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.server.api.LoginApiService;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import lombok.EqualsAndHashCode;
 import net.minecraft.network.codec.StreamCodec;
@@ -21,7 +22,7 @@ public class AnonymousLoginRequest implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     AnonymousLoginRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((anonymousLoginRequest, serverPlayer) -> {
-                        LoginApiService.getInstance().loginAsAnonymous(serverPlayer, true);
+                        ILoginApiService.getInstance(ApiProvider.NCM).loginAsAnonymous(serverPlayer, true);
                     })
             );
         }

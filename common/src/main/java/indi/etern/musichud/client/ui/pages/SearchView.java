@@ -12,7 +12,7 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.SearchType;
-import indi.etern.musichud.beans.music.AlbumInfo;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
@@ -158,7 +158,7 @@ public class SearchView extends LinearLayout {
     }
 
     private void refreshSearchMeta(int offset, List<?> result, SearchType searchType) {
-        boolean mayHasMore = result.size() == 50;// see also: MusicApiService.searchXXX(...);
+        boolean mayHasMore = result.size() == 50;// see also: IMusicApiService.searchXXX(...);
         SearchMeta searchMeta = searchMetas.getOrDefault(searchType, new SearchMeta(searchType, searchText));
         searchMeta.nextOffset = offset + result.size();
         searchMeta.mayHasMore = mayHasMore;
@@ -196,7 +196,7 @@ public class SearchView extends LinearLayout {
         }
     }
 
-    public void setSearchAlbumResult(int offset, List<AlbumInfo> result) {
+    public void setSearchAlbumResult(int offset, List<Album> result) {
         SearchType searchType = SearchType.ALBUM;
         refreshSearchMeta(offset, result, searchType);
         if (offset == 0) {

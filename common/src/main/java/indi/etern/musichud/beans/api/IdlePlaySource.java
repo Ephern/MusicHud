@@ -1,10 +1,11 @@
 package indi.etern.musichud.beans.api;
 
-import indi.etern.musichud.beans.music.AlbumInfo;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.network.Codecs;
-import indi.etern.musichud.server.api.MusicApiService;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.IMusicApiService;
 import io.netty.buffer.ByteBuf;
 import lombok.Getter;
 import lombok.Setter;
@@ -40,12 +41,12 @@ public final class IdlePlaySource {
 
     public void serverLoadMusicCollection(ServerPlayer player) {
         if (musicCollection == null) {
-            if (type.equals(AlbumInfo.class)) {
+            if (type.equals(Album.class)) {
                 dataLoaded = true;
-                musicCollection = MusicApiService.getInstance().getAlbumInfoDetail(id, player);
+                musicCollection = IMusicApiService.getInstance(ApiProvider.NCM).getAlbumInfoDetail(id, player);
             } else if (type.equals(Playlist.class)) {
                 dataLoaded = true;
-                musicCollection = MusicApiService.getInstance().getPlaylistDetail(id, player);
+                musicCollection = IMusicApiService.getInstance(ApiProvider.NCM).getPlaylistDetail(id, player);
             }
         }
     }

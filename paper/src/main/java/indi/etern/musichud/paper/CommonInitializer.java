@@ -5,7 +5,7 @@ import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.platform.plugin.paper.config.ServerConfigDefinition;
 import indi.etern.musichud.platform.plugin.paper.event.PaperEventService;
 import indi.etern.musichud.platform.plugin.paper.network.PaperNetworkManager;
-import indi.etern.musichud.server.api.ServerApiMeta;
+import indi.etern.musichud.server.api.ApiServerManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
 @SuppressWarnings("unused")
@@ -44,7 +44,7 @@ public final class CommonInitializer extends JavaPlugin {
         if (eventService != null) {
             eventService.fireServerStopping();
         }
-        ServerApiMeta.Register.stopApiServer();
+        ApiServerManager.stopApiServer();
         if (networkManager != null) {
             networkManager.close();
             networkManager = null;

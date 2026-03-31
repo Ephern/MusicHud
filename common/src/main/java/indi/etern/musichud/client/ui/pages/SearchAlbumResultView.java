@@ -1,7 +1,7 @@
 package indi.etern.musichud.client.ui.pages;
 
 import icyllis.modernui.core.Context;
-import indi.etern.musichud.beans.music.AlbumInfo;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import lombok.Getter;
@@ -11,7 +11,7 @@ import java.util.List;
 public class SearchAlbumResultView extends AutoFlowGridLayout {
     @Getter
     private static SearchAlbumResultView instance;
-    private static List<AlbumInfo> result;
+    private static List<Album> result;
 
     public SearchAlbumResultView(Context context) {
         super(context);
@@ -20,7 +20,7 @@ public class SearchAlbumResultView extends AutoFlowGridLayout {
         refresh();
     }
 
-    public static void setResult(List<AlbumInfo> result) {
+    public static void setResult(List<Album> result) {
         SearchAlbumResultView.result = result;
         if (instance != null) {
             instance.refresh();
@@ -30,21 +30,21 @@ public class SearchAlbumResultView extends AutoFlowGridLayout {
     public void refresh() {
         removeAllViews();
         if (result != null) {
-            for (AlbumInfo playlist : result) {
+            for (Album playlist : result) {
                 addItem(getContext(), playlist);
             }
         }
     }
 
-    public void append(List<AlbumInfo> albumInfos) {
-        result.addAll(albumInfos);
-        for (AlbumInfo albumInfo : albumInfos) {
-            addItem(getContext(), albumInfo);
+    public void append(List<Album> albums) {
+        result.addAll(albums);
+        for (Album album : albums) {
+            addItem(getContext(), album);
         }
     }
 
-    private void addItem(Context context, AlbumInfo albumInfo) {
-        MusicCollectionCard child = new MusicCollectionCard(context, albumInfo);
+    private void addItem(Context context, Album album) {
+        MusicCollectionCard child = new MusicCollectionCard(context, album);
         addView(child);
     }
 }

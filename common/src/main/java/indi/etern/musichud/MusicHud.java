@@ -1,13 +1,10 @@
 package indi.etern.musichud;
 
-import indi.etern.musichud.interfaces.IEventService;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.utils.RegistrationManager;
 import lombok.Getter;
 import lombok.Setter;
-import net.fabricmc.api.EnvType;
 import net.minecraft.resources.ResourceLocation;
-import net.neoforged.fml.config.IConfigSpec;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -41,8 +38,8 @@ public final class MusicHud {
             throw new IllegalStateException("Current environment is not set");
         }
         LOGGER.atLevel(Level.ALL);
-        IEventService.init();
-        RegistrationManager.performAutoRegistration();
+        LOGGER.debug("Initialized in environment: {}", currentEnvironment);
+        EXECUTOR.execute(RegistrationManager::performAutoRegistration);
     }
 
     public static ResourceLocation location(String s) {

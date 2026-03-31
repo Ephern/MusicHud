@@ -13,6 +13,7 @@ import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import org.apache.commons.lang3.StringUtils;
+import org.apache.logging.log4j.Logger;
 
 import java.util.Collection;
 import java.util.HashMap;
@@ -21,6 +22,7 @@ import java.util.Map;
 public class ModNetworkManager implements INetworkRegister, IServerNetworkService, IClientNetworkService {
     private static volatile ModNetworkManager instance;
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final Logger logger = MusicHud.getLogger(ModNetworkManager.class);
 
     public static ModNetworkManager getInstance() {
         if (instance == null) {
@@ -106,16 +108,31 @@ public class ModNetworkManager implements INetworkRegister, IServerNetworkServic
 
     @Override
     public void sendToServer(C2SPayload payload) {
-        NetworkManager.sendToServer(payload);
+        try {
+            NetworkManager.sendToServer(payload);
+        } catch (Exception e) {
+            logger.error("while sending: {}", payload.type().id(), e);
+            throw e;
+        }
     }
 
     @Override
     public void sendToPlayer(ServerPlayer player, S2CPayload payload) {
-        NetworkManager.sendToPlayer(player, payload);
+        try {
+            NetworkManager.sendToPlayer(player, payload);
+        } catch (Exception e) {
+            logger.error("while sending: {}", payload.type().id(), e);
+            throw e;
+        }
     }
 
     @Override
     public void sendToPlayers(Collection<ServerPlayer> players, S2CPayload payload) {
-        NetworkManager.sendToPlayers(players, payload);
+        try {
+            NetworkManager.sendToPlayers(players, payload);
+        } catch (Exception e) {
+            logger.error("while sending: {}", payload.type().id(), e);
+            throw e;
+        }
     }
 }

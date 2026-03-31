@@ -1,5 +1,6 @@
 package indi.etern.musichud.beans.music;
 
+import com.google.gson.annotations.SerializedName;
 import lombok.AccessLevel;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -14,30 +15,32 @@ import java.util.Objects;
 public class LyricInfo {
     public static final StreamCodec<RegistryFriendlyByteBuf, LyricInfo> CODEC = StreamCodec.composite(
             Lyric.CODEC,
-            LyricInfo::getLrc,
+            LyricInfo::getLyric,
             Lyric.CODEC,
-            LyricInfo::getTlyric,
+            LyricInfo::getTranslatedLyric,
             LyricInfo::new
     );
     public static final LyricInfo NONE = new LyricInfo();
     @Getter
     int code = 0;
-    Lyric lrc = Lyric.NONE;
-    Lyric tlyric = Lyric.NONE;
+    @SerializedName("lrc")
+    Lyric lyric = Lyric.NONE;
+    @SerializedName("tlyric")
+    Lyric translatedLyric = Lyric.NONE;
 
     public LyricInfo(
-            Lyric lrc,
-            Lyric tlyric
+            Lyric lyric,
+            Lyric translatedLyric
     ) {
-        this.lrc = lrc;
-        this.tlyric = tlyric;
+        this.lyric = lyric;
+        this.translatedLyric = translatedLyric;
     }
 
-    public Lyric getLrc() {
-        return Objects.requireNonNullElse(lrc, Lyric.NONE);
+    public Lyric getLyric() {
+        return Objects.requireNonNullElse(lyric, Lyric.NONE);
     }
 
-    public Lyric getTlyric() {
-        return Objects.requireNonNullElse(tlyric, Lyric.NONE);
+    public Lyric getTranslatedLyric() {
+        return Objects.requireNonNullElse(translatedLyric, Lyric.NONE);
     }
 }

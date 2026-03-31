@@ -4,7 +4,8 @@ import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.server.api.LoginApiService;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import lombok.EqualsAndHashCode;
 import net.minecraft.network.codec.StreamCodec;
@@ -20,7 +21,7 @@ public class CancelQRLoginRequest implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     CancelQRLoginRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((cancelQRLoginRequest, serverPlayer) -> {
-                        LoginApiService.getInstance().cancelQRLoginByPlayer(serverPlayer);
+                        ILoginApiService.getInstance(ApiProvider.NCM).cancelQRLoginByPlayer(serverPlayer);
                     })
             );
         }

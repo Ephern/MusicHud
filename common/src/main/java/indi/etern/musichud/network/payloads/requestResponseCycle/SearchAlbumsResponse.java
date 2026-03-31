@@ -1,7 +1,7 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import icyllis.modernui.mc.MuiModApi;
-import indi.etern.musichud.beans.music.AlbumInfo;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.client.ui.pages.SearchView;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -14,11 +14,11 @@ import net.minecraft.network.codec.StreamCodec;
 
 import java.util.List;
 
-public record SearchAlbumsResponse(int offset,List<AlbumInfo> result) implements S2CPayload {
+public record SearchAlbumsResponse(int offset,List<Album> result) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, SearchAlbumsResponse> CODEC = StreamCodec.composite(
             ByteBufCodecs.INT,
             SearchAlbumsResponse::offset,
-            Codecs.ofList(() -> AlbumInfo.CODEC),
+            Codecs.ofList(() -> Album.CODEC),
             SearchAlbumsResponse::result,
             SearchAlbumsResponse::new
     );

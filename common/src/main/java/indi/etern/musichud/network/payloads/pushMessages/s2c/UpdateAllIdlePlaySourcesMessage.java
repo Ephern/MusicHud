@@ -1,7 +1,7 @@
 package indi.etern.musichud.network.payloads.pushMessages.s2c;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.AlbumInfo;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.interfaces.CommonRegister;
@@ -17,11 +17,11 @@ import net.minecraft.network.codec.StreamCodec;
 import java.util.List;
 
 public record UpdateAllIdlePlaySourcesMessage(List<Playlist> playlistSources,
-                                              List<AlbumInfo> albumSources) implements S2CPayload {
+                                              List<Album> albumSources) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, UpdateAllIdlePlaySourcesMessage> CODEC = StreamCodec.composite(
             Codecs.ofList(() -> Playlist.CODEC),
             UpdateAllIdlePlaySourcesMessage::playlistSources,
-            Codecs.ofList(() -> AlbumInfo.CODEC),
+            Codecs.ofList(() -> Album.CODEC),
             UpdateAllIdlePlaySourcesMessage::albumSources,
             UpdateAllIdlePlaySourcesMessage::new
     );

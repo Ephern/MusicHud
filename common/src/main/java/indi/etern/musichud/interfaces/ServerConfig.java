@@ -2,49 +2,45 @@ package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.platform.Environment;
-import indi.etern.musichud.platform.mod.forgeConfig.config.ServerConfigDefinition;
+
+import java.util.function.Supplier;
 
 public interface ServerConfig {
-    void setServerApiBaseUrl(String serverApiBaseUrl);
-    void setStartupBinaryApiServerWhenLaunch(boolean startupBinaryApiServerWhenLaunch);
-    void setServerApiBinaryExecutablePath(String serverApiBinaryExecutablePath);
-    void setPusherVoteAdditionalRate(double pusherVoteAdditionalRate);
-    void setUseRandomCnIp(boolean useRandomCnIp);
-
-    String getServerApiBaseUrl();
-    boolean getStartupBinaryApiServerWhenLaunch();
-    String getServerApiBinaryExecutablePath();
-    double getPusherVoteAdditionalRate();
-    boolean getUseRandomCnIp();
-
-    void save();
-    void setConfigured(boolean configured);
-    boolean isConfigured();
-
     static ServerConfig getInstance() {
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
-        switch (platform) {
-            case FABRIC, NEOFORGE -> {
-                return ServerConfigDefinition.getInstance();
-            }
-            case PAPER -> {
-                return ReflectionHolder.load("indi.etern.musichud.platform.plugin.paper.config.ServerConfigDefinition", ServerConfig.class);
+        Supplier<ServerConfig> supplier = platform.getServerConfigSupplier();
+        if (supplier != null) {
+            ServerConfig serverConfig = supplier.get();
+            if (serverConfig != null) {
+                return serverConfig;
             }
         }
         throw new UnsupportedOperationException();
     }
 
-    final class ReflectionHolder {
-        private ReflectionHolder() {
-        }
+    String getServerApiBaseUrl();
 
-        static <T> T load(String className, Class<T> expectedType) {
-            try {
-                Object instance = Class.forName(className).getMethod("getInstance").invoke(null);
-                return expectedType.cast(instance);
-            } catch (ReflectiveOperationException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
+    void setServerApiBaseUrl(String serverApiBaseUrl);
+
+    boolean getStartupBinaryApiServerWhenLaunch();
+
+    void setStartupBinaryApiServerWhenLaunch(boolean startupBinaryApiServerWhenLaunch);
+
+    String getServerApiBinaryExecutablePath();
+
+    void setServerApiBinaryExecutablePath(String serverApiBinaryExecutablePath);
+
+    double getPusherVoteAdditionalRate();
+
+    void setPusherVoteAdditionalRate(double pusherVoteAdditionalRate);
+
+    boolean getUseRandomCnIp();
+
+    void setUseRandomCnIp(boolean useRandomCnIp);
+
+    void save();
+
+    boolean isConfigured();
+
+    void setConfigured(boolean configured);
 }

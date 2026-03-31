@@ -1,9 +1,8 @@
 package indi.etern.musichud.platform.plugin.paper.event;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.interfaces.IEventService;
+import indi.etern.musichud.interfaces.IServerEventService;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
 import org.bukkit.event.EventHandler;
@@ -15,7 +14,7 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
 
-public final class PaperEventService implements IEventService, Listener {
+public final class PaperEventService implements IServerEventService, Listener {
     private static volatile PaperEventService instance;
     private final Logger logger = MusicHud.getLogger(PaperEventService.class);
     private final List<Consumer<ServerPlayer>> commonPlayerQuitListeners = new CopyOnWriteArrayList<>();
@@ -45,30 +44,6 @@ public final class PaperEventService implements IEventService, Listener {
     }
 
     @Override
-    public void initialize() {
-    }
-
-    @Override
-    public void registerClientPlayerJoin(Consumer<Player> listener) {
-        throw unsupportedClientOperation();
-    }
-
-    @Override
-    public void registerClientPlayerQuit(Consumer<Player> listener) {
-        throw unsupportedClientOperation();
-    }
-
-    @Override
-    public void registerClientTickPost(Runnable listener) {
-        throw unsupportedClientOperation();
-    }
-
-    @Override
-    public void registerClientLifecycleStopping(Runnable listener) {
-        throw unsupportedClientOperation();
-    }
-
-    @Override
     public void registerCommonPlayerQuit(Consumer<ServerPlayer> listener) {
         commonPlayerQuitListeners.add(listener);
     }
@@ -90,10 +65,6 @@ public final class PaperEventService implements IEventService, Listener {
         for (Runnable listener : serverLifecycleStoppingListeners) {
             runSafely(listener, "server stopping");
         }
-    }
-
-    private UnsupportedOperationException unsupportedClientOperation() {
-        return new UnsupportedOperationException("Client events are not available in the native Paper adapter");
     }
 
     private void runSafely(Runnable runnable, String phase) {

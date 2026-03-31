@@ -5,7 +5,9 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.server.api.MusicApiService;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.IMusicApiService;
+import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
 import indi.etern.musichud.utils.JsonUtil;
 import io.netty.buffer.Unpooled;
 import lombok.SneakyThrows;
@@ -20,13 +22,13 @@ import static indi.etern.musichud.MusicHud.getLogger;
 
 public class MainTest {
     private static final Logger LOGGER = getLogger(MainTest.class);
-    private final MusicApiService musicApiService = MusicApiService.getInstance();
+    private final IMusicApiService IMusicApiService = indi.etern.musichud.server.api.IMusicApiService.getInstance(ApiProvider.NCM);
 
     @SneakyThrows
     @Test
     public void testSearch() {
         LOGGER.info("test search");
-        List<MusicDetail> searchResult = musicApiService.search("Hideaway Feint", 0, 50, SearchType.MUSIC, response -> JsonUtil.gson.fromJson(response, MusicApiService.SearchMusicResponseBody.class)).result().getMusicDetails();
+        List<MusicDetail> searchResult = IMusicApiService.search("Hideaway Feint", 0, 50, SearchType.MUSIC, response -> JsonUtil.gson.fromJson(response, MusicApiService.SearchMusicResponseBody.class)).result().getMusicDetails();
         assert !searchResult.isEmpty();
         LOGGER.info(JsonUtil.gson.toJson(searchResult));
     }
@@ -35,11 +37,11 @@ public class MainTest {
     @Test
     public void testGetDetail() {
         LOGGER.info("test get detail");
-        List<MusicDetail> detailByIds = musicApiService.getMusicDetailByIds(List.of(1827011682L));
+        List<MusicDetail> detailByIds = IMusicApiService.getMusicDetailByIds(List.of(1827011682L));
         assert !detailByIds.isEmpty();
         LOGGER.info(JsonUtil.gson.toJson(detailByIds));
         LOGGER.info("test get resource detail");
-        MusicResourceInfo resourceInfo = musicApiService.getResourceInfo(detailByIds.getFirst(), Quality.LOSSLESS, null);
+        MusicResourceInfo resourceInfo = IMusicApiService.getResourceInfo(detailByIds.getFirst(), Quality.LOSSLESS, null);
         LOGGER.info(JsonUtil.gson.toJson(resourceInfo));
     }
 
@@ -47,7 +49,7 @@ public class MainTest {
     @Test
     public void testPlaylistDetail() {
         LOGGER.info("test get playlist detail");
-        Playlist detailByIds = musicApiService.getPlaylistDetail(975427390, null);
+        Playlist detailByIds = IMusicApiService.getPlaylistDetail(975427390, null);
         LOGGER.info(JsonUtil.gson.toJson(detailByIds));
         RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY);
         Playlist.CODEC.encode(buf, detailByIds);

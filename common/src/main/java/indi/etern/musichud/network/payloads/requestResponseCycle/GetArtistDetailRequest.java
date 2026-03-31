@@ -6,7 +6,8 @@ import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.server.api.MusicApiService;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
@@ -25,7 +26,7 @@ public record GetArtistDetailRequest(long id) implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetArtistDetailRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((playlistDetailRequest, player) -> {
-                        Artist artistDetail = MusicApiService.getInstance().getArtistDetail(playlistDetailRequest.id, player);
+                        Artist artistDetail = IMusicApiService.getInstance(ApiProvider.NCM).getArtistDetail(playlistDetailRequest.id, player);
                         if (artistDetail != null) {
                             IServerNetworkService.getInstance().sendToPlayer(player,new GetArtistDetailResponse(artistDetail));
                         }
