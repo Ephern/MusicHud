@@ -16,7 +16,7 @@ import org.lwjgl.glfw.GLFW;
 @RegisterMark
 public class Keybinds implements ClientRegister {
     public void register() {
-        String category = "key.category.music_hud.music_hud";
+        KeyMapping.Category category = KeyMapping.Category.register(MusicHud.location(MusicHud.MOD_ID));
         var mainMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".open_main",
                 InputConstants.Type.KEYSYM,
