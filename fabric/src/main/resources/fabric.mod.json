@@ -3,7 +3,7 @@
   "id": "music_hud",
   "version": "${version}",
   "name": "Music Hud",
-  "description": "A mod allow to play music from NCM in whole server ",
+  "description": "Request music in whole server powered by Netease Cloud Music (NCM) | 一个基于网易云的全服点歌模组",
   "authors": [
     "Etern"
   ],
