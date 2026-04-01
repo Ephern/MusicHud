@@ -3,7 +3,6 @@ package indi.etern.musichud.platform;
 import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.platform.mod.forgeConfig.config.ServerConfigDefinition;
 import lombok.*;
 
 import java.util.function.Supplier;
@@ -45,7 +44,7 @@ public class Environment {
                 () -> load("indi.etern.musichud.platform.mod.architectury.registry.ModKeyRegistryService", IKeyRegistryService.class)
         ),
         PAPER(
-                () -> load("indi.etern.musichud.platform.plugin.paper.config.ServerConfigDefinition", ServerConfigDefinition.class),
+                () -> load("indi.etern.musichud.platform.plugin.paper.config.ServerConfigDefinition", ServerConfig.class),
                 null,
                 () -> load("indi.etern.musichud.platform.plugin.paper.network.PaperNetworkManager", IServerNetworkService.class),
                 null,
