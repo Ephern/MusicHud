@@ -8,35 +8,35 @@ modId = "music_hud"
 version = "${version}"
 displayName = "Music Hud"
 authors = "Etern"
-description = "A mod allow to play music from NCM in whole server"
+description = "Request music in whole server powered by Netease Cloud Music (NCM) | 一个基于网易云的全服点歌模组"
 displayURL = "https://github.com/Etern-34520/MusicHud"
 logoFile = "assets/music_hud/icon.png"
 
 [[dependencies.music_hud]]
 modId = "neoforge"
 type = "required"
-versionRange = "[21.6,21.8]"
+versionRange = "[21.9,21.10]"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.music_hud]]
 modId = "minecraft"
 type = "required"
-versionRange = "[1.21.6,1.21.8]"
+versionRange = "[1.21.9,1.21.10]"
 ordering = "NONE"
 side = "BOTH"
 
 [[dependencies.music_hud]]
 modId = "architectury"
 type = "required"
-versionRange = "[17.0.0,)"
+versionRange = "[18.0.5,)"
 ordering = "AFTER"
 side = "BOTH"
 
 [[dependencies.music_hud]]
 modId = "modernui"
 type = "required"
-versionRange = "[3.12.0.4,)"
+versionRange = "[3.12.0.5,)"
 ordering = "AFTER"
 side = "CLIENT"
 
