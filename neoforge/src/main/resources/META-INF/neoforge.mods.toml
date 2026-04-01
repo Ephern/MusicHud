@@ -8,7 +8,7 @@ modId = "music_hud"
 version = "${version}"
 displayName = "Music Hud"
 authors = "Etern"
-description = "A mod allow to play music from NCM in whole server"
+description = "Request music in whole server powered by Netease Cloud Music (NCM) | 一个基于网易云的全服点歌模组"
 displayURL = "https://github.com/Etern-34520/MusicHud"
 logoFile = "assets/music_hud/icon.png"
 
