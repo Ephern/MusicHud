@@ -1,12 +1,12 @@
-package indi.etern.musichud.client.music;
+package indi.etern.musichud.client.audio;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.FormatType;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.client.music.decoder.AudioDecoder;
-import indi.etern.musichud.client.music.decoder.AudioFormatDetector;
+import indi.etern.musichud.client.audio.decoder.AudioDecoder;
+import indi.etern.musichud.client.audio.decoder.AudioFormatDetector;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IClientNetworkService;
@@ -83,12 +83,18 @@ public class StreamAudioPlayer {
         BufferedInputStream bufferedStream = new BufferedInputStream(inputStream, 8192);
 
         if (formatType != FormatType.AUTO) {
-            FormatType detectedFormatType = AudioFormatDetector.detectFormat(bufferedStream);
-            if (detectedFormatType != formatType) {
-                LOGGER.warn("Detected format type is not equals to resource format type, using detected");
+            FormatType detectedFormatType = null;
+            try {
+                detectedFormatType = AudioFormatDetector.detectFormat(bufferedStream);
+            } catch (IOException e) {
+                LOGGER.warn("Error while trying to detect format", e);
             }
-
-            return detectedFormatType.newDecoder(bufferedStream);
+            if (detectedFormatType != null && detectedFormatType != formatType) {
+                LOGGER.warn("Detected format type is not equals to resource format type, using detected");
+                return detectedFormatType.newDecoder(bufferedStream);
+            } else {
+                return formatType.newDecoder(bufferedStream);
+            }
         } else {
             return formatType.newDecoder(bufferedStream);
         }

@@ -72,7 +72,7 @@ public class MusicCollectionCard extends LinearLayout {
         PusherInfo pusherInfo = musicCollection.getPusherInfo();
         LocalPlayer localPlayer = Minecraft.getInstance().player;
         if (pusherInfo == null || pusherInfo.equals(PusherInfo.EMPTY)
-                || (localPlayer != null && pusherInfo.playerUUID().equals(localPlayer.getUUID()))) {
+                || (localPlayer != null && pusherInfo.getPlayerUUID().equals(localPlayer.getUUID()))) {
             Button addToIdleSourceButton = new Button(context);
             updateButton(addToIdleSourceButton);
             addToIdleSourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
@@ -116,7 +116,7 @@ public class MusicCollectionCard extends LinearLayout {
             pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             pusherText.setTextSize(Theme.TEXT_SIZE_SMALL);
             pusherText.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-            pusherText.setText(I18n.get(MusicHud.MOD_ID + ".text.pusherSource") + pusherInfo.playerName());
+            pusherText.setText(I18n.get(MusicHud.MOD_ID + ".text.pusherSource") + pusherInfo.getPlayerName());
             LayoutParams pusherParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             pusherParams.setMargins(dp(4), 0, 0, dp(8));
             addView(pusherText, pusherParams);

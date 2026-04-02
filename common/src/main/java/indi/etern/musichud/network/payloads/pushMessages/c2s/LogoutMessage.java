@@ -24,8 +24,8 @@ public class LogoutMessage implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     LogoutMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
-                        ILoginApiService ILoginApiService = indi.etern.musichud.server.api.ILoginApiService.getInstance(ApiProvider.NCM);
-                        ILoginApiService.logout(player);
+                        ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
+                        loginApiService.logout(player);
                     })
             );
         }

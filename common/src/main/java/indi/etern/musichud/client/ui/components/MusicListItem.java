@@ -170,10 +170,10 @@ public class MusicListItem extends LinearLayout {
 
         if (showPusherInfo) {
             PusherInfo pusherInfo = musicDetail.getPusherInfo();
-            if (!pusherInfo.playerName().isEmpty()) {
+            if (!pusherInfo.getPlayerName().isEmpty()) {
                 ClientPacketListener connection = Minecraft.getInstance().getConnection();
                 if (connection == null) throw new IllegalStateException();
-                pusherText.setText(pusherInfo.playerName());
+                pusherText.setText(pusherInfo.getPlayerName());
             }
         }
     }

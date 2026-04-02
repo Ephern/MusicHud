@@ -47,33 +47,22 @@ public class MusicDetail {
     @SerializedName("pop")
     @Getter
     int popularity;
-    @SerializedName("v")
-    @Getter
-    int infoVersion;
-    @SerializedName("version")
-    @Getter
-    int musicVersion;
     @SerializedName("al")
     @Setter
     Album album = Album.NONE;
     @SerializedName("dt")
     @Getter
     int durationMillis;
-    @SerializedName("hr")
-    QualityInfo hiRes = QualityInfo.NONE;
-    @SerializedName("sq")
-    QualityInfo sq = QualityInfo.NONE;
-    @SerializedName("h")
-    QualityInfo high = QualityInfo.NONE;
-    @SerializedName("m")
-    QualityInfo medium = QualityInfo.NONE;
-    @SerializedName("l")
-    QualityInfo low = QualityInfo.NONE;
     @Getter
     long mark; // bit mask
     @SerializedName("tns")
     List<String> translations = List.of();
 
+    // only useful for server, and its a optional api field
+    @SerializedName("privilege")
+    @Setter
+    @Getter
+    ExtraInfo extraInfo;
     // Not contained in the original API response, set separately
     @Setter
     PusherInfo pusherInfo = PusherInfo.EMPTY;
@@ -100,26 +89,6 @@ public class MusicDetail {
         this.translations = translations;
         this.pusherInfo = pusherInfo;
         this.lyricInfo = lyricInfo;
-    }
-
-    public QualityInfo getHiRes() {
-        return Objects.requireNonNullElse(hiRes, QualityInfo.NONE);
-    }
-
-    public QualityInfo getSq() {
-        return Objects.requireNonNullElse(sq, QualityInfo.NONE);
-    }
-
-    public QualityInfo getHigh() {
-        return Objects.requireNonNullElse(high, QualityInfo.NONE);
-    }
-
-    public QualityInfo getMedium() {
-        return Objects.requireNonNullElse(medium, QualityInfo.NONE);
-    }
-
-    public QualityInfo getLow() {
-        return Objects.requireNonNullElse(low, QualityInfo.NONE);
     }
 
     public String getName() {
@@ -167,5 +136,15 @@ public class MusicDetail {
     @Override
     public int hashCode() {
         return Objects.hashCode(id);
+    }
+
+    public record ExtraInfo(
+            @SerializedName("cs")
+            boolean cloudSource,
+            @SerializedName("st")
+            int copyrightStatus,//0 is normal, less than 0 means no copyright
+            @SerializedName("toast")
+            boolean disabledAsCopyrightProtect
+    ) {
     }
 }

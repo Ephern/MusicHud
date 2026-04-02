@@ -1,6 +1,5 @@
 package indi.etern.musichud.server.api.impl.ncm;
 
-import indi.etern.musichud.beans.api.MusicDetailsResponse;
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.PlaylistResponse;
 import indi.etern.musichud.server.api.UrlMeta;
@@ -126,6 +125,11 @@ public class ServerApiMeta {
                 null,
                 Set.of("limit"/*default:100*/),
                 true, false, true, String.class);
+        public static final UrlMeta<String> CLOUD_DRIVE = new UrlMeta<>(
+                "/user/cloud",
+                null,
+                Set.of("limit"/*default:30*/, "offset"),
+                true, false, true, String.class);
     }
 
     public static class Artist {
@@ -203,13 +207,13 @@ public class ServerApiMeta {
                 Set.of("id"),
                 Set.of("source"/*pyncmd|bodian|kuwo|kugou|qq|migu*/),
                 true, false, true, MusicApiService.GetMatchResourceUrlResponse.class);
-        public static final UrlMeta<MusicDetailsResponse> DETAIL = new UrlMeta<>(
+        public static final UrlMeta<MusicApiService.MusicDetailsResponse> DETAIL = new UrlMeta<>(
                 "/song/detail",
                 Set.of("ids"),
                 null,
                 true,
                 false,
-                true, MusicDetailsResponse.class);
+                true, MusicApiService.MusicDetailsResponse.class);
         public static final UrlMeta<LyricInfo> LYRIC = new UrlMeta<>("/lyric",
                 Set.of("id")
                 , null,

@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.music;
+package indi.etern.musichud.client.audio;
 
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
@@ -199,7 +199,7 @@ public class NowPlayingInfo {
             throw new IllegalStateException();
         }
         if (currentlyPlayingMusicDetail != null) {
-            return connection.getPlayerInfo(currentlyPlayingMusicDetail.getPusherInfo().playerUUID());
+            return connection.getPlayerInfo(currentlyPlayingMusicDetail.getPusherInfo().getPlayerUUID());
         } else {
             return null;
         }

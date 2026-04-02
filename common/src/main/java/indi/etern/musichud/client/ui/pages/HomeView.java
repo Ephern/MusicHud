@@ -15,7 +15,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.client.music.NowPlayingInfo;
+import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
@@ -193,7 +193,7 @@ public class HomeView extends LinearLayout {
                 idlePlaySourceCardMap.put(collection, child);
             });
             serverIdlePlaySources.forEach(collection -> {
-                if (localPlayer != null && !collection.getPusherInfo().playerUUID().equals(localPlayer.getUUID())) {
+                if (localPlayer != null && !collection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID())) {
                     MusicCollectionCard child = new MusicCollectionCard(context, collection);
                     serverIdlePlaySourceCardsList.addView(child);
                     idlePlaySourceCardMap.put(collection, child);
@@ -223,7 +223,7 @@ public class HomeView extends LinearLayout {
                 });
             });
             musicService.getServerIdlePlaySourceAddListeners().add(collection -> {
-                if ((localPlayer != null && collection.getPusherInfo().playerUUID() != localPlayer.getUUID())
+                if ((localPlayer != null && collection.getPusherInfo().getPlayerUUID() != localPlayer.getUUID())
                         && !idlePlaySourceCardMap.containsKey(collection)) {
                     MuiModApi.postToUiThread(() -> {
                         addIdlePlaySourceTo(collection, context, serverIdlePlaySourceCardsList);
@@ -326,7 +326,7 @@ public class HomeView extends LinearLayout {
         Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
         boolean hasIdlePlaySources = !musicService.getLocalIdlePlaySources().isEmpty() || !musicService.getServerIdlePlaySources().isEmpty();
         MusicDetail next = hasIdlePlaySources ? nextIdle : null;
-        if (musicQueue.isEmpty() && next != null && next != MusicDetail.NONE) {
+        if (musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE)) {
             nextToPlayTitle.setVisibility(VISIBLE);
             nextToPlayItem.setVisibility(VISIBLE);
             nextToPlayItem.bindData(next);
@@ -344,7 +344,7 @@ public class HomeView extends LinearLayout {
         LinearLayout actions = new LinearLayout(getContext());
 
         assert Minecraft.getInstance().player != null;
-        if (musicDetail.getPusherInfo().playerUUID().equals(Minecraft.getInstance().player.getUUID())) {
+        if (musicDetail.getPusherInfo().getPlayerUUID().equals(Minecraft.getInstance().player.getUUID())) {
             Button removeButton = new Button(getContext());
             removeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.remove"));
             removeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
