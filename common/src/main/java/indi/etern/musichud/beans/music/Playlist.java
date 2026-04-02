@@ -163,7 +163,7 @@ public class Playlist implements MusicCollection {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, pusherInfo.playerUUID(), name, coverImgUrl);
+        return Objects.hash(id, pusherInfo.getPlayerUUID(), name, coverImgUrl);
     }
 
     @Override

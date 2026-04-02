@@ -9,7 +9,7 @@ import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.LyricLine;
-import indi.etern.musichud.client.music.NowPlayingInfo;
+import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.Easings;
 

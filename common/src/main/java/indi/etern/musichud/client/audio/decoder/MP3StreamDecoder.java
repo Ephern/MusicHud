@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.music.decoder;
+package indi.etern.musichud.client.audio.decoder;
 
 import javazoom.jl.decoder.*;
 import lombok.SneakyThrows;

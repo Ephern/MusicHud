@@ -11,8 +11,8 @@ import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.config.ProfileConfigData;
-import indi.etern.musichud.client.music.NowPlayingInfo;
-import indi.etern.musichud.client.music.StreamAudioPlayer;
+import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
@@ -327,14 +327,14 @@ public class MusicService {
         }
         LocalPlayer localPlayer = Minecraft.getInstance().player;
         for (MusicCollection musicCollection : playlistSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().playerUUID().equals(localPlayer.getUUID()))) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()))) {
                 toAdd.add(musicCollection);
                 serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
                 serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
             }
         }
         for (MusicCollection musicCollection : albumSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().playerUUID().equals(localPlayer.getUUID()))) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()))) {
                 toAdd.add(musicCollection);
                 serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
                 serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));

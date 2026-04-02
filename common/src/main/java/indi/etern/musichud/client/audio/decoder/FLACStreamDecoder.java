@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.music.decoder;
+package indi.etern.musichud.client.audio.decoder;
 
 import lombok.SneakyThrows;
 import org.jflac.FLACDecoder;

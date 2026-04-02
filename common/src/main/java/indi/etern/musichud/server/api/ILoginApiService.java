@@ -21,7 +21,7 @@ public interface ILoginApiService {
 
     String getAnonymousCookie();
 
-    String randomVipCookieOr(Supplier<String> defaultCookieSupplier);
+    String randomVipCookieOrElse(Supplier<String> defaultCookieSupplier);
 
     void joinUnlogged(ServerPlayer serverPlayer);
 
@@ -42,6 +42,8 @@ public interface ILoginApiService {
     java.util.Map<ServerPlayer, LoginApiService.PlayerLoginInfo> getLoginedPlayerInfoMap();
 
     java.util.Set<java.util.function.Consumer<java.util.Map<ServerPlayer, LoginApiService.PlayerLoginInfo>>> getLoginStateChangeListeners();
+
+    String getRawCookieOrElse(ServerPlayer serverPlayer, Supplier<String> supplier);
 
     @RegisterMark
     class Register implements ServerRegister {

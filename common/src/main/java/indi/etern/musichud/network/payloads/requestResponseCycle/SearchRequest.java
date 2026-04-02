@@ -31,13 +31,13 @@ public record SearchRequest(String query, SearchType searchType, int offset) imp
             INetworkRegister.getInstance().autoRegisterPayload(SearchRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
                         S2CPayload s2CPayload;
-                        IMusicApiService IMusicApiService = indi.etern.musichud.server.api.IMusicApiService.getInstance(ApiProvider.NCM);
+                        IMusicApiService musicApiService = IMusicApiService.getInstance(ApiProvider.NCM);
                         switch (message.searchType) {
-                            case ARTIST -> s2CPayload = new SearchArtistsResponse(message.offset, IMusicApiService.searchArtists(message.query, message.offset));
-                            case ALBUM -> s2CPayload = new SearchAlbumsResponse(message.offset, IMusicApiService.searchAlbums(message.query, message.offset));
-                            case MUSIC -> s2CPayload = new SearchMusicResponse(message.offset, IMusicApiService.searchMusic(message.query, message.offset));
-                            case PLAYLIST -> s2CPayload = new SearchPlaylistsResponse(message.offset, IMusicApiService.searchPlaylists(message.query, message.offset));
-                            default -> s2CPayload = new SearchMusicResponse(message.offset, IMusicApiService.searchMusic(message.query, message.offset));
+                            case ARTIST -> s2CPayload = new SearchArtistsResponse(message.offset, musicApiService.searchArtists(message.query, message.offset));
+                            case ALBUM -> s2CPayload = new SearchAlbumsResponse(message.offset, musicApiService.searchAlbums(message.query, message.offset));
+                            case MUSIC -> s2CPayload = new SearchMusicResponse(message.offset, musicApiService.searchMusic(message.query, message.offset));
+                            case PLAYLIST -> s2CPayload = new SearchPlaylistsResponse(message.offset, musicApiService.searchPlaylists(message.query, message.offset));
+                            default -> s2CPayload = new SearchMusicResponse(message.offset, musicApiService.searchMusic(message.query, message.offset));
                         }
                         IServerNetworkService.getInstance().sendToPlayer(player, s2CPayload);
                     })

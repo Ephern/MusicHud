@@ -1,7 +1,7 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.music.StreamAudioPlayer;
+import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import lombok.Setter;

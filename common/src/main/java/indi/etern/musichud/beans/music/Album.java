@@ -45,7 +45,7 @@ public class Album implements MusicCollection{
 
     // Not contained in the original API response, set separately
     @Getter
-    PusherInfo pusherInfo = PusherInfo.EMPTY;
+    transient PusherInfo pusherInfo = PusherInfo.EMPTY;
 
     public String getThumbnailPicUrl(int size) {
         return picUrl + "?param=" + size + "y" + size;
@@ -108,6 +108,6 @@ public class Album implements MusicCollection{
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, pusherInfo.playerUUID());
+        return Objects.hash(id, pusherInfo.getPlayerUUID());
     }
 }
