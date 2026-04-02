@@ -14,7 +14,7 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import indi.etern.musichud.beans.music.LyricLine;
-import indi.etern.musichud.client.music.NowPlayingInfo;
+import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.utils.Easings;
 import lombok.Getter;
 import lombok.NonNull;

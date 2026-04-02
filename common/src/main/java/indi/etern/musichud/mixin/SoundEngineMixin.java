@@ -1,6 +1,6 @@
 package indi.etern.musichud.mixin;
 
-import indi.etern.musichud.client.music.StreamAudioPlayer;
+import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.interfaces.ClientConfig;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundEngine;

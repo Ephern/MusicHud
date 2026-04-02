@@ -1,9 +1,6 @@
 package indi.etern.musichud.beans.music;
 
-import indi.etern.musichud.client.music.decoder.AudioDecoder;
-import indi.etern.musichud.client.music.decoder.AudioFormatDetector;
-import indi.etern.musichud.client.music.decoder.FLACStreamDecoder;
-import indi.etern.musichud.client.music.decoder.MP3StreamDecoder;
+import indi.etern.musichud.client.audio.decoder.*;
 import lombok.SneakyThrows;
 
 import java.io.BufferedInputStream;
@@ -20,6 +17,12 @@ public enum FormatType {
         @Override
         public AudioDecoder newDecoder(BufferedInputStream inputStream) {
             return new MP3StreamDecoder(inputStream);
+        }
+    },
+    WAV {
+        @Override
+        public AudioDecoder newDecoder(BufferedInputStream inputStream) {
+            return new WavStreamDecoder(inputStream);
         }
     },
     AUTO {

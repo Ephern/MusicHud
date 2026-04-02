@@ -81,7 +81,7 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public String randomVipCookieOr(Supplier<String> defaultCookieSupplier) {
+    public String randomVipCookieOrElse(Supplier<String> defaultCookieSupplier) {
         //noinspection ComparatorMethodParameterNotUsed
         Comparator<String> randomComparator = (a, b) -> MusicHud.RANDOM.nextInt(-1, 1);
         return loginedPlayerInfoMap.values().stream()
@@ -224,11 +224,11 @@ public class LoginApiService implements ILoginApiService {
                 throw new IllegalStateException("accountDetail.profile is null but the account is not anonymous");
             }
         }
+        profile.setVipType(accountDetail.account.vipType);
         PlayerLoginInfo playerLoginInfo = PlayerLoginInfo.of(loginCookieInfo);
         playerLoginInfo.appendAccountDetail(accountDetail);
         loginedPlayerInfoMap.put(player, playerLoginInfo);
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(loginedPlayerInfoMap));
-        profile.setVipType(accountDetail.account.vipType);
         return profile;
     }
 
@@ -240,6 +240,22 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public PlayerLoginInfo getLoginInfoByServerPlayer(ServerPlayer player) {
         return loginedPlayerInfoMap.get(player);
+    }
+
+    @Override
+    public String getRawCookieOrElse(ServerPlayer serverPlayer, Supplier<String> supplier) {
+        String rawCookie;
+        if (serverPlayer != null) {
+            PlayerLoginInfo loginInfo = getLoginedPlayerInfoMap().get(serverPlayer);
+            if (loginInfo != null) {
+                rawCookie = loginInfo.loginCookieInfo.rawCookie();
+            } else {
+                rawCookie = supplier != null ? supplier.get() : null;
+            }
+        } else {
+            rawCookie = supplier != null ? supplier.get() : null;
+        }
+        return rawCookie;
     }
 
     @AllArgsConstructor

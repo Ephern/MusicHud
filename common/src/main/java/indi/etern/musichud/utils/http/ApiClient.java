@@ -197,7 +197,6 @@ public class ApiClient {
         }
     }
 
-    //    @JsonIgnoreProperties(ignoreUnknown = true)
     private record CodeOnlyResponse(int code) {
     }
 }

@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.music.decoder;
+package indi.etern.musichud.client.audio.decoder;
 
 import indi.etern.musichud.beans.music.FormatType;
 
@@ -8,34 +8,40 @@ import java.io.InputStream;
 public class AudioFormatDetector {
     private static final byte[] ID3_HEADER = {0x49, 0x44, 0x33};
     private static final byte[] FLAC_HEADER = {0x66, 0x4C, 0x61, 0x43};
+    private static final byte[] WAV_HEADER = {'R', 'I', 'F', 'F', 'W', 'A', 'V', 'E'};
 
     public static FormatType detectFormat(InputStream inputStream) throws IOException {
         if (!inputStream.markSupported()) {
             throw new IllegalArgumentException("InputStream must support mark/reset");
         }
 
-        inputStream.mark(1024); // 增加标记大小以检测ID3标签
+        inputStream.mark(1024);
         byte[] header = new byte[1024];
         int bytesRead = inputStream.read(header);
         inputStream.reset();
 
-        if (bytesRead < 4) {
+        if (bytesRead < 12) {
             throw new IOException("Insufficient data to determine format");
         }
 
-        // 检测FLAC格式
+        // 检测 WAV 格式
+        if (header[0] == WAV_HEADER[0] && header[1] == WAV_HEADER[1] && header[2] == WAV_HEADER[2] && header[3] == WAV_HEADER[3] &&
+                header[8] == WAV_HEADER[4] && header[9] == WAV_HEADER[5] && header[10] == WAV_HEADER[6] && header[11] == WAV_HEADER[7]) {
+            return FormatType.WAV;
+        }
+
+        // 检测 FLAC 格式（原逻辑）
         if (header[0] == FLAC_HEADER[0] && header[1] == FLAC_HEADER[1] &&
                 header[2] == FLAC_HEADER[2] && header[3] == FLAC_HEADER[3]) {
             return FormatType.FLAC;
         }
 
-        // 检测MP3格式（通过ID3标签）
+        // 检测 MP3 格式（原逻辑，注意 ID3 头或帧头检测）
         if (header[0] == ID3_HEADER[0] && header[1] == ID3_HEADER[1] &&
                 header[2] == ID3_HEADER[2]) {
             return FormatType.MP3;
         }
 
-        // 如果没有ID3标签，尝试检测MP3帧头（更复杂的检测）
         if (detectMP3FrameHeader(header, bytesRead)) {
             return FormatType.MP3;
         }

@@ -6,7 +6,6 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.user.Profile;
-import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.interfaces.ServerRegister;
@@ -33,7 +32,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class MusicPlayerServerService {
     private static volatile MusicPlayerServerService instance;
-    private final IMusicApiService IMusicApiService = indi.etern.musichud.server.api.IMusicApiService.getInstance(ApiProvider.NCM);
+    private final IMusicApiService musicApiService = IMusicApiService.getInstance(ApiProvider.NCM);
     private final CurrentVoteInfo currentVoteInfo = new CurrentVoteInfo();
     private final Logger logger = MusicHud.getLogger(MusicPlayerServerService.class);
     private final Cache<CacheKey, MusicResourceInfo> musicResourceInfoCache = CacheBuilder.newBuilder()
@@ -92,7 +91,7 @@ public class MusicPlayerServerService {
                             PusherInfo pusherInfo = switchedToPlay.getPusherInfo();
                             if (pusherInfo != null &&
                                     loginedPlayerInfoMap.keySet().stream().noneMatch(
-                                            serverPlayer -> serverPlayer.getUUID().equals(pusherInfo.playerUUID())
+                                            serverPlayer -> serverPlayer.getUUID().equals(pusherInfo.getPlayerUUID())
                                     )
                             ) {
                                 continue;
@@ -106,13 +105,13 @@ public class MusicPlayerServerService {
 
                     nextIdleMusicDetail = preloadMusicDetail != null ? preloadMusicDetail : MusicDetail.NONE;
 
-                    ILoginApiService ILoginApiService = indi.etern.musichud.server.api.ILoginApiService.getInstance(ApiProvider.NCM);
-                    MusicResourceInfo resourceInfo = IMusicApiService.getResourceInfo(switchedToPlay, Quality.STANDARD, ILoginApiService.randomVipCookieOr(ILoginApiService::getAnonymousCookie));
+                    ServerPlayer pusherPlayer = switchedToPlay.getPusherInfo().getServerPlayer();
+                    MusicResourceInfo resourceInfo = musicApiService.getResourceInfo(switchedToPlay, Quality.STANDARD, pusherPlayer);
                     if (resourceInfo.equals(MusicResourceInfo.NONE)) {
                         continue;
                     }
                     if (switchedToPlay.getLyricInfo() == null || switchedToPlay.getLyricInfo().equals(LyricInfo.NONE)) {
-                        switchedToPlay.setLyricInfo(IMusicApiService.getLyricInfo(switchedToPlay));
+                        switchedToPlay.setLyricInfo(musicApiService.getLyricInfo(switchedToPlay));
                     }
                     serverNetworkService.sendToPlayers(
                             loginedPlayerInfoMap.keySet(),
@@ -182,12 +181,7 @@ public class MusicPlayerServerService {
             LoginApiService.PlayerLoginInfo loginInfo =
                     ILoginApiService.getInstance(ApiProvider.NCM).getLoginInfoByServerPlayer(sourcePlayer);
             if (loginInfo != null) {
-                PusherInfo pusherInfo = new PusherInfo(
-                        loginInfo.getProfile().getUserId(),
-                        sourcePlayer.getUUID(),
-                        sourcePlayer.getName().getString()
-                );
-                randomTrack.setPusherInfo(pusherInfo);
+                randomTrack.setPusherInfo(getPusherInfo(sourcePlayer));
             } else {
                 randomTrack.setPusherInfo(PusherInfo.EMPTY);
             }
@@ -219,6 +213,7 @@ public class MusicPlayerServerService {
                     pusher.getUUID(),
                     pusher.getName().getString()
             );
+            pusherInfo.setServerPlayer(pusher);
         }
         return pusherInfo;
     }
@@ -302,7 +297,7 @@ public class MusicPlayerServerService {
     }
 
     public void pushMusicToQueue(long musicDetailId, ServerPlayer pusher) {
-        List<MusicDetail> musicDetailByIds = IMusicApiService.getMusicDetailByIds(List.of(musicDetailId));
+        List<MusicDetail> musicDetailByIds = musicApiService.getMusicDetailByIds(List.of(musicDetailId), pusher);
         if (musicDetailByIds.size() != 1) {
             throw new IllegalStateException();
         }
@@ -352,7 +347,7 @@ public class MusicPlayerServerService {
     }
 
     private void removeMusicInternal(int index, MusicDetail musicDetail, ServerPlayer player) throws IllegalAccessException {
-        if (musicDetail.getPusherInfo().playerUUID().equals(player.getUUID())) {
+        if (musicDetail.getPusherInfo().getPlayerUUID().equals(player.getUUID())) {
             AtomicInteger index1 = new AtomicInteger(0);
             musicQueue.removeIf(musicDetail1 -> index == index1.getAndIncrement() && musicDetail.equals(musicDetail1));
             serverNetworkService.sendToPlayers(ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet(),
@@ -363,7 +358,7 @@ public class MusicPlayerServerService {
     }
 
     private void trySimplyRemove(MusicDetail musicDetail, ServerPlayer serverPlayer) {
-        if (musicDetail.getPusherInfo().playerUUID().equals(serverPlayer.getUUID())) {
+        if (musicDetail.getPusherInfo().getPlayerUUID().equals(serverPlayer.getUUID())) {
             musicQueue.remove(musicDetail);
             serverNetworkService.sendToPlayers(ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().keySet(),
                     new RefreshMusicQueueMessage(musicQueue));
@@ -400,7 +395,7 @@ public class MusicPlayerServerService {
 
     public MusicResourceInfo getMusicResourceInfo(long id, Quality quality, String retryFor, ServerPlayer serverPlayer) {
         try {
-            List<MusicDetail> musicDetails = indi.etern.musichud.server.api.IMusicApiService.getInstance(ApiProvider.NCM).getMusicDetailByIds(List.of(id));
+            List<MusicDetail> musicDetails = IMusicApiService.getInstance(ApiProvider.NCM).getMusicDetailByIds(List.of(id), null);
             if (musicDetails.size() == 1) {
                 MusicDetail musicDetail = musicDetails.getFirst();
                 try {
@@ -431,15 +426,7 @@ public class MusicPlayerServerService {
     }
 
     private @NotNull MusicResourceInfo getMusicResourceInfoWithoutCache(Quality quality, MusicDetail musicDetail, ServerPlayer serverPlayer) {
-        ILoginApiService ILoginApiService = indi.etern.musichud.server.api.ILoginApiService.getInstance(ApiProvider.NCM);
-        var loginInfo = ILoginApiService.getLoginInfoByServerPlayer(serverPlayer);
-        String cookie;
-        if (loginInfo.getVipType() == VipType.VIP) {
-            cookie = loginInfo.getLoginCookieInfo().rawCookie();
-        } else {
-            cookie = ILoginApiService.randomVipCookieOr(() -> loginInfo.getLoginCookieInfo().rawCookie());
-        }
-        MusicResourceInfo resourceInfo = IMusicApiService.getResourceInfo(musicDetail, quality, cookie);
+        MusicResourceInfo resourceInfo = musicApiService.getResourceInfo(musicDetail, quality, serverPlayer);
         if (resourceInfo != null && !resourceInfo.equals(MusicResourceInfo.NONE)) {
             return resourceInfo;
         } else {
@@ -478,7 +465,7 @@ public class MusicPlayerServerService {
             if (!votedPlayers.contains(player) && musicDetail.getId() == id) {
                 votedPlayers.add(player);
                 voteRate += 1.0f / ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap().size();
-                if (musicDetail.getPusherInfo().playerUUID().equals(player.getUUID())) {
+                if (musicDetail.getPusherInfo().getPlayerUUID().equals(player.getUUID())) {
                     voteRate += (float) ServerConfig.getInstance().getPusherVoteAdditionalRate();
                     logger.info("Pusher player \"{}\" voted for skip current music {}:{}", player.getName().getString(), id, musicDetail.getName());
                 } else {
