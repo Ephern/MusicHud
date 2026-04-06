@@ -19,8 +19,6 @@ public class Profile {
                     Profile::getAvatarUrl,
                     ByteBufCodecs.LONG,
                     Profile::getUserId,
-                    VipType.STREAM_CODEC,
-                    Profile::getVipType,
                     Profile::new
             );
     public static final Profile ANONYMOUS = new Profile("anonymous", "", 0, VipType.NORMAL);
@@ -34,11 +32,21 @@ public class Profile {
     @Setter
     VipType vipType;
 
+    public Profile(String nickname, String avatarUrl, Long userId) {
+        this.nickname = nickname;
+        this.avatarUrl = avatarUrl;
+        this.userId = userId;
+        vipType = VipType.NORMAL;
+    }
+
     public String getNickname() {
         return Objects.requireNonNullElse(nickname, "");
     }
     public String getAvatarUrl() {
         return Objects.requireNonNullElse(avatarUrl, "");
+    }
+    public VipType getVipType() {
+        return Objects.requireNonNullElse(vipType, VipType.NORMAL);
     }
 
     @Override
