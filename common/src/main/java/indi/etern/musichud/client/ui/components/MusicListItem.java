@@ -47,15 +47,17 @@ public class MusicListItem extends LinearLayout {
         setOrientation(HORIZONTAL);
         LayoutParams musicLayoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         setLayoutParams(musicLayoutParams);
+        setGravity(Gravity.CENTER_VERTICAL);
 
         albumImage = new UrlImageView(context);
         albumImage.setCornerRadius(dp(8));
+        albumImage.setAspectRatio(1);
         addView(albumImage, new LayoutParams(dp(imageSize), dp(imageSize)));
 
         LinearLayout musicTexts = new LinearLayout(context);
         musicTexts.setOrientation(VERTICAL);
         musicTexts.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams textsParams = new LayoutParams(0, LayoutParams.MATCH_PARENT, 1);
+        LayoutParams textsParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
         textsParams.setMargins(dp(12), 0, 0, 0);
         addView(musicTexts, textsParams);
 
