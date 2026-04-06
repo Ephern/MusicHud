@@ -10,8 +10,6 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.PostProcessable;
-import indi.etern.musichud.server.api.ApiProvider;
-import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.utils.JsonUtil;
 import indi.etern.musichud.utils.http.ApiClient;
@@ -25,6 +23,7 @@ import org.jetbrains.annotations.NotNull;
 
 import javax.annotation.Nullable;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
@@ -193,7 +192,7 @@ public class MusicApiService implements IMusicApiService {
                 String userCookie = loginApiService.getRawCookieOrElse(serverPlayer,
                         () -> loginApiService.randomVipCookieOrElse(loginApiService::getAnonymousCookie)
                 );
-                var response = ApiClient.post(ServerApiMeta.Music.DETAIL, requestBody, userCookie);
+                MusicDetailsResponse response = ApiClient.post(ServerApiMeta.Music.DETAIL, requestBody, userCookie);
                 List<MusicDetail> musicDetails = response.musicDetails();
                 result.addAll(musicDetails);
                 for (MusicDetail musicDetail : musicDetails) {
@@ -245,26 +244,26 @@ public class MusicApiService implements IMusicApiService {
 
     @Override
     public MusicResourceInfo getResourceInfo(MusicDetail musicDetail, Quality quality, ServerPlayer serverPlayer) {
-        ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
-        var loginInfo = loginApiService.getLoginInfoByServerPlayer(serverPlayer);
-        AtomicBoolean vipAccessible = new AtomicBoolean(true);
-        String cookie;
-        boolean isVip = loginInfo.getVipType() == VipType.VIP;
-        if (isVip || musicDetail.getExtraInfo().cloudSource()) {
-            if (!isVip) {
-                vipAccessible.set(false);
-            }
-            cookie = loginInfo.getLoginCookieInfo().rawCookie();
-        } else {
-            cookie = loginApiService.randomVipCookieOrElse(() -> {
-                vipAccessible.set(false);
-                return loginInfo.getLoginCookieInfo().rawCookie();
-            });
-        }
-
         if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
             return MusicResourceInfo.NONE;
         } else {
+            var loginInfo = loginApiService.getLoginInfoByServerPlayer(serverPlayer);
+            AtomicBoolean vipAccessible = new AtomicBoolean(true);
+            String cookie;
+            boolean isVip = loginInfo != null && loginInfo.getVipType() == VipType.VIP;
+            MusicDetail.ExtraInfo extraInfo = musicDetail.getExtraInfo();
+            if (isVip || extraInfo != null && extraInfo.cloudSource()) {
+                if (!isVip) {
+                    vipAccessible.set(false);
+                }
+                cookie = loginInfo == null ? loginApiService.getAnonymousCookie() : loginInfo.getLoginCookieInfo().rawCookie();
+            } else {
+                cookie = loginApiService.randomVipCookieOrElse(() -> {
+                    vipAccessible.set(false);
+                    return loginInfo == null ? loginApiService.getAnonymousCookie() : loginInfo.getLoginCookieInfo().rawCookie();
+                });
+            }
+
             MusicResourceInfo musicResourceInfo;
             int retryCount = 0;
             boolean available;
@@ -278,7 +277,7 @@ public class MusicApiService implements IMusicApiService {
                 if (response.code == 200) {
                     musicResourceInfo = response.data.getFirst();
                     // 30 seconds trial or have no copyright
-                    if (!musicDetail.getExtraInfo().cloudSource() &&
+                    if ((extraInfo == null || !extraInfo.cloudSource()) &&
                             ((musicResourceInfo.getFee() == Fee.SEPARATELY_PURCHASE || (musicResourceInfo.getFee() == Fee.VIP && !vipAccessible.get()))
                             ||musicResourceInfo.getUrl() == null)
                     ) {
@@ -320,6 +319,9 @@ public class MusicApiService implements IMusicApiService {
 
     @Override
     public List<Playlist> getPlayersUserSubscribedPlaylists(ServerPlayer player) {
+        if (player == null) {
+            return Collections.emptyList();
+        }
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {
@@ -336,6 +338,9 @@ public class MusicApiService implements IMusicApiService {
 
     @Override
     public List<Album> getPlayersUserSubscribedAlbums(ServerPlayer player) {
+        if (player == null) {
+            return Collections.emptyList();
+        }
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {
@@ -352,6 +357,9 @@ public class MusicApiService implements IMusicApiService {
 
     @Override
     public List<Artist> getPlayersUserSubscribedArtists(ServerPlayer player) {
+        if (player == null) {
+            return Collections.emptyList();
+        }
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {

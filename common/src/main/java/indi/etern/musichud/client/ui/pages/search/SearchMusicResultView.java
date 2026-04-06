@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.pages;
+package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.core.Context;
 import icyllis.modernui.widget.LinearLayout;
@@ -8,7 +8,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.MusicListItem;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 
@@ -53,10 +53,10 @@ public class SearchMusicResultView extends LinearLayout {
     private void addItem(Context context, MusicDetail musicDetail) {
         var musicLayout = new MusicListItem(context);
         musicLayout.bindData(musicDetail);
-        var background = ButtonInsetBackground.builder()
+        var background = ButtonInsetBackgroundFactory.builder()
                 .cornerRadius(dp(12))
                 .inset(dp(1))
-                .padding(new ButtonInsetBackground.Padding(dp(4), dp(4), dp(4), dp(4))).build().get();
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build().newBackgroundDrawable();
         musicLayout.setBackground(background);
 
         musicLayout.setClickable(true);

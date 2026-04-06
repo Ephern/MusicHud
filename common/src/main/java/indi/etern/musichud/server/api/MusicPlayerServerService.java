@@ -177,6 +177,19 @@ public class MusicPlayerServerService {
             }
 
             MusicDetail randomTrack = allTracks.get(MusicHud.RANDOM.nextInt(allTracks.size()));
+            if (randomTrack.getExtraInfo() == null) {
+                List<MusicDetail> detailByIds = musicApiService.getMusicDetailByIds(List.of(randomTrack.getId()), null);
+                if (detailByIds.size() == 1) {
+                    MusicDetail musicDetail = detailByIds.getFirst();
+                    if (musicDetail.getId() == randomTrack.getId()) {
+                        randomTrack.setExtraInfo(musicDetail.getExtraInfo());
+                    } else {
+                        throw new IllegalStateException();
+                    }
+                } else {
+                    throw new IllegalStateException();
+                }
+            }
 
             LoginApiService.PlayerLoginInfo loginInfo =
                     ILoginApiService.getInstance(ApiProvider.NCM).getLoginInfoByServerPlayer(sourcePlayer);
@@ -282,17 +295,20 @@ public class MusicPlayerServerService {
 
         Map<ServerPlayer, LoginApiService.PlayerLoginInfo> loginedPlayerInfoMap = ILoginApiService.getInstance(ApiProvider.NCM).getLoginedPlayerInfoMap();
         for (ServerPlayer player : players) {
-            Profile playerProfile = loginedPlayerInfoMap.get(player).getProfile();
-            List<Playlist> processedPrivatePlaylists = new ArrayList<>();
-            for (Playlist playlist : privatePlaylists) {
-                if (playlist.getCreator().equals(playerProfile)) {
-                    processedPrivatePlaylists.add(playlist);
-                } else {
-                    processedPrivatePlaylists.add(playlist.copyWithSensitiveErased());
+            LoginApiService.PlayerLoginInfo playerLoginInfo = loginedPlayerInfoMap.get(player);
+            if (playerLoginInfo != null) {
+                Profile playerProfile = playerLoginInfo.getProfile();
+                List<Playlist> processedPrivatePlaylists = new ArrayList<>();
+                for (Playlist playlist : privatePlaylists) {
+                    if (playlist.getCreator().equals(playerProfile)) {
+                        processedPrivatePlaylists.add(playlist);
+                    } else {
+                        processedPrivatePlaylists.add(playlist.copyWithSensitiveErased());
+                    }
                 }
+                processedPrivatePlaylists.addAll(publicPlaylists);
+                serverNetworkService.sendToPlayer(player, new UpdateAllIdlePlaySourcesMessage(processedPrivatePlaylists, albums));
             }
-            processedPrivatePlaylists.addAll(publicPlaylists);
-            serverNetworkService.sendToPlayer(player, new UpdateAllIdlePlaySourcesMessage(processedPrivatePlaylists, albums));
         }
     }
 

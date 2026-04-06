@@ -15,8 +15,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 public record LoginResultMessage(boolean success, String message, LoginCookieInfo loginCookieInfo, Profile profile) implements S2CPayload {
-    public static final
-    StreamCodec<RegistryFriendlyByteBuf, LoginResultMessage> CODEC =
+    public static final StreamCodec<RegistryFriendlyByteBuf, LoginResultMessage> CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.BOOL,
                     LoginResultMessage::success,

@@ -8,13 +8,13 @@ import indi.etern.musichud.client.ui.Theme;
 import lombok.Builder;
 
 @Builder
-public class ButtonInsetBackground {
+public class ButtonInsetBackgroundFactory {
     Padding padding;
     int cornerRadius;
     int inset;
     public record Padding(int left,int top,int right,int bottom) {}
 
-    public Drawable get() {
+    public Drawable newBackgroundDrawable() {
         ShapeDrawable background = new ShapeDrawable();
         if (padding != null) {
             background.setPadding(padding.left,padding.top,padding.left,padding.bottom);

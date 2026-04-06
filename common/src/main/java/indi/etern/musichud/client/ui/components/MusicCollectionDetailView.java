@@ -14,7 +14,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.function.Consumer;
@@ -51,11 +51,11 @@ public class MusicCollectionDetailView extends LinearLayout {
             RouterContainer.getInstance().popNavigate();
             backButton.setOnClickListener(null);
         });
-        Drawable drawable = ButtonInsetBackground.builder()
+        Drawable drawable = ButtonInsetBackgroundFactory.builder()
                 .inset(0)
                 .cornerRadius(dp(8))
-                .padding(new ButtonInsetBackground.Padding(dp(16), 0, dp(16), 0))
-                .build().get();
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
+                .build().newBackgroundDrawable();
         backButton.setBackground(drawable);
         LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
         backButtonParams.setMargins(0, 0, dp(4), 0);
@@ -104,11 +104,11 @@ public class MusicCollectionDetailView extends LinearLayout {
         updateButton();
         addToIdleSourceListButton.setTextColor(Theme.PRIMARY_COLOR);
         addToIdleSourceListButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        Drawable background1 = ButtonInsetBackground.builder()
+        Drawable background1 = ButtonInsetBackgroundFactory.builder()
                 .inset(0)
                 .cornerRadius(dp(8))
-                .padding(new ButtonInsetBackground.Padding(0, dp(2), 0, dp(2)))
-                .build().get();
+                .padding(new ButtonInsetBackgroundFactory.Padding(0, dp(2), 0, dp(2)))
+                .build().newBackgroundDrawable();
         addToIdleSourceListButton.setBackground(background1);
         addToIdleSourceListButton.setOnClickListener((v) -> {
             if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
@@ -190,10 +190,10 @@ public class MusicCollectionDetailView extends LinearLayout {
         var musicLayout = new MusicListItem(context);
         musicLayout.setShowPusherInfo(false);
         musicLayout.bindData(musicDetail);
-        var background = ButtonInsetBackground.builder()
+        var background = ButtonInsetBackgroundFactory.builder()
                 .cornerRadius(dp(12))
                 .inset(dp(1))
-                .padding(new ButtonInsetBackground.Padding(dp(4), dp(4), dp(4), dp(4))).build().get();
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build().newBackgroundDrawable();
         musicLayout.setBackground(background);
 
         musicLayout.setClickable(true);

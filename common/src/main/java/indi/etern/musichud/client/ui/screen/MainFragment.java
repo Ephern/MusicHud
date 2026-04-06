@@ -25,11 +25,11 @@ import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
-import indi.etern.musichud.client.ui.pages.AccountBaseView;
+import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
-import indi.etern.musichud.client.ui.pages.SearchView;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.pages.search.SearchView;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import lombok.Setter;
@@ -136,11 +136,11 @@ public class MainFragment extends Fragment {
                     }
                     index++;
                     Button artistButton = new Button(context);
-                    Drawable background = ButtonInsetBackground.builder()
+                    Drawable background = ButtonInsetBackgroundFactory.builder()
                             .inset(0)
                             .cornerRadius(artistButton.dp(2))
-                            .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
-                            .build().get();
+                            .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
+                            .build().newBackgroundDrawable();
                     artistButton.setBackground(background);
                     artistButton.setFocusable(true);
                     artistButton.setClickable(true);
@@ -161,11 +161,11 @@ public class MainFragment extends Fragment {
 
                 instance.albumContainer.removeAllViews();
                 Button albumButton = new Button(context);
-                Drawable background = ButtonInsetBackground.builder()
+                Drawable background = ButtonInsetBackgroundFactory.builder()
                         .inset(0)
                         .cornerRadius(albumButton.dp(2))
-                        .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
-                        .build().get();
+                        .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
+                        .build().newBackgroundDrawable();
                 albumButton.setBackground(background);
                 albumButton.setFocusable(true);
                 albumButton.setClickable(true);
@@ -352,9 +352,9 @@ public class MainFragment extends Fragment {
 
                 skipCurrentButton.setHeight(skipCurrentButton.dp(40));
 
-                var background = ButtonInsetBackground.builder()
-                        .padding(new ButtonInsetBackground.Padding(skipCurrentButton.dp(2), skipCurrentButton.dp(1), skipCurrentButton.dp(2), skipCurrentButton.dp(1)))
-                        .cornerRadius(skipCurrentButton.dp(4)).build().get();
+                var background = ButtonInsetBackgroundFactory.builder()
+                        .padding(new ButtonInsetBackgroundFactory.Padding(skipCurrentButton.dp(2), skipCurrentButton.dp(1), skipCurrentButton.dp(2), skipCurrentButton.dp(1)))
+                        .cornerRadius(skipCurrentButton.dp(4)).build().newBackgroundDrawable();
                 skipCurrentButton.setBackground(background);
                 skipCurrentButton.setOnClickListener((v) -> {
                     MusicService.getInstance().voteForSkipCurrent();
