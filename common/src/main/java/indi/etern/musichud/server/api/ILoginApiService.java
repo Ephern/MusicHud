@@ -45,6 +45,14 @@ public interface ILoginApiService {
 
     String getRawCookieOrElse(ServerPlayer serverPlayer, Supplier<String> supplier);
 
+    void requestValidationCodeFor(int regionCode, long phone, ServerPlayer serverPlayer);
+
+    void loginWithPhoneAndCode(int regionCode, long phone, int code, ServerPlayer serverPlayer);
+
+    void loginWithPhoneAndPassword(long phone, String md5password, ServerPlayer serverPlayer);
+
+    void loginWithEmailAndPassword(String email, String md5password, ServerPlayer serverPlayer);
+
     @RegisterMark
     class Register implements ServerRegister {
         @Override

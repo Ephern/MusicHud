@@ -16,7 +16,7 @@ import icyllis.modernui.view.ViewTreeObserver;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import lombok.Setter;
@@ -96,9 +96,9 @@ public class UrlImageView extends FrameLayout {
         retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
         retryButton.setTextSize(Theme.TEXT_SIZE_SMALL);
         retryButton.setTextColor(Theme.PRIMARY_COLOR);
-        var background = ButtonInsetBackground.builder()
-                .padding(new ButtonInsetBackground.Padding(retryButton.dp(2), retryButton.dp(1), retryButton.dp(2), retryButton.dp(1)))
-                .cornerRadius(retryButton.dp(4)).inset(dp(1)).build().get();
+        var background = ButtonInsetBackgroundFactory.builder()
+                .padding(new ButtonInsetBackgroundFactory.Padding(retryButton.dp(2), retryButton.dp(1), retryButton.dp(2), retryButton.dp(1)))
+                .cornerRadius(retryButton.dp(4)).inset(dp(1)).build().newBackgroundDrawable();
         retryButton.setBackground(background);
         retryButton.setOnClickListener(v -> {
             if (currentURLString != null) {

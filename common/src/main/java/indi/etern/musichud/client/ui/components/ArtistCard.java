@@ -7,7 +7,7 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import net.minecraft.client.resources.language.I18n;
 
 public class ArtistCard extends LinearLayout {
@@ -56,10 +56,10 @@ public class ArtistCard extends LinearLayout {
         musicCounts.setTextAlignment(TEXT_ALIGNMENT_CENTER);
         texts.addView(musicCounts);
 
-        var background = ButtonInsetBackground.builder()
+        var background = ButtonInsetBackgroundFactory.builder()
                 .cornerRadius(dp(12))
                 .inset(dp(1))
-                .padding(new ButtonInsetBackground.Padding(dp(8), dp(8), dp(8), dp(8))).build().get();
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(8), dp(8), dp(8))).build().newBackgroundDrawable();
         setBackground(background);
 
         setClickable(true);

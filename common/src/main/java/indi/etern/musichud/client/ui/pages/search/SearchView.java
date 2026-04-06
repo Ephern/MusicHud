@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.pages;
+package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
@@ -17,7 +17,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SearchRequest;
@@ -88,9 +88,9 @@ public class SearchView extends LinearLayout {
         Button searchButton = new Button(context);
         searchButton.setText(I18n.get(MusicHud.MOD_ID + ".button.searchMusic"));
         LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
-        Drawable background = ButtonInsetBackground.builder()
-                .inset(0).padding(new ButtonInsetBackground.Padding(dp(8), 0, dp(8), 0))
-                .cornerRadius(dp(4)).build().get();
+        Drawable background = ButtonInsetBackgroundFactory.builder()
+                .inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), 0, dp(8), 0))
+                .cornerRadius(dp(4)).build().newBackgroundDrawable();
         searchButton.setBackground(background);
         buttonParams.setMargins(dp(8), 0, 0, 0);
         top.addView(searchButton, buttonParams);

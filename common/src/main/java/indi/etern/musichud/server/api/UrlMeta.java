@@ -8,8 +8,16 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
-public record UrlMeta<T>(String url, Set<String> requiredParams, Set<String> optionalParams, boolean noCache,
-                         boolean anonymous, boolean autoRetry, Class<T> responseType) {
+public record UrlMeta<T>(
+        String url,
+        Set<String> requiredParams,
+        Set<String> optionalParams,
+        boolean noCache,
+        boolean noCookie,
+        boolean anonymous,
+        boolean autoRetry,
+        Set<Integer> allowedHttpCodes,
+        Class<T> responseType) {
     private static final ServerConfig serverConfig = ServerConfig.getInstance();
 
     @Override
@@ -26,6 +34,9 @@ public record UrlMeta<T>(String url, Set<String> requiredParams, Set<String> opt
         }
         if (noCache) {
             query.add("timestamp=" + System.currentTimeMillis());
+        }
+        if (noCookie) {
+            query.add("noCookie=true");
         }
         if (!query.isEmpty()) {
             uri += "?" + String.join("&", query);

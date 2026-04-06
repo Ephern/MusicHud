@@ -22,7 +22,7 @@ import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicListItem;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -349,11 +349,11 @@ public class HomeView extends LinearLayout {
             removeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.remove"));
             removeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             removeButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            Drawable background = ButtonInsetBackground.builder()
+            Drawable background = ButtonInsetBackgroundFactory.builder()
                     .inset(1)
-                    .padding(new ButtonInsetBackground.Padding(dp(8), dp(2), dp(2), dp(8)))
+                    .padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(2), dp(2), dp(8)))
                     .cornerRadius(dp(4))
-                    .build().get();
+                    .build().newBackgroundDrawable();
             removeButton.setBackground(background);
             removeButton.setOnClickListener(v -> {
                 MusicService.getInstance().sendRemoveMusicFromQueue(playQueueView.indexOfChild(musicListItem), musicDetail);

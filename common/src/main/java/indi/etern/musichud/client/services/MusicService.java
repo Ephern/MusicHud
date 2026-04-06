@@ -8,15 +8,17 @@ import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
-import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.music.*;
-import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
+import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
-import indi.etern.musichud.interfaces.*;
+import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.ClientRegister;
+import indi.etern.musichud.interfaces.IClientEventService;
+import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.*;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
@@ -49,6 +51,7 @@ public class MusicService {
             .build();
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private static final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static volatile MusicService instance;
     @Getter
     private final Set<MusicCollection> localIdlePlaySources = new HashSet<>();
@@ -74,7 +77,6 @@ public class MusicService {
     private final List<Consumer<MusicDetail>> musicQueuePushListeners = new ArrayList<>();
     @Getter
     private final List<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = new ArrayList<>();
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     long lastPressTime = 0;
     @Getter
     private boolean idlePlaySourceLoaded = false;
@@ -260,8 +262,8 @@ public class MusicService {
                 streamAudioPlayer.playAsync(musicDetail, serverStartTime)
                         .thenAccept(nowPlayingInfo::startAt)
                         .exceptionally(e -> {
-                    return null;//TODO display error in hud
-                });
+                            return null;//TODO display error in hud
+                        });
             } else {
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 nowPlayingInfo.startAt(null);
@@ -357,7 +359,8 @@ public class MusicService {
                 try {
                     Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
                     completableFuture.completeExceptionally(new ApiException());
-                } catch (InterruptedException ignored) {}
+                } catch (InterruptedException ignored) {
+                }
             });
         } else {
             completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserPlaylists when logined as anonymous"));
@@ -378,7 +381,8 @@ public class MusicService {
                 try {
                     Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
                     completableFuture.completeExceptionally(new ApiException());
-                } catch (InterruptedException ignored) {}
+                } catch (InterruptedException ignored) {
+                }
             });
         } else {
             completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserAlbums when logined as anonymous"));
@@ -399,7 +403,8 @@ public class MusicService {
                 try {
                     Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
                     completableFuture.completeExceptionally(new ApiException());
-                } catch (InterruptedException ignored) {}
+                } catch (InterruptedException ignored) {
+                }
             });
         } else {
             completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserArtists when logined as anonymous"));
@@ -430,9 +435,7 @@ public class MusicService {
         @Override
         public void register() {
             LoginService.getInstance().getLoginCompleteListeners().add((loginCookieInfo) -> {
-                if (loginCookieInfo.type() != LoginType.ANONYMOUS) {
-                    MusicService.getInstance().loadIdlePlaySourceFromConfig();
-                }
+                MusicService.getInstance().loadIdlePlaySourceFromConfig();
             });
             IClientEventService.getInstance().registerClientPlayerQuit((player) -> {
                 reset();

@@ -20,7 +20,7 @@ import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.client.ui.screen.MainFragment;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.ApiServerManager;
@@ -296,7 +296,7 @@ public class ConfigView extends LinearLayout {
             stopApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.stopApiServer"));
             stopApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             stopApiServerButton.setTextSize(14);
-            Drawable bg1 = ButtonInsetBackground.builder().inset(0).padding(new ButtonInsetBackground.Padding(dp(8), dp(4), dp(8), dp(4))).build().get();
+            Drawable bg1 = ButtonInsetBackgroundFactory.builder().inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build().newBackgroundDrawable();
             stopApiServerButton.setBackground(bg1);
             stopApiServerButton.setOnClickListener((v) -> {
                 ApiServerManager.stopApiServer();
@@ -306,7 +306,7 @@ public class ConfigView extends LinearLayout {
             restartApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.restartApiServer"));
             restartApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             restartApiServerButton.setTextSize(14);
-            Drawable bg = ButtonInsetBackground.builder().inset(0).padding(new ButtonInsetBackground.Padding(dp(8), dp(4), dp(8), dp(4))).build().get();
+            Drawable bg = ButtonInsetBackgroundFactory.builder().inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build().newBackgroundDrawable();
             restartApiServerButton.setBackground(bg);
             restartApiServerButton.setOnClickListener((v) -> {
                 ApiServerManager.restartApiServer();

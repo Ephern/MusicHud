@@ -7,9 +7,10 @@ import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.config.ProfileConfigData;
-import indi.etern.musichud.client.ui.components.AccountView;
-import indi.etern.musichud.client.ui.components.QRLoginView;
-import indi.etern.musichud.client.ui.pages.AccountBaseView;
+import indi.etern.musichud.client.ui.pages.account.AccountView;
+import indi.etern.musichud.client.ui.pages.account.LoginView;
+import indi.etern.musichud.client.ui.pages.account.QRLoginView;
+import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
@@ -21,6 +22,7 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.CookieLoginRequ
 import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse;
 import lombok.Getter;
 import lombok.Setter;
+import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
@@ -71,10 +73,14 @@ public class LoginService {
                         if (accountView != null) {
                             accountView.refresh();
                         }
-                        QRLoginView qrLoginView = QRLoginView.getInstance();
-                        if (qrLoginView != null) {
-                            qrLoginView.reset();
-                            qrLoginView.errorText(loginResult.message());
+                        LoginView loginView = LoginView.getInstance();
+                        if (loginView != null) {
+                            loginView.reset();
+                            String message = loginResult.message();
+                            if (message.startsWith(MusicHud.MOD_ID)) {
+                                message = I18n.get(message);
+                            }
+                            loginView.errorText(message);
                         }
                     });
                 }

@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.pages;
+package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.beans.music.Album;

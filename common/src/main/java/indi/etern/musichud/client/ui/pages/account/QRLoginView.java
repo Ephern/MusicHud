@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.components;
+package indi.etern.musichud.client.ui.pages.account;
 
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
@@ -10,20 +10,18 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.requestResponseCycle.CancelQRLoginRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginRequest;
-import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.client.resources.language.I18n;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 @Slf4j
-public class QRLoginView extends LinearLayout {
-    @Getter
-    private static QRLoginView instance;
+public class QRLoginView extends LinearLayout implements ILoginView{
     private final Button loginButton;
     private final UrlImageView urlImageView;
     private final TextView messageTextView;
@@ -36,12 +34,12 @@ public class QRLoginView extends LinearLayout {
         TextView textView = new TextView(context);
         textView.setTextSize(Theme.TEXT_SIZE_LARGE);
         textView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-        textView.setText(I18n.get(MusicHud.MOD_ID + ".text.loginWithQRCode"));
+        textView.setText(I18n.get(MusicHud.MOD_ID + ".text.login.qrCode"));
         textView.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
         TextView textView1 = new TextView(context);
         textView1.setTextSize(Theme.TEXT_SIZE_NORMAL);
         textView1.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        textView1.setText(I18n.get(MusicHud.MOD_ID + ".text.loginDescription"));
+        textView1.setText(I18n.get(MusicHud.MOD_ID + ".text.login.description"));
         LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         params1.setMargins(0, dp(4), 0, 0);
         textView1.setLayoutParams(params1);
@@ -71,9 +69,9 @@ public class QRLoginView extends LinearLayout {
         messageTextView.setVisibility(View.GONE);
         messageTextView.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        var background = ButtonInsetBackground.builder()
-                .padding(new ButtonInsetBackground.Padding(0,0,0,0))
-                .cornerRadius(dp(4)).inset(dp(1)).build().get();
+        var background = ButtonInsetBackgroundFactory.builder()
+                .padding(new ButtonInsetBackgroundFactory.Padding(0,0,0,0))
+                .cornerRadius(dp(4)).inset(dp(1)).build().newBackgroundDrawable();
         loginButton.setBackground(background);
         LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         buttonParams.setMargins(0, dp(8), 0, 0);
@@ -98,7 +96,6 @@ public class QRLoginView extends LinearLayout {
         addView(messageTextView);
         addView(urlImageView);
 
-        instance = this;
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
             public void onViewAttachedToWindow(View v) {}
@@ -106,17 +103,18 @@ public class QRLoginView extends LinearLayout {
             @Override
             public void onViewDetachedFromWindow(View v) {
                 clientNetworkService.sendToServer(CancelQRLoginRequest.REQUEST);
-                instance = null;
             }
         });
     }
 
+    @Override
     public void reset() {
         loginButton.setVisibility(VISIBLE);
         urlImageView.clear();
         messageTextView.setVisibility(GONE);
     }
 
+    @Override
     public void errorText(String message) {
         messageTextView.setTextColor(Theme.ERROR_TEXT_COLOR);
         messageTextView.setVisibility(View.VISIBLE);
