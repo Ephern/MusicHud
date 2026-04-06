@@ -18,7 +18,7 @@ import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.client.Minecraft;
@@ -77,11 +77,11 @@ public class MusicCollectionCard extends LinearLayout {
             updateButton(addToIdleSourceButton);
             addToIdleSourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             addToIdleSourceButton.setTextSize(Theme.TEXT_SIZE_SMALL);
-            Drawable background1 = ButtonInsetBackground.builder()
+            Drawable background1 = ButtonInsetBackgroundFactory.builder()
                     .inset(0)
                     .cornerRadius(dp(8))
-                    .padding(new ButtonInsetBackground.Padding(dp(4), dp(8), dp(4), dp(8)))
-                    .build().get();
+                    .padding(new ButtonInsetBackgroundFactory.Padding(dp(4), dp(8), dp(4), dp(8)))
+                    .build().newBackgroundDrawable();
             addToIdleSourceButton.setBackground(background1);
             addToIdleSourceButton.setOnClickListener((v) -> {
                 if (musicService.getLocalIdlePlaySources().contains(musicCollection)) {
@@ -134,11 +134,11 @@ public class MusicCollectionCard extends LinearLayout {
                 }
             });
 
-            ButtonInsetBackground background = ButtonInsetBackground.builder().inset(dp(1))
+            ButtonInsetBackgroundFactory background = ButtonInsetBackgroundFactory.builder().inset(dp(1))
                     .cornerRadius(dp(12))
-                    .padding(new ButtonInsetBackground.Padding(dp(6), dp(6), dp(6), dp(6)))
+                    .padding(new ButtonInsetBackgroundFactory.Padding(dp(6), dp(6), dp(6), dp(6)))
                     .build();
-            setBackground(background.get());
+            setBackground(background.newBackgroundDrawable());
         } else {
             ShapeDrawable background = new ShapeDrawable();
             background.setPadding(dp(6), dp(6), dp(6), dp(6));

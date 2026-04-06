@@ -22,6 +22,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Set;
 import java.util.concurrent.Executors;
 
 public class ApiClient {
@@ -103,7 +104,8 @@ public class ApiClient {
                     responseBody = response.body().toString();
                     currentlyParsing = CodeOnlyResponse.class;
                     var codeOnlyResponse = JsonUtil.gson.fromJson(responseBody, CodeOnlyResponse.class);
-                    if (codeOnlyResponse.code == 200 || trial == maxTrial || !urlMeta.autoRetry()) {
+                    Set<Integer> allowedHttpCodes = urlMeta.allowedHttpCodes();
+                    if (allowedHttpCodes == null || allowedHttpCodes.contains(codeOnlyResponse.code) || trial == maxTrial || !urlMeta.autoRetry()) {
                         if (urlMeta.responseType().equals(String.class)) {
                             //noinspection unchecked
                             t = (T) responseBody;

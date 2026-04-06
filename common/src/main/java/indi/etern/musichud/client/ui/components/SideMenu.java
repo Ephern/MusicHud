@@ -12,7 +12,7 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.RadioButton;
 import icyllis.modernui.widget.RadioGroup;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import lombok.Getter;
 
 import java.util.LinkedHashMap;
@@ -134,9 +134,9 @@ public class SideMenu extends FrameLayout {
 
         button.setHeight(button.dp(40));
 
-        var background = ButtonInsetBackground.builder()
-                .padding(new ButtonInsetBackground.Padding(button.dp(2),button.dp(1),button.dp(2),button.dp(1)))
-                .cornerRadius(button.dp(4)).inset(dp(1)).build().get();
+        var background = ButtonInsetBackgroundFactory.builder()
+                .padding(new ButtonInsetBackgroundFactory.Padding(button.dp(2),button.dp(1),button.dp(2),button.dp(1)))
+                .cornerRadius(button.dp(4)).inset(dp(1)).build().newBackgroundDrawable();
         button.setBackground(background);
         button.setLayoutParams(buttonParams);
 

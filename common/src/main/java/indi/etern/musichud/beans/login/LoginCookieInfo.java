@@ -17,7 +17,6 @@ import java.time.ZonedDateTime;
 
 public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime generateTime) {
     private static final Logger logger = MusicHud.getLogger(LoginCookieInfo.class);
-    private static LoginCookieInfo current;
     public static final StreamCodec<ByteBuf, LoginCookieInfo> STREAM_CODEC =
             StreamCodec.composite(
                     LoginType.PACKET_CODEC,

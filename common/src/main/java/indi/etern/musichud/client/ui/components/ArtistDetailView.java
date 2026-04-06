@@ -13,7 +13,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.stream.Collectors;
@@ -46,11 +46,11 @@ public class ArtistDetailView extends LinearLayout {
             RouterContainer.getInstance().popNavigate();
             backButton.setOnClickListener(null);
         });
-        Drawable drawable = ButtonInsetBackground.builder()
+        Drawable drawable = ButtonInsetBackgroundFactory.builder()
                 .inset(0)
                 .cornerRadius(dp(8))
-                .padding(new ButtonInsetBackground.Padding(dp(16), 0, dp(16), 0))
-                .build().get();
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
+                .build().newBackgroundDrawable();
         backButton.setBackground(drawable);
         LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
         backButtonParams.setMargins(0, 0, dp(4), 0);
@@ -218,10 +218,10 @@ public class ArtistDetailView extends LinearLayout {
         var musicLayout = new MusicListItem(context);
         musicLayout.setShowPusherInfo(false);
         musicLayout.bindData(musicDetail);
-        var background = ButtonInsetBackground.builder()
+        var background = ButtonInsetBackgroundFactory.builder()
                 .cornerRadius(dp(12))
                 .inset(dp(1))
-                .padding(new ButtonInsetBackground.Padding(dp(4), dp(4), dp(4), dp(4))).build().get();
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build().newBackgroundDrawable();
         musicLayout.setBackground(background);
 
         musicLayout.setClickable(true);

@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.pages;
+package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.animation.MotionEasingUtils;
 import icyllis.modernui.animation.ObjectAnimator;

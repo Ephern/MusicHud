@@ -2,7 +2,7 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.beans.music.Playlist;
-import indi.etern.musichud.client.ui.pages.SearchView;
+import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.Codecs;

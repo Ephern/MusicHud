@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.components;
+package indi.etern.musichud.client.ui.pages.account;
 
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
@@ -18,7 +18,11 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.components.ArtistCard;
+import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
+import indi.etern.musichud.client.ui.components.MusicCollectionCard;
+import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 
@@ -30,6 +34,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class AccountView extends LinearLayout {
     @Getter
     private static AccountView instance;
+    private final LoginService loginService = LoginService.getInstance();
 
     public AccountView(Context context) {
         super(context);
@@ -75,6 +80,15 @@ public class AccountView extends LinearLayout {
             retryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
 
+            Button logoutButton = new Button(context);
+            logoutButton.setFocusable(true);
+            logoutButton.setClickable(true);
+            logoutButton.setTextColor(Theme.PRIMARY_COLOR);
+            logoutButton.setHeight(dp(36));
+            logoutButton.setWidth(dp(84));
+            logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
+
             ProgressBar progressRing = new ProgressBar(context);
             progressRing.setIndeterminate(true);
             progressRing.setIndeterminateTintList(ColorStateList.valueOf(Theme.PRIMARY_COLOR));
@@ -83,19 +97,28 @@ public class AccountView extends LinearLayout {
             ringParams.setMargins(0, dp(32), 0, 0);
             progressRing.setLayoutParams(ringParams);
 
-            var background = ButtonInsetBackground.builder()
-                    .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
-                    .cornerRadius(dp(4)).inset(dp(1)).build().get();
+            ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                    .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
+                    .cornerRadius(dp(4)).inset(dp(1)).build();
+            var background = backgroundFactory.newBackgroundDrawable();
             retryButton.setBackground(background);
             LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            buttonParams.setMargins(0, dp(8), 0, 0);
+            buttonParams.setMargins(0, dp(8), 0, dp(8));
             retryButton.setLayoutParams(buttonParams);
             retryButton.setOnClickListener((view) -> {
                 MuiModApi.postToUiThread(() -> {
                     retryButton.setVisibility(GONE);
                     progressRing.setVisibility(VISIBLE);
                 });
-                LoginService.getInstance().loginToServer();
+                loginService.loginToServer();
+            });
+
+            var background2 = backgroundFactory.newBackgroundDrawable();
+            logoutButton.setBackground(background2);
+            logoutButton.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+            logoutButton.setOnClickListener(b -> {
+                loginService.logout();
+                loginService.loginAsAnonymousToServer();
             });
 
             addView(textView);
@@ -142,15 +165,15 @@ public class AccountView extends LinearLayout {
             logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
             logoutButton.setTextColor(Theme.PRIMARY_COLOR);
             logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            Drawable background = ButtonInsetBackground.builder()
+            Drawable background = ButtonInsetBackgroundFactory.builder()
                     .inset(0).cornerRadius(dp(4))
-                    .padding(new ButtonInsetBackground.Padding(0, dp(2), 0, dp(2)))
-                    .build().get();
+                    .padding(new ButtonInsetBackgroundFactory.Padding(0, dp(2), 0, dp(2)))
+                    .build().newBackgroundDrawable();
             logoutButton.setBackground(background);
             texts.addView(logoutButton, logoutButtonParam);
             logoutButton.setOnClickListener(b -> {
-                LoginService.getInstance().logout();
-                LoginService.getInstance().loginAsAnonymousToServer();
+                loginService.logout();
+                loginService.loginAsAnonymousToServer();
             });
 
             LayoutParams topPanelLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);

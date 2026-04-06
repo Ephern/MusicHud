@@ -11,7 +11,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackground;
+import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -110,11 +110,11 @@ public class MusicListItem extends LinearLayout {
             }
             index++;
             Button artistButton = new Button(context);
-            Drawable background = ButtonInsetBackground.builder()
+            Drawable background = ButtonInsetBackgroundFactory.builder()
                     .inset(0)
                     .cornerRadius(dp(2))
-                    .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
-                    .build().get();
+                    .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
+                    .build().newBackgroundDrawable();
             artistButton.setBackground(background);
             artistButton.setFocusable(true);
             artistButton.setClickable(true);
@@ -138,11 +138,11 @@ public class MusicListItem extends LinearLayout {
         split.setText(" - ");
         musicArtistAndAlbum.addView(split);
         Button albumButton = new Button(context);
-        Drawable background = ButtonInsetBackground.builder()
+        Drawable background = ButtonInsetBackgroundFactory.builder()
                 .inset(0)
                 .cornerRadius(dp(2))
-                .padding(new ButtonInsetBackground.Padding(0, 0, 0, 0))
-                .build().get();
+                .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
+                .build().newBackgroundDrawable();
         albumButton.setBackground(background);
         albumButton.setFocusable(true);
         albumButton.setClickable(true);
