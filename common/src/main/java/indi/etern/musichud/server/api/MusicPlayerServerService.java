@@ -59,7 +59,7 @@ public class MusicPlayerServerService {
         @Override
         public void run() {
             Thread thread = Thread.currentThread();
-            thread.setName("Music Data Pusher");
+            thread.setName("MHWorker-Music-Data-Pusher");
             pusherThread = thread;
             pusherThreadRunning = true;
             String message = "";

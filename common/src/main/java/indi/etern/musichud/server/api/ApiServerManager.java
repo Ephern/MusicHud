@@ -52,7 +52,7 @@ public class ApiServerManager implements ServerRegister {
     public void register() {
         register = this;
         MusicHud.EXECUTOR.execute(() -> {
-            Thread.currentThread().setName("API Server Launcher");
+            Thread.currentThread().setName("MHWorker-API-Launcher");
             boolean apiAvailable = ApiClient.checkAvailable();
             if (serverConfig.getStartupBinaryApiServerWhenLaunch() && !apiAvailable) {
                 triedCount = 0;
@@ -104,7 +104,7 @@ public class ApiServerManager implements ServerRegister {
 
                     // 使用虚拟线程池分别读取 stdout 和 stderr
                     MusicHud.EXECUTOR.execute(() -> {
-                        Thread.currentThread().setName("API Console");
+                        Thread.currentThread().setName("MHWorker-API-Console");
                         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                             String line;
                             while ((line = reader.readLine()) != null) {
@@ -120,7 +120,7 @@ public class ApiServerManager implements ServerRegister {
                     });
 
                     MusicHud.EXECUTOR.execute(() -> {
-                        Thread.currentThread().setName("API Console");
+                        Thread.currentThread().setName("MHWorker-API-Console");
                         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
                             String line;
                             while ((line = reader.readLine()) != null) {
@@ -133,7 +133,7 @@ public class ApiServerManager implements ServerRegister {
 
                     // 在另一个虚拟线程中等待进程结束，并处理重启逻辑
                     MusicHud.EXECUTOR.execute(() -> {
-                        Thread.currentThread().setName("API Daemon");
+                        Thread.currentThread().setName("MHWorker-API-Daemon");
                         try {
                             int exitCode = process.waitFor();
                             setApiStatus(BinaryApiServerStatus.STOPPED);
