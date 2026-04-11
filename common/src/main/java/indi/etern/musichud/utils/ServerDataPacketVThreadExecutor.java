@@ -13,7 +13,7 @@ public class ServerDataPacketVThreadExecutor {
     ) {
         return (payload, player) -> {
             MusicHud.EXECUTOR.execute(() -> {
-                Thread.currentThread().setName("Datapack VProcessor");
+                Thread.currentThread().setName("MHWorker-Network-V");
                 if (player instanceof ServerPlayer serverPlayer) {
                     try {
                         consumer.accept(payload, serverPlayer);

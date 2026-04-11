@@ -160,7 +160,7 @@ public class StreamAudioPlayer {
             CompletableFuture<Void> downloadInitializedFuture = new CompletableFuture<>();
             CompletableFuture<ZonedDateTime> startPlayingFuture = new CompletableFuture<>();
             downloadFuture = MusicHud.EXECUTOR.submit(() -> {
-                Thread.currentThread().setName("Downloader");
+                Thread.currentThread().setName("MHWorker-Downloader");
                 try {
                     downloadAudioWithRetry(startTime != null, downloadInitializedFuture);
                 } catch (Exception e) {
@@ -176,7 +176,7 @@ public class StreamAudioPlayer {
             downloadInitializedFuture.thenAccept(ignore -> {
                 serverStartTime = startTime == null ? ZonedDateTime.now() : startTime;
                 playingFuture = MusicHud.EXECUTOR.submit(() -> {
-                    Thread.currentThread().setName("Music Player");
+                    Thread.currentThread().setName("MH-MusicPlayer");
                     try {
                         playAudioWithRetry(startPlayingFuture);
                     } catch (Exception e) {

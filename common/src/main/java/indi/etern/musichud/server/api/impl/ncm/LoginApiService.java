@@ -189,7 +189,7 @@ public class LoginApiService implements ILoginApiService {
             Runnable runnable = null;
         };
         ref.runnable = () -> {
-            Thread.currentThread().setName("PollingVWorker_" + Thread.currentThread().hashCode());
+            Thread.currentThread().setName("MHWorker-Polling-V" + Thread.currentThread().hashCode());
             try {
                 logger.info("Start QR login polling v-thread for player: {}", player.getName());
                 QRLoginStatus qrLoginStatus = null;
