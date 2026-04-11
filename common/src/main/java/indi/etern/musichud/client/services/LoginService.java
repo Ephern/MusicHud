@@ -7,11 +7,13 @@ import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.config.ProfileConfigData;
+import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.account.AccountView;
 import indi.etern.musichud.client.ui.pages.account.LoginView;
-import indi.etern.musichud.client.ui.pages.account.QRLoginView;
-import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
-import indi.etern.musichud.interfaces.*;
+import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.ClientRegister;
+import indi.etern.musichud.interfaces.IClientEventService;
+import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.LogoutMessage;
@@ -46,7 +48,7 @@ public class LoginService {
     @Getter
     NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, player) -> {
         MusicHud.EXECUTOR.submit(() -> {
-            Thread.currentThread().setName("Login Processor");
+            Thread.currentThread().setName("MHWorker-Login-V");
             LoginCookieInfo loginCookieInfo = loginResult.loginCookieInfo();
             LoginType type = loginCookieInfo.type();
             if (type != LoginType.UNLOGGED && type != LoginType.ANONYMOUS && loginResult.success()) {
