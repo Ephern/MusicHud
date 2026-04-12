@@ -10,6 +10,11 @@ import org.joml.Vector4f;
 import static indi.etern.musichud.client.ui.utils.UniformDataUtils.colorToVector;
 
 public class HudUniformWriter {
+    long initTimestamp;
+
+    public HudUniformWriter() {
+        initTimestamp = System.currentTimeMillis();
+    }
 
     /**
      * 将渲染数据写入 uniform buffer
@@ -33,7 +38,7 @@ public class HudUniformWriter {
                 layout.width/2,
                 layout.height/2,
                 Math.min(Math.min(layout.width, layout.height)/2, layout.radius),
-                0
+                (System.currentTimeMillis() - initTimestamp) / 1000.0f
         );
 
         var transitionStatus = HudRenderData.getTransitionStatus();

@@ -1,0 +1,279 @@
+package indi.etern.musichud.client.ui.utils;
+
+import com.mojang.blaze3d.platform.NativeImage;
+import net.minecraft.client.renderer.texture.DynamicTexture;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+public class ColorExtractor {
+    /**
+     * 从 DynamicTexture 提取四种颜色
+     *
+     * @return int[4] {主色, 次主色, 亮色, 暗色} 均为 ARGB
+     */
+    public static int[] extractColors(DynamicTexture texture) {
+        if (texture == null) return getDefaultColors();
+
+        NativeImage image = texture.getPixels();
+        if (image == null) return getDefaultColors();
+
+        int width = image.getWidth();
+        int height = image.getHeight();
+        if (width == 0 || height == 0) return getDefaultColors();
+
+        // 采样步长（可保持原样或略提高）
+        int step = Math.max(1, (int) Math.sqrt((width * height) / 2500.0));
+        Map<Integer, Float> colorWeight = new HashMap<>();  // 量化颜色 -> 累计权重
+
+        // 在 extractColors 方法内，完成 colorWeight 统计后，计算总权重
+        float totalWeight = 0;
+
+        int bits = 5;  // 可改为4~6
+        int shift = 8 - bits;
+
+        for (int y = 0; y < height; y += step) {
+            for (int x = 0; x < width; x += step) {
+                int argb = image.getPixel(x, y);
+                if ((argb >>> 24) == 0) continue;
+                int rgb = argb & 0x00FFFFFF;
+
+                // 颜色量化
+                int r = (rgb >> 16) & 0xFF;
+                int g = (rgb >> 8) & 0xFF;
+                int b = rgb & 0xFF;
+
+                int qr = r >> shift;
+                int qg = g >> shift;
+                int qb = b >> shift;
+                int quantized = (qr << 10) | (qg << 5) | qb;   // 15位整数
+
+                colorWeight.merge(quantized, 1f, Float::sum);
+            }
+        }
+
+        for (float w : colorWeight.values()) totalWeight += w;
+        float minWeightRatio = 0.005f; // 0.5%，可根据需要调整
+        float minWeight = totalWeight * minWeightRatio;
+
+        Map<Integer, Integer> quantToRgb = new HashMap<>();
+        for (int quant : colorWeight.keySet()) {
+            int r = ((quant >> 10) & 0x1F) << shift;
+            int g = ((quant >> 5) & 0x1F) << shift;
+            int b = (quant & 0x1F) << shift;
+            quantToRgb.put(quant, (r << 16) | (g << 8) | b);
+        }
+
+        if (colorWeight.isEmpty()) return getDefaultColors();
+
+        // 按加权总权重排序
+        List<Map.Entry<Integer, Float>> sorted = new ArrayList<>(colorWeight.entrySet());
+        sorted.sort((a, b) -> b.getValue().compareTo(a.getValue()));
+        int poolSize = Math.min(sorted.size(), 50);
+        List<Integer> candidates = new ArrayList<>();
+        for (int i = 0; i < poolSize; i++) {
+            int quant = sorted.get(i).getKey();
+            // 将量化值解码回一个代表性RGB（取该桶的中值）
+            int r = ((quant >> 10) & 0x1F) << 3;
+            int g = ((quant >> 5) & 0x1F) << 3;
+            int b = (quant & 0x1F) << 3;
+            // 添加少量抖动以避免完全相同的色块（可选）
+            int rgb = (r << 16) | (g << 8) | b;
+            candidates.add(rgb);
+        }
+
+        // 主色：鲜艳度最高（饱和度 * 亮度）
+        int primary = candidates.getFirst();
+        float bestVivid = 0;
+        for (int rgb : candidates) {
+            float vivid = getSaturation(rgb) * getLuminance(rgb);
+            if (vivid > bestVivid) {
+                bestVivid = vivid;
+                primary = rgb;
+            }
+        }
+
+        // 次主色：鲜艳度与色差综合
+        int secondary = primary;
+        float bestScore = -1;
+        for (int rgb : candidates) {
+            if (rgb == primary) continue;
+            float vivid = getSaturation(rgb) * getLuminance(rgb);
+            float dist = colorDistance(primary, rgb);
+            float score = vivid * 1.5f + dist;
+            if (score > bestScore && dist > 0.25f) {
+                bestScore = score;
+                secondary = rgb;
+            }
+        }
+
+        // ---------- 3. 亮色：亮度最高，且与主色、次主色色差足够，且权重大于 minWeight ----------
+        int bright = primary;
+        float maxLum = 0;
+        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
+            if (entry.getValue() < minWeight) continue; // 忽略低频杂色
+            int rgb = quantToRgb.get(entry.getKey());
+            float lum = getLuminance(rgb);
+            float distToPrimary = colorDistance(primary, rgb);
+            float distToSecondary = colorDistance(secondary, rgb);
+            if (lum > maxLum && distToPrimary > 0.2f && distToSecondary > 0.2f) {
+                maxLum = lum;
+                bright = rgb;
+            }
+        }
+        // 如果没找到满足色差条件的亮色，退而求其次，只要求亮度高且权重大
+        if (bright == primary) {
+            maxLum = 0;
+            for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
+                if (entry.getValue() < minWeight) continue;
+                int rgb = quantToRgb.get(entry.getKey());
+                float lum = getLuminance(rgb);
+                if (lum > maxLum) {
+                    maxLum = lum;
+                    bright = rgb;
+                }
+            }
+        }
+
+        // ---------- 4. 暗色：亮度最低，且与主色、次主色、亮色色差足够，且权重大于 minWeight ----------
+        int dark = primary;
+        float minLum = 1;
+        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
+            if (entry.getValue() < minWeight) continue;
+            int rgb = quantToRgb.get(entry.getKey());
+            float lum = getLuminance(rgb);
+            float distToPrimary = colorDistance(primary, rgb);
+            float distToSecondary = colorDistance(secondary, rgb);
+            float distToBright = colorDistance(bright, rgb);
+            if (lum < minLum && distToPrimary > 0.2f && distToSecondary > 0.2f && distToBright > 0.2f) {
+                minLum = lum;
+                dark = rgb;
+            }
+        }
+        if (dark == primary) {
+            minLum = 1;
+            for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
+                if (entry.getValue() < minWeight) continue;
+                int rgb = quantToRgb.get(entry.getKey());
+                float lum = getLuminance(rgb);
+                if (lum < minLum) {
+                    minLum = lum;
+                    dark = rgb;
+                }
+            }
+        }
+
+        return new int[]{
+                0xFF000000 | primary,
+                0xFF000000 | secondary,
+                0xFF000000 | bright,
+                0xFF000000 | dark
+        };
+    }
+
+    // 新增辅助方法：计算 RGB 的饱和度（0~1）
+    private static float getSaturation(int rgb) {
+        int r = (rgb >> 16) & 0xFF;
+        int g = (rgb >> 8) & 0xFF;
+        int b = rgb & 0xFF;
+        int max = Math.max(r, Math.max(g, b));
+        int min = Math.min(r, Math.min(g, b));
+        if (max == 0) return 0;
+        return (max - min) / (float) max;
+    }
+
+    private static float colorDistance(int rgb1, int rgb2) {
+        float r1 = ((rgb1 >> 16) & 0xFF) / 255.0f;
+        float g1 = ((rgb1 >> 8) & 0xFF) / 255.0f;
+        float b1 = (rgb1 & 0xFF) / 255.0f;
+        float r2 = ((rgb2 >> 16) & 0xFF) / 255.0f;
+        float g2 = ((rgb2 >> 8) & 0xFF) / 255.0f;
+        float b2 = (rgb2 & 0xFF) / 255.0f;
+        return Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+    }
+
+    private static float getLuminance(int rgb) {
+        float r = ((rgb >> 16) & 0xFF) / 255.0f;
+        float g = ((rgb >> 8) & 0xFF) / 255.0f;
+        float b = (rgb & 0xFF) / 255.0f;
+        return 0.2126f * r + 0.7152f * g + 0.0722f * b;
+    }
+
+    public static int[] getDefaultColors() {
+        return new int[]{
+                0xFF1A1A1A, 0xFF202020,
+                0XFF202020, 0xFF2A2A2A
+        };
+    }
+
+
+    /**
+     * 对颜色数组进行饱和度、亮度、Gamma调整
+     *
+     * @param colors     长度为4的ARGB颜色数组（不透明，alpha将被忽略并重置为0xFF）
+     * @param saturation 饱和度乘数（0~2，0=灰度，1=不变，>1增强）
+     * @param brightness 亮度乘数（0~2，0=全黑，1=不变，>1提亮）
+     * @param contrast   对比度
+     * @return 调整后的新颜色数组（ARGB，alpha=0xFF）
+     */
+    public static int[] adjustColors(int[] colors, float saturation, float brightness, float contrast) {
+        if (colors == null || colors.length != 4) return colors;
+        int[] adjusted = new int[4];
+        for (int i = 0; i < 4; i++) {
+            adjusted[i] = adjustColorFull(colors[i], saturation, brightness, contrast);
+        }
+        return adjusted;
+    }
+
+    /**
+     * 调整单个颜色（完整版）
+     */
+    private static int adjustColorFull(int argb, float vibrance, float brightness, float contrast) {
+        int r = (argb >> 16) & 0xFF;
+        int g = (argb >> 8) & 0xFF;
+        int b = argb & 0xFF;
+
+        // 线性化
+        float rLin = (float) Math.pow(r / 255.0, 2.2);
+        float gLin = (float) Math.pow(g / 255.0, 2.2);
+        float bLin = (float) Math.pow(b / 255.0, 2.2);
+
+        // 自然饱和度
+        if (vibrance != 1.0f) {
+            float maxC = Math.max(rLin, Math.max(gLin, bLin));
+            float minC = Math.min(rLin, Math.min(gLin, bLin));
+            float satOrig = maxC - minC;
+            if (satOrig > 1e-6) {
+                float adjust = (vibrance - 1.0f) * (1.0f - satOrig);
+                float newSat = satOrig + adjust;
+                newSat = Math.clamp(newSat, 0.0f, 1.0f);
+                float scale = newSat / satOrig;
+                float gray = 0.2126f * rLin + 0.7152f * gLin + 0.0722f * bLin;
+                rLin = gray + (rLin - gray) * scale;
+                gLin = gray + (gLin - gray) * scale;
+                bLin = gray + (bLin - gray) * scale;
+            } // 若 satOrig == 0，保持灰度不变（vibrance 对纯灰度无影响）
+        }
+
+        // 亮度
+        rLin *= brightness;
+        gLin *= brightness;
+        bLin *= brightness;
+
+        // 对比度（最后执行，并确保 clamp）
+        if (contrast != 1.0f) {
+            float midpoint = 0.5f;
+            rLin = (rLin - midpoint) * contrast + midpoint;
+            gLin = (gLin - midpoint) * contrast + midpoint;
+            bLin = (bLin - midpoint) * contrast + midpoint;
+        }
+
+        // 最终 clamp 并转回 sRGB（注意：输出应保持线性？通常直接输出 sRGB 值，此处已线性处理，不需要再 gamma 校正）
+        int rOut = (int) (Math.clamp(rLin, 0.0f, 1.0f) * 255);
+        int gOut = (int) (Math.clamp(gLin, 0.0f, 1.0f) * 255);
+        int bOut = (int) (Math.clamp(bLin, 0.0f, 1.0f) * 255);
+        return 0xFF000000 | (rOut << 16) | (gOut << 8) | bOut;
+    }
+}

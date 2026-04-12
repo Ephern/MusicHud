@@ -5,7 +5,7 @@ uniform sampler2D Sampler1;  // 下一张未模糊图片
 
 layout(std140) uniform HudAlbumParams {
     mat4 u_Translation;
-    vec4 u_RectParam;  // (halfWidth, halfHeight, radius, unused)
+    vec4 u_RectParam;  // (halfWidth, halfHeight, radius, timestamp)
     vec3 u_TransitionParam;  // (fadeProgress, nextImageAspect, imageAspect)
     mat4 u_BgColors;
 //    float u_Progress; removed after 1.21.11
@@ -56,8 +56,8 @@ void main() {
     float radius = u_RectParam.z;
 
     float fadeProgress = u_TransitionParam.x;
-    float currentImageAspect = u_TransitionParam.y;
-    float nextImageAspect = u_TransitionParam.z;
+    float currentImageAspect = 1;
+    float nextImageAspect = 1;
 
     // 计算圆角矩形遮罩
     vec2 d = abs(f_Position) - halfSize + radius;

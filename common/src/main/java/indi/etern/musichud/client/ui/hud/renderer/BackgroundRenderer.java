@@ -1,16 +1,15 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import com.google.common.cache.Cache;
+import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
 import icyllis.modernui.mc.GradientRectangleRenderState;
 import icyllis.modernui.mc.MuiModApi;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundImage;
-import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
-import indi.etern.musichud.client.ui.hud.metadata.HudUniformWriter;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.piplines.HudRenderPipelines;
-import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.ui.utils.ColorExtractor;
+import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -20,10 +19,16 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix3x2f;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+
 public class BackgroundRenderer {
     private static volatile BackgroundRenderer instance;
     private final HudUniformWriter uniformWriter = new HudUniformWriter();
-    private ResourceLocation defaultImageLocation;
+    // 颜色缓存，避免每帧重复提取
+    private final Cache<DynamicTexture, int[]> colorCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(Duration.of(3, ChronoUnit.MINUTES))
+            .maximumSize(2).build();
     private GpuBufferSlice gpuBufferSlice;
     private HudRenderData currentData;
 
@@ -46,30 +51,33 @@ public class BackgroundRenderer {
             return;
         }
 
-        gpuBufferSlice = uniformWriter.write(currentData, gr);
-
         Layout layout = currentData.getLayout();
         BackgroundImage bgImage = currentData.getBackgroundImage();
+        DynamicTexture currentTexture = getDynamicTexture(bgImage.currentUnblurredLocation);
+        DynamicTexture currentBlurredTexture = getDynamicTexture(bgImage.currentBlurredLocation);
 
+        // 获取过渡状态
         var transitionStatus = HudRenderData.getTransitionStatus();
         var nextData = transitionStatus.getNextData();
-        ResourceLocation nextBlurredLocation = nextData == null ? null : nextData.nextBlurred();
-        DynamicTexture currentTexture = getDynamicTexture(bgImage.currentBlurredLocation);
-        DynamicTexture nextTexture = getDynamicTexture(nextBlurredLocation);
-        DynamicTexture transitionTexture = transitionStatus.isTransitioning() ?
-                nextTexture : currentTexture;
+        float progress = transitionStatus.getProgress();
 
-        TextureSetup textureSetup;
-        if (currentTexture != null) {
-            textureSetup = transitionTexture != null ?
-                    TextureSetup.doubleTexture(
-                            currentTexture.getTextureView(),
-                            transitionTexture.getTextureView()
-                    ) : TextureSetup.singleTexture(currentTexture.getTextureView());
-        } else {
-            textureSetup = TextureSetup.noTexture();
+        // 获取当前图片和下一张图片的 DynamicTexture
+        DynamicTexture nextBlurredTexture = null;
+        if (progress > 0 && nextData != null) {
+            nextBlurredTexture = getDynamicTexture(nextData.nextBlurred());
         }
 
+        // 提取颜色（带缓存）
+        int[] currentColors = getColorsForTexture(currentBlurredTexture);
+        int[] nextColors = nextBlurredTexture != null ? getColorsForTexture(nextBlurredTexture) : currentColors;
+
+        // 构建过渡中的 BackgroundColor 对象（用于传给 UniformWriter）
+        BackgroundColor interpolatedColor = buildInterpolatedBackgroundColor(currentColors, nextColors, progress);
+
+        currentData.setBackgroundColor(interpolatedColor);
+        gpuBufferSlice = uniformWriter.write(currentData, gr);
+
+        // 提交渲染（纯色背景，不需要纹理）
         float halfWidth = layout.width / 2f;
         float halfHeight = layout.height / 2f;
 
@@ -77,7 +85,7 @@ public class BackgroundRenderer {
         MuiModApi.get().submitGuiElementRenderState(gr,
                 new GradientRectangleRenderState(
                         HudRenderPipelines.BACKGROUND,
-                        textureSetup,
+                        TextureSetup.noTexture(),
                         new Matrix3x2f(gr.pose()),
                         -halfWidth, -halfHeight, halfWidth, halfHeight,
                         0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
@@ -85,17 +93,52 @@ public class BackgroundRenderer {
                 ));
     }
 
-    private DynamicTexture getDynamicTexture(ResourceLocation imageLocation) {
-        if (imageLocation == null) {
-            if (defaultImageLocation == null) {
-                String greyImageBase64 = "data:bitmap/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAGElEQVQYV2OMiYn5z0AEYBxViC+UqB88ABNsFMnD0ASTAAAAAElFTkSuQmCC";
-                ImageTextureData imageTextureData = ImageUtils.loadBase64(greyImageBase64);
-                imageTextureData.register().join();
-                defaultImageLocation = imageTextureData.getLocation();
-            }
-            return getDynamicTexture(defaultImageLocation);
+    /**
+     * 获取纹理的颜色数组，带缓存
+     */
+    @SneakyThrows
+    private int[] getColorsForTexture(DynamicTexture texture) {
+        if (texture == null) {
+            return ColorExtractor.getDefaultColors();
         }
+        return colorCache.get(texture, () -> ColorExtractor.adjustColors(ColorExtractor.extractColors(texture), 1.1f, 0.55f, 0.7f));
+    }
 
+    /**
+     * 构建插值后的 BackgroundColor 对象
+     */
+    private BackgroundColor buildInterpolatedBackgroundColor(int[] from, int[] to, float t) {
+        if (t <= 0.01f) return new BackgroundColor(from[0], from[1], from[2], from[3]);
+        if (t >= 0.99f) return new BackgroundColor(to[0], to[1], to[2], to[3]);
+
+        int tl = interpolateARGB(from[0], to[0], t);
+        int tr = interpolateARGB(from[1], to[1], t);
+        int br = interpolateARGB(from[2], to[2], t);
+        int bl = interpolateARGB(from[3], to[3], t);
+        return new BackgroundColor(tl, tr, br, bl);
+    }
+
+    private int interpolateARGB(int a, int b, float t) {
+        int aA = (a >> 24) & 0xFF;
+        int aR = (a >> 16) & 0xFF;
+        int aG = (a >> 8) & 0xFF;
+        int aB = a & 0xFF;
+
+        int bA = (b >> 24) & 0xFF;
+        int bR = (b >> 16) & 0xFF;
+        int bG = (b >> 8) & 0xFF;
+        int bB = b & 0xFF;
+
+        int rA = (int) (aA + (bA - aA) * t);
+        int rR = (int) (aR + (bR - aR) * t);
+        int rG = (int) (aG + (bG - aG) * t);
+        int rB = (int) (aB + (bB - aB) * t);
+
+        return (rA << 24) | (rR << 16) | (rG << 8) | rB;
+    }
+
+    private DynamicTexture getDynamicTexture(ResourceLocation imageLocation) {
+        if (imageLocation == null) return null;
         AbstractTexture texture = Minecraft.getInstance()
                 .getTextureManager()
                 .getTexture(imageLocation);

@@ -76,11 +76,6 @@ public class HudRendererManager {
             synchronized (HudRendererManager.class) {
                 if (instance == null) {
                     instance = new HudRendererManager();
-                    BackgroundColor bgColor = new BackgroundColor(
-                            0x801A1A1A, 0xFC202020,
-                            0XC0202020, 0xC02A2A2A
-                    );
-                    instance.setBgColor(bgColor);
                     instance.updateLayoutFromConfig();
                     instance.refreshStyle();
 
@@ -262,7 +257,7 @@ public class HudRendererManager {
             ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
                     .thenAccept(imageTextureData -> {
                         imageTextureData.register().thenAcceptAsync((v) -> {
-                            ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 50);
+                            ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 16);
                             blurredImageTextureData.register().thenAccept((v1) -> Minecraft.getInstance().execute(() -> {
                                 if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
                                     var nextData = new TransitionNextData(blurredImageTextureData.getLocation(), imageTextureData.getLocation(), 1f);

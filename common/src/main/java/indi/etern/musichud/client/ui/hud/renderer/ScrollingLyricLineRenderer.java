@@ -82,10 +82,6 @@ public class ScrollingLyricLineRenderer {
             return;
         }
 
-        // 停止当前行的滚动
-//        stopScrolling(currentLine1);
-//        stopScrolling(currentLine2);
-
         // 准备新行状态（滚动尚未开始）
         nextLine1.reset(newLine1);
         nextLine2.reset(newLine2);
@@ -235,16 +231,6 @@ public class ScrollingLyricLineRenderer {
 
         updateAnimations();
 
-        // 两行的高度（像素）
-//        LineConfig line1Config = currentLine1.config;
-//        float line1Height = line1Config != null && line1Config.text != null && !line1Config.text.isEmpty() ?
-//                this.line1Height : 0;
-//        LineConfig line2Config = currentLine2.config;
-//        float line2Height = line2Config != null && line2Config.text != null && !line2Config.text.isEmpty() ?
-//                this.line2Height + lineSpacing : 0;
-
-        // 总高度（行高+间距）
-//        int totalHeight = (int) (line1Height + line2Height);
         int totalHeight = (int) (line1Height + line2Height);
         int previousStartY = cachedContainerY + (cachedContainerHeight - totalHeight) / 2; // 垂直居中
         int nextStartY = cachedContainerY + (cachedContainerHeight - totalHeight) / 2; // 垂直居中

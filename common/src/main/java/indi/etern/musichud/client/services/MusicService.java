@@ -297,21 +297,24 @@ public class MusicService {
 
     public void keyBindsVoteSkipCurrent() {
         long currentTimeMillis = System.currentTimeMillis();
-        if (currentTimeMillis - lastPressTime <= 3000) {
-            lastPressTime = 0;
-            voteForSkipCurrent();
-            MuiModApi.postToUiThread(() -> {
-                //noinspection UnstableApiUsage
-                Context context = UIManager.getInstance().getDecorView().getContext();
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed"), Toast.LENGTH_SHORT));
-            });
-        } else {
-            lastPressTime = currentTimeMillis;
-            MuiModApi.postToUiThread(() -> {
-                //noinspection UnstableApiUsage
-                Context context = UIManager.getInstance().getDecorView().getContext();
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip"), Toast.LENGTH_SHORT));
-            });
+        MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+        if (currentlyPlayingMusicDetail != null && currentlyPlayingMusicDetail != MusicDetail.NONE) {
+            if (currentTimeMillis - lastPressTime <= 3000) {
+                lastPressTime = 0;
+                voteForSkipCurrent();
+                MuiModApi.postToUiThread(() -> {
+                    //noinspection UnstableApiUsage
+                    Context context = UIManager.getInstance().getDecorView().getContext();
+                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed"), Toast.LENGTH_SHORT));
+                });
+            } else {
+                lastPressTime = currentTimeMillis;
+                MuiModApi.postToUiThread(() -> {
+                    //noinspection UnstableApiUsage
+                    Context context = UIManager.getInstance().getDecorView().getContext();
+                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip"), Toast.LENGTH_SHORT));
+                });
+            }
         }
     }
 
