@@ -169,7 +169,6 @@ public class ScrollingLyricLineRenderer {
 
         // 始终左对齐：起始X = baseX + scrollOffset
         float drawX = baseX + scrollOffset;
-
         float drawY = baseY + yOffset;
 
         gr.pose().pushMatrix();

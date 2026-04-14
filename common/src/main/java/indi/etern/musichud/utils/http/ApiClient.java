@@ -165,7 +165,7 @@ public class ApiClient {
                         }
                     }
                 } catch (ConnectException e) {
-                    MusicHud.getLogger(ApiClient.class).error("Please check Api server status");
+                    LOGGER.error("Please check Api server status | 请检查 Api 服务器状态");
                     throw e;
                 }
             } catch (ConnectException e) {

@@ -18,6 +18,7 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix3x2f;
+import org.joml.Matrix3x2fStack;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -46,6 +47,35 @@ public class BackgroundRenderer {
         this.currentData = data;
     }
 
+    private static final int SWATCH_SIZE = 20;
+    private static final int PADDING = 4;
+    private static final int START_X = 4;
+    private static final int START_Y = 4;
+
+    public void drawColorDebug(GuiGraphics guiGraphics, int[] colors) {
+        if (colors == null || colors.length != 4) return;
+
+        int currentY = START_Y;
+        String[] labels = {"Primary", "Secondary", "Bright", "Dark"};
+
+        Matrix3x2fStack pose = guiGraphics.pose();
+        pose.pushMatrix();
+        for (int i = 0; i < 4; i++) {
+            int color = colors[i];
+            // 绘制色块背景（黑色边框+色块）
+            guiGraphics.fill(START_X, currentY, START_X + SWATCH_SIZE, currentY + SWATCH_SIZE, 0xFF000000); // 黑色边框背景
+            guiGraphics.fill(START_X + 1, currentY + 1, START_X + SWATCH_SIZE - 1, currentY + SWATCH_SIZE - 1, color);
+
+            // 绘制文字（颜色值 + 标签）
+            String hex = String.format("#%06X", color & 0x00FFFFFF);
+            guiGraphics.drawString(Minecraft.getInstance().font, labels[i] + ": " + hex,
+                    START_X + SWATCH_SIZE + PADDING, currentY + (SWATCH_SIZE - 8) / 2, 0xFFFFFFFF);
+
+            currentY += SWATCH_SIZE + PADDING;
+        }
+        pose.popMatrix();
+    }
+
     public void render(GuiGraphics gr) {
         if (currentData == null) {
             return;
@@ -53,8 +83,7 @@ public class BackgroundRenderer {
 
         Layout layout = currentData.getLayout();
         BackgroundImage bgImage = currentData.getBackgroundImage();
-        DynamicTexture currentTexture = getDynamicTexture(bgImage.currentUnblurredLocation);
-        DynamicTexture currentBlurredTexture = getDynamicTexture(bgImage.currentBlurredLocation);
+        DynamicTexture currentTextureForColorExtract = getDynamicTexture(bgImage.currentBlurredLocation);
 
         // 获取过渡状态
         var transitionStatus = HudRenderData.getTransitionStatus();
@@ -62,16 +91,17 @@ public class BackgroundRenderer {
         float progress = transitionStatus.getProgress();
 
         // 获取当前图片和下一张图片的 DynamicTexture
-        DynamicTexture nextBlurredTexture = null;
+        DynamicTexture nextTextureForColorExtract = null;
         if (progress > 0 && nextData != null) {
-            nextBlurredTexture = getDynamicTexture(nextData.nextBlurred());
+            nextTextureForColorExtract = getDynamicTexture(nextData.nextBlurred());
         }
 
         // 提取颜色（带缓存）
-        int[] currentColors = getColorsForTexture(currentBlurredTexture);
-        int[] nextColors = nextBlurredTexture != null ? getColorsForTexture(nextBlurredTexture) : currentColors;
+        int[] currentColors = getColorsForTexture(currentTextureForColorExtract);
+        int[] nextColors = nextTextureForColorExtract != null ? getColorsForTexture(nextTextureForColorExtract) : currentColors;
 
         // 构建过渡中的 BackgroundColor 对象（用于传给 UniformWriter）
+        int[] debug = {0xFFFF0000, 0xFF0000FF, 0xFFFFFFFF, 0xFF000000};
         BackgroundColor interpolatedColor = buildInterpolatedBackgroundColor(currentColors, nextColors, progress);
 
         currentData.setBackgroundColor(interpolatedColor);
@@ -91,6 +121,7 @@ public class BackgroundRenderer {
                         0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
                         scissor
                 ));
+//        drawColorDebug(gr, currentColors);
     }
 
     /**
@@ -101,7 +132,7 @@ public class BackgroundRenderer {
         if (texture == null) {
             return ColorExtractor.getDefaultColors();
         }
-        return colorCache.get(texture, () -> ColorExtractor.adjustColors(ColorExtractor.extractColors(texture), 1.1f, 0.55f, 0.7f));
+        return colorCache.get(texture, () -> ColorExtractor.adjustColors(ColorExtractor.extractColors(texture), 1.15f, 0.45f, 0.76f));
     }
 
     /**

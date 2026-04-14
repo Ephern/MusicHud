@@ -69,6 +69,12 @@ public class LoginService {
                     ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
                     profileConfigData.setProfile(loginResult.profile());
                     profileConfigData.saveToConfig();
+                    MuiModApi.postToUiThread(() -> {
+                        AccountView accountView = AccountView.getInstance();
+                        if (accountView != null) {
+                            accountView.refresh();
+                        }
+                    });
                 } else {
                     MuiModApi.postToUiThread(() -> {
                         AccountView accountView = AccountView.getInstance();

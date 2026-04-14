@@ -100,7 +100,7 @@
   "music_hud.config.layout.hudWidth": "宽度",
   "music_hud.config.layout.hudHeight": "高度",
   "music_hud.config.layout.hudCornerRadius": "圆角半径",
-  "music_hud.config.category.embeddedServer": "单人/局域网联机",
+  "music_hud.config.category.embeddedServer": "单人 / 局域网联机",
   "music_hud.config.embeddedServer.enable": "在 单人 / 局域网联机（主机） 中启用 Music Hud（重新启动后生效）",
   "music_hud.config.embeddedServer.serverApiBaseUrl": "API 服务器的根 URL（以 http(s): 开头）",
   "music_hud.config.embeddedServer.startupBinaryApiServerWhenLaunch": "在游戏启动时启动 API 服务器（重新启动后生效）",

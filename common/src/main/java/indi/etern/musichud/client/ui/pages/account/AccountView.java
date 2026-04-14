@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.pages.account;
 
+import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
@@ -80,6 +81,15 @@ public class AccountView extends LinearLayout {
             retryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
 
+            LinearLayout buttonsLayout = new LinearLayout(context);
+            buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
+            LayoutParams buttonsParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            buttonsParams.setMargins(0, dp(8), 0, 0);
+            buttonsLayout.setLayoutParams(buttonsParams);
+            LayoutTransition transition = new LayoutTransition();
+            transition.enableTransitionType(LayoutTransition.CHANGING);
+            buttonsLayout.setLayoutTransition(transition);
+
             Button logoutButton = new Button(context);
             logoutButton.setFocusable(true);
             logoutButton.setClickable(true);
@@ -102,9 +112,7 @@ public class AccountView extends LinearLayout {
                     .cornerRadius(dp(4)).inset(dp(1)).build();
             var background = backgroundFactory.newBackgroundDrawable();
             retryButton.setBackground(background);
-            LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            buttonParams.setMargins(0, dp(8), 0, dp(8));
-            retryButton.setLayoutParams(buttonParams);
+            retryButton.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
             retryButton.setOnClickListener((view) -> {
                 MuiModApi.postToUiThread(() -> {
                     retryButton.setVisibility(GONE);
@@ -122,7 +130,9 @@ public class AccountView extends LinearLayout {
             });
 
             addView(textView);
-            addView(retryButton);
+            addView(buttonsLayout);
+            buttonsLayout.addView(retryButton);
+            buttonsLayout.addView(logoutButton);
             addView(progressRing);
         } else {
             setGravity(Gravity.TOP);

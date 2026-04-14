@@ -62,10 +62,10 @@ public class HudUniformWriter {
 
     private Matrix4f buildColorMatrix(BackgroundColor bgColor) {
         Matrix4f matrix = new Matrix4f();
-        matrix.setColumn(0, colorToVector(bgColor.colorTL));
-        matrix.setColumn(1, colorToVector(bgColor.colorTR));
-        matrix.setColumn(2, colorToVector(bgColor.colorBR));
-        matrix.setColumn(3, colorToVector(bgColor.colorBL));
+        matrix.setColumn(0, colorToVector(bgColor.color1));
+        matrix.setColumn(1, colorToVector(bgColor.color2));
+        matrix.setColumn(2, colorToVector(bgColor.color3));
+        matrix.setColumn(3, colorToVector(bgColor.color4));
         return matrix;
     }
 

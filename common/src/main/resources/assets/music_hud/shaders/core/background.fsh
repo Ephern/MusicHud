@@ -55,16 +55,51 @@ float fbm(vec2 uv) {
     return value * 0.5 + 0.5;  // map from [-1,1] to [0,1]
 }
 
-// ---------- Color mixing between 4 colors based on t (0..1) ----------
+const float SPLIT_C0 = 0.2;
+const float SPLIT_C1 = 0.36;
+const float SPLIT_C2 = 0.64;
+const float SPLIT_C3 = 0.8;
+
 vec4 mix4Colors(vec4 c0, vec4 c1, vec4 c2, vec4 c3, float t) {
-    t = clamp(t, 0.0, 1.0);
-    float seg = t * 3.0;
-    float frac = fract(seg);
-    int idx = int(floor(seg));
-    float f = frac * frac * (3.0 - 2.0 * frac);  // cubic Hermite
-    if (idx == 0) return mix(c0, c1, f);
-    else if (idx == 1) return mix(c1, c2, f);
-    else return mix(c2, c3, f);
+    t = clamp(t, SPLIT_C0, SPLIT_C3);
+
+    float s0 = SPLIT_C0;
+    float s1 = SPLIT_C1;
+    float s2 = SPLIT_C2;
+    float s3 = SPLIT_C3;
+
+    // 防止分界点顺序错误（可选的安全钳位）
+    s1 = clamp(s1, s0, s3);
+    s2 = clamp(s2, s1, s3);
+
+    if (t <= s1) {
+        // 第一段：范围 [s0, s1]
+        float f = (t - s0) / (s1 - s0);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(c0, c1, f);
+    } else if (t <= s2) {
+        // 第二段：范围 [s1, s2]
+        float f = (t - s1) / (s2 - s1);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(c1, c2, f);
+    } else {
+        // 第三段：范围 [s2, s3]
+        float f = (t - s2) / (s3 - s2);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(c2, c3, f);
+    }
+}
+
+vec4 mix4ColorsDirectional(vec4 c0, vec4 c1, vec4 c2, vec4 c3, float t, float direction) {
+    // direction > 0 时正向 (c0→c3)，<0 时反向 (c3→c0)
+    if (direction < 0.0) {
+        // 反转 t 并交换颜色顺序
+        t = 1.0 - t;
+        vec4 tmp = c0; c0 = c3; c3 = tmp;
+        tmp = c1; c1 = c2; c2 = tmp;
+    }
+    // 调用原来的 mix4Colors（常量分界版本）
+    return mix4Colors(c0, c1, c2, c3, t);
 }
 
 float aastep(float x) {
@@ -87,10 +122,10 @@ void main() {
     vec2 noiseUv = uv;
     noiseUv.x *= aspect;
     // Fluid-like distortion: scroll and scale the UVs
-    float speed = 0.01;
+    float speed = 0.008;
     vec2 scrollVec = vec2(timestamp * speed, timestamp * speed * 0.7);
-    vec2 uv0 = noiseUv * 0.015 + scrollVec;          // base noise
-    vec2 uv1 = noiseUv * 0.03 - scrollVec * 1.3;    // second layer for complexity
+    vec2 uv0 = noiseUv * 0.02 + scrollVec;          // base noise
+    vec2 uv1 = noiseUv * 0.04 - scrollVec * 1.3;    // second layer for complexity
 
     // Combine two FBM layers
     float noise1 = fbm(uv0);
@@ -98,13 +133,15 @@ void main() {
     float finalNoise = (noise1 * 0.7 + noise2 * 0.3);
 
     // Retrieve the 4 colors from uniform (column-major matrix)
-    vec4 color0 = u_BgColors[0];
-    vec4 color1 = u_BgColors[1];
-    vec4 color2 = u_BgColors[2];
-    vec4 color3 = u_BgColors[3];
+    vec4 primary = u_BgColors[0];
+    vec4 secondary = u_BgColors[1];
+    vec4 bright = u_BgColors[2];
+    vec4 dark = u_BgColors[3];
 
     // Map noise to color gradient position
-    vec4 color = mix4Colors(color1, color0, color2, color3, finalNoise);
+//    vec4 color = mix4Colors(dark, primary, secondary, bright, finalNoise);
+    float dir = snoise(uv0 * 0.8 + timestamp * 0.2); // 动态变化的方向场
+    vec4 color = mix4ColorsDirectional(dark, primary, secondary, bright, finalNoise, dir);
 
     // ---------- Rounded rectangle clipping (with antialiasing) ----------
     vec2 halfSize = vec2(halfWidth, halfHeight);
