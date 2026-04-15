@@ -7,6 +7,7 @@ import net.minecraft.server.level.ServerPlayer;
 
 import java.util.function.Consumer;
 
+@SuppressWarnings("unused")
 public class FabricServerEventService implements IServerEventService {
     private static volatile FabricServerEventService instance;
 

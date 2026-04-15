@@ -8,6 +8,7 @@ import net.minecraft.world.entity.player.Player;
 
 import java.util.function.Consumer;
 
+@SuppressWarnings("unused")
 public class FabricClientEventService implements IClientEventService {
     private static volatile FabricClientEventService instance;
 

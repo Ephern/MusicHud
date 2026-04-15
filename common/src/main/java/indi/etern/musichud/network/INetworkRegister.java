@@ -41,18 +41,4 @@ public interface INetworkRegister {
     );
 
     <T extends IPayload> CustomPacketPayload.Type<T> getType(Class<T> customPacketPayloadClass);
-
-    final class ReflectionHolder {
-        private ReflectionHolder() {
-        }
-
-        static <T> T load(String className, Class<T> expectedType) {
-            try {
-                Object instance = Class.forName(className).getMethod("getInstance").invoke(null);
-                return expectedType.cast(instance);
-            } catch (ReflectiveOperationException e) {
-                throw new RuntimeException(e);
-            }
-        }
-    }
 }
