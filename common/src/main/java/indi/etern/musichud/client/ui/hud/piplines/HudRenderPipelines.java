@@ -19,8 +19,6 @@ public class HudRenderPipelines {
             .withVertexShader(MusicHud.location("core/background"))
             .withFragmentShader(MusicHud.location("core/background"))
             .withUniform("HudBackgroundParams", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")  // 当前图片
-            .withSampler("Sampler1")  // 下一张图片
             .withBlend(BlendFunction.TRANSLUCENT)
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
             .build();

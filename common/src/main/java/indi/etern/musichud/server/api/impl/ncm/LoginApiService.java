@@ -127,17 +127,23 @@ public class LoginApiService implements ILoginApiService {
     @SneakyThrows
     @Override
     public void loginAsAnonymous(ServerPlayer player, boolean sendFail) {
-        AnonymousLoginData response = ApiClient.post(
-                ServerApiMeta.Login.ANONYMOUS,
-                null,
-                null);
-        LoginCookieInfo loginCookieInfo;
-        if (response.code == 200) {
-            loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, response.cookie, ZonedDateTime.now());
-            Profile profile = loadUserProfile(player, loginCookieInfo);
-            sendSuccessLoginResultTo(player, loginCookieInfo, profile);
-        } else if (sendFail) {
-            sendLoginFailResult(player, new RuntimeException("login failed"));
+        try {
+            AnonymousLoginData response = ApiClient.post(
+                    ServerApiMeta.Login.ANONYMOUS,
+                    null,
+                    null);
+            LoginCookieInfo loginCookieInfo;
+            if (response.code == 200) {
+                loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, response.cookie, ZonedDateTime.now());
+                Profile profile = loadUserProfile(player, loginCookieInfo);
+                sendSuccessLoginResultTo(player, loginCookieInfo, profile);
+            } else if (sendFail) {
+                sendLoginFailResult(player, new RuntimeException("login failed"));
+            }
+        } catch (Exception e){
+            if (sendFail) {
+                sendLoginFailResult(player, new RuntimeException("login failed"));
+            }
         }
     }
 

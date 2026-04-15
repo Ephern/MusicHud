@@ -100,7 +100,7 @@
   "music_hud.config.layout.hudWidth": "寬度",
   "music_hud.config.layout.hudHeight": "高度",
   "music_hud.config.layout.hudCornerRadius": "圓角半徑",
-  "music_hud.config.category.embeddedServer": "單人/區域網路連線",
+  "music_hud.config.category.embeddedServer": "單人 / 區域網路連線",
   "music_hud.config.embeddedServer.enable": "在 單人 / 區域網路連線（主機） 中啟用 Music Hud（重新啟動後生效）",
   "music_hud.config.embeddedServer.serverApiBaseUrl": "API 伺服器的根 URL（以 http(s): 開頭）",
   "music_hud.config.embeddedServer.startupBinaryApiServerWhenLaunch": "在遊戲啟動時啟動 API 伺服器（重新啟動後生效）",

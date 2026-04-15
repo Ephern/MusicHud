@@ -42,10 +42,11 @@ public final class MusicHud {
         }
         LOGGER.atLevel(Level.ALL);
         LOGGER.debug("Initialized in environment: {}", currentEnvironment);
-        EXECUTOR.execute(() -> {
-            Thread.currentThread().setName("MHWorker-Init");
-            RegistrationManager.performAutoRegistration();
-        });
+        RegistrationManager.performCommonAutoRegistration();
+    }
+
+    public static void onConfigLoaded() {
+        RegistrationManager.performSideAutoRegistration();
     }
 
     public static Identifier location(String s) {

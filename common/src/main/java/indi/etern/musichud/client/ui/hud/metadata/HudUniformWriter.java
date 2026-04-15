@@ -10,6 +10,11 @@ import org.joml.Vector4f;
 import static indi.etern.musichud.client.ui.utils.UniformDataUtils.colorToVector;
 
 public class HudUniformWriter {
+    long initTimestamp;
+
+    public HudUniformWriter() {
+        initTimestamp = System.currentTimeMillis();
+    }
 
     /**
      * 将渲染数据写入 uniform buffer
@@ -33,7 +38,7 @@ public class HudUniformWriter {
                 layout.width/2,
                 layout.height/2,
                 Math.min(Math.min(layout.width, layout.height)/2, layout.radius),
-                0
+                (System.currentTimeMillis() - initTimestamp) / 1000.0f
         );
 
         var transitionStatus = HudRenderData.getTransitionStatus();
@@ -56,10 +61,10 @@ public class HudUniformWriter {
 
     private Matrix4f buildColorMatrix(BackgroundColor bgColor) {
         Matrix4f matrix = new Matrix4f();
-        matrix.setColumn(0, colorToVector(bgColor.colorTL));
-        matrix.setColumn(1, colorToVector(bgColor.colorTR));
-        matrix.setColumn(2, colorToVector(bgColor.colorBR));
-        matrix.setColumn(3, colorToVector(bgColor.colorBL));
+        matrix.setColumn(0, colorToVector(bgColor.color1));
+        matrix.setColumn(1, colorToVector(bgColor.color2));
+        matrix.setColumn(2, colorToVector(bgColor.color3));
+        matrix.setColumn(3, colorToVector(bgColor.color4));
         return matrix;
     }
 

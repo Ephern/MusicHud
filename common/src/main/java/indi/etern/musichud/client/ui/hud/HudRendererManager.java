@@ -14,6 +14,7 @@ import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.IClientEventService;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
@@ -30,7 +31,7 @@ public class HudRendererManager {
     private static volatile HudRendererManager instance;
     @Getter
     private static volatile boolean loaded = false;
-    private final BackgroundRenderer HUD_RENDERER = BackgroundRenderer.getInstance();
+    private final BackgroundRenderer BACKGROUND_RENDERER = BackgroundRenderer.getInstance();
     private final AlbumImageRenderer IMAGE_RENDERER = AlbumImageRenderer.getInstance();
     private final PlayerHeadRenderer PLAYER_HEAD_RENDERER = PlayerHeadRenderer.getInstance();
     private final PlayingStatusRenderer PLAYING_STATUS_RENDERER = PlayingStatusRenderer.getInstance();
@@ -46,8 +47,6 @@ public class HudRendererManager {
     private volatile HudRenderData progressDisplayData;
     @Setter
     private volatile Layout baseLayout;
-    @Setter
-    private volatile BackgroundColor bgColor;
     private float contentInterval;
     private float contentPadding;
 
@@ -76,11 +75,6 @@ public class HudRendererManager {
             synchronized (HudRendererManager.class) {
                 if (instance == null) {
                     instance = new HudRendererManager();
-                    BackgroundColor bgColor = new BackgroundColor(
-                            0x801A1A1A, 0xFC202020,
-                            0XC0202020, 0xC02A2A2A
-                    );
-                    instance.setBgColor(bgColor);
                     instance.updateLayoutFromConfig();
                     instance.refreshStyle();
 
@@ -110,6 +104,12 @@ public class HudRendererManager {
                 clientConfig.getHudVerticalPosition()
         );
         setBaseLayout(layout);
+        IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
+            MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+            if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
+                reset();
+            }
+        });
     }
 
     public void refreshStyle() {
@@ -118,7 +118,7 @@ public class HudRendererManager {
         }
 
         BackgroundImage bgImage = getBackgroundImageOrElse(new BackgroundImage(null, null, 1));
-        configureBaseRenderer(baseLayout, bgColor, bgImage);
+        configureBaseRenderer(baseLayout, bgImage);
 
         Layout baseLayout = hudBaseData.getLayout();
         contentPadding = Math.max(baseLayout.height / 10, 3);
@@ -205,7 +205,7 @@ public class HudRendererManager {
 
     private void configureProgressRenderer(Layout layout) {
         if (progressDisplayData == null) {
-            progressDisplayData = new HudRenderData(layout, null, null);
+            progressDisplayData = new HudRenderData(layout, null);
             progressDisplayData.setProgressBar(new ProgressBar(
                     0x00A0A0A0,
                     0x50FFFFFF,
@@ -222,21 +222,20 @@ public class HudRendererManager {
 
     private void configureImageRenderer(Layout imageLayout, BackgroundImage bgImage) {
         if (imageDisplayData == null) {
-            imageDisplayData = new HudRenderData(imageLayout, null, bgImage);
+            imageDisplayData = new HudRenderData(imageLayout, bgImage);
         } else {
             imageDisplayData.setLayout(imageLayout);
         }
         IMAGE_RENDERER.configure(imageDisplayData);
     }
 
-    private void configureBaseRenderer(@NotNull Layout layout, @NotNull BackgroundColor bgColor, BackgroundImage bgImage) {
+    private void configureBaseRenderer(@NotNull Layout layout, BackgroundImage bgImage) {
         if (hudBaseData == null) {
-            hudBaseData = new HudRenderData(layout, bgColor, bgImage);
+            hudBaseData = new HudRenderData(layout, bgImage);
         } else {
             hudBaseData.setLayout(layout);
-            hudBaseData.setBackgroundColor(bgColor);
         }
-        HUD_RENDERER.configure(hudBaseData);
+        BACKGROUND_RENDERER.configure(hudBaseData);
     }
 
     private BackgroundImage getBackgroundImageOrElse(BackgroundImage bgImage) {
@@ -262,7 +261,7 @@ public class HudRendererManager {
             ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
                     .thenAccept(imageTextureData -> {
                         imageTextureData.register().thenAcceptAsync((v) -> {
-                            ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 50);
+                            ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 16);
                             blurredImageTextureData.register().thenAccept((v1) -> Minecraft.getInstance().execute(() -> {
                                 if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
                                     var nextData = new TransitionNextData(blurredImageTextureData.getLocation(), imageTextureData.getLocation(), 1f);
@@ -318,7 +317,9 @@ public class HudRendererManager {
             PLAY_TIME_RENDERER.setText(playTimeString);
         }
 
-        HUD_RENDERER.render(graphics);
+        BACKGROUND_RENDERER.render(graphics);
+        graphics.nextStratum();
+
         IMAGE_RENDERER.render(graphics);
         PLAYER_HEAD_RENDERER.render(graphics);
         PLAYING_STATUS_RENDERER.render(graphics);
@@ -342,7 +343,7 @@ public class HudRendererManager {
     }
 
     public void updateRenderPass(RenderPass renderPass) {
-        HUD_RENDERER.updateRenderPass(renderPass);
+        BACKGROUND_RENDERER.updateRenderPass(renderPass);
         IMAGE_RENDERER.updateRenderPass(renderPass);
         PROGRESS_RENDERER.updateRenderPass(renderPass);
     }

@@ -28,8 +28,6 @@ dependencies {
     // Use Neoforge to avoid "Type net/neoforged/api/distmarker/Dist not present"
     modImplementation "net.neoforged:mergetool:2.0.0"
 
-    // Architectury API. This is optional, and you can comment it out if you don't need it.
-    modImplementation "dev.architectury:architectury:$rootProject.architectury_api_version"
     testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
     api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
