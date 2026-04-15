@@ -25,8 +25,8 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import indi.etern.musichud.throwable.ApiException;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
@@ -297,21 +297,24 @@ public class MusicService {
 
     public void keyBindsVoteSkipCurrent() {
         long currentTimeMillis = System.currentTimeMillis();
-        if (currentTimeMillis - lastPressTime <= 3000) {
-            lastPressTime = 0;
-            voteForSkipCurrent();
-            MuiModApi.postToUiThread(() -> {
-                //noinspection UnstableApiUsage
-                Context context = UIManager.getInstance().getDecorView().getContext();
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed"), Toast.LENGTH_SHORT));
-            });
-        } else {
-            lastPressTime = currentTimeMillis;
-            MuiModApi.postToUiThread(() -> {
-                //noinspection UnstableApiUsage
-                Context context = UIManager.getInstance().getDecorView().getContext();
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip"), Toast.LENGTH_SHORT));
-            });
+        MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+        if (currentlyPlayingMusicDetail != null && currentlyPlayingMusicDetail != MusicDetail.NONE) {
+            if (currentTimeMillis - lastPressTime <= 3000) {
+                lastPressTime = 0;
+                voteForSkipCurrent();
+                MuiModApi.postToUiThread(() -> {
+                    //noinspection UnstableApiUsage
+                    Context context = UIManager.getInstance().getDecorView().getContext();
+                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed"), Toast.LENGTH_SHORT));
+                });
+            } else {
+                lastPressTime = currentTimeMillis;
+                MuiModApi.postToUiThread(() -> {
+                    //noinspection UnstableApiUsage
+                    Context context = UIManager.getInstance().getDecorView().getContext();
+                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip"), Toast.LENGTH_SHORT));
+                });
+            }
         }
     }
 
@@ -327,16 +330,16 @@ public class MusicService {
                 serverIdlePlaySourceRemoveListeners.forEach((listener) -> listener.accept(musicCollection));
             }
         }
-        LocalPlayer localPlayer = Minecraft.getInstance().player;
+        Player player = Minecraft.getInstance().player;
         for (MusicCollection musicCollection : playlistSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()))) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
                 toAdd.add(musicCollection);
                 serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
                 serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
             }
         }
         for (MusicCollection musicCollection : albumSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()))) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
                 toAdd.add(musicCollection);
                 serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
                 serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));

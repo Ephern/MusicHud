@@ -70,7 +70,12 @@ public class RegistrationManager {
 
     private static final Set<Class<?>> registeredSet = new HashSet<>();
 
-    public static void performAutoRegistration() {
+    public static void performCommonAutoRegistration() {
+        MusicHud.LOGGER.info("Starting explicit auto-registration for common");
+        registerClassesFromList(COMMON_REGISTRIES, "common");
+    }
+
+    public static void performSideAutoRegistration() {
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
         MusicHud.LOGGER.info("Starting explicit auto-registration in environment: {}", side.name());
 
@@ -83,7 +88,6 @@ public class RegistrationManager {
         } else {
             registerClassesFromList(SERVER_REGISTRIES, "server");
         }
-        registerClassesFromList(COMMON_REGISTRIES, "common");
     }
 
     private static void registerClassesFromList(String[] classNames, String typeName) {

@@ -132,7 +132,9 @@ public class NowPlayingInfo {
             this.lyricLines = null;
             this.atomicLyricLines.set(null);
         }
-        MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, idleNextToPlay, this.lyricLines));
+        try {
+            MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, idleNextToPlay, this.lyricLines));
+        } catch (IllegalStateException ignored) {}
         HudRendererManager.getInstance().switchMusic(musicDetail);
         List.copyOf(musicSwitchListener).forEach(consumer -> {
             consumer.accept(previous, musicDetail);

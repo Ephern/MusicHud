@@ -30,9 +30,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 
-import java.util.HashMap;
+import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -40,11 +41,10 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 @Slf4j
 public class HomeView extends LinearLayout {
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     @Getter
     private static HomeView instance;
-
-    private final HashMap<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new HashMap<>();
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private final Map<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new ConcurrentHashMap<>();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
     private MusicListItem nextToPlayItem;
@@ -188,12 +188,14 @@ public class HomeView extends LinearLayout {
             Set<MusicCollection> clientIdlePlaySources = musicService.getLocalIdlePlaySources();
             Set<MusicCollection> serverIdlePlaySources = musicService.getServerIdlePlaySources();
             clientIdlePlaySources.forEach(collection -> {
-                MusicCollectionCard child = new MusicCollectionCard(context, collection);
-                clientIdlePlaySourceCardsList.addView(child);
-                idlePlaySourceCardMap.put(collection, child);
+                if (!idlePlaySourceCardMap.containsKey(collection)) {
+                    MusicCollectionCard child = new MusicCollectionCard(context, collection);
+                    clientIdlePlaySourceCardsList.addView(child);
+                    idlePlaySourceCardMap.put(collection, child);
+                }
             });
             serverIdlePlaySources.forEach(collection -> {
-                if (localPlayer != null && !collection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID())) {
+                if (localPlayer != null && !collection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()) && !idlePlaySourceCardMap.containsKey(collection)) {
                     MusicCollectionCard child = new MusicCollectionCard(context, collection);
                     serverIdlePlaySourceCardsList.addView(child);
                     idlePlaySourceCardMap.put(collection, child);
