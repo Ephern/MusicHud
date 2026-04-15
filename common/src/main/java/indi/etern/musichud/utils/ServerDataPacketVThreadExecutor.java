@@ -3,6 +3,7 @@ package indi.etern.musichud.utils;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.NetworkReceiver;
+import indi.etern.musichud.throwable.ApiException;
 import net.minecraft.server.level.ServerPlayer;
 
 import java.util.function.BiConsumer;
@@ -17,6 +18,8 @@ public class ServerDataPacketVThreadExecutor {
                 if (player instanceof ServerPlayer serverPlayer) {
                     try {
                         consumer.accept(payload, serverPlayer);
+                    } catch (ApiException e) {
+                        MusicHud.getLogger(payload.getClass()).error(e);
                     } catch (Exception e) {
                         MusicHud.getLogger(payload.getClass()).error(e);
                         //noinspection CallToPrintStackTrace

@@ -101,7 +101,7 @@ public class BackgroundRenderer {
         int[] nextColors = nextTextureForColorExtract != null ? getColorsForTexture(nextTextureForColorExtract) : currentColors;
 
         // 构建过渡中的 BackgroundColor 对象（用于传给 UniformWriter）
-        int[] debug = {0xFFFF0000, 0xFF0000FF, 0xFFFFFFFF, 0xFF000000};
+//        int[] debug = {0xFFFF0000, 0xFF0000FF, 0xFFFFFFFF, 0xFF000000};
         BackgroundColor interpolatedColor = buildInterpolatedBackgroundColor(currentColors, nextColors, progress);
 
         currentData.setBackgroundColor(interpolatedColor);

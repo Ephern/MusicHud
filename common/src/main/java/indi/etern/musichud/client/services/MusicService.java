@@ -25,8 +25,8 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import indi.etern.musichud.throwable.ApiException;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
@@ -330,16 +330,16 @@ public class MusicService {
                 serverIdlePlaySourceRemoveListeners.forEach((listener) -> listener.accept(musicCollection));
             }
         }
-        LocalPlayer localPlayer = Minecraft.getInstance().player;
+        Player player = Minecraft.getInstance().player;
         for (MusicCollection musicCollection : playlistSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()))) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
                 toAdd.add(musicCollection);
                 serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
                 serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
             }
         }
         for (MusicCollection musicCollection : albumSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(localPlayer != null && musicCollection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()))) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
                 toAdd.add(musicCollection);
                 serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
                 serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));

@@ -29,6 +29,7 @@ public final class CommonInitializer extends JavaPlugin {
 
         try {
             MusicHud.init();
+            MusicHud.onConfigLoaded();
         } catch (RuntimeException e) {
             shutdownServices();
             throw e;

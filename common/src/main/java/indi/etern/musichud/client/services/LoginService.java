@@ -140,7 +140,9 @@ public class LoginService {
 
     public void sendConnectMessageToServer() {
         if (clientConfig.getEnable()) {
-            clientNetworkService.sendToServer(new ConnectRequest(Version.current));
+            MusicHud.EXECUTOR.submit(() -> {
+                clientNetworkService.sendToServer(new ConnectRequest(Version.current));
+            });
         }
     }
 

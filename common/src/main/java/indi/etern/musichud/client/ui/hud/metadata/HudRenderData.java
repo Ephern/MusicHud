@@ -15,9 +15,8 @@ public class HudRenderData {
     private volatile BackgroundImage backgroundImage;
     private volatile ProgressBar progressBar;
 
-    public HudRenderData(Layout layout, BackgroundColor backgroundColor, BackgroundImage backgroundImage) {
+    public HudRenderData(Layout layout, BackgroundImage backgroundImage) {
         this.layout = layout;
-        this.backgroundColor = backgroundColor;
         this.backgroundImage = backgroundImage;
     }
 }
