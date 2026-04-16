@@ -90,7 +90,8 @@ public class MusicApiService implements IMusicApiService {
                 logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(serverPlayer).getName().getString(), playlistResponse.getCode());
             }
         }
-        Profile profile = loginApiService.playerInfoMap.get(serverPlayer).profile;
+        LoginApiService.PlayerLoginInfo playerLoginInfo = loginApiService.playerInfoMap.get(serverPlayer);
+        Profile profile = playerLoginInfo != null ? playerLoginInfo.profile : null;
         if (playlist.getPrivacy() == Privacy.PRIVATE && !playlist.getCreator().equals(profile)) {
             return Playlist.privacyBlocked(id, playlist.getCreator());
         } else {
