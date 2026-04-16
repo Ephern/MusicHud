@@ -2,7 +2,7 @@
 ![Static Badge](https://img.shields.io/badge/Java-21-red?style=for-the-badge)
 ![Static Badge](https://img.shields.io/badge/License-LGPLv3-brightgreen?style=for-the-badge)
 
-![Banner](https://cdn.modrinth.com/data/7Rnb6oJr/images/a870b990118bb03864c5302052995e70e3dafef4.png)
+![Banner](https://cdn.modrinth.com/data/7Rnb6oJr/images/82adebdd95d53dd3d97c41ae2f60d24b033c9fb3.png)
 ![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/2d00c770f54f44fc194f46842f5876e307ab54e5.png)
 
 #### A GUI-based Full Server Song Request Mod / Plugin
