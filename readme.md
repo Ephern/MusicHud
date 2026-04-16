@@ -18,7 +18,7 @@
 ## Prerequisites
 - ModernUI (only client)
 - Forge Config API Port (only fabric)
-- Architectury API
+- Architectury API (Mod edition, 1.2.0 and below)
 
 ## Features
 - GUI-based, providing an in-game operation interface and a relatively aesthetic, easily configurable HUD.
@@ -26,6 +26,7 @@
 - The server does not retain user data; it is only temporarily stored during login.
 - Streamed playback with no redundant client-side caching.
 - Staggered lyrics auto scroll inspired by Apple Music
+- HUD dynamic fluid background
 
 ## Functions
 - Search for music.
@@ -86,7 +87,7 @@ There are 2 methods to deploy
 ## 前置依赖
 - ModernUI （仅客户端）
 - Forge Config API Port （仅 Fabric）
-- Architectury API
+- Architectury API （非插件版，1.2.0 以及更低版本）
 
 ## 特点
 - GUI 化， 提供游戏内操作界面，以及较为美观易配置的 HUD
@@ -94,6 +95,7 @@ There are 2 methods to deploy
 - 服务端不保留用户数据，仅在登录时暂存
 - 流式播放，无赘余的客户端缓存
 - 受 Apple Music 启发的歌词交错滚动
+- HUD 动态流体背景
 
 ## 功能
 - 搜索音乐

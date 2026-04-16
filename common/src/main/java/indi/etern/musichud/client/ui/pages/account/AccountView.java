@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.pages.account;
 
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.util.ColorStateList;
 import icyllis.modernui.view.Gravity;
@@ -60,7 +59,7 @@ public class AccountView extends LinearLayout {
         Context context = getContext();
 
         Profile currentProfile = Profile.getCurrent();
-        if (currentProfile == null) {
+        if (currentProfile == null || currentProfile == Profile.ANONYMOUS) {
             setGravity(Gravity.CENTER_HORIZONTAL);
 
             TextView textView = new TextView(context);
@@ -90,6 +89,10 @@ public class AccountView extends LinearLayout {
             transition.enableTransitionType(LayoutTransition.CHANGING);
             buttonsLayout.setLayoutTransition(transition);
 
+            ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                    .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
+                    .cornerRadius(dp(4)).inset(dp(1)).build();
+
             Button logoutButton = new Button(context);
             logoutButton.setFocusable(true);
             logoutButton.setClickable(true);
@@ -98,6 +101,13 @@ public class AccountView extends LinearLayout {
             logoutButton.setWidth(dp(84));
             logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
+            var background2 = backgroundFactory.newBackgroundDrawable();
+            logoutButton.setBackground(background2);
+            logoutButton.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+            logoutButton.setOnClickListener(b -> {
+                loginService.logout();
+                loginService.loginAsAnonymousToServer();
+            });
 
             ProgressBar progressRing = new ProgressBar(context);
             progressRing.setIndeterminate(true);
@@ -107,11 +117,8 @@ public class AccountView extends LinearLayout {
             ringParams.setMargins(0, dp(32), 0, 0);
             progressRing.setLayoutParams(ringParams);
 
-            ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
-                    .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
-                    .cornerRadius(dp(4)).inset(dp(1)).build();
-            var background = backgroundFactory.newBackgroundDrawable();
-            retryButton.setBackground(background);
+            var background3 = backgroundFactory.newBackgroundDrawable();
+            retryButton.setBackground(background3);
             retryButton.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
             retryButton.setOnClickListener((view) -> {
                 MuiModApi.postToUiThread(() -> {
@@ -121,13 +128,6 @@ public class AccountView extends LinearLayout {
                 loginService.loginToServer();
             });
 
-            var background2 = backgroundFactory.newBackgroundDrawable();
-            logoutButton.setBackground(background2);
-            logoutButton.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-            logoutButton.setOnClickListener(b -> {
-                loginService.logout();
-                loginService.loginAsAnonymousToServer();
-            });
 
             addView(textView);
             addView(buttonsLayout);
@@ -147,12 +147,12 @@ public class AccountView extends LinearLayout {
             topPanel.addView(avatar);
             avatar.loadUrl(currentProfile.getAvatarUrl());
 
-            LayoutParams textsLayoutParams = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
-            textsLayoutParams.setMargins(dp(16), 0, 0, 0);
-            LinearLayout texts = new LinearLayout(context);
-            texts.setOrientation(VERTICAL);
-            texts.setGravity(Gravity.CENTER_VERTICAL);
-            topPanel.addView(texts, textsLayoutParams);
+            LayoutParams infoLp1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            infoLp1.setMargins(dp(16), 0, 0, 0);
+            LinearLayout infoLayout = new LinearLayout(context);
+            infoLayout.setOrientation(VERTICAL);
+            infoLayout.setGravity(Gravity.CENTER_VERTICAL);
+            topPanel.addView(infoLayout, infoLp1);
 
             LayoutParams nameLayoutParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             TextView nickName = new TextView(context);
@@ -160,7 +160,7 @@ public class AccountView extends LinearLayout {
             nickName.setTextSize(Theme.TEXT_SIZE_LARGER);
             nickName.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             nickName.setText(currentProfile.getNickname());
-            texts.addView(nickName, nameLayoutParams);
+            infoLayout.addView(nickName, nameLayoutParams);
 
             LayoutParams idLayoutParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             TextView id = new TextView(context);
@@ -168,23 +168,44 @@ public class AccountView extends LinearLayout {
             id.setTextSize(Theme.TEXT_SIZE_NORMAL);
             id.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             id.setText(Long.toString(currentProfile.getUserId()));
-            texts.addView(id, idLayoutParams);
+            infoLayout.addView(id, idLayoutParams);
 
-            LayoutParams logoutButtonParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                    .inset(0).cornerRadius(dp(4))
+                    .padding(new ButtonInsetBackgroundFactory.Padding(0, dp(2), 0, dp(2)))
+                    .build();
+
+            LinearLayout buttonsLayout = new LinearLayout(context);
+            buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
+            infoLayout.addView(buttonsLayout);
+
+            Button refreshButton = new Button(context);
+            refreshButton.setFocusable(true);
+            refreshButton.setClickable(true);
+            refreshButton.setTextColor(Theme.PRIMARY_COLOR);
+            refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            refreshButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+            var background1 = backgroundFactory.newBackgroundDrawable();
+            refreshButton.setBackground(background1);
+            LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            params.setMargins(0, 0, dp(8), 0);
+            refreshButton.setLayoutParams(params);
+            refreshButton.setOnClickListener(b -> {
+                refresh();
+            });
+            buttonsLayout.addView(refreshButton);
+
             Button logoutButton = new Button(context);
             logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
             logoutButton.setTextColor(Theme.PRIMARY_COLOR);
             logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            Drawable background = ButtonInsetBackgroundFactory.builder()
-                    .inset(0).cornerRadius(dp(4))
-                    .padding(new ButtonInsetBackgroundFactory.Padding(0, dp(2), 0, dp(2)))
-                    .build().newBackgroundDrawable();
-            logoutButton.setBackground(background);
-            texts.addView(logoutButton, logoutButtonParam);
+            var background2 = backgroundFactory.newBackgroundDrawable();
+            logoutButton.setBackground(background2);
             logoutButton.setOnClickListener(b -> {
                 loginService.logout();
                 loginService.loginAsAnonymousToServer();
             });
+            buttonsLayout.addView(logoutButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
             LayoutParams topPanelLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             topPanelLayoutParams.setMargins(0, dp(32), 0, dp(32));
@@ -262,7 +283,7 @@ public class AccountView extends LinearLayout {
                     })
             ).thenAccept((v) -> {
                 MuiModApi.postToUiThread(() -> {
-                    removeView(progressBar);
+                    progressBar.setVisibility(View.GONE);
                 });
             });
         }

@@ -147,7 +147,7 @@ public class MusicCollectionCard extends LinearLayout {
     }
 
     private void updateButton(Button addToIdleSourceButton) {
-        if (musicService.getLocalIdlePlaySources().contains(musicCollection)) {
+        if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
             addToIdleSourceButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
         } else {
             addToIdleSourceButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));

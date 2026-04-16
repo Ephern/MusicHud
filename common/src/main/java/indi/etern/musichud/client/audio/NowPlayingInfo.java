@@ -31,7 +31,7 @@ public class NowPlayingInfo {
     private final Set<Consumer<LyricLine>> lyricLineUpdateListener = new HashSet<>();
     @Setter
     @Getter
-    private Duration updateInAdvanceDuration = Duration.of(300, ChronoUnit.MILLIS);
+    private Duration updateInAdvanceDuration = Duration.of(800, ChronoUnit.MILLIS);
     @Getter
     private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
     @Getter

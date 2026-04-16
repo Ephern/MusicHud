@@ -118,6 +118,7 @@ public class LyricLineView extends LinearLayout {
                 duration == null ?
                         nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime())
                         : duration.minus(delta);
+        stayEmphasizeDuration = stayEmphasizeDuration.minus(Duration.of(800, ChronoUnit.MILLIS));
         switch (lyricLine.getType()) {
             case META_DATA -> {
             }
@@ -165,8 +166,7 @@ public class LyricLineView extends LinearLayout {
                 emphasizeAnimSet.playTogether(alpha, scaleX, scaleY);
                 emphasizeAnimSet.start();
 
-                long millis = stayEmphasizeDuration.minus(Duration.ofMillis(1800)).toMillis();
-//                millis = (millis - 400) / 1000 * 1000 + 400;//to ensure no animation cut
+                long millis = stayEmphasizeDuration.toMillis() - 1300;
                 for (int i = 0; i < 3; i++) {
                     View viewById = mainText.findViewById(i);
                     if (viewById != null) {

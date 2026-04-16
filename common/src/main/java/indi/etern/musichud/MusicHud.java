@@ -10,11 +10,14 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
+import java.util.HashSet;
 import java.util.Random;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 
 public final class MusicHud {
     public static final String MOD_ID = "music_hud";
@@ -24,8 +27,9 @@ public final class MusicHud {
     public static final Logger LOGGER = LogManager.getLogger(LOGGER_BASE_NAME);
     public static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
     @Getter
-    @Setter
     private static ConnectStatus status = ConnectStatus.NOT_CONNECTED;
+    @Getter
+    private static Set<Consumer<ConnectStatus>> connectStatusListeners = new HashSet<>();
     @Getter
     @Setter
     private static Environment currentEnvironment;
@@ -87,5 +91,10 @@ public final class MusicHud {
     @FunctionalInterface
     public interface ScheduledTask {
         void stop() throws InterruptedException;
+    }
+
+    public static void setStatus(ConnectStatus status) {
+        MusicHud.status = status;
+        connectStatusListeners.forEach(l -> l.accept(status));
     }
 }

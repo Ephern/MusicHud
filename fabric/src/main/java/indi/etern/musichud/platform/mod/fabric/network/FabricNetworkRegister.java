@@ -1,7 +1,6 @@
 package indi.etern.musichud.platform.mod.fabric.network;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.C2SPayload;
@@ -21,8 +20,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @SuppressWarnings("unused")
 public class FabricNetworkRegister implements INetworkRegister {
     private static volatile FabricNetworkRegister instance;
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
-
     private final Map<Class<? extends IPayload>, CustomPacketPayload.Type<?>> typeMap = new ConcurrentHashMap<>();
 
     public static FabricNetworkRegister getInstance() {
@@ -55,9 +52,6 @@ public class FabricNetworkRegister implements INetworkRegister {
         PayloadTypeRegistry.playC2S().register(type, codec);
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
-        if (side == Environment.Side.CLIENT) {
-            return;
-        }
 
         ServerPlayNetworking.registerGlobalReceiver(type, (payload, context) -> {
             serverReceiver.receive(payload, context.player());
