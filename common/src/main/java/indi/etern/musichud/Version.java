@@ -8,7 +8,7 @@ import org.jetbrains.annotations.NotNull;
 public record Version(long mayor, long minor, long patch, BuildType build) implements Comparable<Version>{
     public static final StreamCodec<? super RegistryFriendlyByteBuf, Version> PACKET_CODEC;
     public static Version current = new Version(1,2,1, BuildType.Stable);
-    public static Version leastCapable = new Version(1,2,0,BuildType.PreRelease);
+    public static Version leastCapable = new Version(1,2,1,BuildType.Stable);
 
     static {
         PACKET_CODEC = new StreamCodec<ByteBuf, Version>() {
