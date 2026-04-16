@@ -34,7 +34,7 @@ public final class CommonInitializer {
         modEventBus = eventBus;
         modEventBus.register(this);
 
-        if (FMLEnvironment.dist.isClient()) {
+        if (FMLEnvironment.getDist().isClient()) {
             MusicHud.setCurrentEnvironment(Environment.of(Environment.Side.CLIENT, Environment.Platform.NEOFORGE));
             container.registerConfig(ModConfig.Type.COMMON, ServerConfigDefinition.configure.getRight());
             container.registerConfig(ModConfig.Type.CLIENT, ClientConfigDefinition.configure.getRight());
@@ -76,7 +76,7 @@ public final class CommonInitializer {
         ModConfig config = configEvent.getConfig();
         if (config.getModId().equals(MusicHud.MOD_ID)) {
             onConfigEvent(configEvent);
-            boolean inClient = FMLEnvironment.dist.isClient();
+            boolean inClient = FMLEnvironment.getDist().isClient();
             if ((inClient && clientConfig.isConfigured() && serverConfig.isConfigured())
                     || (!inClient && serverConfig.isConfigured())) {
                 MusicHud.onConfigLoaded();
