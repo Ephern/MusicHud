@@ -59,11 +59,11 @@ public class ScrollingLyricLineRenderer {
      * @param scrollMs1    第一行滚动时长（毫秒），若文本不超宽则不滚动
      * @param style2       第二行的文本和颜色
      * @param scrollMs2    第二行滚动时长
-     * @param transitionMs 切换动画时长（毫秒）
+     * @param transitionDuration 切换动画时长（毫秒）
      */
     public void setLines(TextStyle style1, long scrollMs1,
                          TextStyle style2, long scrollMs2,
-                         long transitionMs) {
+                         long transitionDuration) {
         // 准备新配置
         LineConfig newLine1 = new LineConfig(style1, scrollMs1);
         LineConfig newLine2 = new LineConfig(style2, scrollMs2);
@@ -94,7 +94,7 @@ public class ScrollingLyricLineRenderer {
         // 开始切换动画
         isTransitioning = true;
         transitionProgress = 0.0f;
-        transitionDuration = transitionMs;
+        this.transitionDuration = transitionDuration;
         transitionStartTime = System.currentTimeMillis();
     }
 

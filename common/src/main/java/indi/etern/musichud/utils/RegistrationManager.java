@@ -1,9 +1,8 @@
 package indi.etern.musichud.utils;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.interfaces.Register;
+import indi.etern.musichud.platform.Environment;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -82,12 +81,8 @@ public class RegistrationManager {
         // 根据环境注册特定接口
         if (side == Environment.Side.CLIENT) {
             registerClassesFromList(CLIENT_REGISTRIES, "client");
-            if (ClientConfig.getInstance().getEnableEmbeddedServer()) {
-                registerClassesFromList(SERVER_REGISTRIES, "server");
-            }
-        } else {
-            registerClassesFromList(SERVER_REGISTRIES, "server");
         }
+        registerClassesFromList(SERVER_REGISTRIES, "server");
     }
 
     private static void registerClassesFromList(String[] classNames, String typeName) {

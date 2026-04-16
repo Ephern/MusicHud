@@ -20,25 +20,18 @@ import java.util.function.Consumer;
 
 @RegisterMark
 public class ApiServerManager implements ServerRegister {
-    private static ApiServerManager register;
-    private static final Logger apiLogger = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/API");
-    private static final ServerConfig serverConfig = ServerConfig.getInstance();
-    private static Process process;
-    private static boolean continueRestart = true;
+    private final Logger apiLogger = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/API");
+    private final ServerConfig serverConfig = ServerConfig.getInstance();
     @Getter
-    private static BinaryApiServerStatus binaryApiServerStatus = BinaryApiServerStatus.STOPPED;
+    private final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
     @Getter
-    private static final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
-    private static final int maxTries = 5;
-    private static int triedCount = 0;
-
-    public enum BinaryApiServerStatus {
-        STOPPED, LAUNCHING, RUNNING;
-
-        public String i18nKey() {
-            return MusicHud.MOD_ID + ".text.binaryApiServerStatus." + name();
-        }
-    }
+    private static ApiServerManager instance;
+    private Process process;
+    private boolean continueRestart = true;
+    @Getter
+    private BinaryApiServerStatus binaryApiServerStatus = BinaryApiServerStatus.STOPPED;
+    private int triedCount = 0;
+    private boolean initialized = false;
 
     public void log(String s, boolean error) {
         if (error || s.contains("[ERROR]")) {
@@ -50,41 +43,53 @@ public class ApiServerManager implements ServerRegister {
 
     @Override
     public void register() {
-        register = this;
-        MusicHud.EXECUTOR.execute(() -> {
-            Thread.currentThread().setName("MHWorker-API-Launcher");
-            boolean apiAvailable = ApiClient.checkAvailable();
-            if (serverConfig.getStartupBinaryApiServerWhenLaunch() && !apiAvailable) {
-                triedCount = 0;
-                startEmbeddedApiServer();
-                Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
-                if (side == Environment.Side.CLIENT) {
-                    IClientEventService.getInstance().registerClientLifecycleStopping(ApiServerManager::stopApiServer);
-                } else if (side == Environment.Side.SERVER) {
-                    IServerEventService.getInstance().registerServerLifecycleStopping(ApiServerManager::stopApiServer);
-                }
-            } else if (apiAvailable) {
-                apiLogger.info("API Server has been launched externally");
-            }
-        });
+        instance = this;
+        if (initialized) {
+            return;
+        }
+        initialized = true;
+        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && !ClientConfig.getInstance().getEnableEmbeddedServer()) {
+            return;
+        }
+        if (serverConfig.getStartupBinaryApiServerWhenLaunch()) {
+            launchApiServerInternal();
+        }
     }
 
-    public static void stopApiServer() {
+    public void stopApiServer() {
         if (process != null) {
             continueRestart = false;
             process.destroy();
         }
     }
 
-    public static void restartApiServer() {
-        if (register != null) {
-            triedCount = 0;
-            stopApiServer();
-            register.startEmbeddedApiServer();
-        }
+    public void restartApiServer() {
+        triedCount = 0;
+        stopApiServer();
+        launchApiServerInternal();
+    }
+
+    private void launchApiServerInternal() {
+        MusicHud.EXECUTOR.execute(() -> {
+            Thread.currentThread().setName("MHWorker-API-Launcher");
+            boolean apiAvailable = ApiClient.checkAvailable();
+            if (!apiAvailable) {
+                triedCount = 0;
+                startEmbeddedApiServer();
+                Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
+                if (side == Environment.Side.CLIENT) {
+                    IClientEventService.getInstance().registerClientLifecycleStopping(this::stopApiServer);
+                } else if (side == Environment.Side.SERVER) {
+                    IServerEventService.getInstance().registerServerLifecycleStopping(this::stopApiServer);
+                }
+            } else {
+                apiLogger.info("API Server has been launched externally");
+            }
+        });
     }
 
     private void startEmbeddedApiServer() {
+        int maxTries = 5;
         if (triedCount >= maxTries) {
             apiLogger.error("Embedded API Server has been stopped due to maximum tries reached.");
             return;
@@ -158,5 +163,13 @@ public class ApiServerManager implements ServerRegister {
     private void setApiStatus(BinaryApiServerStatus status) {
         binaryApiServerStatus = status;
         apiStatusListeners.forEach(l -> l.accept(status));
+    }
+
+    public enum BinaryApiServerStatus {
+        STOPPED, LAUNCHING, RUNNING;
+
+        public String i18nKey() {
+            return MusicHud.MOD_ID + ".text.binaryApiServerStatus." + name();
+        }
     }
 }

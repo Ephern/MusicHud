@@ -4,6 +4,7 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.google.gson.annotations.SerializedName;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.Version;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.user.Profile;
@@ -11,7 +12,9 @@ import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.IntegerCodeEnum;
 import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage;
+import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectResponse;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeResponse;
+import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.http.ApiClient;
@@ -33,7 +36,7 @@ public class LoginApiService implements ILoginApiService {
     private static volatile LoginApiService loginApiService;
     Map<ServerPlayer, Runnable> pollingMap = new HashMap<>();
     @Getter
-    Map<ServerPlayer, PlayerLoginInfo> loginedPlayerInfoMap = new HashMap<>();
+    Map<ServerPlayer, PlayerLoginInfo> playerInfoMap = new HashMap<>();
     @Getter
     Set<Consumer<Map<ServerPlayer, PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
     volatile String anonymousCookie;
@@ -97,7 +100,7 @@ public class LoginApiService implements ILoginApiService {
     public String randomVipCookieOrElse(Supplier<String> defaultCookieSupplier) {
         //noinspection ComparatorMethodParameterNotUsed
         Comparator<String> randomComparator = (a, b) -> MusicHud.RANDOM.nextInt(-1, 1);
-        return loginedPlayerInfoMap.values().stream()
+        return playerInfoMap.values().stream()
                 .filter(info -> info.getVipType() != null && info.getVipType() == VipType.VIP)
                 .map(info -> info.getLoginCookieInfo().rawCookie())
                 .sorted(randomComparator)
@@ -107,16 +110,16 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public void joinUnlogged(ServerPlayer serverPlayer) {
-        loginedPlayerInfoMap.put(serverPlayer, PlayerLoginInfo.UNLOGGED);
-        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(loginedPlayerInfoMap));
+        playerInfoMap.put(serverPlayer, PlayerLoginInfo.UNLOGGED);
+        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap));
         MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(serverPlayer));
     }
 
     @Override
     public void logout(ServerPlayer player) {
         Runnable remove = pollingMap.remove(player);
-        loginedPlayerInfoMap.remove(player);
-        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(loginedPlayerInfoMap));
+        playerInfoMap.remove(player);
+        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap));
         if (remove != null) {
             logger.warn("Polling v-thread stopped as player {} quit", player.getName());
         }
@@ -261,8 +264,8 @@ public class LoginApiService implements ILoginApiService {
         profile.setVipType(account.vipType);
         PlayerLoginInfo playerLoginInfo = PlayerLoginInfo.of(loginCookieInfo);
         playerLoginInfo.appendProfile(profile);
-        loginedPlayerInfoMap.put(player, playerLoginInfo);
-        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(loginedPlayerInfoMap));
+        playerInfoMap.put(player, playerLoginInfo);
+        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap));
         return profile;
     }
 
@@ -276,14 +279,14 @@ public class LoginApiService implements ILoginApiService {
         if (player == null) {
             return null;
         }
-        return loginedPlayerInfoMap.get(player);
+        return playerInfoMap.get(player);
     }
 
     @Override
     public String getRawCookieOrElse(ServerPlayer serverPlayer, Supplier<String> supplier) {
         String rawCookie;
         if (serverPlayer != null) {
-            PlayerLoginInfo loginInfo = getLoginedPlayerInfoMap().get(serverPlayer);
+            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(serverPlayer);
             if (loginInfo != null) {
                 rawCookie = loginInfo.loginCookieInfo.rawCookie();
             } else {
@@ -352,6 +355,16 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public void loginWithEmailAndPassword(String email, String md5password, ServerPlayer serverPlayer) {
         throw new UnsupportedOperationException("Not supported yet due to api.");
+    }
+
+    @Override
+    public void disconnectToAll() {
+        serverNetworkService.sendToPlayers(playerInfoMap.keySet(), new ConnectResponse(false, Version.current, List.of(ApiProvider.NCM)));
+    }
+
+    @Override
+    public void reconnectAll() {
+        serverNetworkService.sendToPlayers(playerInfoMap.keySet(), new ConnectResponse(true, Version.current, List.of(ApiProvider.NCM)));
     }
 
     record ValidationCodeRequest(int ctcode, long phone) {

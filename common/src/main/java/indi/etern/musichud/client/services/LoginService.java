@@ -135,6 +135,7 @@ public class LoginService {
     public void setDisconnected() {
         if (clientConfig.getEnable()) {
             MusicHud.setStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
+            Profile.setCurrent(Profile.ANONYMOUS);
         }
     }
 

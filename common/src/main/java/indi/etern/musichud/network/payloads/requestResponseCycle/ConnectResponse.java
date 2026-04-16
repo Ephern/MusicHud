@@ -1,8 +1,13 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
+import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
+import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.LoginService;
+import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.Codecs;
@@ -19,7 +24,8 @@ import java.util.List;
 
 import static indi.etern.musichud.MusicHud.LOGGER;
 
-public record ConnectResponse(boolean accepted, Version serverVersion, List<ApiProvider> availableApis) implements S2CPayload {
+public record ConnectResponse(boolean accepted, Version serverVersion,
+                              List<ApiProvider> availableApis) implements S2CPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, ConnectResponse> CODEC =
             StreamCodec.composite(
                     ByteBufCodecs.BOOL,
@@ -37,18 +43,28 @@ public record ConnectResponse(boolean accepted, Version serverVersion, List<ApiP
             NetworkReceiver<ConnectResponse> receiver = NetworkReceiver.noop();
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
                 receiver = (payload, player) -> {
-                    LOGGER.info("Connecting {}", payload.accepted() ? "accepted" : "denied");
-                    if (payload.accepted()) {
-                        if (Version.capableWith(payload.serverVersion)) {
-                            MusicHud.setStatus(MusicHud.ConnectStatus.CONNECTED);
-                            LoginService.getInstance().loginToServer();
+                    if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
+                        LOGGER.info("Connecting {}", payload.accepted() ? "accepted" : "denied");
+                        if (payload.accepted()) {
+                            if (Version.capableWith(payload.serverVersion)) {
+                                MusicHud.setStatus(MusicHud.ConnectStatus.CONNECTED);
+                                LoginService.getInstance().loginToServer();
+                            } else {
+                                LoginService.getInstance().logout();
+                                MusicHud.setStatus(MusicHud.ConnectStatus.INCAPABLE);
+                            }
                         } else {
-                            LoginService.getInstance().logout();
                             MusicHud.setStatus(MusicHud.ConnectStatus.INCAPABLE);
                         }
-                    } else {
-                        MusicHud.setStatus(MusicHud.ConnectStatus.INCAPABLE);
+                    } else if (!payload.accepted()) {
+                        LOGGER.info("Disconnected");
+                        MusicHud.setStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
+                        MusicService.RegisterImpl.reset();
+                        NowPlayingInfo.getInstance().stop();
+                        StreamAudioPlayer.getInstance().stop();
+                        LoginService.getInstance().setDisconnected();
                     }
+                    MuiModApi.postToUiThread(MainFragment::refresh);
                 };
             }
             INetworkRegister.getInstance().autoRegisterPayload(

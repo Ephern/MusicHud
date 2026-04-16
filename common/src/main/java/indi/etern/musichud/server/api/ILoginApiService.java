@@ -39,7 +39,7 @@ public interface ILoginApiService {
 
     LoginApiService.PlayerLoginInfo getLoginInfoByServerPlayer(ServerPlayer player);
 
-    java.util.Map<ServerPlayer, LoginApiService.PlayerLoginInfo> getLoginedPlayerInfoMap();
+    java.util.Map<ServerPlayer, LoginApiService.PlayerLoginInfo> getPlayerInfoMap();
 
     java.util.Set<java.util.function.Consumer<java.util.Map<ServerPlayer, LoginApiService.PlayerLoginInfo>>> getLoginStateChangeListeners();
 
@@ -52,6 +52,10 @@ public interface ILoginApiService {
     void loginWithPhoneAndPassword(long phone, String md5password, ServerPlayer serverPlayer);
 
     void loginWithEmailAndPassword(String email, String md5password, ServerPlayer serverPlayer);
+
+    void disconnectToAll();
+
+    void reconnectAll();
 
     @RegisterMark
     class Register implements ServerRegister {

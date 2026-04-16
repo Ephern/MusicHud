@@ -2,7 +2,6 @@ package indi.etern.musichud.platform.mod.neoforge.network;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
-import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.IServerNetworkService;
@@ -20,7 +19,6 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -30,9 +28,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings("unused")
 public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkService, IClientNetworkService {
-
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
-    private static final Logger logger = MusicHud.getLogger(NeoForgeNetworkManager.class);
     private static volatile NeoForgeNetworkManager instance;
     private final Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
     private final Map<Class<? extends IPayload>, CustomPacketPayload.Type<?>> typeMap = new ConcurrentHashMap<>();
@@ -53,15 +48,10 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     @SuppressWarnings({"rawtypes", "unchecked"})
     private void registerPayloadInternal(RegistrationInfo<?> info) {
         if (C2SPayload.class.isAssignableFrom(info.clazz)) { // C2S
-            if (side == Environment.Side.CLIENT) {
-                registrar.playToServer(info.type(), (StreamCodec) info.codec(), (payload, context) -> {
-                });
-            } else {
-                registrar.playToServer(info.type(), (StreamCodec) info.codec(), (payload, context) -> {
-                    NetworkReceiver receiver = info.serverReceiver();
-                    receiver.receive(payload, context.player());
-                });
-            }
+            registrar.playToServer(info.type(), (StreamCodec) info.codec(), (payload, context) -> {
+                NetworkReceiver receiver = info.serverReceiver();
+                receiver.receive(payload, context.player());
+            });
         } else if (S2CPayload.class.isAssignableFrom(info.clazz)) { // S2C
             if (side == Environment.Side.CLIENT) {
                 registrar.playToClient(info.type(), (StreamCodec) info.codec(), (payload, context) -> {

@@ -45,7 +45,7 @@ public final class CommonInitializer extends JavaPlugin {
         if (eventService != null) {
             eventService.fireServerStopping();
         }
-        ApiServerManager.stopApiServer();
+        ApiServerManager.getInstance().stopApiServer();
         if (networkManager != null) {
             networkManager.close();
             networkManager = null;

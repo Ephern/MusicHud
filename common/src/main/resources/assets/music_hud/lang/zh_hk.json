@@ -4,7 +4,7 @@
   "music_hud.vote_skip": "投票切歌",
   "music_hud.toggle_hud": "切換 HUD 顯示",
   "music_hud.text.disabled": "已停用 Music Hud",
-  "music_hud.text.notConnected": "未連線",
+  "music_hud.text.notConnected": "未連線 或 伺服器端已停用",
   "music_hud.text.incapableWithServer": "與目前伺服器版本不相容",
   "music_hud.text.idle": "暫無音樂播放",
   "music_hud.text.pusherSource": "來自 ",
