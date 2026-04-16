@@ -52,21 +52,29 @@ public class HudRendererManager {
 
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
-            String text = lyricLine.getText();
-            String translatedText = lyricLine.getTranslatedText();
+            MusicHud.EXECUTOR.execute(() -> {
+                String text = lyricLine.getText();
+                String translatedText = lyricLine.getTranslatedText();
 
-            ScrollingLyricLineRenderer.TextStyle style1 = new ScrollingLyricLineRenderer.TextStyle(text, Theme.NORMAL_TEXT_COLOR);
-            ScrollingLyricLineRenderer.TextStyle style2 = new ScrollingLyricLineRenderer.TextStyle(translatedText, Theme.SECONDARY_TEXT_COLOR);
+                ScrollingLyricLineRenderer.TextStyle style1 = new ScrollingLyricLineRenderer.TextStyle(text, Theme.NORMAL_TEXT_COLOR);
+                ScrollingLyricLineRenderer.TextStyle style2 = new ScrollingLyricLineRenderer.TextStyle(translatedText, Theme.SECONDARY_TEXT_COLOR);
 
-            Duration duration = lyricLine.getDuration();
-            long scrollMillis;
-            if (duration != null) {
-                scrollMillis = duration.toMillis();
-            } else {
-                scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
-            }
-            scrollMillis = (long) (scrollMillis * 0.8);
-            LYRICS_LINE_RENDERER.setLines(style1, scrollMillis, style2, scrollMillis, 300);
+                Duration duration = lyricLine.getDuration();
+                long scrollMillis;
+                if (duration != null) {
+                    scrollMillis = duration.toMillis();
+                } else {
+                    scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
+                }
+                scrollMillis = (long) (scrollMillis * 0.8);
+
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                }
+
+                LYRICS_LINE_RENDERER.setLines(style1, scrollMillis, style2, scrollMillis, 300);
+            });
         });
     }
 

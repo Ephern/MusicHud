@@ -1,6 +1,5 @@
 package indi.etern.musichud.platform.mod.fabric.network;
 
-import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
@@ -15,8 +14,6 @@ import java.util.concurrent.ConcurrentHashMap;
 @SuppressWarnings("unused")
 public class FabricServerNetworkService implements IServerNetworkService {
     private static volatile FabricServerNetworkService instance;
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
-
     private final Map<Class<? extends IPayload>, CustomPacketPayload.Type<?>> typeMap = new ConcurrentHashMap<>();
 
     public static FabricServerNetworkService getInstance() {
