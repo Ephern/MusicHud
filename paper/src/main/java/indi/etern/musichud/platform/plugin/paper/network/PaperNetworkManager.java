@@ -216,7 +216,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
             T payload,
             ServerPlayer player
     ) {
-        return ArchitecturyPayloadCodec.encode(
+        return PayloadCodec.encode(
                 (StreamCodec<? super RegistryFriendlyByteBuf, T>) codec,
                 payload,
                 player
@@ -228,7 +228,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
             NetworkReceiver<T> receiver
     ) {
         private void receive(byte[] bytes, ServerPlayer player) {
-            T payload = ArchitecturyPayloadCodec.decode(codec, bytes, player);
+            T payload = PayloadCodec.decode(codec, bytes, player);
             receiver.receive(payload, player);
         }
     }
