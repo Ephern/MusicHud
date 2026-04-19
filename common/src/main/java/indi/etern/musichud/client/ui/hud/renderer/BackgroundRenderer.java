@@ -4,15 +4,13 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
-import icyllis.modernui.mc.GradientRectangleRenderState;
-import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.piplines.HudRenderPipelines;
+import indi.etern.musichud.client.ui.hud.piplines.HudRenderState;
 import indi.etern.musichud.client.ui.utils.ColorExtractor;
 import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -25,7 +23,7 @@ import java.time.temporal.ChronoUnit;
 
 public class BackgroundRenderer {
     private static volatile BackgroundRenderer instance;
-    private final HudUniformWriter uniformWriter = new HudUniformWriter();
+    private final HudUniformWriter uniformWriter = HudUniformWriter.getInstance();
     // 颜色缓存，避免每帧重复提取
     private final Cache<DynamicTexture, int[]> colorCache = CacheBuilder.newBuilder()
             .expireAfterAccess(Duration.of(3, ChronoUnit.MINUTES))
@@ -107,21 +105,13 @@ public class BackgroundRenderer {
         currentData.setBackgroundColor(interpolatedColor);
         gpuBufferSlice = uniformWriter.write(currentData, gr);
 
-        // 提交渲染（纯色背景，不需要纹理）
-        float halfWidth = layout.width / 2f;
-        float halfHeight = layout.height / 2f;
-
-        ScreenRectangle scissor = MuiModApi.get().peekScissorStack(gr);
-        MuiModApi.get().submitGuiElementRenderState(gr,
-                new GradientRectangleRenderState(
-                        HudRenderPipelines.BACKGROUND,
-                        TextureSetup.noTexture(),
-                        new Matrix3x2f(gr.pose()),
-                        -halfWidth, -halfHeight, halfWidth, halfHeight,
-                        0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF, 0xFFFFFFFF,
-                        scissor
-                ));
-//        drawColorDebug(gr, currentColors);
+        HudRenderState hudRenderState = new HudRenderState(
+                HudRenderPipelines.BACKGROUND,
+                TextureSetup.noTexture(),
+                new Matrix3x2f(gr.pose()),
+                layout.width, layout.height
+        );
+        uniformWriter.submitGuiElementRenderState(gr, hudRenderState);
     }
 
     /**

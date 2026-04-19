@@ -3,17 +3,61 @@ package indi.etern.musichud.client.ui.hud.metadata;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.render.state.GuiElementRenderState;
+import net.minecraft.client.gui.render.state.GuiRenderState;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 import org.joml.Vector4f;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
+
 import static indi.etern.musichud.client.ui.utils.UniformDataUtils.colorToVector;
 
 public class HudUniformWriter {
+    private static volatile HudUniformWriter instance;
     long initTimestamp;
+    VarHandle guiRenderStateHandle;
 
-    public HudUniformWriter() {
+    private HudUniformWriter() {
         initTimestamp = System.currentTimeMillis();
+        try {
+            // 假设目标类是 Person（混淆后类名可能也变了，但可通过 Class.forName 动态加载）
+            Class<?> clazz = GuiGraphics.class;
+            Field found = null;
+            for (Field f : clazz.getDeclaredFields()) {
+                // 按类型筛选：例如只关心 String 类型
+                if (f.getType() == GuiRenderState.class) {
+                    if (found != null) {
+                        throw new IllegalStateException("Multiple GuiRenderState fields in GuiGraphics");
+                    }
+                    found = f;
+                }
+            }
+            if (found == null) {
+                throw new IllegalStateException("No GuiRenderState field found in GuiGraphics");
+            }
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(clazz, MethodHandles.lookup());
+            guiRenderStateHandle = lookup.unreflectVarHandle(found);
+        } catch (Throwable t) {
+            throw new ExceptionInInitializerError(t);
+        }
+    }
+
+    public static HudUniformWriter getInstance() {
+        if (instance == null) {
+            synchronized (HudUniformWriter.class) {
+                if (instance == null) {
+                    instance = new HudUniformWriter();
+                }
+            }
+        }
+        return instance;
+    }
+
+    private GuiRenderState getGuiRenderState(GuiGraphics graphics) {
+        return (GuiRenderState) guiRenderStateHandle.get(graphics);
     }
 
     /**
@@ -75,5 +119,12 @@ public class HudUniformWriter {
         emptyColorMatrix.setColumn(1, colorToVector(0));
         emptyColorMatrix.setColumn(2, colorToVector(0));
         emptyColorMatrix.setColumn(3, colorToVector(0));
+    }
+
+    public void submitGuiElementRenderState(
+            GuiGraphics gr,
+            GuiElementRenderState renderState
+    ) {
+        getGuiRenderState(gr).submitGuiElement(renderState);
     }
 }

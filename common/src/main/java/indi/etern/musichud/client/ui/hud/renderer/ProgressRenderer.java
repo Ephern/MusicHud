@@ -3,15 +3,14 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import icyllis.modernui.mc.GradientRectangleRenderState;
-import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
+import indi.etern.musichud.client.ui.hud.metadata.HudUniformWriter;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.hud.metadata.ProgressBar;
 import indi.etern.musichud.client.ui.hud.piplines.HudRenderPipelines;
+import indi.etern.musichud.client.ui.hud.piplines.ProgressBarRenderState;
 import lombok.Getter;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
@@ -25,6 +24,7 @@ public class ProgressRenderer {
     private GpuBufferSlice gpuBufferSlice;
     @Getter
     private HudRenderData currentData;
+    private HudUniformWriter uniformWriter = HudUniformWriter.getInstance();
 
     public static ProgressRenderer getInstance() {
         if (instance == null) {
@@ -48,23 +48,17 @@ public class ProgressRenderer {
         gpuBufferSlice = write(currentData, gr);
 
         Layout layout = currentData.getLayout();
-        float halfWidth = layout.width / 2f;
-        float halfHeight = layout.height / 2f;
-
-        ScreenRectangle scissor = MuiModApi.get().peekScissorStack(gr);
 
         // 获取进度条颜色
         ProgressBar progressBar = currentData.getProgressBar();
 
-        MuiModApi.get().submitGuiElementRenderState(gr,
-                new GradientRectangleRenderState(
-                        HudRenderPipelines.PROGRESS_BAR,
-                        TextureSetup.noTexture(),
-                        new Matrix3x2f(gr.pose()),
-                        -halfWidth, -halfHeight, halfWidth, halfHeight,
-                        progressBar.fillColorLeft, progressBar.fillColorRight, progressBar.backgroundColor, 0,
-                        scissor
-                ));
+        uniformWriter.submitGuiElementRenderState(gr, new ProgressBarRenderState(
+                HudRenderPipelines.PROGRESS_BAR,
+                TextureSetup.noTexture(),
+                new Matrix3x2f(gr.pose()),
+                layout.width, layout.height,
+                progressBar.fillColorLeft, progressBar.fillColorRight, progressBar.backgroundColor
+        ));
     }
 
     public void updateRenderPass(RenderPass renderPass) {
