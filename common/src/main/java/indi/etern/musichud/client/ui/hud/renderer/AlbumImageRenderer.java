@@ -1,29 +1,23 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.systems.RenderPass;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundImage;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
-import indi.etern.musichud.client.ui.hud.metadata.HudUniformWriter;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.hud.piplines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.piplines.HudRenderState;
 import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
-import org.joml.Matrix3x2f;
+import org.jetbrains.annotations.NotNull;
 
-public class AlbumImageRenderer {
+public class AlbumImageRenderer implements HudRenderer{
     private static volatile AlbumImageRenderer instance;
     private ResourceLocation defaultImageLocation;
-    private GpuBufferSlice gpuBufferSlice;
-    private final HudUniformWriter uniformWriter = HudUniformWriter.getInstance();
     private HudRenderData currentData;
 
     public static AlbumImageRenderer getInstance() {
@@ -40,22 +34,35 @@ public class AlbumImageRenderer {
         this.currentData = data;
     }
 
-    public void render(GuiGraphics gr) {
+    @Override
+    public void render(HudRenderContext context) {
         if (currentData == null) {
             return;
         }
 
-        gpuBufferSlice = uniformWriter.write(currentData, gr);
+        context.writeUniformData("HudAlbumParams", currentData);
+
+        TextureSetup textureSetup = getMixedTextureSetup();
 
         Layout layout = currentData.getLayout();
-        BackgroundImage bgImage = currentData.getBackgroundImage();
+        HudRenderState hudRenderState = new HudRenderState(
+                HudRenderPipelines.ROUNDED_ALBUM,
+                textureSetup,
+                context.currentPose(),
+                layout.width, layout.height
+        );
+        context.submitGuiElementRenderState(hudRenderState);
+    }
 
-        var transitionStatus = HudRenderData.getTransitionStatus();
-        var nextData = transitionStatus.getNextData();
-        ResourceLocation nextUnblurredLocation = nextData == null ? null : nextData.nextUnblurred();
-        DynamicTexture currentTexture = getDynamicTexture(bgImage.currentUnblurredLocation);
+    private @NotNull TextureSetup getMixedTextureSetup() {
+        var background = currentData.getTransitionableBackground();
+        BackgroundData next = background.getNext();
+        BackgroundData current = background.getCurrent();
+        ResourceLocation nextUnblurredLocation = next == null || next.image() == null ? null : next.image().unblurredLocation;
+        ResourceLocation currentUnblurredLocation = current.image() != null ? current.image().unblurredLocation : null;
+        DynamicTexture currentTexture = getDynamicTexture(currentUnblurredLocation);
         DynamicTexture nextTexture = getDynamicTexture(nextUnblurredLocation);
-        DynamicTexture transitionTexture = transitionStatus.isTransitioning() ?
+        DynamicTexture transitionTexture = background.isTransitioning() ?
                 nextTexture : currentTexture;
 
         TextureSetup textureSetup;
@@ -68,14 +75,7 @@ public class AlbumImageRenderer {
         } else {
             textureSetup = TextureSetup.noTexture();
         }
-
-        HudRenderState hudRenderState = new HudRenderState(
-                HudRenderPipelines.ROUNDED_ALBUM,
-                textureSetup,
-                new Matrix3x2f(gr.pose()),
-                layout.width, layout.height
-        );
-        uniformWriter.submitGuiElementRenderState(gr, hudRenderState);
+        return textureSetup;
     }
 
     private DynamicTexture getDynamicTexture(ResourceLocation imageLocation) {
@@ -96,11 +96,5 @@ public class AlbumImageRenderer {
             return dynamicTexture;
         }
         return null;
-    }
-
-    public void updateRenderPass(RenderPass renderPass) {
-        if (gpuBufferSlice != null) {
-            renderPass.setUniform("HudAlbumParams", gpuBufferSlice);
-        }
     }
 }

@@ -7,12 +7,11 @@ import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Style;
 
 @Getter
 @Setter
-public class TextRenderer {
+public class TextRenderer implements HudRenderer{
     private ModernStringSplitter modernStringSplitter = null;
     private TextStyle currentTextData;
     private Layout layout;
@@ -106,7 +105,7 @@ public class TextRenderer {
         }
     }
 
-    public void render(GuiGraphics gr) {
+    public void render(HudRenderContext context) {
         // 更新过渡进度
         updateTransition();
 
@@ -117,27 +116,27 @@ public class TextRenderer {
         float scale = layout.height / 9;
 
         // 应用位置和缩放
-        Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(gr);
+        Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
 
         // 如果没有在过渡，只渲染当前文本
         if (!isTransitioning || nextTextData == null) {
-            renderText(gr, currentTextData, absolutePosition, scale, 1.0f);
+            renderText(context, currentTextData, absolutePosition, scale, 1.0f);
         } else {
             // 渲染淡出的旧文本
             float oldAlpha = 1.0f - transitionProgress;
             if (oldAlpha > 0) {
-                renderText(gr, currentTextData, absolutePosition, scale, oldAlpha);
+                renderText(context, currentTextData, absolutePosition, scale, oldAlpha);
             }
 
             // 渲染淡入的新文本
             float newAlpha = transitionProgress;
             if (newAlpha > 0) {
-                renderText(gr, nextTextData, absolutePosition, scale, newAlpha);
+                renderText(context, nextTextData, absolutePosition, scale, newAlpha);
             }
         }
     }
 
-    private void renderText(GuiGraphics gr, TextStyle textData, Layout.AbsolutePosition absolutePosition,
+    private void renderText(HudRenderContext context, TextStyle textData, Layout.AbsolutePosition absolutePosition,
                             float scale, float alpha) {
         String text = textData.text;
         if (text == null || text.isEmpty()) return;
@@ -150,18 +149,19 @@ public class TextRenderer {
 
         // 计算位置
         float x = position.computeX(absolutePosition.x(), scale, trimmedText, this::measureWidth);
-        gr.pose().pushMatrix();
-        gr.pose().translate(x, absolutePosition.y());
-        gr.pose().scale(scale, scale);
-        gr.drawString(Minecraft.getInstance().font, trimmedText, 0, 0, color);
-        gr.pose().popMatrix();
+        context.transform()
+                .translate(x, absolutePosition.y())
+                .scale(scale)
+                .then(transforming -> {
+                    context.drawString(Minecraft.getInstance().font, trimmedText, 0, 0, color);
+                });
     }
 
     private int getColorWithAlpha(int baseColor, float alpha) {
         // baseColor 是 RGB 格式，我们需要添加 Alpha 通道
         int alphaValue = (int) (alpha * 255);
         // 确保 alpha 值在 0-255 范围内
-        alphaValue = Math.max(0, Math.min(255, alphaValue));
+        alphaValue = Math.clamp(alphaValue, 0, 255);
         // 将 Alpha 通道合并到颜色中 (ARGB 格式)
         return (alphaValue << 24) | (baseColor & 0x00FFFFFF);
     }

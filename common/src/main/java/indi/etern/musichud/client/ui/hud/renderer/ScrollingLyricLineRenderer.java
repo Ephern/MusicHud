@@ -8,10 +8,9 @@ import indi.etern.musichud.client.ui.utils.Easings;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
 import org.jetbrains.annotations.Nullable;
 
-public class ScrollingLyricLineRenderer {
+public class ScrollingLyricLineRenderer implements HudRenderer {
     private final LineState currentLine1;
     private final LineState currentLine2;
     private final LineState nextLine1;
@@ -30,7 +29,6 @@ public class ScrollingLyricLineRenderer {
     private int cachedContainerWidth;
     @Setter
     private int lineSpacing = 0;
-
     public ScrollingLyricLineRenderer() {
         try {
             modernStringSplitter = TextLayoutEngine.getInstance().getStringSplitter();
@@ -55,10 +53,10 @@ public class ScrollingLyricLineRenderer {
     /**
      * 设置双行文本及其样式
      *
-     * @param style1       第一行的文本和颜色
-     * @param scrollMs1    第一行滚动时长（毫秒），若文本不超宽则不滚动
-     * @param style2       第二行的文本和颜色
-     * @param scrollMs2    第二行滚动时长
+     * @param style1             第一行的文本和颜色
+     * @param scrollMs1          第一行滚动时长（毫秒），若文本不超宽则不滚动
+     * @param style2             第二行的文本和颜色
+     * @param scrollMs2          第二行滚动时长
      * @param transitionDuration 切换动画时长（毫秒）
      */
     public void setLines(TextStyle style1, long scrollMs1,
@@ -157,7 +155,7 @@ public class ScrollingLyricLineRenderer {
         return rawWidth * scale;
     }
 
-    private void renderLine(GuiGraphics gr, LineState line, int baseX, int baseY, float lineHeight, float yOffset) {
+    private void renderLine(HudRenderContext context, LineState line, int baseX, int baseY, float lineHeight, float yOffset) {
         if (line.config == null) return;
         String text = line.config.text;
         if (text.isEmpty()) return;
@@ -171,11 +169,12 @@ public class ScrollingLyricLineRenderer {
         float drawX = baseX + scrollOffset;
         float drawY = baseY + yOffset;
 
-        gr.pose().pushMatrix();
-        gr.pose().translate(drawX, drawY);
-        gr.pose().scale(scale, scale);
-        gr.drawString(Minecraft.getInstance().font, text, 0, 0, line.config.color);
-        gr.pose().popMatrix();
+        context.transform()
+                .translate(drawX, drawY)
+                .scale(scale)
+                .then(transforming -> {
+                    context.drawString(Minecraft.getInstance().font, text, 0, 0, line.config.color);
+                });
     }
 
     private void updateAnimations() {
@@ -208,18 +207,13 @@ public class ScrollingLyricLineRenderer {
         }
     }
 
-    /**
-     * 主渲染入口，应在每一帧调用
-     *
-     * @param gr GuiGraphics
-     */
-    public void render(GuiGraphics gr) {
+    public void render(HudRenderContext context) {
         if (layout == null) {
             return;
         }
 
         // 计算实际布局绝对坐标和尺寸
-        Layout.AbsolutePosition absPos = layout.calcAbsolutePosition(gr);
+        Layout.AbsolutePosition absPos = layout.calcAbsolutePosition(context);
         // 布局缓存（每次渲染时更新）
         int cachedContainerX = (int) absPos.x();
         int cachedContainerY = (int) absPos.y();
@@ -233,28 +227,28 @@ public class ScrollingLyricLineRenderer {
         int totalHeight = (int) (line1Height + line2Height);
         int previousStartY = cachedContainerY + (cachedContainerHeight - totalHeight) / 2; // 垂直居中
         int nextStartY = cachedContainerY + (cachedContainerHeight - totalHeight) / 2; // 垂直居中
-        Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(gr);
+        Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
 
         float x = absolutePosition.x();
         float y = absolutePosition.y();
-        gr.enableScissor((int) x, (int) y, (int) (x + layout.width), (int) (y + layout.height));
+        context.enableScissor((int) x, (int) y, (int) (x + layout.width), (int) (y + layout.height));
         if (isTransitioning && nextLine1.config != null && nextLine2.config != null) {
             // 旧文本向上移出
             float easedProgress = Easings.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
             float oldYOffset = -easedProgress * layout.height;
-            renderLine(gr, currentLine1, cachedContainerX, previousStartY, line1Height, oldYOffset);
-            renderLine(gr, currentLine2, cachedContainerX, (int) (previousStartY + lineSpacing + line1Height), line2Height, oldYOffset);
+            renderLine(context, currentLine1, cachedContainerX, previousStartY, line1Height, oldYOffset);
+            renderLine(context, currentLine2, cachedContainerX, (int) (previousStartY + lineSpacing + line1Height), line2Height, oldYOffset);
 
             // 新文本从下方向上移入
             float newYOffset = (1 - easedProgress) * layout.height;
-            renderLine(gr, nextLine1, cachedContainerX, nextStartY, line1Height, newYOffset);
-            renderLine(gr, nextLine2, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, newYOffset);
+            renderLine(context, nextLine1, cachedContainerX, nextStartY, line1Height, newYOffset);
+            renderLine(context, nextLine2, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, newYOffset);
         } else {
             // 正常显示
-            renderLine(gr, currentLine1, cachedContainerX, nextStartY, line1Height, 0);
-            renderLine(gr, currentLine2, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, 0);
+            renderLine(context, currentLine1, cachedContainerX, nextStartY, line1Height, 0);
+            renderLine(context, currentLine2, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, 0);
         }
-        gr.disableScissor();
+        context.disableScissor();
     }
 
     private static class LineConfig {
