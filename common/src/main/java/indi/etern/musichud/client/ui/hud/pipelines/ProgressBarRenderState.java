@@ -36,16 +36,16 @@ public record ProgressBarRenderState(
     }
 
     @Override
-    public void buildVertices(@NonNull VertexConsumer consumer, float z) {
+    public void buildVertices(@NonNull VertexConsumer consumer) {
         float left = -width / 2f;
         float right = width / 2f;
         float top = -height / 2f;
         float bottom = height / 2f;
 
-        consumer.addVertexWith2DPose(pose, right, bottom, z).setColor(leftFillColor);
-        consumer.addVertexWith2DPose(pose, right, top, z).setColor(rightFillColor);
-        consumer.addVertexWith2DPose(pose, left, top, z).setColor(backgroundColor);
-        consumer.addVertexWith2DPose(pose, left, bottom, z).setColor(0xFFFFFFFF);
+        consumer.addVertexWith2DPose(pose, right, bottom).setColor(leftFillColor);
+        consumer.addVertexWith2DPose(pose, right, top).setColor(rightFillColor);
+        consumer.addVertexWith2DPose(pose, left, top).setColor(backgroundColor);
+        consumer.addVertexWith2DPose(pose, left, bottom).setColor(0xFFFFFFFF);
     }
 
     @Nullable

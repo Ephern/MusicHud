@@ -28,16 +28,16 @@ public record HudRenderState(
     }
 
     @Override
-    public void buildVertices(@NonNull VertexConsumer consumer, float z) {
+    public void buildVertices(@NonNull VertexConsumer consumer) {
         float left = -width / 2f;
         float right = width / 2f;
         float top = -height / 2f;
         float bottom = height / 2f;
 
-        consumer.addVertexWith2DPose(pose, right, bottom, z);
-        consumer.addVertexWith2DPose(pose, right, top, z);
-        consumer.addVertexWith2DPose(pose, left, top, z);
-        consumer.addVertexWith2DPose(pose, left, bottom, z);
+        consumer.addVertexWith2DPose(pose, right, bottom);
+        consumer.addVertexWith2DPose(pose, right, top);
+        consumer.addVertexWith2DPose(pose, left, top);
+        consumer.addVertexWith2DPose(pose, left, bottom);
     }
 
     @Nullable
