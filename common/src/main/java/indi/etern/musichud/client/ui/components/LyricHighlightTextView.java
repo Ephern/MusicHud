@@ -124,11 +124,13 @@ public class LyricHighlightTextView extends TextView {
             if (statusUpdateProcessing) {
                 getPaint().setShader(null);
                 float fraction = (float) getMillisBetween(playedDuration, statusUpdateTime) / animationDurationMillis;
-                if (0 <= fraction && fraction < 1) {
+                if (0 < fraction && fraction < 1) {
                     super.setTextColor(ColorEvaluator.evaluate(fraction, Theme.EMPHASIZE_LYRIC_COLOR, Theme.FADE_LYRIC_COLOR));
                 } else if (fraction >= 1) {
                     super.setTextColor(Theme.FADE_LYRIC_COLOR);
                     statusUpdateProcessing = false;
+                } else {
+                    super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
                 }
             }
             super.onDraw(canvas);
@@ -167,11 +169,6 @@ public class LyricHighlightTextView extends TextView {
 
         // 非 fullLineMode，处理渐变高亮
         if (statusUpdateProcessing) {
-            if (status == HighlightStatus.PERFORMING || status == HighlightStatus.DONE) {
-                super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
-            } else if (status == HighlightStatus.WAITING) {
-                super.setTextColor(Theme.FADE_LYRIC_COLOR);
-            }
             statusUpdateProcessing = false;
         }
 
@@ -190,6 +187,7 @@ public class LyricHighlightTextView extends TextView {
             paint.setShader(null);
             super.onDraw(canvas);
             phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));//TODO Animation
+            super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
             setStatus(HighlightStatus.DONE);
             if (onFade != null) {
                 onFade.run();
