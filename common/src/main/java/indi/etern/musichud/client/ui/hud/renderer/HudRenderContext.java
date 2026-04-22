@@ -10,7 +10,7 @@ import lombok.Setter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.render.state.GuiElementRenderState;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix3x2fStack;
 
@@ -59,24 +59,24 @@ public class HudRenderContext {
         return new Transforming(graphics);
     }
 
-    public void blit(RenderPipeline renderPipeline, ResourceLocation resourceLocation,
+    public void blit(RenderPipeline renderPipeline, Identifier identifier,
                      int targetX, int targetY, int sourceX, int sourceY,
                      int targetWidth, int targetHeight, int sourceWidth, int sourceHeight,
                      int textureWidth, int textureHeight) {
         graphics.blit(
                 renderPipeline,
-                resourceLocation,
+                identifier,
                 targetX, targetY, sourceX, sourceY,
                 targetWidth, targetHeight, sourceWidth, sourceHeight,
                 textureWidth, textureHeight);
     }
 
-    public void blit(RenderPipeline renderPipeline, ResourceLocation resourceLocation,
+    public void blit(RenderPipeline renderPipeline, Identifier identifier,
                      int targetX, int targetY, int sourceX, int sourceY,
                      int targetWidth, int targetHeight, int sourceWidth, int sourceHeight) {
         graphics.blit(
                 renderPipeline,
-                resourceLocation,
+                identifier,
                 targetX, targetY, sourceX, sourceY,
                 targetWidth, targetHeight, sourceWidth, sourceHeight);
     }

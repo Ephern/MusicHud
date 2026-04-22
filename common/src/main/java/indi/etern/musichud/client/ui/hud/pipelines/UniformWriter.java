@@ -57,8 +57,7 @@ public class UniformWriter {
                 new Matrix4f().mul(localMatrix),
                 data.vector4f(),
                 data.vector3f(),
-                data.matrix4f(),
-                0
+                data.matrix4f()
         );
     }
 

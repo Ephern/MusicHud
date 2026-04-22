@@ -13,11 +13,11 @@ import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.Identifier;
-import org.joml.Matrix3x2f;
+import org.jetbrains.annotations.NotNull;
 
 public class AlbumImageRenderer implements HudRenderer{
     private static volatile AlbumImageRenderer instance;
-    private ResourceLocation defaultImageLocation;
+    private Identifier defaultImageLocation;
     private HudRenderData currentData;
 
     public static AlbumImageRenderer getInstance() {
@@ -58,10 +58,10 @@ public class AlbumImageRenderer implements HudRenderer{
         var background = currentData.getTransitionableBackground();
         BackgroundData next = background.getNext();
         BackgroundData current = background.getCurrent();
-        ResourceLocation nextUnblurredLocation = next == null || next.image() == null ? null : next.image().unblurredLocation;
-        ResourceLocation currentUnblurredLocation = current.image() != null ? current.image().unblurredLocation : null;
-        DynamicTexture currentTexture = getDynamicTexture(currentUnblurredLocation);
-        DynamicTexture nextTexture = getDynamicTexture(nextUnblurredLocation);
+        Identifier nextUnblurred = next == null || next.image() == null ? null : next.image().unblurredLocation;
+        Identifier currentUnblurred = current.image() != null ? current.image().unblurredLocation : null;
+        DynamicTexture currentTexture = getDynamicTexture(currentUnblurred);
+        DynamicTexture nextTexture = getDynamicTexture(nextUnblurred);
         DynamicTexture transitionTexture = background.isTransitioning() ?
                 nextTexture : currentTexture;
 

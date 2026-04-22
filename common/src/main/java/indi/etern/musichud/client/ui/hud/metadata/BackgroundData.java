@@ -5,7 +5,7 @@ import indi.etern.musichud.client.ui.utils.Mixable;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.Objects;
 
@@ -26,7 +26,7 @@ public final class BackgroundData implements Mixable<BackgroundData> {
         this.colors = colors;
     }
 
-    private DynamicTexture getDynamicTexture(ResourceLocation imageLocation) {
+    private DynamicTexture getDynamicTexture(Identifier imageLocation) {
         if (imageLocation == null) return null;
         AbstractTexture texture = Minecraft.getInstance()
                 .getTextureManager()

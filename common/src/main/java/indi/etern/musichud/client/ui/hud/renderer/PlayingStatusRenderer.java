@@ -8,7 +8,7 @@ import lombok.Setter;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
-public class PlayingStatusRenderer {
+public class PlayingStatusRenderer implements HudRenderer{
     public static final Identifier LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
     public static final Identifier RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
     public static final Identifier ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
@@ -18,7 +18,7 @@ public class PlayingStatusRenderer {
     private Layout layout;
     @Setter
     private boolean visibility = true;
-    private Identifier currentIdentifier;
+    private Identifier currentLocation;
 
     public static PlayingStatusRenderer getInstance() {
         if (instance == null) {
@@ -36,7 +36,7 @@ public class PlayingStatusRenderer {
 
     public void setStatus(StreamAudioPlayer.Status status) {
         this.status = status;
-        currentIdentifier = switch (status) {
+        currentLocation = switch (status) {
             case BUFFERING -> LOADING_ICON_LOCATION;
             case RETRYING -> RETRYING_ICON_LOCATION;
             case ERROR -> ERROR_ICON_LOCATION;
@@ -46,9 +46,9 @@ public class PlayingStatusRenderer {
 
     @Override
     public void render(HudRenderContext hudRenderContext) {
-        if (currentIdentifier != null && visibility) {
+        if (currentLocation != null && visibility) {
             float rotationRadians;
-            if (currentIdentifier == ERROR_ICON_LOCATION) {
+            if (currentLocation == ERROR_ICON_LOCATION) {
                 rotationRadians = 0;
             } else {
                 rotationRadians = (float) ((Math.PI * 2) * ((float) (System.currentTimeMillis() % 1000) / 1000));
@@ -68,12 +68,12 @@ public class PlayingStatusRenderer {
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
                     .then(transforming -> {
-                        hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentIdentifier, screenX, screenY, 0, 0, width, height, width, height);
+                        hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentLocation, screenX, screenY, 0, 0, width, height, width, height);
                     });
         }
     }
 
     public boolean isVisible() {
-        return visibility && currentIdentifier != null;
+        return visibility && currentLocation != null;
     }
 }
