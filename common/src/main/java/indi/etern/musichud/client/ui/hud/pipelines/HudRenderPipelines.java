@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.hud.piplines;
+package indi.etern.musichud.client.ui.hud.pipelines;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
@@ -20,7 +20,7 @@ public class HudRenderPipelines {
             .withFragmentShader(MusicHud.location("core/background"))
             .withUniform("HudBackgroundParams", UniformType.UNIFORM_BUFFER)
             .withBlend(BlendFunction.TRANSLUCENT)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+            .withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.QUADS)
             .build();
 
     public static final RenderPipeline ROUNDED_ALBUM = RenderPipeline.builder()
@@ -33,7 +33,7 @@ public class HudRenderPipelines {
             .withSampler("Sampler0")
             .withSampler("Sampler1")
             .withBlend(BlendFunction.TRANSLUCENT)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
+            .withVertexFormat(DefaultVertexFormat.POSITION, VertexFormat.Mode.QUADS)
             .build();
 
     public static final RenderPipeline PROGRESS_BAR = RenderPipeline.builder()

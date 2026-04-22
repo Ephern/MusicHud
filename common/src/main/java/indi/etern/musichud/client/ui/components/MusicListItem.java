@@ -29,7 +29,7 @@ public class MusicListItem extends LinearLayout {
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("mm:ss");
     private UrlImageView albumImage;
     private TextView musicName;
-    private LinearLayout musicArtistAndAlbum;
+    private FlexWrapLayout musicArtistAndAlbum;
     private TextView durationText;
     private TextView pusherText;
     @Setter
@@ -67,8 +67,7 @@ public class MusicListItem extends LinearLayout {
         musicName.setTextColor(Theme.NORMAL_TEXT_COLOR);
         musicTexts.addView(musicName);
 
-        musicArtistAndAlbum = new LinearLayout(context);
-        musicArtistAndAlbum.setOrientation(HORIZONTAL);
+        musicArtistAndAlbum = new FlexWrapLayout(context);
         musicTexts.addView(musicArtistAndAlbum);
 
         LinearLayout linearLayout = new LinearLayout(context);

@@ -4,6 +4,8 @@ import lombok.*;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Objects;
 
 @Getter
@@ -21,13 +23,10 @@ public class LyricLine implements Comparable<LyricLine>{
         return compareTo(o) > 0;
     }
 
-    public boolean isBefore(@NotNull LyricLine o) {
-        return compareTo(o) < 0;
-    }
-
     public enum Type {
         NORMAL, META_DATA, RHYTHM
     }
+
     @Setter
     Type type;
     Duration startTime;
@@ -42,6 +41,7 @@ public class LyricLine implements Comparable<LyricLine>{
     @EqualsAndHashCode.Exclude
     @ToString.Exclude
     LyricLine next;
+    Map<Duration, Integer> phraseEndingMap = new LinkedHashMap<>(0);
 
     public String getTranslatedText() {
         return Objects.requireNonNullElse(translatedText, "");

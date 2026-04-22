@@ -66,6 +66,9 @@ public class Theme {
     public static final int SUB_LYRIC_SIZE = 15;
     public static final float EMPHASIZE_LYRIC_ALPHA = 0.9f;
     public static final float FADE_LYRIC_ALPHA = 0.3f;
+    public static final int EMPHASIZE_LYRIC_COLOR = 0xD6FFFFFF;
+    public static final int GLOW_LYRIC_COLOR = 0xFFFFFFFF;
+    public static final int FADE_LYRIC_COLOR = 0x4BFFFFFF;
 
     public static TextView getNotificationTextView(Context context, boolean enabled) {
         TextView textView = new TextView(context);

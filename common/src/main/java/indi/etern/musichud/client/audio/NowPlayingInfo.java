@@ -8,7 +8,8 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
-import indi.etern.musichud.client.ui.utils.lyrics.LyricParser;
+import indi.etern.musichud.client.ui.utils.lyrics.FullLineLyricParser;
+import indi.etern.musichud.client.ui.utils.lyrics.WordByWordLyricParser;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -122,7 +123,11 @@ public class NowPlayingInfo {
         ArrayDeque<LyricLine> lyricLines;
         if (!lyricInfo.equals(LyricInfo.NONE)) {
             try {
-                lyricLines = LyricParser.parse(lyricInfo);
+                if (lyricInfo.withWordByWordLyric()) {
+                    lyricLines = WordByWordLyricParser.parse(lyricInfo);
+                } else {
+                    lyricLines = FullLineLyricParser.parse(lyricInfo);
+                }
                 this.lyricLines = lyricLines;
                 this.atomicLyricLines.set(new ArrayDeque<>(lyricLines));
             } catch (Exception e) {
