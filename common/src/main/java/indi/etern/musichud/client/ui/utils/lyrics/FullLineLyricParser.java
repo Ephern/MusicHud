@@ -5,7 +5,6 @@ import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.ui.utils.lyrics.beans.MetaInfoLine;
 import indi.etern.musichud.interfaces.ClientConfig;
-import org.apache.commons.lang3.function.TriConsumer;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
@@ -13,34 +12,37 @@ import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
+import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class LyricParser {
+public class FullLineLyricParser {
     private static final Pattern mainPattern = Pattern.compile("\\[[0-9:.]+].*");
     private static final DateTimeFormatter TIME_FORMATTER = new DateTimeFormatterBuilder()
             .appendPattern("HH:mm:ss")
             .appendFraction(java.time.temporal.ChronoField.MILLI_OF_SECOND, 1, 3, true)
             .toFormatter();
     private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(5);
-    private static final Logger logger = MusicHud.getLogger(LyricParser.class);
+    private static final Logger logger = MusicHud.getLogger(FullLineLyricParser.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    record LyricLineMetaData(Duration startTime, String lyric, LyricLine.Type type) {}
 
     public static ArrayDeque<LyricLine> parse(LyricInfo lyricInfo) {
         String lyric = lyricInfo.getLyric().getLyric();
         String translatedLyric = lyricInfo.getTranslatedLyric().getLyric();
         LinkedHashMap<Duration, LyricLine> map = new LinkedHashMap<>();
         List<LyricLine> lyricLinesWithoutValidTimestamp = new ArrayList<>(0);
-        matchLine(lyric, (duration, s, type) -> {
-            LyricLine lyricLine = map.get(duration);
-            String lyricString = s == null ? "" : s.replace('\u00A0', ' ').trim();
+        matchLine(lyric, (metaData) -> {
+            Duration startTime = metaData.startTime;
+            LyricLine lyricLine = map.get(startTime);
+            String lyricString = metaData.lyric == null ? "" : metaData.lyric.replace('\u00A0', ' ').replace('\n', ' ').trim();
             if (lyricLine == null) {
                 lyricLine = new LyricLine();
-                lyricLine.setStartTime(duration);
+                lyricLine.setStartTime(startTime);
                 lyricLine.setText(lyricString);
-                lyricLine.setType(type);
-                if (duration != null) {
-                    map.put(duration, lyricLine);
+                lyricLine.setType(metaData.type);
+                if (startTime != null) {
+                    map.put(startTime, lyricLine);
                 } else if (lyricLine.getText() != null && !lyricLine.getText().startsWith("}")) {
                     lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
@@ -49,17 +51,19 @@ public class LyricParser {
             }
         });
         if (clientConfig.getShowTranslatedCnLyrics()) {
-            matchLine(translatedLyric, (duration, s, type) -> {
-                LyricLine lyricLine = map.get(duration);
+            matchLine(translatedLyric, (metaData) -> {
+                Duration startTime = metaData.startTime;
+                LyricLine lyricLine = map.get(startTime);
                 if (lyricLine == null) {
                     lyricLine = new LyricLine();
-                    lyricLine.setStartTime(duration);
-                    if (duration != null) {
-                        map.put(duration, lyricLine);
+                    lyricLine.setStartTime(startTime);
+                    if (startTime != null) {
+                        map.put(startTime, lyricLine);
                     } else {
                         lyricLinesWithoutValidTimestamp.add(lyricLine);
                     }
                 }
+                String s = metaData.lyric;
                 if (s != null) {
                     lyricLine.setTranslatedText(s.replace('\u00A0', ' ').trim());
                 } else {
@@ -87,9 +91,7 @@ public class LyricParser {
                         }
                         LyricLine rhythmLine = new LyricLine();
                         rhythmLine.setStartTime(rhythmStartTime);
-//                        rhythmLine.setDuration(rhythmDuration);
                         rhythmLine.setPrevious(lastLyricLine);
-//                        rhythmLine.setNext(lyricLine);
                         lastLyricLine = rhythmLine;
                         rhythmLine.setType(LyricLine.Type.RHYTHM);
                         rhythmLine.setText("");
@@ -145,10 +147,10 @@ public class LyricParser {
         }
     }
 
-    static void matchLine(String lyric, TriConsumer<Duration, String, LyricLine.Type> matchedConsumer) {
+    static void matchLine(String lyric, Consumer<LyricLineMetaData> matchedConsumer) {
         List<MetaInfoLine> metaInfoLines = RegexJsonExtractor.extractJsonObjectsSafely(lyric, MetaInfoLine.class);
         metaInfoLines.forEach(metaInfoLine -> {
-            matchedConsumer.accept(metaInfoLine.getTimestampDuration(), metaInfoLine.getText(), LyricLine.Type.META_DATA);
+            matchedConsumer.accept(new LyricLineMetaData(metaInfoLine.getTimestampDuration(), metaInfoLine.getText(), LyricLine.Type.META_DATA));
         });
         Matcher matcher = mainPattern.matcher(lyric);
         while (matcher.find()) {
@@ -178,9 +180,9 @@ public class LyricParser {
                 String lyricLineContent = split[1];
                 try {
                     Duration duration = parseToDuration(timestamp.substring(1, timestamp.length() - 1));
-                    matchedConsumer.accept(duration, lyricLineContent, LyricLine.Type.NORMAL);
+                    matchedConsumer.accept(new LyricLineMetaData(duration, lyricLineContent, LyricLine.Type.NORMAL));
                 } catch (Exception ignored) {
-                    matchedConsumer.accept(null, lyricLineContent, LyricLine.Type.NORMAL);
+                    matchedConsumer.accept(new LyricLineMetaData(null, lyricLineContent, LyricLine.Type.NORMAL));
                 }
             } catch (Exception e) {
                 logger.debug("failed to parse line \"{}\"", item);

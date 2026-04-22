@@ -10,6 +10,12 @@ public class MetaInfoLine {
     protected int timestampMillis;
     @SerializedName("c")
     protected List<MetaInfoStringWrapper> metaInfoStrings;
+    @SerializedName("li")
+    protected String avatarUrl;
+    // example orpheus://nm/artist/home?id=90331&type=artist
+    // "90331" is artist's id
+    @SerializedName("or")
+    protected String internalLink;
 
     public Duration getTimestampDuration() {
         return Duration.ofMillis(timestampMillis);

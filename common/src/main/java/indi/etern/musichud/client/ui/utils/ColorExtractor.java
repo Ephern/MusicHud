@@ -1,11 +1,10 @@
 package indi.etern.musichud.client.ui.utils;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 public class ColorExtractor {
@@ -14,7 +13,7 @@ public class ColorExtractor {
      *
      * @return int[4] {主色, 次主色, 亮色, 暗色} 均为 ARGB
      */
-    public static int[] extractColors(DynamicTexture texture) {
+    public static ThemedColors extractColors(DynamicTexture texture) {
         if (texture == null) return getDefaultColors();
 
         NativeImage image = texture.getPixels();
@@ -68,22 +67,6 @@ public class ColorExtractor {
 
         if (colorWeight.isEmpty()) return getDefaultColors();
 
-        // 按加权总权重排序
-        List<Map.Entry<Integer, Float>> sorted = new ArrayList<>(colorWeight.entrySet());
-        sorted.sort((a, b) -> b.getValue().compareTo(a.getValue()));
-        int poolSize = Math.min(sorted.size(), 50);
-        List<Integer> candidates = new ArrayList<>();
-        for (int i = 0; i < poolSize; i++) {
-            int quant = sorted.get(i).getKey();
-            // 将量化值解码回一个代表性RGB（取该桶的中值）
-            int r = ((quant >> 10) & 0x1F) << 3;
-            int g = ((quant >> 5) & 0x1F) << 3;
-            int b = (quant & 0x1F) << 3;
-            // 添加少量抖动以避免完全相同的色块
-            int rgb = (r << 16) | (g << 8) | b;
-            candidates.add(rgb);
-        }
-
         float satWeight = 0.4f;
         final float FREQ_WEIGHT = 0.2f;   // 频率影响权重（0~1，0表示忽略频率）
 
@@ -131,7 +114,7 @@ public class ColorExtractor {
             }
         }
 
-        // ---------- 3. 亮色：综合亮度与色差评分，取最高分 ----------
+        // 亮色：综合亮度与色差评分，取最高分
         int bright = primary;
         float bestBrightScore = -1;
         for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
@@ -150,7 +133,7 @@ public class ColorExtractor {
             }
         }
 
-        // ---------- 4. 暗色：综合暗度与色差评分，取最高分 ----------
+        // 暗色：综合暗度与色差评分，取最高分
         int dark = primary;
         float bestDarkScore = -1;
         for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
@@ -170,15 +153,14 @@ public class ColorExtractor {
             }
         }
 
-        return new int[]{
+        return new ThemedColors(
                 0xFF000000 | primary,
                 0xFF000000 | secondary,
                 0xFF000000 | bright,
                 0xFF000000 | dark
-        };
+        );
     }
 
-    // 新增辅助方法：计算 RGB 的饱和度（0~1）
     private static float getSaturation(int rgb) {
         int r = (rgb >> 16) & 0xFF;
         int g = (rgb >> 8) & 0xFF;
@@ -206,11 +188,11 @@ public class ColorExtractor {
         return 0.2126f * r + 0.7152f * g + 0.0722f * b;
     }
 
-    public static int[] getDefaultColors() {
-        return new int[]{
+    public static ThemedColors getDefaultColors() {
+        return new ThemedColors(
                 0xFF1A1A1A, 0xFF202020,
                 0XFF202020, 0xFF2A2A2A
-        };
+        );
     }
 
 
@@ -223,13 +205,14 @@ public class ColorExtractor {
      * @param contrast   对比度
      * @return 调整后的新颜色数组（ARGB，alpha=0xFF）
      */
-    public static int[] adjustColors(int[] colors, float saturation, float brightness, float contrast) {
-        if (colors == null || colors.length != 4) return colors;
-        int[] adjusted = new int[4];
-        for (int i = 0; i < 4; i++) {
-            adjusted[i] = adjustColorFull(colors[i], saturation, brightness, contrast);
-        }
-        return adjusted;
+    public static ThemedColors adjustColors(ThemedColors colors, float saturation, float brightness, float contrast) {
+        if (colors == null) return null;
+        return new ThemedColors(
+                adjustColorFull(colors.primary, saturation, brightness, contrast),
+                adjustColorFull(colors.secondary, saturation, brightness, contrast),
+                adjustColorFull(colors.bright, saturation, brightness, contrast),
+                adjustColorFull(colors.dark, saturation, brightness, contrast)
+        );
     }
 
     /**
@@ -275,7 +258,6 @@ public class ColorExtractor {
             bLin = (bLin - midpoint) * contrast + midpoint;
         }
 
-        // 最终 clamp 并转回 sRGB（注意：输出应保持线性？通常直接输出 sRGB 值，此处已线性处理，不需要再 gamma 校正）
         int rOut = (int) (Math.clamp(rLin, 0.0f, 1.0f) * 255);
         int gOut = (int) (Math.clamp(gLin, 0.0f, 1.0f) * 255);
         int bOut = (int) (Math.clamp(bLin, 0.0f, 1.0f) * 255);

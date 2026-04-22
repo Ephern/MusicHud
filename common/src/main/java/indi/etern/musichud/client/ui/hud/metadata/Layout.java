@@ -1,8 +1,8 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
+import indi.etern.musichud.client.ui.hud.renderer.HudRenderContext;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.gui.GuiGraphics;
 
 public class Layout {
     public volatile float x, y, width, height;
@@ -34,23 +34,23 @@ public class Layout {
     }
 
     public record AbsolutePosition(float x, float y) {}
-    public AbsolutePosition calcAbsolutePosition(GuiGraphics graphics) {
+    public AbsolutePosition calcAbsolutePosition(HudRenderContext context) {
         if (parent != null) {
-            AbsolutePosition absolutePosition = parent.calcAbsolutePosition(graphics);
-            float xOffset = hPosition.calcX(x, graphics, getRootLayout());
-            float yOffset = verticalAlign.calcY(y, graphics, getRootLayout());
+            AbsolutePosition absolutePosition = parent.calcAbsolutePosition(context);
+            float xOffset = hPosition.calcX(x, context, getRootLayout());
+            float yOffset = verticalAlign.calcY(y, context, getRootLayout());
             return new AbsolutePosition(absolutePosition.x + xOffset, absolutePosition.y + yOffset);
         } else {
-            float xOffset = hPosition.calcX(x, graphics, getRootLayout());
-            float yOffset = verticalAlign.calcY(y, graphics, getRootLayout());
+            float xOffset = hPosition.calcX(x, context, getRootLayout());
+            float yOffset = verticalAlign.calcY(y, context, getRootLayout());
             return new AbsolutePosition(xOffset, yOffset);
         }
     }
 
-    public AbsolutePosition calcAbsoluteCenterPosition(GuiGraphics graphics) {
+    public AbsolutePosition calcAbsoluteCenterPosition(HudRenderContext context) {
         float halfWidth = width / 2;
         float halfHeight = height / 2;
-        AbsolutePosition absolutePosition = calcAbsolutePosition(graphics);
+        AbsolutePosition absolutePosition = calcAbsolutePosition(context);
         float centerX = absolutePosition.x() + halfWidth;
         float centerY = absolutePosition.y() + halfHeight;
         return new AbsolutePosition(centerX, centerY);
