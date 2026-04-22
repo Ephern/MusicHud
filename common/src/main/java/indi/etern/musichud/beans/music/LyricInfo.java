@@ -18,6 +18,10 @@ public class LyricInfo {
             LyricInfo::getLyric,
             Lyric.CODEC,
             LyricInfo::getTranslatedLyric,
+            Lyric.CODEC,
+            LyricInfo::getWordByWordLyric,
+            Lyric.CODEC,
+            LyricInfo::getWordByWordTranslatedLyric,
             LyricInfo::new
     );
     public static final LyricInfo NONE = new LyricInfo();
@@ -27,13 +31,21 @@ public class LyricInfo {
     Lyric lyric = Lyric.NONE;
     @SerializedName("tlyric")
     Lyric translatedLyric = Lyric.NONE;
+    @SerializedName("yrc")
+    Lyric wordByWordLyric = Lyric.NONE;
+    @SerializedName("ytlrc")
+    Lyric wordByWordTranslatedLyric = Lyric.NONE;
 
     public LyricInfo(
             Lyric lyric,
-            Lyric translatedLyric
+            Lyric translatedLyric,
+            Lyric wordByWordLyric,
+            Lyric wordByWordTranslatedLyric
     ) {
         this.lyric = lyric;
         this.translatedLyric = translatedLyric;
+        this.wordByWordLyric = wordByWordLyric;
+        this.wordByWordTranslatedLyric = wordByWordTranslatedLyric;
     }
 
     public Lyric getLyric() {
@@ -42,5 +54,17 @@ public class LyricInfo {
 
     public Lyric getTranslatedLyric() {
         return Objects.requireNonNullElse(translatedLyric, Lyric.NONE);
+    }
+
+    public Lyric getWordByWordLyric() {
+        return Objects.requireNonNullElse(wordByWordLyric, Lyric.NONE);
+    }
+
+    public Lyric getWordByWordTranslatedLyric() {
+        return Objects.requireNonNullElse(wordByWordTranslatedLyric, Lyric.NONE);
+    }
+
+    public boolean withWordByWordLyric() {
+        return wordByWordLyric != Lyric.NONE && !wordByWordLyric.lyric.isEmpty();
     }
 }

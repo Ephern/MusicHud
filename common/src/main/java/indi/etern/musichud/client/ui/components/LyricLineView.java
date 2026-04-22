@@ -63,12 +63,11 @@ public class LyricLineView extends LinearLayout {
                 this.mainText = rhythmLine;
                 mainLine.addView(rhythmLine);
             } else {
-                TextView mainText = new TextView(getContext());
+                LyricHighlightTextView mainText = new LyricHighlightTextView(getContext(), lyricLine);
                 this.mainText = mainText;
-                mainText.setText(lyricLine.getText());
                 mainText.setTextStyle(TextPaint.BOLD);
                 mainText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-                mainText.setAlpha(Theme.FADE_LYRIC_ALPHA);
+//                mainText.setAlpha(Theme.FADE_LYRIC_ALPHA);
                 mainLine.addView(mainText);
                 if (lyricLine.getType() == LyricLine.Type.META_DATA) {
                     mainText.setTextSize(Theme.SUB_LYRIC_SIZE);
@@ -123,8 +122,10 @@ public class LyricLineView extends LinearLayout {
             case META_DATA -> {
             }
             case NORMAL -> {
-                ObjectAnimator alphaAnim = ObjectAnimator.ofFloat(mainText, View.ALPHA,
-                        Theme.FADE_LYRIC_ALPHA, Theme.EMPHASIZE_LYRIC_ALPHA);
+                if (mainText instanceof LyricHighlightTextView highlightTextView) {
+                    highlightTextView.emphasize();
+                    highlightTextView.setOnFade(this::fadeNormalLine);
+                }
                 row.setPivotX(0f);
                 int height = row.getHeight();
                 row.setPivotY(Math.max(height, dp(24)));
@@ -134,7 +135,7 @@ public class LyricLineView extends LinearLayout {
                 scaleY.setInterpolator(Easings.EASE_IN_OUT_QUAD);
 
                 emphasizeAnimSet = new AnimatorSet();
-                emphasizeAnimSet.playTogether(scaleX, scaleY, alphaAnim);
+                emphasizeAnimSet.playTogether(scaleX, scaleY/*, alphaAnim*/);
                 emphasizeAnimSet.setDuration(600);
                 emphasizeAnimSet.setStartDelay(200);
                 emphasizeAnimSet.start();
@@ -187,25 +188,24 @@ public class LyricLineView extends LinearLayout {
         }
     }
 
+    private void fadeNormalLine() {
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, row.getScaleX(), 1f);
+        scaleX.setInterpolator(Easings.EASE_IN_OUT_QUAD);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, row.getScaleY(), 1f);
+        scaleY.setInterpolator(Easings.EASE_IN_OUT_QUAD);
+
+        AnimatorSet set = new AnimatorSet();
+        set.playTogether(scaleX, scaleY);
+        set.setDuration(400);
+        set.start();
+    }
+
     public void fade() {
         if (emphasizeAnimSet != null) {
             emphasizeAnimSet.cancel();
         }
         switch (lyricLine.getType()) {
-            case META_DATA -> {
-            }
-            case NORMAL -> {
-                ObjectAnimator alphaAnim = ObjectAnimator.ofFloat(mainText, View.ALPHA,
-                        Theme.EMPHASIZE_LYRIC_ALPHA, Theme.FADE_LYRIC_ALPHA);
-                ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, row.getScaleX(), 1f);
-                scaleX.setInterpolator(Easings.EASE_IN_OUT_QUAD);
-                ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, row.getScaleY(), 1f);
-                scaleY.setInterpolator(Easings.EASE_IN_OUT_QUAD);
-
-                AnimatorSet set = new AnimatorSet();
-                set.playTogether(scaleX, scaleY, alphaAnim);
-                set.setDuration(400);
-                set.start();
+            case META_DATA, NORMAL -> {
             }
             case RHYTHM -> {
                 {

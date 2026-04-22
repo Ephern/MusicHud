@@ -1,5 +1,4 @@
 package indi.etern.musichud.client.ui.utils.lyrics;
-//import indi.etern.musichud.utils.JsonUtil;
 
 import indi.etern.musichud.utils.JsonUtil;
 
@@ -7,10 +6,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class RegexJsonExtractor {
-
-//    private static final ObjectMapper MAPPER = JsonUtil.objectMapper;
-
-    // 改进版：处理嵌套和转义
     public static <T> List<T> extractJsonObjectsSafely(String input, Class<T> valueType) {
         List<T> results = new ArrayList<>();
         List<String> jsonStrings = new ArrayList<>();
@@ -47,7 +42,6 @@ public class RegexJsonExtractor {
             }
         }
 
-        // 解析所有找到的JSON字符串
         for (String jsonStr : jsonStrings) {
             try {
                 T obj = JsonUtil.gson.fromJson(jsonStr, valueType);
