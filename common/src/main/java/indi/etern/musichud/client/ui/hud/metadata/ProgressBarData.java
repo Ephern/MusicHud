@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import indi.etern.musichud.client.ui.hud.piplines.UniformData;
+import indi.etern.musichud.client.ui.hud.pipelines.UniformData;
 import lombok.Getter;
 import lombok.Setter;
 import org.joml.Matrix4f;

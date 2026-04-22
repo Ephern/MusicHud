@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.hud.piplines;
+package indi.etern.musichud.client.ui.hud.pipelines;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
 import com.mojang.blaze3d.pipeline.RenderPipeline;

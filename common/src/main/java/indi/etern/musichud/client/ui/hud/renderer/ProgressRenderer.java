@@ -2,8 +2,8 @@ package indi.etern.musichud.client.ui.hud.renderer;
 
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.hud.metadata.ProgressBarData;
-import indi.etern.musichud.client.ui.hud.piplines.HudRenderPipelines;
-import indi.etern.musichud.client.ui.hud.piplines.ProgressBarRenderState;
+import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
+import indi.etern.musichud.client.ui.hud.pipelines.ProgressBarRenderState;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.gui.render.TextureSetup;

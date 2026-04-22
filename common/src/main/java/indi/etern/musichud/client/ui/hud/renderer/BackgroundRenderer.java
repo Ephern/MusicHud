@@ -4,8 +4,8 @@ import icyllis.modernui.mc.ModernUIMod;
 import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
-import indi.etern.musichud.client.ui.hud.piplines.HudRenderPipelines;
-import indi.etern.musichud.client.ui.hud.piplines.HudRenderState;
+import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
+import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.render.TextureSetup;
 

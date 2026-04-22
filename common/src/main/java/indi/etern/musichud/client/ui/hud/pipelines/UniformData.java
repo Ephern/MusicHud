@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.hud.piplines;
+package indi.etern.musichud.client.ui.hud.pipelines;
 
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import org.joml.Matrix4f;
