@@ -69,6 +69,11 @@ public class Theme {
     public static final int EMPHASIZE_LYRIC_COLOR = 0xD6FFFFFF;
     public static final int GLOW_LYRIC_COLOR = 0xFFFFFFFF;
     public static final int FADE_LYRIC_COLOR = 0x4BFFFFFF;
+    public static final int HUD_EMPHASIZE_COLOR = 0xD0FFFFFF;
+    public static final int HUD_FADE_COLOR = 0x70FFFFFF;
+    public static final int HUD_PROGRESS_LEFT = 0x00000000;
+    public static final int HUD_PROGRESS_CURRENT = 0x50FFFFFF;
+    public static final int HUD_PROGRESS_BACKGROUND = 0x32FFFFFF;
 
     public static TextView getNotificationTextView(Context context, boolean enabled) {
         TextView textView = new TextView(context);

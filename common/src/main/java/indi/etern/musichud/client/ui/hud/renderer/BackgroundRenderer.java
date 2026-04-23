@@ -53,7 +53,7 @@ public class BackgroundRenderer implements HudRenderer {
         // 绘制文字（颜色值 + 标签）
         String hex = String.format("#%06X", color & 0x00FFFFFF);
         renderContext.drawString(Minecraft.getInstance().font, label + ": " + hex,
-                START_X + SWATCH_SIZE + PADDING, currentY + (SWATCH_SIZE - 8) / 2, 0xFFFFFFFF);
+                START_X + SWATCH_SIZE + PADDING, currentY + (SWATCH_SIZE - 8) / 2, 0xFFFFFFFF, true);
     }
 
     @Override

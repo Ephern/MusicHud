@@ -97,8 +97,8 @@ public class HudRenderContext {
         graphics.disableScissor();
     }
 
-    public void drawString(Font font, String text, int x, int y, int color) {
-        graphics.drawString(font, text, x, y, color);
+    public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
+        graphics.drawString(font, text, x, y, color, dropShadow);
     }
 
     public void fill(int fromX, int fromY, int toX, int toY, int color) {

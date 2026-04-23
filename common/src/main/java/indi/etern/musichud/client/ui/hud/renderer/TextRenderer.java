@@ -33,7 +33,7 @@ public class TextRenderer implements HudRenderer{
         }
     }
 
-    public void configureLayout(Layout layout, int baseColor, Position position) {
+    public void configure(Layout layout, int baseColor, Position position) {
         this.layout = layout;
         this.baseColor = baseColor;
         this.position = position;
@@ -153,13 +153,13 @@ public class TextRenderer implements HudRenderer{
                 .translate(x, absolutePosition.y())
                 .scale(scale)
                 .then(transforming -> {
-                    context.drawString(Minecraft.getInstance().font, trimmedText, 0, 0, color);
+                    context.drawString(Minecraft.getInstance().font, trimmedText, 0, 0, color, false);
                 });
     }
 
     private int getColorWithAlpha(int baseColor, float alpha) {
-        // baseColor 是 RGB 格式，我们需要添加 Alpha 通道
-        int alphaValue = (int) (alpha * 255);
+        float a = ((baseColor >> 24) & 0xff) / 255.0f;
+        int alphaValue = (int) (a * alpha * 255);
         // 确保 alpha 值在 0-255 范围内
         alphaValue = Math.clamp(alphaValue, 0, 255);
         // 将 Alpha 通道合并到颜色中 (ARGB 格式)
