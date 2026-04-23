@@ -21,8 +21,10 @@ import lombok.ToString;
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
 import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 
 public class LyricHighlightTextView extends TextView {
@@ -86,6 +88,7 @@ public class LyricHighlightTextView extends TextView {
             }
         }
         setText(spannableString);
+        getPaint().setLinearText(true);
     }
 
     private static HighlightSpan applySpan(SpannableString spannableString, int start, int end) {
@@ -104,16 +107,16 @@ public class LyricHighlightTextView extends TextView {
 
     private void setStatus(HighlightStatus status) {
         this.status = status;
-        ZonedDateTime musicStartTime = nowPlayingInfo.getMusicStartTime();
-        statusUpdateTime = musicStartTime == null ? Duration.ZERO : Duration.between(musicStartTime, ZonedDateTime.now());
+        statusUpdateTime = nowPlayingInfo.getPlayedDuration();
         statusUpdateProcessing = true;
     }
 
     @Override
     protected void onDraw(@Nonnull Canvas canvas) {
+        TextPaint textPaint = getPaint();
         if (status == HighlightStatus.WAITING) {
-            getPaint().setShader(null);
             super.setTextColor(Theme.FADE_LYRIC_COLOR);
+            textPaint.setShader(null);
             super.onDraw(canvas);
             return;
         }
@@ -122,7 +125,6 @@ public class LyricHighlightTextView extends TextView {
 
         if (status == HighlightStatus.DONE) {
             if (statusUpdateProcessing) {
-                getPaint().setShader(null);
                 float fraction = (float) getMillisBetween(playedDuration, statusUpdateTime) / animationDurationMillis;
                 if (0 < fraction && fraction < 1) {
                     super.setTextColor(ColorEvaluator.evaluate(fraction, Theme.EMPHASIZE_LYRIC_COLOR, Theme.FADE_LYRIC_COLOR));
@@ -132,6 +134,7 @@ public class LyricHighlightTextView extends TextView {
                 } else {
                     super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
                 }
+                textPaint.setShader(null);
             }
             super.onDraw(canvas);
             return;
@@ -141,7 +144,6 @@ public class LyricHighlightTextView extends TextView {
         Layout layout = getLayout();
         if (layout == null) return;
 
-        TextPaint paint = getPaint();
         long range = layout.getLineRangeForDraw(canvas);
         if (range < 0) return;
 
@@ -183,11 +185,10 @@ public class LyricHighlightTextView extends TextView {
             currentPhrase = phrases.get(phraseIndex);
         } else if (phraseIndex >= phrases.size()) {
             // 已经超过最后一个短语，整行显示强调色（已唱完）
-            paint.setColor(Theme.EMPHASIZE_LYRIC_COLOR);
-            paint.setShader(null);
-            super.onDraw(canvas);
-            phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));//TODO Animation
             super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
+            textPaint.setShader(null);
+            super.onDraw(canvas);
+            phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));
             setStatus(HighlightStatus.DONE);
             if (onFade != null) {
                 onFade.run();
@@ -209,8 +210,8 @@ public class LyricHighlightTextView extends TextView {
         long phraseDurationMillis = phraseEnd.minus(phraseStart).toMillis();
         if (phraseDurationMillis <= 0) {
             // 无效短语，直接绘制强调色
-            paint.setColor(Theme.EMPHASIZE_LYRIC_COLOR);
-            paint.setShader(null);
+            textPaint.setColor(Theme.EMPHASIZE_LYRIC_COLOR);
+            textPaint.setShader(null);
             super.onDraw(canvas);
             return;
         }
@@ -256,11 +257,11 @@ public class LyricHighlightTextView extends TextView {
             float lineActualRight = layout.getLineRight(line);
 
             if (lineLogicalRight <= gradientLeftLogical) {
-                paint.setColor(Theme.EMPHASIZE_LYRIC_COLOR);
-                paint.setShader(null);
+                textPaint.setColor(Theme.EMPHASIZE_LYRIC_COLOR);
+                textPaint.setShader(null);
             } else if (lineLogicalLeft >= gradientRightLogical) {
-                paint.setColor(Theme.FADE_LYRIC_COLOR);
-                paint.setShader(null);
+                textPaint.setColor(Theme.FADE_LYRIC_COLOR);
+                textPaint.setShader(null);
             } else {
                 float t1 = (gradientLeftLogical - lineLogicalLeft) / (lineLogicalRight - lineLogicalLeft);
                 float t2 = (gradientPointLogicalX - lineLogicalLeft) / (lineLogicalRight - lineLogicalLeft);
@@ -268,9 +269,9 @@ public class LyricHighlightTextView extends TextView {
 
                 int[] colors = {Theme.EMPHASIZE_LYRIC_COLOR, Theme.GLOW_LYRIC_COLOR, Theme.FADE_LYRIC_COLOR};
                 float[] positions = {t1, t2, t3};
-                paint.setShader(new LinearGradient(lineActualLeft, 0, lineActualRight, 0,
+                textPaint.setShader(new LinearGradient(lineActualLeft, 0, lineActualRight, 0,
                         colors, positions, Shader.TileMode.CLAMP, null));
-                paint.setColor(Theme.GLOW_LYRIC_COLOR);
+                textPaint.setColor(Theme.GLOW_LYRIC_COLOR);
             }
             layout.drawText(canvas, line, line);
         }
