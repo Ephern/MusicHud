@@ -173,7 +173,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                 .translate(drawX, drawY)
                 .scale(scale)
                 .then(transforming -> {
-                    context.drawString(Minecraft.getInstance().font, text, 0, 0, line.config.color);
+                    context.drawString(Minecraft.getInstance().font, text, 0, 0, line.config.color, false);
                 });
     }
 

@@ -60,8 +60,8 @@ public class HudRendererManager {
                 String text = lyricLine.getText();
                 String translatedText = lyricLine.getTranslatedText();
 
-                ScrollingLyricLineRenderer.TextStyle style1 = new ScrollingLyricLineRenderer.TextStyle(text, Theme.NORMAL_TEXT_COLOR);
-                ScrollingLyricLineRenderer.TextStyle style2 = new ScrollingLyricLineRenderer.TextStyle(translatedText, Theme.SECONDARY_TEXT_COLOR);
+                ScrollingLyricLineRenderer.TextStyle style1 = new ScrollingLyricLineRenderer.TextStyle(text, Theme.HUD_EMPHASIZE_COLOR);
+                ScrollingLyricLineRenderer.TextStyle style2 = new ScrollingLyricLineRenderer.TextStyle(translatedText, Theme.HUD_FADE_COLOR);
 
                 Duration duration = lyricLine.getDuration();
                 long scrollMillis;
@@ -190,7 +190,7 @@ public class HudRendererManager {
 
         Layout titleLayout = Layout.ofTextLayout(mainContentX, titleY, maxTitleWidth, titleSize);
         titleLayout.setParent(baseLayout);
-        TITLE_RENDERER.configureLayout(titleLayout, Theme.EMPHASIZE_TEXT_COLOR, TextRenderer.Position.LEFT);
+        TITLE_RENDERER.configure(titleLayout, Theme.EMPHASIZE_TEXT_COLOR, TextRenderer.Position.LEFT);
 
         float lyricHeight = contentHeight - titleSize - progressHeight - infoTextSize - contentInterval * 2;
         Layout layout = new Layout(mainContentX, lyricsY, progressWidth, lyricHeight, 0);
@@ -204,16 +204,16 @@ public class HudRendererManager {
         artistAndAlbumLayout.setParent(baseLayout);
         Layout playTimeLayout = Layout.ofTextLayout(progressRightX, aboveProgressY, progressWidth, infoTextSize);
         playTimeLayout.setParent(baseLayout);
-        ARTISTS_AND_ALBUM_RENDERER.configureLayout(artistAndAlbumLayout, Theme.SECONDARY_TEXT_COLOR, TextRenderer.Position.LEFT);
-        PLAY_TIME_RENDERER.configureLayout(playTimeLayout, Theme.SECONDARY_TEXT_COLOR, TextRenderer.Position.RIGHT);
+        ARTISTS_AND_ALBUM_RENDERER.configure(artistAndAlbumLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.LEFT);
+        PLAY_TIME_RENDERER.configure(playTimeLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.RIGHT);
     }
 
     private void configureProgressRenderer(Layout layout) {
         progressBarData = new ProgressBarData(
                 layout,
-                0x00A0A0A0,
-                0x50FFFFFF,
-                0x40A0A0A0,
+                Theme.HUD_PROGRESS_LEFT,
+                Theme.HUD_PROGRESS_CURRENT,
+                Theme.HUD_PROGRESS_BACKGROUND,
                 12f,
                 2f,
                 0.01f
