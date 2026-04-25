@@ -45,6 +45,7 @@ public class HudRendererManager {
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private final DateTimeFormatter LONG_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter SHORT_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("mm:ss");
+    private final HudRenderContext hudRenderContext = new HudRenderContext();
     private volatile HudRenderData hudBaseData;
     private volatile HudRenderData imageDisplayData;
     private ProgressBarData progressBarData;
@@ -300,7 +301,6 @@ public class HudRendererManager {
         transitionable.startTransition(nextData);
     }
 
-    HudRenderContext hudRenderContext = new HudRenderContext();
     public void renderFrame(GuiGraphics graphics, DeltaTracker deltaTracker) {
         if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
             return;

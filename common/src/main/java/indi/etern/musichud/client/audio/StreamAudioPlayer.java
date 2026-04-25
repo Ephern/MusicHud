@@ -174,11 +174,10 @@ public class StreamAudioPlayer {
                 }
             });
             downloadInitializedFuture.thenAccept(ignore -> {
-                serverStartTime = startTime == null ? ZonedDateTime.now() : startTime;
                 playingFuture = MusicHud.EXECUTOR.submit(() -> {
                     Thread.currentThread().setName("MH-MusicPlayer");
                     try {
-                        playAudioWithRetry(startPlayingFuture);
+                        playAudioWithRetry(startPlayingFuture, startTime);
                     } catch (Exception e) {
                         LOGGER.error("Play thread error", e);
                         if (!startPlayingFuture.isDone()) {
@@ -193,8 +192,9 @@ public class StreamAudioPlayer {
     }
 
     @SuppressWarnings("BusyWait")
-    private void playAudioWithRetry(CompletableFuture<ZonedDateTime> startPlayingFuture) {
+    private void playAudioWithRetry(CompletableFuture<ZonedDateTime> startPlayingFuture, ZonedDateTime serverStartTime) {
         boolean finished = false;
+        boolean futureFinished = startPlayingFuture.isDone() || startPlayingFuture.isCancelled() || startPlayingFuture.isCompletedExceptionally();
         try {
             // 等待一些数据缓冲
             while (shouldContinuePlaying && totalBufferedBytes.get() < BUFFER_SIZE * BUFFER_COUNT) {
@@ -231,7 +231,6 @@ public class StreamAudioPlayer {
                         }
                         if (clientConfig.getDisableVanillaMusic())
                             Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC);
-                        startPlayingFuture.complete(serverStartTime);
                         setStatus(Status.PLAYING);
                         AL10.alSourcePlay(source);
                         checkALError("alSourcePlay");
@@ -280,6 +279,12 @@ public class StreamAudioPlayer {
                                     } else {
                                         isBuffering = false;
                                         setStatus(Status.PLAYING);
+                                    }
+                                    if (!futureFinished) {
+                                        ZonedDateTime time = serverStartTime == null ? ZonedDateTime.now() : serverStartTime;
+                                        this.serverStartTime = time;
+                                        startPlayingFuture.complete(time);
+                                        futureFinished = true;
                                     }
 
                                     ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
@@ -369,9 +374,8 @@ public class StreamAudioPlayer {
                     long bytesSkipped = 0;
                     long startSyncTimestamp = System.currentTimeMillis();
                     while (shouldContinueDownloading) {
-                        long seconds = Duration.between(serverStartTime, ZonedDateTime.now()).getSeconds();
-                        long skipBytes = seconds
-                                * bytesPerSecond;
+                        long millis = Duration.between(serverStartTime, ZonedDateTime.now()).toMillis();
+                        long skipBytes = millis * bytesPerSecond / 1000;
                         if (bytesSkipped >= skipBytes) {
                             break;
                         }
@@ -635,13 +639,6 @@ public class StreamAudioPlayer {
                 AL10.alGetError();
             }
         }
-    }
-
-    // 获取当前缓冲状态（秒）
-    @SuppressWarnings("unused")
-    public float getBufferedSeconds() {
-        if (currentDecoder == null) return 0;
-        return calculateBufferedSeconds(currentDecoder.getFormat());
     }
 
     public CompletableFuture<MusicResourceInfo> getCurrentMusicResourceInfo(Quality quality, MusicResourceInfo previous) {
