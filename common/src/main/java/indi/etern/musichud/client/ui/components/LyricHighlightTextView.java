@@ -289,7 +289,7 @@ public class LyricHighlightTextView extends TextView {
         if (spanCount == 1) {
             HighlightSpan span = phrase.spans.getFirst();
             float t = Math.clamp((float) progressMillis / totalDuration, 0, 1);
-            span.yOffset = -phraseRaiseY * Easings.EASE_OUT_QUAD.getInterpolation(t);
+            span.yOffset = -phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t);
         } else {
             float staggerRate = 0.3f; // 错开比例，最后一个比第一个晚 totalDuration * staggerRate 毫秒
             long staggerDuration = (long) (totalDuration * staggerRate); // 错开总时长
@@ -309,7 +309,7 @@ public class LyricHighlightTextView extends TextView {
                     span.scale = 1;
                 } else {
                     float t = (float) (nowMillis - animStart) / animDuration;
-                    span.yOffset = -phraseRaiseY * Easings.EASE_OUT_QUAD.getInterpolation(t);
+                    span.yOffset = -phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t);
                     span.scale = 1 + 0.3f * Math.min(phrase.durationMillis , fullDurablePhraseMillis) / fullDurablePhraseMillis * quadratic(t);
                 }
             }

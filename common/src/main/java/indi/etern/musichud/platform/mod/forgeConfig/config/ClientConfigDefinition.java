@@ -81,11 +81,11 @@ public class ClientConfigDefinition implements ClientConfig {
         hudWidth = builder
                 .comment("Hud width")
                 .translation(MusicHud.MOD_ID + ".config.layout.hudWidth")
-                .define("hudWidth", 150);
+                .define("hudWidth", 152);
         hudHeight = builder
                 .comment("Hud height")
                 .translation(MusicHud.MOD_ID + ".config.layout.hudHeight")
-                .define("hudHeight", 44);
+                .define("hudHeight", 52);
         hudCornerRadius = builder
                 .comment("Hud rounded corner radius")
                 .translation(MusicHud.MOD_ID + ".config.layout.hudCornerRadius")
