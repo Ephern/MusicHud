@@ -3,12 +3,9 @@
 #moj_import <minecraft:dynamictransforms.glsl>
 #moj_import <minecraft:projection.glsl>
 
-layout(std140) uniform HudProgressParams {
-    mat4 u_LocalMat;
-    vec4 u_ProgressData;  // (halfWidth, halfHeight, radius, progress)
-    vec3 u_GradientOffsets;  // (gradientLength, rightOffset, transitionBorderRate)
-    mat4 u_GradientColors;  // (leftFillColor, rightFillColor, backgroundColor, unused)[RGBA Vector4f]
-//    float u_TransitionBorderRate; removed after 1.21.11
+layout(std140) uniform MHProgressPosition {
+    mat4 u_Translation;
+    vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
 };
 
 in vec3 Position;
@@ -21,6 +18,6 @@ void main() {
     f_Position = Position.xy;
     f_Color = Color;
 
-    vec4 localPos = u_LocalMat * vec4(Position, 1.0);
+    vec4 localPos = u_Translation * vec4(Position, 1.0);
     gl_Position = ProjMat * ModelViewMat * vec4(localPos.xy, Position.z, 1.0);
 }

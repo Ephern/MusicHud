@@ -3,12 +3,9 @@
 #moj_import <minecraft:dynamictransforms.glsl>
 #moj_import <minecraft:projection.glsl>
 
-layout(std140) uniform HudAlbumParams {
+layout(std140) uniform MHAlbumPosition {
     mat4 u_Translation;
-    vec4 u_RectParam;  // (halfWidth, halfHeight, radius, unused)
-    vec3 u_TransitionParam;  // (fadeProgress, nextImageAspect, imageAspect)
-    mat4 u_BgColors;
-//    float u_Progress; removed after 1.21.11
+    vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
 };
 
 in vec3 Position;

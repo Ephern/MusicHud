@@ -234,4 +234,5 @@ public class NowPlayingInfo {
         atomicLyricLines.set(null);
         currentLyricLine = null;
     }
+
 }

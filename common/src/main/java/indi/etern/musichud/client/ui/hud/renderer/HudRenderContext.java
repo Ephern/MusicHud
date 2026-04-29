@@ -3,13 +3,13 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.systems.RenderPass;
-import indi.etern.musichud.client.ui.hud.pipelines.UniformData;
-import indi.etern.musichud.client.ui.hud.pipelines.UniformWriter;
-import lombok.NonNull;
-import lombok.Setter;
+import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
+import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
+import indi.etern.musichud.client.ui.hud.pipelines.RenderStateUtil;
+import lombok.*;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.render.state.GuiElementRenderState;
+import net.minecraft.client.renderer.DynamicUniformStorage;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix3x2fStack;
@@ -19,40 +19,111 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public class HudRenderContext {
+    private static final RenderStateUtil UNIFORM_WRITER = new RenderStateUtil();
+    @Getter
+    private static HudRenderContext current;
+
+    private final Map<StorageKey, DynamicUniformStorage<?>> storageMap = new HashMap<>();
+    private final Map<StorageKey, HudUniform> pendingUniforms = new HashMap<>();
+    private final Map<StorageKey, GpuBufferSlice> uniformSlices = new HashMap<>();
+
+    private final Map<StorageKey, HudUniform> lastWrittenUniforms = new HashMap<>();
+    private final Map<StorageKey, GpuBufferSlice> lastSlices = new HashMap<>();
+
     @Setter
     private GuiGraphics graphics;
-    private final Map<String, GpuBufferSlice> uniforms = new HashMap<>();
-    private static final UniformWriter UNIFORM_WRITER = new UniformWriter();
 
     public HudRenderContext() {
+        current = this;
     }
 
     public void clearContext() {
+        for (DynamicUniformStorage<?> storage : storageMap.values()) {
+            storage.endFrame();
+        }
+        pendingUniforms.clear();
+        uniformSlices.clear();
         graphics = null;
-        uniforms.clear();
     }
 
-    public void writeUniformData(String uniformName, UniformData uniformData) {
-        GpuBufferSlice write = UNIFORM_WRITER.write(uniformData, this);
-        uniforms.put(uniformName, write);
+    public void prepareUniforms() {
+        for (Map.Entry<StorageKey, HudUniform> entry : pendingUniforms.entrySet()) {
+            StorageKey key = entry.getKey();
+            HudUniform uniform = entry.getValue();
+
+            // skip re-upload if same uniform data was already written last frame
+            HudUniform lastWritten = lastWrittenUniforms.get(key);
+            if (lastWritten != null && lastWritten.dataEquals(uniform)) {
+                GpuBufferSlice cachedSlice = lastSlices.get(key);
+                if (cachedSlice != null) {
+                    uniformSlices.put(key, cachedSlice);
+                    lastWrittenUniforms.put(key, uniform);
+                    continue;
+                }
+            }
+
+            @SuppressWarnings("unchecked")
+            DynamicUniformStorage<HudUniform> storage = (DynamicUniformStorage<HudUniform>)
+                    storageMap.computeIfAbsent(key, k ->
+                            new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
+                    );
+
+            GpuBufferSlice slice = storage.writeUniform(uniform);
+            uniformSlices.put(key, slice);
+            lastSlices.put(key, slice);
+            lastWrittenUniforms.put(key, uniform);
+        }
     }
 
     public @NonNull Matrix3x2f currentPose() {
         return new Matrix3x2f(graphics.pose());
     }
 
-    public void submitGuiElementRenderState(GuiElementRenderState hudRenderState) {
+    public void submitHudRenderState(HudRenderState hudRenderState) {
         UNIFORM_WRITER.submitGuiElementRenderState(graphics, hudRenderState);
+
+        HudUniform[] uniforms = hudRenderState.uniforms();
+        if (uniforms != null) {
+            for (HudUniform uniform : uniforms) {
+                StorageKey key = new StorageKey(hudRenderState.pipeline(), uniform.getUBOName());
+                pendingUniforms.put(key, uniform);
+            }
+        }
+    }
+
+    /*public void prepareUniforms() {
+        for (Map.Entry<StorageKey, HudUniform> entry : pendingUniforms.entrySet()) {
+            StorageKey key = entry.getKey();
+            HudUniform uniform = entry.getValue();
+
+            @SuppressWarnings("unchecked")
+            DynamicUniformStorage<HudUniform> storage = (DynamicUniformStorage<HudUniform>)
+                    storageMap.computeIfAbsent(key, k ->
+                            new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
+                    );
+
+            GpuBufferSlice slice = storage.writeUniform(uniform);
+            uniformSlices.put(key, slice);
+//            MusicHud.LOGGER.info("[MusicHud] prepareUniforms wrote {} for pipeline {} size={}", uniform.getUBOName(), key.getPipeline(), uniform.getUBOSize());
+        }
+
+//        if (!pendingUniforms.isEmpty()) {
+//            MusicHud.LOGGER.info("[MusicHud] prepareUniforms: wrote {} uniforms, {} slices stored", pendingUniforms.size(), uniformSlices.size());
+//        }
+    }*/
+
+    public void bindAllUniforms(RenderPass pass) {
+        if (pass == null) return;
+        for (Map.Entry<StorageKey, GpuBufferSlice> entry : uniformSlices.entrySet()) {
+            StorageKey key = entry.getKey();
+            HudUniform uniform = pendingUniforms.get(key);
+            if (uniform == null) continue;
+            pass.setUniform(uniform.getUBOName(), entry.getValue());
+        }
     }
 
     public void nextStratum() {
         graphics.nextStratum();
-    }
-
-    public void updateRenderPass(RenderPass renderPass) {
-        for (Map.Entry<String, GpuBufferSlice> entry : uniforms.entrySet()) {
-            renderPass.setUniform(entry.getKey(), entry.getValue());
-        }
     }
 
     public Transforming transform() {
@@ -63,9 +134,7 @@ public class HudRenderContext {
                      int targetX, int targetY, int sourceX, int sourceY,
                      int targetWidth, int targetHeight, int sourceWidth, int sourceHeight,
                      int textureWidth, int textureHeight) {
-        graphics.blit(
-                renderPipeline,
-                resourceLocation,
+        graphics.blit(renderPipeline, resourceLocation,
                 targetX, targetY, sourceX, sourceY,
                 targetWidth, targetHeight, sourceWidth, sourceHeight,
                 textureWidth, textureHeight);
@@ -74,9 +143,7 @@ public class HudRenderContext {
     public void blit(RenderPipeline renderPipeline, ResourceLocation resourceLocation,
                      int targetX, int targetY, int sourceX, int sourceY,
                      int targetWidth, int targetHeight, int sourceWidth, int sourceHeight) {
-        graphics.blit(
-                renderPipeline,
-                resourceLocation,
+        graphics.blit(renderPipeline, resourceLocation,
                 targetX, targetY, sourceX, sourceY,
                 targetWidth, targetHeight, sourceWidth, sourceHeight);
     }
@@ -103,6 +170,14 @@ public class HudRenderContext {
 
     public void fill(int fromX, int fromY, int toX, int toY, int color) {
         graphics.fill(fromX, fromY, toX, toY, color);
+    }
+
+    @Data
+    @AllArgsConstructor
+    @EqualsAndHashCode
+    private static class StorageKey {
+        private final RenderPipeline pipeline;
+        private final String uboName;
     }
 
     public static class Transforming {

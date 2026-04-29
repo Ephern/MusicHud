@@ -1,5 +1,8 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
+import lombok.EqualsAndHashCode;
+
+@EqualsAndHashCode
 public class ThemedColors {
     public volatile int primary, secondary, bright, dark;
 

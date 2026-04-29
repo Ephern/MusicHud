@@ -1,9 +1,7 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
-import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
 import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
@@ -15,7 +13,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 
-public class AlbumImageRenderer implements HudRenderer{
+public class AlbumImageRenderer implements HudRenderer {
     private static volatile AlbumImageRenderer instance;
     private ResourceLocation defaultImageLocation;
     private HudRenderData currentData;
@@ -36,22 +34,20 @@ public class AlbumImageRenderer implements HudRenderer{
 
     @Override
     public void render(HudRenderContext context) {
-        if (currentData == null) {
-            return;
-        }
-
-        context.writeUniformData("HudAlbumParams", currentData);
+        if (currentData == null) return;
 
         TextureSetup textureSetup = getMixedTextureSetup();
-
         Layout layout = currentData.getLayout();
+
         HudRenderState hudRenderState = new HudRenderState(
                 HudRenderPipelines.ROUNDED_ALBUM,
                 textureSetup,
                 context.currentPose(),
-                layout.width, layout.height
+                layout,
+                layout,
+                DynamicStatusUniform.getInstance()
         );
-        context.submitGuiElementRenderState(hudRenderState);
+        context.submitHudRenderState(hudRenderState);
     }
 
     private @NotNull TextureSetup getMixedTextureSetup() {
@@ -62,16 +58,12 @@ public class AlbumImageRenderer implements HudRenderer{
         ResourceLocation currentUnblurredLocation = current.image() != null ? current.image().unblurredLocation : null;
         DynamicTexture currentTexture = getDynamicTexture(currentUnblurredLocation);
         DynamicTexture nextTexture = getDynamicTexture(nextUnblurredLocation);
-        DynamicTexture transitionTexture = background.isTransitioning() ?
-                nextTexture : currentTexture;
-
+        DynamicTexture transitionTexture = background.isTransitioning() ? nextTexture : currentTexture;
         TextureSetup textureSetup;
         if (currentTexture != null) {
             textureSetup = transitionTexture != null ?
-                    TextureSetup.doubleTexture(
-                            currentTexture.getTextureView(),
-                            transitionTexture.getTextureView()
-                    ) : TextureSetup.singleTexture(currentTexture.getTextureView());
+                    TextureSetup.doubleTexture(currentTexture.getTextureView(), transitionTexture.getTextureView())
+                    : TextureSetup.singleTexture(currentTexture.getTextureView());
         } else {
             textureSetup = TextureSetup.noTexture();
         }
@@ -88,13 +80,8 @@ public class AlbumImageRenderer implements HudRenderer{
             }
             return getDynamicTexture(defaultImageLocation);
         }
-
-        AbstractTexture texture = Minecraft.getInstance()
-                .getTextureManager()
-                .getTexture(imageLocation);
-        if (texture instanceof DynamicTexture dynamicTexture) {
-            return dynamicTexture;
-        }
+        AbstractTexture texture = Minecraft.getInstance().getTextureManager().getTexture(imageLocation);
+        if (texture instanceof DynamicTexture dynamicTexture) return dynamicTexture;
         return null;
     }
 }
