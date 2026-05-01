@@ -156,11 +156,11 @@ public class HudRenderContext {
         return graphics.guiHeight();
     }
 
-    public void enableScissor(int x, int y, int width, int height) {
-        graphics.enableScissor(x, y, width, height);
+    public void pushScissor(int fromX, int fromY, int toX, int toY) {
+        graphics.enableScissor(fromX, fromY, toX, toY);
     }
 
-    public void disableScissor() {
+    public void popScissor() {
         graphics.disableScissor();
     }
 
