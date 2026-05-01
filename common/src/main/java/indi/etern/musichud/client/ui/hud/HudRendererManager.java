@@ -126,29 +126,30 @@ public class HudRendererManager {
     }
 
     public void refreshStyle() {
-        if (baseLayout.radius > baseLayout.height / 2) {
-            baseLayout.radius = baseLayout.height / 2;
+        float halfHeight = baseLayout.getHeight() / 2;
+        if (baseLayout.getRadius() > halfHeight) {
+            baseLayout.setRadius(halfHeight);
         }
 
         BackgroundImages bgImage = getBackgroundImagesOrElse(null);
         configureBaseRenderer(baseLayout, bgImage);
 
         Layout baseLayout = hudBaseData.getLayout();
-        contentPadding = Math.max(baseLayout.height / 10, 3);
+        contentPadding = Math.max(baseLayout.getHeight() / 10, 3);
 
-        float imageHeightAndWidth = baseLayout.height - 2 * contentPadding;
-        float imageRadius = Math.clamp(baseLayout.radius - contentPadding, 0, imageHeightAndWidth / 2f);
+        float imageHeightAndWidth = baseLayout.getHeight() - 2 * contentPadding;
+        float imageRadius = Math.clamp(baseLayout.getRadius() - contentPadding, 0, imageHeightAndWidth / 2f);
         Layout imageLayout = new Layout("Album", contentPadding, contentPadding, imageHeightAndWidth, imageHeightAndWidth, imageRadius);
         imageLayout.setParent(baseLayout);
 
         configureImageRenderer(imageLayout);
 
-        float contentHeight = baseLayout.height - contentPadding * 2;
+        float contentHeight = baseLayout.getHeight() - contentPadding * 2;
         float contentUnit = Math.max(contentHeight / 32f, 1);
         float titleSize = contentUnit * 7;
         boolean showProgress = contentHeight > 14f;
 
-        float progressWidth = baseLayout.width - imageHeightAndWidth - 3 * contentPadding - baseLayout.radius / 3;
+        float progressWidth = baseLayout.getWidth() - imageHeightAndWidth - 3 * contentPadding - baseLayout.getRadius() / 3;
         float progressHeight = showProgress ? contentUnit * 2 : 0;
         float mainContentX = contentPadding + imageHeightAndWidth + contentPadding;
         float progressY = contentPadding + imageHeightAndWidth - progressHeight - 1;
@@ -335,19 +336,19 @@ public class HudRendererManager {
         PLAYING_STATUS_RENDERER.render(hudRenderContext);
         PROGRESS_RENDERER.render(hudRenderContext);
 
-        float progressWidth = PROGRESS_RENDERER.getProgressData().getLayout().width;
+        float progressWidth = PROGRESS_RENDERER.getProgressData().getLayout().getWidth();
         Layout titleLayout = TITLE_RENDERER.getLayout();
-        float titleMaxWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().width - contentInterval;
+        float titleMaxWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().getWidth() - contentInterval;
         if (PLAYING_STATUS_RENDERER.isVisible()) {
-            titleLayout.width = titleMaxWidth - contentPadding - PLAYING_STATUS_RENDERER.getLayout().width;
+            titleLayout.setWidth(titleMaxWidth - contentPadding - PLAYING_STATUS_RENDERER.getLayout().getWidth());
         } else {
-            titleLayout.width = titleMaxWidth;
+            titleLayout.setWidth(titleMaxWidth);
         }
 
         TITLE_RENDERER.render(hudRenderContext);
         LYRICS_LINE_RENDERER.render(hudRenderContext);
 
-        ARTISTS_AND_ALBUM_RENDERER.getLayout().width = progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - 1f;
+        ARTISTS_AND_ALBUM_RENDERER.getLayout().setWidth(progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - 1f);
         ARTISTS_AND_ALBUM_RENDERER.render(hudRenderContext);
         PLAY_TIME_RENDERER.render(hudRenderContext);
 

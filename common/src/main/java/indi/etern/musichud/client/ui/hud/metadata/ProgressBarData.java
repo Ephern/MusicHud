@@ -51,14 +51,14 @@ public class ProgressBarData implements HudUniform {
     }
 
     @Override
-    public boolean dataEquals(HudUniform other) {
-        return other instanceof ProgressBarData progressBarData
+    public boolean shouldUseBuffer(HudUniform lastBuffered) {
+        return lastBuffered instanceof ProgressBarData progressBarData
                 && Objects.equals(playedColor, progressBarData.playedColor)
                 && Objects.equals(currentColor, progressBarData.currentColor)
                 && Objects.equals(backgroundColor, progressBarData.backgroundColor)
                 && Objects.equals(gradientLength, progressBarData.gradientLength)
                 && Objects.equals(gradientRightOffset, progressBarData.gradientRightOffset)
                 && Objects.equals(transitionBorderRate, progressBarData.transitionBorderRate)
-                && layout.dataEquals(progressBarData.layout);
+                && layout.shouldUseBuffer(progressBarData.layout);
     }
 }

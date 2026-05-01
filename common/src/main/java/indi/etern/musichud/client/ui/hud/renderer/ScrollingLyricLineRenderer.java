@@ -217,8 +217,8 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         // 布局缓存（每次渲染时更新）
         int cachedContainerX = (int) absPos.x();
         int cachedContainerY = (int) absPos.y();
-        cachedContainerWidth = (int) layout.width;
-        int cachedContainerHeight = (int) layout.height;
+        cachedContainerWidth = (int) layout.getWidth();
+        int cachedContainerHeight = (int) layout.getHeight();
 
         if (cachedContainerWidth <= 0 || cachedContainerHeight <= 0) return;
 
@@ -231,16 +231,16 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         float x = absolutePosition.x();
         float y = absolutePosition.y();
-        context.enableScissor((int) x, (int) y, (int) (x + layout.width), (int) (y + layout.height));
+        context.enableScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
         if (isTransitioning && nextLine1.config != null && nextLine2.config != null) {
             // 旧文本向上移出
             float easedProgress = Easings.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
-            float oldYOffset = -easedProgress * layout.height;
+            float oldYOffset = -easedProgress * layout.getHeight();
             renderLine(context, currentLine1, cachedContainerX, previousStartY, line1Height, oldYOffset);
             renderLine(context, currentLine2, cachedContainerX, (int) (previousStartY + lineSpacing + line1Height), line2Height, oldYOffset);
 
             // 新文本从下方向上移入
-            float newYOffset = (1 - easedProgress) * layout.height;
+            float newYOffset = (1 - easedProgress) * layout.getHeight();
             renderLine(context, nextLine1, cachedContainerX, nextStartY, line1Height, newYOffset);
             renderLine(context, nextLine2, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, newYOffset);
         } else {

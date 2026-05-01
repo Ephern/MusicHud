@@ -50,20 +50,20 @@ public class PlayerHeadRenderer implements HudRenderer {
                             skinLocation,
                             0, 0,
                             8, 8,
-                            (int) layout.width, (int) layout.height,
+                            (int) layout.getWidth(), (int) layout.getHeight(),
                             8, 8,
                             SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE
                     );
                 });
         context.transform()
-                .translate(absolutePosition.x() - layout.width * 0.08f, absolutePosition.y() - layout.height * 0.08f)
+                .translate(absolutePosition.x() - layout.getWidth() * 0.08f, absolutePosition.y() - layout.getHeight() * 0.08f)
                 .scale(1.16f)
                 .then((transforming) -> {
                     context.blit(
                             RenderPipelines.GUI_TEXTURED,
                             skinLocation,
                             0, 0, 40, 8,
-                            (int) layout.width, (int) layout.height, 8, 8,
+                            (int) layout.getWidth(), (int) layout.getHeight(), 8, 8,
                             SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE
                     );
                 });

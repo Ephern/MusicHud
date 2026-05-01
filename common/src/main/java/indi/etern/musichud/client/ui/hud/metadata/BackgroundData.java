@@ -112,7 +112,7 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
     }
 
     @Override
-    public boolean dataEquals(HudUniform other) {
-        return other instanceof BackgroundData data && colors.equals(data.colors);
+    public boolean shouldUseBuffer(HudUniform lastBuffered) {
+        return lastBuffered instanceof BackgroundData data && colors.equals(data.colors);
     }
 }

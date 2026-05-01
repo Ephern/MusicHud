@@ -6,23 +6,21 @@ import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import indi.etern.musichud.client.ui.hud.renderer.HudRenderContext;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
-import lombok.Setter;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
 
-import java.util.Objects;
-
 @EqualsAndHashCode
+@Getter
 public class Layout implements HudUniform {
     public static final int UBO_SIZE = new Std140SizeCalculator().putMat4f().putVec3().align(16).get(); // pad to 16-byte alignment (std140)
-    public volatile float x, y, width, height;
-    public volatile float radius;
-    public volatile HorizontalAlign horizontalAlign;
-    public volatile VerticalAlign verticalAlign;
-    public String targetElementName = "";
-    @Setter
-    @Getter
+    private volatile float x, y, width, height;
+    private volatile float radius;
+    private volatile HorizontalAlign horizontalAlign;
+    private volatile VerticalAlign verticalAlign;
+    private String targetElementName = "";
     private volatile Layout parent;
+    private boolean dirty;
+    private AbsolutePosition lastAbsolutePosition;
 
     public Layout(String targetElementName, float x, float y, float width, float height, float radius) {
         this.targetElementName = targetElementName;
@@ -66,19 +64,23 @@ public class Layout implements HudUniform {
         Layout.AbsolutePosition absolutePosition = calcAbsoluteCenterPosition(HudRenderContext.getCurrent());
         localMatrix.translate(absolutePosition.x(), absolutePosition.y());
         builder.putMat4f(new Matrix4f().mul(localMatrix)).putVec3(width / 2, height / 2, radius);
+        if (dirty) {
+            dirty = false;
+        }
     }
 
     @Override
-    public boolean dataEquals(HudUniform other) {
-        return other instanceof Layout layout
-                && Objects.equals(x, layout.x)
-                && Objects.equals(y, layout.y)
-                && Objects.equals(width, layout.width)
-                && Objects.equals(height, layout.height)
-                && Objects.equals(radius, layout.radius)
-                && Objects.equals(horizontalAlign, layout.horizontalAlign)
-                && Objects.equals(verticalAlign, layout.verticalAlign)
-                && ((parent == null && layout.parent == null) || (parent != null && parent.dataEquals(layout.parent)));
+    public boolean shouldUseBuffer(HudUniform lastBuffered) {
+        checkAbsolutePositionDirty();
+        return equals(lastBuffered) && !dirty;
+    }
+
+    private void checkAbsolutePositionDirty() {
+        AbsolutePosition absolutePosition = calcAbsoluteCenterPosition(HudRenderContext.getCurrent());
+        if (!absolutePosition.equals(lastAbsolutePosition)) {
+            dirty = true;
+            lastAbsolutePosition = absolutePosition;
+        }
     }
 
     public AbsolutePosition calcAbsolutePosition(HudRenderContext context) {
@@ -109,6 +111,51 @@ public class Layout implements HudUniform {
         } else {
             return this;
         }
+    }
+
+    public void setX(float x) {
+        this.dirty = true;
+        this.x = x;
+    }
+
+    public void setY(float y) {
+        this.dirty = true;
+        this.y = y;
+    }
+
+    public void setWidth(float width) {
+        this.dirty = true;
+        this.width = width;
+    }
+
+    public void setHeight(float height) {
+        this.dirty = true;
+        this.height = height;
+    }
+
+    public void setRadius(float radius) {
+        this.dirty = true;
+        this.radius = radius;
+    }
+
+    public void setHorizontalAlign(HorizontalAlign horizontalAlign) {
+        this.dirty = true;
+        this.horizontalAlign = horizontalAlign;
+    }
+
+    public void setVerticalAlign(VerticalAlign verticalAlign) {
+        this.dirty = true;
+        this.verticalAlign = verticalAlign;
+    }
+
+    public void setTargetElementName(String targetElementName) {
+        this.dirty = true;
+        this.targetElementName = targetElementName;
+    }
+
+    public void setParent(Layout parent) {
+        this.dirty = true;
+        this.parent = parent;
     }
 
     public record AbsolutePosition(float x, float y) {

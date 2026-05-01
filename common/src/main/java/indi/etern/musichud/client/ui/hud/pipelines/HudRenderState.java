@@ -26,8 +26,8 @@ public record HudRenderState(
                           @NonNull Matrix3x2f pose,
                           @NonNull Layout layout,
                           HudUniform... uniforms) {
-        this(pipeline, textureSetup, pose, layout.width, layout.height,
-                UniformDataUtils.getBounds(-layout.width / 2f, -layout.height / 2f, layout.width / 2f, layout.height / 2f, pose), uniforms);
+        this(pipeline, textureSetup, pose, layout.getWidth(), layout.getHeight(),
+                UniformDataUtils.getBounds(-layout.getWidth() / 2f, -layout.getHeight() / 2f, layout.getWidth() / 2f, layout.getHeight() / 2f, pose), uniforms);
     }
 
     @Override

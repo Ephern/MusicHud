@@ -33,7 +33,7 @@ public class ProgressRenderer implements HudRenderer {
 
     @Override
     public void render(HudRenderContext hudRenderContext) {
-        if (progressData == null || progressData.getLayout().height <= 0) return;
+        if (progressData == null || progressData.getLayout().getHeight() <= 0) return;
 
         Layout layout = progressData.getLayout();
         hudRenderContext.submitHudRenderState(

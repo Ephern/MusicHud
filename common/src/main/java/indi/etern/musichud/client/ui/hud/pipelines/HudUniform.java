@@ -10,7 +10,7 @@ public interface HudUniform extends DynamicUniformStorage.DynamicUniform {
     String getUBOName();
     int getUBOSize();
     void write(Std140Builder builder);
-    boolean dataEquals(HudUniform other);
+    boolean shouldUseBuffer(HudUniform lastBuffered);
     default void write(@NotNull ByteBuffer byteBuffer) {
         write(Std140Builder.intoBuffer(byteBuffer));
     }

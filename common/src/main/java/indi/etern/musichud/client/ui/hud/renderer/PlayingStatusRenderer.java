@@ -57,8 +57,8 @@ public class PlayingStatusRenderer implements HudRenderer {
             Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(hudRenderContext);
             int screenX = (int) absolutePosition.x();
             int screenY = (int) absolutePosition.y();
-            int width = (int) layout.width;
-            int height = (int) layout.height;
+            int width = (int) layout.getWidth();
+            int height = (int) layout.getHeight();
 
             float centerX = screenX + width / 2f;
             float centerY = screenY + height / 2f;

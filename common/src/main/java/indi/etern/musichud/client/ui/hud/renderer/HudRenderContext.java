@@ -53,7 +53,7 @@ public class HudRenderContext {
 
             // skip re-upload if same uniform data was already written last frame
             HudUniform lastWritten = lastWrittenUniforms.get(key);
-            if (lastWritten != null && lastWritten.dataEquals(uniform)) {
+            if (lastWritten != null && lastWritten.shouldUseBuffer(uniform)) {
                 GpuBufferSlice cachedSlice = lastSlices.get(key);
                 if (cachedSlice != null) {
                     uniformSlices.put(key, cachedSlice);

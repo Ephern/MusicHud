@@ -74,7 +74,7 @@ public class GradientTextData implements HudUniform {
     }
 
     @Override
-    public boolean dataEquals(HudUniform other) {
+    public boolean shouldUseBuffer(HudUniform lastBuffered) {
         return false;
     }
 
