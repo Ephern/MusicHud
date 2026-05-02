@@ -33,6 +33,7 @@ public final class MusicHud {
     @Getter
     @Setter
     private static Environment currentEnvironment;
+    private static long initAtMillis;
 
     public static Logger getLogger(Class<?> clazz) {
         Logger logger = LogManager.getLogger(LOGGER_BASE_NAME + "/" + clazz.getSimpleName());
@@ -47,6 +48,11 @@ public final class MusicHud {
         LOGGER.atLevel(Level.ALL);
         LOGGER.debug("Initialized in environment: {}", currentEnvironment);
         RegistrationManager.performCommonAutoRegistration();
+        initAtMillis = System.currentTimeMillis();
+    }
+
+    public static long getRunningMillis() {
+        return System.currentTimeMillis() - initAtMillis;
     }
 
     public static void onConfigLoaded() {

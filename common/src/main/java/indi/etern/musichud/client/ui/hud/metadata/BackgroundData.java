@@ -1,15 +1,19 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
+import com.mojang.blaze3d.buffers.Std140Builder;
+import com.mojang.blaze3d.buffers.Std140SizeCalculator;
+import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import indi.etern.musichud.client.ui.utils.ColorExtractor;
 import indi.etern.musichud.client.ui.utils.Mixable;
+import indi.etern.musichud.client.ui.utils.UniformDataUtils;
+import lombok.EqualsAndHashCode;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
 
-import java.util.Objects;
-
-public final class BackgroundData implements Mixable<BackgroundData> {
+@EqualsAndHashCode
+public final class BackgroundData implements Mixable<BackgroundData>, HudUniform {
     private final BackgroundImages image;
     private final ThemedColors colors;
     public static BackgroundData NONE = new BackgroundData(null, ColorExtractor.getDefaultColors());
@@ -43,20 +47,6 @@ public final class BackgroundData implements Mixable<BackgroundData> {
 
     public BackgroundImages image() {
         return image;
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (obj == this) return true;
-        if (obj == null || obj.getClass() != this.getClass()) return false;
-        var that = (BackgroundData) obj;
-        return Objects.equals(this.colors, that.colors) &&
-                Objects.equals(this.image, that.image);
-    }
-
-    @Override
-    public int hashCode() {
-        return Objects.hash(colors, image);
     }
 
     @Override
@@ -99,5 +89,30 @@ public final class BackgroundData implements Mixable<BackgroundData> {
         int rB = (int) (aB + (bB - aB) * t);
 
         return (rA << 24) | (rR << 16) | (rG << 8) | rB;
+    }
+
+    public static final int UBO_SIZE = new Std140SizeCalculator().putVec4().putVec4().putVec4().putVec4().align(16).get();
+
+    @Override
+    public String getUBOName() {
+        return "MHNowPlayingThemeColor";
+    }
+
+    @Override
+    public int getUBOSize() {
+        return UBO_SIZE;
+    }
+
+    @Override
+    public void write(Std140Builder builder) {
+        builder.putVec4(UniformDataUtils.colorToVector(colors.primary));
+        builder.putVec4(UniformDataUtils.colorToVector(colors.secondary));
+        builder.putVec4(UniformDataUtils.colorToVector(colors.bright));
+        builder.putVec4(UniformDataUtils.colorToVector(colors.dark));
+    }
+
+    @Override
+    public boolean shouldUseBuffer(HudUniform lastBuffered) {
+        return lastBuffered instanceof BackgroundData data && colors.equals(data.colors);
     }
 }

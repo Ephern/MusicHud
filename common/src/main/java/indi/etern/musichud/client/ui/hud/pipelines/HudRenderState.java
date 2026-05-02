@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.hud.pipelines;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.utils.UniformDataUtils;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -16,15 +17,17 @@ public record HudRenderState(
         @NonNull Matrix3x2f pose,
         float width,
         float height,
-        @Nullable ScreenRectangle bounds   // bounds 只用于裁剪，不作为顶点坐标
+        @Nullable ScreenRectangle bounds,
+        HudUniform[] uniforms
 ) implements GuiElementRenderState {
 
     public HudRenderState(@NonNull RenderPipeline pipeline,
                           @NonNull TextureSetup textureSetup,
                           @NonNull Matrix3x2f pose,
-                          float width, float height) {
-        this(pipeline, textureSetup, pose, width, height,
-                UniformDataUtils.getBounds(-width / 2f, -height / 2f, width / 2f, height / 2f, pose));
+                          @NonNull Layout layout,
+                          HudUniform... uniforms) {
+        this(pipeline, textureSetup, pose, layout.getWidth(), layout.getHeight(),
+                UniformDataUtils.getBounds(-layout.getWidth() / 2f, -layout.getHeight() / 2f, layout.getWidth() / 2f, layout.getHeight() / 2f, pose), uniforms);
     }
 
     @Override
@@ -33,11 +36,10 @@ public record HudRenderState(
         float right = width / 2f;
         float top = -height / 2f;
         float bottom = height / 2f;
-
-        consumer.addVertexWith2DPose(pose, right, bottom);
-        consumer.addVertexWith2DPose(pose, right, top);
-        consumer.addVertexWith2DPose(pose, left, top);
-        consumer.addVertexWith2DPose(pose, left, bottom);
+        consumer.addVertexWith2DPose(pose, right, bottom).setColor(-1);
+        consumer.addVertexWith2DPose(pose, right, top).setColor(-1);
+        consumer.addVertexWith2DPose(pose, left, top).setColor(-1);
+        consumer.addVertexWith2DPose(pose, left, bottom).setColor(-1);
     }
 
     @Nullable

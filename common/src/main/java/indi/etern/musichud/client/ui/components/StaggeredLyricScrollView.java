@@ -20,6 +20,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -59,7 +60,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private float[] stretchMillis;
     @Getter
     private float lastTargetScrollPosition;
-    private float startScrollPosition;
+    private float cumulativeBaseOffset;
+    private float prevScrollValue;
+    private boolean prevScrollInitialized;
+    private float baseOffsetAtRedirect;
+    private float[] staggerFromOffsets;
     private final Consumer<LyricLine> lyricLineUpdateListener = this::highlightLine;
     private final Runnable autoRecenterRunnable = new Runnable() {
         @Override
@@ -198,7 +203,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             justHighlightedLyricLine = lyricLine;
 
             if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.FOLLOW_LYRICS) {
-                scrollToLyric(target);
+                Duration duration = lyricLine.getDuration();
+                long lineDuration = duration != null ? duration.toMillis() : nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
+                scrollToLyric(target, lyricLine.getType() == LyricLine.Type.META_DATA || lineDuration < STAGGERED_BASE_DURATION_MILLIS / 2);
             }
         });
     }
@@ -212,7 +219,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (targetLine != null) {
             LyricLineView target = lyricLines.get(targetLine);
             if (target != null) {
-                scrollToLyric(target);
+                scrollToLyric(target, false);
             }
         }
     }
@@ -240,7 +247,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
         int targetScrollY = targetTop - dp(80);
         int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
-        targetScrollY = Math.max(0, Math.min(targetScrollY, maxScroll));
+        targetScrollY = Math.clamp(targetScrollY, 0, maxScroll);
 
         scrollController.abortAnimation();
         scrollController.setMaxScroll(maxScroll);
@@ -251,19 +258,17 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         scrollStatus = ScrollStatus.IDLE;
     }
 
-    private void scrollToLyric(LyricLineView target) {
+    private void scrollToLyric(LyricLineView target, boolean forceDisableStagger) {
         if (target == null || scrollController == null) return;
         int targetTop = target.getScrollPosition(this);
 
         int scrollViewHeight = getHeight();
         if (scrollViewHeight <= 0) {
-            post(() -> scrollToLyric(target));
+            post(() -> scrollToLyric(target, false));
             return;
         }
         int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
-        lastTargetScrollPosition = Math.max(0, Math.min(targetTop - dp(80), maxScroll));
-        int currentY = currentScrollPosition;
-        startScrollPosition = currentY;
+        lastTargetScrollPosition = Math.clamp(targetTop - dp(80), 0, maxScroll);
 
         int duration = (int) (STAGGERED_BASE_DURATION_MILLIS / 2);
         if (scrollStatus == ScrollStatus.IDLE) {
@@ -271,17 +276,33 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
 
         int targetIndex = lineList.indexOf(target);
+        boolean staggerJustStarted = !staggeredActive;
+        if (staggerJustStarted) {
+            staggerFromOffsets = null;
+        } else {
+            baseOffsetAtRedirect = cumulativeBaseOffset;
+            staggerFromOffsets = new float[lineList.size()];
+            for (int i = 0; i < lineList.size(); i++) {
+                staggerFromOffsets[i] = lineList.get(i).getTranslationY();
+            }
+        }
         calcLoggedDelay(targetIndex);
         startScrollMillis = Core.timeMillis();
-        if (targetIndex >= 0 && scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER) {
+        if (forceDisableStagger) {
+            staggeredActive = false;
+        } else if (targetIndex >= 0 && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
             staggeredActive = true;
         }
 
-        scrollController.scrollTo(currentY, 1);
-        scrollController.abortAnimation();
-        scrollController.scrollTo(lastTargetScrollPosition, duration);
-        scrollController.setStartValue(currentY);
+        //Force reset due to manual scroll makes scrollController value different to actual value
+        if (scrollController.getCurrValue() != currentScrollPosition) {
+            scrollController.scrollTo(currentScrollPosition, 0);
+            scrollController.abortAnimation();
+            prevScrollInitialized = false;
+        }
+
         scrollController.setMaxScroll(maxScroll);
+        scrollController.scrollTo(lastTargetScrollPosition, duration);
     }
 
     private void checkManualScrolling() {
@@ -372,7 +393,19 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         float elapsedMillis = ((float) currentTimeNanos / 1000000 - startScrollMillis);
         boolean anyActive = false;
 
-        float baseOffset = (scrollController.getCurrValue() - startScrollPosition) / 2;
+        float currentScrollValue = scrollController.getCurrValue();
+        if (prevScrollInitialized) {
+            cumulativeBaseOffset += (currentScrollValue - prevScrollValue) / 2.0f;
+        } else {
+            cumulativeBaseOffset = 0;
+            prevScrollInitialized = true;
+        }
+        prevScrollValue = currentScrollValue;
+        float baseOffset = cumulativeBaseOffset;
+
+        float scrollCompensation = staggerFromOffsets != null
+                ? baseOffset - baseOffsetAtRedirect
+                : baseOffset;
 
         firstStagger = false;
         for (int i = 0; i < lineList.size(); i++) {
@@ -385,8 +418,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             float lastTargetOffset = line.getTargetOffset(lastHighlightedLyricLine);
             float targetOffset = line.getTargetOffset(justHighlightedLyricLine);
 
+            float fromOffset = staggerFromOffsets != null
+                    ? staggerFromOffsets[i]
+                    : lastTargetOffset;
+
             if (elapsedMillis <= delay) {
-                line.setTranslationY(baseOffset + lastTargetOffset);
+                line.setTranslationY(fromOffset + scrollCompensation);
                 anyActive = true;
             } else {
                 float t = elapsedMillis - delay;
@@ -395,7 +432,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                     pushStaggering(line);
                     float progress = t / duration; // [0,1)
                     float eased = Easings.EASE_IN_OUT_QUINT.getInterpolation(progress);
-                    float offset = baseOffset * (1 - eased) + (targetOffset - lastTargetOffset) * eased + lastTargetOffset;
+                    float offset = fromOffset * (1 - eased) + targetOffset * eased + scrollCompensation * (1 - eased);
                     line.setTranslationY(offset);
                     anyActive = true;
                 } else {
@@ -407,6 +444,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (!anyActive && staggeredActive) {
             staggeredActive = false;
             delayMillis = null;
+            staggerFromOffsets = null;
+            prevScrollInitialized = false;
+            cumulativeBaseOffset = 0;
         }
     }
 

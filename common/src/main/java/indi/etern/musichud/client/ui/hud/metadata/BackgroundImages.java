@@ -1,7 +1,9 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
+import lombok.EqualsAndHashCode;
 import net.minecraft.resources.ResourceLocation;
 
+@EqualsAndHashCode
 public class BackgroundImages {
     public volatile ResourceLocation blurredLocation;
     public volatile ResourceLocation unblurredLocation;

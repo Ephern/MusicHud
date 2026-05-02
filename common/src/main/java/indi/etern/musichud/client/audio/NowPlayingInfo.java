@@ -32,7 +32,7 @@ public class NowPlayingInfo {
     private final Set<Consumer<LyricLine>> lyricLineUpdateListener = new HashSet<>();
     @Setter
     @Getter
-    private Duration updateInAdvanceDuration = Duration.of(800, ChronoUnit.MILLIS);
+    private Duration updateInAdvanceDuration = Duration.of(400, ChronoUnit.MILLIS);
     @Getter
     private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
     @Getter
@@ -112,6 +112,7 @@ public class NowPlayingInfo {
     public void switchMusicInfo(MusicDetail musicDetail, MusicDetail idleNextToPlay) {
         MusicDetail previous = currentlyPlayingMusicDetail;
         currentlyPlayingMusicDetail = musicDetail;
+        currentLyricLine = null;
         nextToPlayIdleMusicDetail = idleNextToPlay;
         if (!musicDetail.equals(MusicDetail.NONE)) {
             musicDuration = Duration.ofMillis(musicDetail.getDurationMillis());
@@ -124,9 +125,9 @@ public class NowPlayingInfo {
         if (!lyricInfo.equals(LyricInfo.NONE)) {
             try {
                 if (lyricInfo.withWordByWordLyric()) {
-                    lyricLines = WordByWordLyricParser.parse(lyricInfo);
+                    lyricLines = WordByWordLyricParser.parse(musicDetail);
                 } else {
-                    lyricLines = FullLineLyricParser.parse(lyricInfo);
+                    lyricLines = FullLineLyricParser.parse(musicDetail);
                 }
                 this.lyricLines = lyricLines;
                 this.atomicLyricLines.set(new ArrayDeque<>(lyricLines));
@@ -233,4 +234,5 @@ public class NowPlayingInfo {
         atomicLyricLines.set(null);
         currentLyricLine = null;
     }
+
 }

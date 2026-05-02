@@ -7,7 +7,7 @@
 
 #### A GUI-based Full Server Song Request Mod / Plugin
 
-> Due to service scope provided by Netease, this mod might not working good outside China
+> Due to service scope provided by NetEase, this mod might not work well outside China
 
 ## Related Links
 
@@ -42,12 +42,12 @@
 First of all, place the prerequisite mods (Architectury API, ModernUI, and Forge Config API Port—required only for Fabric) and the MusicHud jar file into the mods folder.
 
 #### Single-player or LAN Multi-player Host
-> Currently experimentally supports single-player mode.
+> Currently experimentally supported.
 
 All you need is to deploy an API server
 
 #### Multiplayer (join Server or LAN Multi-player)
-You don't need to deploy an API server, but the server or LAN multiplayer host to deploy MusicHUD and API server
+You don't need to deploy an API server, but the server or LAN multiplayer host needs to deploy MusicHUD and API server
 
 ### Server
 All you need is to deploy an API server
@@ -55,21 +55,21 @@ All you need is to deploy an API server
 ### How to Deploy an API server
 There are 2 methods to deploy
 #### Deploy bound with mod (recommend for client)
-> This method will allows MusicHUD to manage lifecycle by itself
+> This method allows to MusicHUD manage lifecycle of api server.
 >
-> Due to some limitations, API Server may not be auto-closed when game exit abnormal as crashes
+> Due to some limitations, API Server may not be auto-closed when game exit abnormal (e.g., due to a crash)
 
-1. **Login to GitHub** and goes to https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-and-pr.yml
+1. **Login to GitHub** and go to https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-and-pr.yml
 2. Click latest action runs in type "build-and-pr" and download platform binary artifacts matches to your pc/server
-3. Uncompress the binary executable file from ZIP file to {corepath}/music-hud/ and renames to `api` (`api.exe` on Windows)
+3. Uncompress the binary executable file from ZIP file to {corepath}/music-hud/ and rename it to `api` (`api.exe` on Windows)
 
-> Default path for plugin versions is `{corepath}/api(.exe)`
+> Default path for plugin versions is `{corepath}/api(.exe)`.
 > Or place it in anywhere and modify config `startupBinaryApiServerWhenLaunch` in game or in config file `music_hud-server.toml`
 
-#### Deploy seperately (recommend for server)
-1. Deploy Netease Cloud Music API Enhanced (https://github.com/neteasecloudmusicapienhanced/api-enhanced).
+#### Deploy separately (recommend for server)
+1. Deploy NetEase Cloud Music API Enhanced (https://github.com/neteasecloudmusicapienhanced/api-enhanced).
 2. If not using the default port (3000) of NCM API Enhanced or deploying on another server, modify the `serverApiBaseUrl` property in the config file.
-> Configuration file location: `/config/music_hud-server.toml`
+> Configuration file location: `/config/music_hud-server.toml`.
 
 ---
 ## CN version description
@@ -82,7 +82,7 @@ There are 2 methods to deploy
 
 [第三方bukkit插件实现 1](https://github.com/Shiroiame-Kusu/MusicHud-Bukkit) (1.0.5 stable -)
 
-[第三方bukkit插件实现 2](https://github.com/MOPELotus/MusicHud-Paper) (1.1.4 hotfix +,，目前已部分合并至主仓库)
+[第三方bukkit插件实现 2](https://github.com/MOPELotus/MusicHud-Paper) (1.1.4 hotfix +，目前已部分合并至主仓库)
 
 ## 前置依赖
 - ModernUI （仅客户端）
@@ -90,7 +90,7 @@ There are 2 methods to deploy
 - Architectury API （非插件版，1.2.0 以及更低版本）
 
 ## 特点
-- GUI 化， 提供游戏内操作界面，以及较为美观易配置的 HUD
+- GUI 化，提供游戏内操作界面，以及较为美观易配置的 HUD
 - 可读取网易云账户歌单，方便点歌
 - 服务端不保留用户数据，仅在登录时暂存
 - 流式播放，无赘余的客户端缓存
@@ -101,7 +101,7 @@ There are 2 methods to deploy
 - 搜索音乐
 - 通过二维码登录网易云账户，从用户歌单点歌
 - 全服同步播放列表
-- 配置歌单作为空闲播放源，服务器随机切歌，解放双手（？）
+- 配置歌单作为空闲播放源，服务器随机切歌
 - 在 HUD 和用户界面中展示歌词，点歌玩家（/头像）
 - 在用户界面中展示播放列表
 
@@ -110,8 +110,6 @@ There are 2 methods to deploy
 首先在 mods 文件夹中放入 Architectury API, ModernUI 和 Forge Config API Port (仅Fabric需要) 这几个前置 mod 和 MusicHud 的 jar 文件
 #### 单人模式 或 局域网联机主机
 > 目前对单人游戏和局域网联机主机提供实验性支持
->
-> 由于一些限制，在游戏非正常退出时（如崩溃）无法自动结束进程
 
 只需要部署 API 服务器
 
@@ -125,6 +123,8 @@ There are 2 methods to deploy
 两种方法
 #### 绑定在 mod 中（推荐客户端使用）
 > 这个方法会让 MusicHUD 管理 API 服务器生命周期
+>
+> 由于一些限制，在游戏非正常退出时（如崩溃）无法自动结束进程
 
 1. **登录到 GitHub** 并跳转到 https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-and-pr.yml
 2. 在 actions 类型中选择 "build-and-pr" 并进入最新的构建中根据你的平台下载对应的二进制构建产物
