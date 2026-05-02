@@ -60,8 +60,8 @@ public class HudRendererManager {
                 String text = lyricLine.getText();
                 String translatedText = lyricLine.getTranslatedText();
 
-                ScrollingLyricLineRenderer.TextStyle style1 = new ScrollingLyricLineRenderer.TextStyle(text, Theme.HUD_EMPHASIZE_COLOR);
-                ScrollingLyricLineRenderer.TextStyle style2 = new ScrollingLyricLineRenderer.TextStyle(translatedText, Theme.HUD_FADE_COLOR);
+                ScrollingLyricLineRenderer.TextStyle style1 = new ScrollingLyricLineRenderer.TextStyle(text, Theme.HUD_FADE_COLOR , Theme.HUD_EMPHASIZE_COLOR);
+                ScrollingLyricLineRenderer.TextStyle style2 = new ScrollingLyricLineRenderer.TextStyle(translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR);
 
                 Duration duration = lyricLine.getDuration();
                 long scrollMillis;

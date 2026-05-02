@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import icyllis.modernui.mc.FontResourceManager;
 import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
@@ -29,11 +30,17 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     private int cachedContainerWidth;
     @Setter
     private int lineSpacing = 0;
+
     public ScrollingLyricLineRenderer() {
-        try {
-            modernStringSplitter = TextLayoutEngine.getInstance().getStringSplitter();
-        } catch (Throwable t) {
-            MusicHud.getLogger(ScrollingLyricLineRenderer.class).debug("ModernTextEngine is disabled", t);
+        FontResourceManager fontResourceManager = FontResourceManager.getInstance();
+        if (fontResourceManager instanceof TextLayoutEngine layoutEngine) {
+            try {
+                modernStringSplitter = layoutEngine.getStringSplitter();
+            } catch (Throwable t) {
+                MusicHud.getLogger(ScrollingLyricLineRenderer.class).debug("ModernTextEngine is disabled", t);
+            }
+        } else {
+            MusicHud.getLogger(ScrollingLyricLineRenderer.class).debug("ModernTextEngine is disabled");
         }
 
         currentLine1 = new LineState();
@@ -44,8 +51,8 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
     public void clear() {
         setLines(
-                new TextStyle("", 0), 0,
-                new TextStyle("", 0), 0,
+                new TextStyle("", 0, 0), 0,
+                new TextStyle("", 0, 0), 0,
                 0
         );
     }
@@ -155,28 +162,6 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         return rawWidth * scale;
     }
 
-    private void renderLine(HudRenderContext context, LineState line, int baseX, int baseY, float lineHeight, float yOffset) {
-        if (line.config == null) return;
-        String text = line.config.text;
-        if (text.isEmpty()) return;
-
-        float scale = lineHeight / Minecraft.getInstance().font.lineHeight;
-        if (scale <= 0) return;
-
-        float scrollOffset = line.scrollOffset;
-
-        // 始终左对齐：起始X = baseX + scrollOffset
-        float drawX = baseX + scrollOffset;
-        float drawY = baseY + yOffset;
-
-        context.transform()
-                .translate(drawX, drawY)
-                .scale(scale)
-                .then(transforming -> {
-                    context.drawString(Minecraft.getInstance().font, text, 0, 0, line.config.color, false);
-                });
-    }
-
     private void updateAnimations() {
         long now = System.currentTimeMillis();
 
@@ -231,40 +216,94 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         float x = absolutePosition.x();
         float y = absolutePosition.y();
-        context.enableScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
+        scissor(context, x, y);
         if (isTransitioning && nextLine1.config != null && nextLine2.config != null) {
             // 旧文本向上移出
             float easedProgress = Easings.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
             float oldYOffset = -easedProgress * layout.getHeight();
-            renderLine(context, currentLine1, cachedContainerX, previousStartY, line1Height, oldYOffset);
-            renderLine(context, currentLine2, cachedContainerX, (int) (previousStartY + lineSpacing + line1Height), line2Height, oldYOffset);
+            renderLine(context, currentLine1, currentLine1.config.color2, cachedContainerX, previousStartY, line1Height, oldYOffset);
+            renderLine(context, currentLine2, currentLine2.config.color1, cachedContainerX, (int) (previousStartY + lineSpacing + line1Height), line2Height, oldYOffset);
 
             // 新文本从下方向上移入
             float newYOffset = (1 - easedProgress) * layout.getHeight();
-            renderLine(context, nextLine1, cachedContainerX, nextStartY, line1Height, newYOffset);
-            renderLine(context, nextLine2, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, newYOffset);
+            renderLine(context, nextLine1, nextLine1.config.color1, cachedContainerX, nextStartY, line1Height, newYOffset);
+            renderLine(context, nextLine2, nextLine2.config.color1, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, newYOffset);
         } else {
-            // 正常显示
-            renderLine(context, currentLine1, cachedContainerX, nextStartY, line1Height, 0);
-            renderLine(context, currentLine2, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, 0);
+            renderLine(context, currentLine1, currentLine1.config.color1, cachedContainerX, nextStartY, line1Height, 0);
+            renderLineHighlight(context, currentLine1, cachedContainerX, nextStartY, line1Height, y, x, getTextWidth(currentLine1.config.text, line1Height) / 3);
+
+            renderLine(context, currentLine2, currentLine2.config.color1, cachedContainerX, (int) (nextStartY + lineSpacing + line1Height), line2Height, 0);
         }
-        context.disableScissor();
+        context.popScissor();
+    }
+
+    private void renderLine(HudRenderContext context, LineState line, int color, int baseX, int baseY, float lineHeight, float yOffset) {
+        if (line.config == null) return;
+        String text = line.config.text;
+        if (text.isEmpty()) return;
+
+        float scale = lineHeight / Minecraft.getInstance().font.lineHeight;
+        if (scale <= 0) return;
+
+        float scrollOffset = line.scrollOffset;
+
+        // 始终左对齐：起始X = baseX + scrollOffset
+        float drawX = baseX + scrollOffset;
+        float drawY = baseY + yOffset;
+
+        context.transform()
+                .translate(drawX, drawY)
+                .scale(scale)
+                .then(transforming -> {
+                    context.drawString(Minecraft.getInstance().font, text, 0, 0, color, false);
+                });
+    }
+
+    private void renderLineHighlight(HudRenderContext context, LineState line, int baseX, int baseY, float lineHeight, float positionY, float highlightFromX, float highlightToX) {
+        if (line.config == null) return;
+        String text = line.config.text;
+        if (text.isEmpty()) return;
+
+        float scale = lineHeight / Minecraft.getInstance().font.lineHeight;
+        if (!(scale <= 0)) {
+            float scrollOffset = line.scrollOffset;// 始终左对齐：起始X = baseX + scrollOffset
+            float drawX = baseX + scrollOffset;
+            int toX = (int) (drawX + highlightToX);
+            context.pushScissor((int) highlightFromX, (int) positionY, toX, (int) (positionY + layout.getHeight()));
+            context.transform()
+                    .translate(drawX, (float) baseY)
+                    .scale(scale)
+                    .then(transforming -> {
+                        context.drawString(Minecraft.getInstance().font, text, 0, 0, line.config.color2, false);
+                    });
+            context.popScissor();
+        }
+    }
+
+    private void scissor(HudRenderContext context, float x, float y) {
+        context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
+    }
+
+    record LinePosition(float x, float y, float scale) {
     }
 
     private static class LineConfig {
         String text;
-        int color;
+        int color1;
+        int color2;
         long scrollMs;
 
         public LineConfig(TextStyle style, long scrollMs) {
             this.text = style.text;
-            this.color = style.baseColor;
+            this.color1 = style.color1;
+            this.color2 = style.color2;
             this.scrollMs = scrollMs;
         }
 
-        public LineConfig(String text, int color, long scrollMs) {
+        public LineConfig(String text, int color1, int color2, long scrollMs) {
             this.text = text;
-            this.color = color;
+            this.color1 = color1;
+            this.color2 = color2;
             this.scrollMs = scrollMs;
         }
 
@@ -272,7 +311,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         public boolean equals(Object obj) {
             if (this == obj) return true;
             if (!(obj instanceof LineConfig other)) return false;
-            return text.equals(other.text) && color == other.color && scrollMs == other.scrollMs;
+            return text.equals(other.text) && color1 == other.color1 && scrollMs == other.scrollMs;
         }
     }
 
@@ -297,7 +336,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         void copyFrom(LineState other) {
             if (other.config != null) {
-                this.config = new LineConfig(other.config.text, other.config.color, other.config.scrollMs);
+                this.config = new LineConfig(other.config.text, other.config.color1, other.config.color2, other.config.scrollMs);
             } else {
                 this.config = null;
             }
@@ -312,11 +351,13 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
     public static class TextStyle {
         public String text;
-        public int baseColor;
+        public int color1;
+        public int color2;
 
-        public TextStyle(String text, int baseColor) {
+        public TextStyle(String text, int color1, int color2) {
             this.text = text;
-            this.baseColor = baseColor;
+            this.color1 = color1;
+            this.color2 = color2;
         }
     }
 }

@@ -39,17 +39,15 @@ public class StreamAudioPlayer {
     private static final int BUFFER_COUNT = 4;
     private static final int BUFFER_SIZE = 65536;
     private static final Logger LOGGER = MusicHud.getLogger(StreamAudioPlayer.class);
+    private final static ClientConfig clientConfig = ClientConfig.getInstance();
     private static volatile StreamAudioPlayer instance = null;
-
     private final int[] buffers = new int[BUFFER_COUNT];
     private final AtomicBoolean initialized = new AtomicBoolean(false);
     private final AtomicReference<Status> status = new AtomicReference<>(Status.IDLE);
     private final BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(30); // 最大30个数据块的缓冲区
-
     @Getter
     private final Set<Consumer<Status>> statusChangeListener = new HashSet<>();
     private final AtomicLong totalBufferedBytes = new AtomicLong(0);
-    private final static ClientConfig clientConfig = ClientConfig.getInstance();
     ZonedDateTime currentStartTime;
     private int source = 0;
     private float lastVolume;
@@ -194,7 +192,8 @@ public class StreamAudioPlayer {
     @SuppressWarnings("BusyWait")
     private void playAudioWithRetry(CompletableFuture<ZonedDateTime> startPlayingFuture, ZonedDateTime serverStartTime) {
         boolean finished = false;
-        boolean futureFinished = startPlayingFuture.isDone() || startPlayingFuture.isCancelled() || startPlayingFuture.isCompletedExceptionally();
+        boolean serverStartTimeUpdated = startPlayingFuture.isDone() || startPlayingFuture.isCancelled() || startPlayingFuture.isCompletedExceptionally();
+        boolean futureFinished = serverStartTimeUpdated;
         try {
             // 等待一些数据缓冲
             while (shouldContinuePlaying && totalBufferedBytes.get() < BUFFER_SIZE * BUFFER_COUNT) {
@@ -254,11 +253,9 @@ public class StreamAudioPlayer {
                                     //noinspection SpellCheckingInspection
                                     checkALError("alSourceUnqueueBuffers");
 
-                                    // 从缓冲区获取音频数据，最多等待500ms
                                     byte[] audioData = audioBuffer.poll(500, TimeUnit.MILLISECONDS);
 
                                     if (audioData == null) {
-                                        // 没有数据可用
                                         if (audioBuffer.isEmpty() && NowPlayingInfo.getInstance().isCompleted()) {
                                             // 播放已完成且缓冲区为空，结束播放
                                             LOGGER.debug("No more audio data available");
@@ -280,11 +277,9 @@ public class StreamAudioPlayer {
                                         isBuffering = false;
                                         setStatus(Status.PLAYING);
                                     }
-                                    if (!futureFinished) {
-                                        ZonedDateTime time = serverStartTime == null ? ZonedDateTime.now() : serverStartTime;
-                                        this.serverStartTime = time;
-                                        startPlayingFuture.complete(time);
-                                        futureFinished = true;
+                                    if (!serverStartTimeUpdated) {
+                                        this.serverStartTime = serverStartTime == null ? ZonedDateTime.now() : serverStartTime;
+                                        serverStartTimeUpdated = true;
                                     }
 
                                     ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
@@ -302,6 +297,10 @@ public class StreamAudioPlayer {
                                     if (audioData.length == BUFFER_SIZE) { // 不是静音数据
                                         totalBufferedBytes.addAndGet(-audioData.length);
                                     }
+                                }
+                                if (!futureFinished) {
+                                    startPlayingFuture.complete(serverStartTime == null ? ZonedDateTime.now() : serverStartTime);
+                                    futureFinished = true;
                                 }
 
                                 int state = AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE);
@@ -434,6 +433,7 @@ public class StreamAudioPlayer {
 
                 // 下载完成
                 LOGGER.debug("Audio download completed");
+                shouldContinueDownloading = false;
                 break;
             } catch (InterruptedException e) {
                 LOGGER.debug("Download stopped by interruption");

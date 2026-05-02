@@ -5,41 +5,30 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Canvas;
 import icyllis.modernui.graphics.LinearGradient;
 import icyllis.modernui.graphics.Shader;
-import icyllis.modernui.graphics.text.FontMetricsInt;
-import icyllis.modernui.graphics.text.ShapedText;
-import icyllis.modernui.text.*;
-import icyllis.modernui.text.style.ReplacementSpan;
+import icyllis.modernui.text.Layout;
+import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.Easings;
-import lombok.EqualsAndHashCode;
 import lombok.Setter;
-import lombok.ToString;
+import lombok.extern.slf4j.Slf4j;
 
 import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.time.Duration;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.function.Function;
 
+@Slf4j
 public class LyricHighlightTextView extends TextView {
     private static final int fullLineHighlightDelay = 300;
     private static final int fullLineFadeDelay = -200;
     private static final int animationDurationMillis = 300;
-    private static final int durablePhraseMillis = 1000;
-    private static final int fullDurablePhraseMillis = 1500;
+    private final LyricLine lyricLine;
     private static final Duration animationDuration = Duration.ofMillis(animationDurationMillis);
-    private final List<Phrase> phrases;
-    private final boolean fullLineMode;
-    private final Map<Duration, Phrase> phraseMap;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    private final Duration lineStart;
-    private final Duration lineEnd;
+    private final Duration lineEndAnimationCallTime;
     private final float phraseRaiseY = dp(1) * 1.5f;
     private HighlightStatus status = HighlightStatus.WAITING;
     private Duration statusUpdateTime = Duration.ZERO;
@@ -49,56 +38,14 @@ public class LyricHighlightTextView extends TextView {
 
     public LyricHighlightTextView(Context context, LyricLine line) {
         super(context);
-        lineStart = line.getStartTime();
+        line.parsePhrases();
+        lyricLine = line;
+
         Duration lineDuration = line.getDuration();
-        if (lineDuration == null) {
-            lineEnd = nowPlayingInfo.getMusicDuration().minus(lineStart);
-        } else {
-            lineEnd = line.getStartTime().plus(lineDuration).minus(animationDuration);
-        }
-        Map<Duration, Integer> phraseEndingMap = line.getPhraseEndingMap();
-        int size = phraseEndingMap.size();
-        fullLineMode = phraseEndingMap.isEmpty();
-        phraseMap = new LinkedHashMap<>(size);
-        phrases = new ArrayList<>(size);
-        String text = line.getText();
+        lineEndAnimationCallTime = line.getStartTime().plus(lineDuration).minus(animationDuration);
 
-        SpannableString spannableString = new SpannableString(text);
-        if (!fullLineMode) {
-            int lastPhraseEnd = 0;
-            Duration lastEndTime = lineStart;
-            //LinkedHashMap
-            for (Map.Entry<Duration, Integer> entry : phraseEndingMap.entrySet()) {
-                Integer phraseEnd = entry.getValue();
-                Duration endTime = entry.getKey();
-                List<HighlightSpan> spans = new ArrayList<>(1);
-                int durationMillis = Math.toIntExact(endTime.minus(lastEndTime).toMillis());
-                if (durationMillis > durablePhraseMillis) {
-                    for (int i = lastPhraseEnd; i < phraseEnd; i++) {
-                        spans.add(applySpan(spannableString, i, i + 1));
-                    }
-                } else {
-                    spans.add(applySpan(spannableString, lastPhraseEnd, phraseEnd));
-                }
-                lastPhraseEnd = phraseEnd;
-                Phrase phrase = new Phrase(entry.getValue(), endTime, durationMillis, spans);
-                phraseMap.put(endTime, phrase);
-                phrases.add(phrase);
-                lastEndTime = endTime;
-            }
-        }
-        setText(spannableString);
+        setText(line.getSpannableString());
         getPaint().setLinearText(true);
-    }
-
-    private static HighlightSpan applySpan(SpannableString spannableString, int start, int end) {
-        HighlightSpan span = new HighlightSpan(0);
-        spannableString.setSpan(
-                span,
-                start, end,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-        );
-        return span;
     }
 
     public void emphasize() {
@@ -147,8 +94,9 @@ public class LyricHighlightTextView extends TextView {
         long range = layout.getLineRangeForDraw(canvas);
         if (range < 0) return;
 
-        Duration fadeAt = lineEnd.plusMillis(fullLineFadeDelay);
-        if (fullLineMode) {
+        Duration fadeAt = lineEndAnimationCallTime.plusMillis(fullLineFadeDelay);
+        List<LyricLine.Phrase> phrases = lyricLine.getPhrases();
+        if (!lyricLine.isWordByWord()) {
             if (statusUpdateProcessing) {
                 float fraction = (float) (getMillisBetween(playedDuration, statusUpdateTime) - fullLineHighlightDelay) / animationDurationMillis;
                 if (0 <= fraction && fraction < 1) {
@@ -160,7 +108,6 @@ public class LyricHighlightTextView extends TextView {
             }
             super.onDraw(canvas);
             if (playedDuration.compareTo(fadeAt) >= 0) {
-                phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));//TODO Animation
                 setStatus(HighlightStatus.DONE);
                 if (onFade != null) {
                     onFade.run();
@@ -178,10 +125,10 @@ public class LyricHighlightTextView extends TextView {
         int phraseIndex = binarySearchPhraseIndex(playedDuration);
         if (phraseIndex < 0) phraseIndex = 0;
         Duration phraseStart, phraseEnd;
-        Phrase currentPhrase;
+        LyricLine.Phrase currentPhrase;
         if (phraseIndex == 0) {
-            phraseStart = lineStart;
-            phraseEnd = phrases.getFirst().endTime;
+            phraseStart = lyricLine.getStartTime();
+            phraseEnd = phrases.getFirst().getEndTime();
             currentPhrase = phrases.get(phraseIndex);
         } else if (phraseIndex >= phrases.size()) {
             // 已经超过最后一个短语，整行显示强调色（已唱完）
@@ -195,14 +142,14 @@ public class LyricHighlightTextView extends TextView {
             }
             return;
         } else {
-            phraseStart = phrases.get(phraseIndex - 1).endTime;
+            phraseStart = phrases.get(phraseIndex - 1).getEndTime();
             currentPhrase = phrases.get(phraseIndex);
-            phraseEnd = currentPhrase.endTime;
+            phraseEnd = currentPhrase.getEndTime();
         }
         for (int i = 0; i < phraseIndex; i++) {
-            List<HighlightSpan> spans = phrases.get(i).spans;
-            for (HighlightSpan span : spans) {
-                span.yOffset = -phraseRaiseY;
+            List<LyricLine.HighlightSpan> spans = phrases.get(i).getSpans();
+            for (LyricLine.HighlightSpan span : spans) {
+                span.setYOffset(-phraseRaiseY);
             }
         }
         raisePhrase(currentPhrase, phraseStart, phraseEnd, playedDuration);
@@ -217,9 +164,9 @@ public class LyricHighlightTextView extends TextView {
         }
 
         long playedInPhrase = Math.min(playedDuration.minus(phraseStart).toMillis(), phraseDurationMillis);
-        Phrase lastPhrase = phraseMap.get(phraseStart);
-        int startOffset = lastPhrase == null ? 0 : lastPhrase.endOffset;
-        int endOffset = currentPhrase.endOffset;
+        LyricLine.Phrase lastPhrase = lyricLine.getPhraseEndDurationMap().get(phraseStart);
+        int startOffset = lastPhrase == null ? 0 : lastPhrase.getEndOffset();
+        int endOffset = currentPhrase.getEndOffset();
 
         int textLength = layout.getText().length();
         startOffset = Math.min(textLength, startOffset);
@@ -277,7 +224,7 @@ public class LyricHighlightTextView extends TextView {
         }
     }
 
-    private void raisePhrase(Phrase phrase, Duration startAt, Duration endAt, Duration now) {
+    private void raisePhrase(LyricLine.Phrase phrase, Duration startAt, Duration endAt, Duration now) {
         long startAtMillis = startAt.toMillis();
         long endAtMillis = endAt.toMillis();
         long nowMillis = now.toMillis();
@@ -285,11 +232,11 @@ public class LyricHighlightTextView extends TextView {
         long progressMillis = nowMillis - startAtMillis;
         if (totalDuration <= 0) return;
 
-        int spanCount = phrase.spans.size();
+        int spanCount = phrase.getSpans().size();
         if (spanCount == 1) {
-            HighlightSpan span = phrase.spans.getFirst();
+            LyricLine.HighlightSpan span = phrase.getSpans().getFirst();
             float t = Math.clamp((float) progressMillis / totalDuration, 0, 1);
-            span.yOffset = -phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t);
+            span.setYOffset(-phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t));
         } else {
             float staggerRate = 0.3f; // 错开比例，最后一个比第一个晚 totalDuration * staggerRate 毫秒
             long staggerDuration = (long) (totalDuration * staggerRate); // 错开总时长
@@ -297,20 +244,20 @@ public class LyricHighlightTextView extends TextView {
             if (animDuration <= 0) animDuration = 1;
 
             for (int i = 0; i < spanCount; i++) {
-                HighlightSpan span = phrase.spans.get(i);
+                LyricLine.HighlightSpan span = phrase.getSpans().get(i);
                 // 错开偏移量：i / (spanCount-1) * staggerDuration，最后一个偏移 staggerDuration
                 long delay = (i == spanCount - 1) ? staggerDuration : (long) ((double) i / (spanCount - 1) * staggerDuration);
                 long animStart = startAtMillis + delay;
                 if (nowMillis <= animStart) {
-                    span.yOffset = 0;
-                    span.scale = 1;
+                    span.setYOffset(0);
+                    span.setScale(1);
                 } else if (nowMillis >= animStart + animDuration) {
-                    span.yOffset = -phraseRaiseY;
-                    span.scale = 1;
+                    span.setYOffset(-phraseRaiseY);
+                    span.setScale(1);
                 } else {
                     float t = (float) (nowMillis - animStart) / animDuration;
-                    span.yOffset = -phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t);
-                    span.scale = 1 + 0.3f * Math.min(phrase.durationMillis , fullDurablePhraseMillis) / fullDurablePhraseMillis * quadratic(t);
+                    span.setYOffset(-phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t));
+                    span.setScale(1 + 0.3f * Math.min(phrase.getDurationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
                 }
             }
         }
@@ -320,14 +267,14 @@ public class LyricHighlightTextView extends TextView {
         return -f * (f - 1);
     }
 
-    private void lowerPhrase(Phrase phrase, Duration startAt, Duration endAt, Duration now) {
+    private void lowerPhrase(LyricLine.Phrase phrase, Duration startAt, Duration endAt, Duration now) {
         long startAtMillis = startAt.toMillis();
         long endAtMillis = endAt.toMillis();
         long nowMillis = now.toMillis();
         float t = Math.clamp((float) (nowMillis - startAtMillis) / (endAtMillis - startAtMillis), 0, 1);
         float yOffset = -phraseRaiseY * Easings.EASE_OUT_QUAD.getInterpolation(t);
 
-        phrase.spans.forEach(span -> span.yOffset = yOffset);
+        phrase.getSpans().forEach(span -> span.setYOffset(yOffset));
     }
 
     private long getMillisBetween(Duration duration1, Duration duration2) {
@@ -336,10 +283,11 @@ public class LyricHighlightTextView extends TextView {
 
     // 二分查找第一个结束时间 > playedDuration 的短语索引
     private int binarySearchPhraseIndex(Duration playedDuration) {
+        List<LyricLine.Phrase> phrases = lyricLine.getPhrases();
         int low = 0, high = phrases.size();
         while (low < high) {
             int mid = (low + high) >>> 1;
-            if (phrases.get(mid).endTime.compareTo(playedDuration) <= 0) {
+            if (phrases.get(mid).getEndTime().compareTo(playedDuration) <= 0) {
                 low = mid + 1;
             } else {
                 high = mid;
@@ -350,60 +298,4 @@ public class LyricHighlightTextView extends TextView {
 
     // 动画过渡相关
     public enum HighlightStatus {WAITING, PERFORMING, DONE}
-
-    @ToString
-    @EqualsAndHashCode
-    static final class Phrase {
-        private final Integer endOffset;
-        private final Duration endTime;
-        private final int durationMillis;
-        private final List<HighlightSpan> spans;
-
-        Phrase(Integer endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {
-            this.endOffset = endOffset;
-            this.endTime = endTime;
-            this.durationMillis = durationMillis;
-            this.spans = spans;
-        }
-    }
-
-    public static class HighlightSpan extends ReplacementSpan {
-        float yOffset;
-        float scale = 1;
-        ShapedText cachedShapedText;
-        int cachedWidth;
-        int textHeight;
-
-        public HighlightSpan(float yOffset) {
-            this.yOffset = yOffset;
-        }
-
-        @Override
-        public int getSize(@Nonnull TextPaint paint, CharSequence text,
-                           int start, int end, @Nullable FontMetricsInt fm) {
-            if (cachedShapedText == null) {
-                String subText = text.subSequence(start, end).toString();
-                cachedShapedText = TextShaper.shapeText(
-                        subText, 0, subText.length(),
-                        TextDirectionHeuristics.FIRSTSTRONG_LTR, paint
-                );
-                cachedWidth = Math.round(cachedShapedText.getAdvance());
-                textHeight = cachedShapedText.getDescent() - cachedShapedText.getAscent();
-            }
-            if (fm != null) {
-                paint.getFontMetricsInt(fm);
-            }
-            return cachedWidth;
-        }
-
-        @Override
-        public void draw(@Nonnull Canvas canvas, CharSequence text,
-                         int start, int end, float x, int top, int y, int bottom,
-                         @Nonnull TextPaint paint) {
-            canvas.save();
-            canvas.scale(scale, scale, x + 0.5f * cachedWidth, y + 0.5f * textHeight);
-            canvas.drawShapedText(cachedShapedText, x, y + yOffset, paint);
-            canvas.restore();
-        }
-    }
 }

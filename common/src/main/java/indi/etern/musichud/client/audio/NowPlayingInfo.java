@@ -125,9 +125,9 @@ public class NowPlayingInfo {
         if (!lyricInfo.equals(LyricInfo.NONE)) {
             try {
                 if (lyricInfo.withWordByWordLyric()) {
-                    lyricLines = WordByWordLyricParser.parse(lyricInfo);
+                    lyricLines = WordByWordLyricParser.parse(musicDetail);
                 } else {
-                    lyricLines = FullLineLyricParser.parse(lyricInfo);
+                    lyricLines = FullLineLyricParser.parse(musicDetail);
                 }
                 this.lyricLines = lyricLines;
                 this.atomicLyricLines.set(new ArrayDeque<>(lyricLines));
