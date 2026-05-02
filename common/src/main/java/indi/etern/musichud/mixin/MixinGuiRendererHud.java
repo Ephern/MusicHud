@@ -5,7 +5,7 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.vertex.VertexFormat;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.hud.renderer.HudRenderContext;
 import net.minecraft.client.gui.render.GuiRenderer;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -26,8 +26,9 @@ public class MixinGuiRendererHud {
                                     GpuBuffer $$4, VertexFormat.IndexType $$5,
                                     int $$6, int $$7, CallbackInfo ci,
                                     RenderPass renderPass) {
-        if (HudRendererManager.isLoaded()) {
-            HudRendererManager.getInstance().updateRenderPass(renderPass);
+        HudRenderContext ctx = HudRenderContext.getCurrent();
+        if (ctx != null) {
+            ctx.bindAllUniforms(renderPass);
         }
     }
 }

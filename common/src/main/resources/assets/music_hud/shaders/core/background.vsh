@@ -1,21 +1,11 @@
 #version 150
 
-layout(std140) uniform DynamicTransforms {
-    mat4 ModelViewMat;
-    vec4 ColorModulator;
-    vec3 ModelOffset;
-    mat4 TextureMat;
-    float LineWidth;
-};
-layout(std140) uniform Projection {
-    mat4 ProjMat;
-};
-layout(std140) uniform HudBackgroundParams {
+#moj_import <minecraft:dynamictransforms.glsl>
+#moj_import <minecraft:projection.glsl>
+
+layout(std140) uniform MHBasePosition {
     mat4 u_Translation;
-    vec4 u_RectParam;  // (halfWidth, halfHeight, radius, unused)
-    vec3 u_TransitionParam;  // (fadeProgress, nextImageAspect, imageAspect)
-    mat4 u_BgColors;
-//    float u_Progress; removed after 1.21.11
+    vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
 };
 
 in vec3 Position;
@@ -25,7 +15,7 @@ out vec2 f_Position;
 out vec4 f_Color;
 
 void main() {
-    f_Position = Position.xy;  // 直接使用原始坐标(相对于中心)
+    f_Position = Position.xy;
     f_Color = Color;
 
     vec4 localPos = u_Translation * vec4(Position, 1.0);

@@ -109,11 +109,11 @@ public class TextRenderer implements HudRenderer{
         // 更新过渡进度
         updateTransition();
 
-        if (currentTextData == null || layout.height <= 0 || layout.width <= 0) {
+        if (currentTextData == null || layout.getHeight() <= 0 || layout.getWidth() <= 0) {
             return;
         }
 
-        float scale = layout.height / 9;
+        float scale = layout.getHeight() / 9;
 
         // 应用位置和缩放
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
@@ -141,7 +141,7 @@ public class TextRenderer implements HudRenderer{
         String text = textData.text;
         if (text == null || text.isEmpty()) return;
 
-        String trimmedText = trimToWidth(text, layout.width / scale);
+        String trimmedText = trimToWidth(text, layout.getWidth() / scale);
         if (trimmedText.isEmpty()) return;
 
         // 计算带透明度的颜色
@@ -170,7 +170,7 @@ public class TextRenderer implements HudRenderer{
         if (currentTextData == null || currentTextData.text == null || currentTextData.text.isEmpty()) {
             return 0f;
         } else {
-            return measureWidth(currentTextData.text) * (layout.height / Minecraft.getInstance().font.lineHeight);
+            return measureWidth(currentTextData.text) * (layout.getHeight() / Minecraft.getInstance().font.lineHeight);
         }
     }
 

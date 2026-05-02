@@ -16,12 +16,12 @@ public enum HorizontalAlign {
     }, CENTER(MusicHud.MOD_ID + ".config.layout.horizontalAlign.CENTER", Gravity.CENTER) {
         @Override
         float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
-            return (float) renderContext.guiWidth() / 2 + x - hudLayout.width / 2;
+            return (float) renderContext.guiWidth() / 2 + x - hudLayout.getWidth() / 2;
         }
     }, RIGHT("music_hud.config.layout.horizontalAlign.RIGHT", Gravity.RIGHT) {
         @Override
         float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
-            return renderContext.guiWidth() - hudLayout.width - x;
+            return renderContext.guiWidth() - hudLayout.getWidth() - x;
         }
     };
 

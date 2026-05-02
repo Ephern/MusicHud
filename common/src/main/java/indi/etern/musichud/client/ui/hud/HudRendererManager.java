@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.hud;
 
-import com.mojang.blaze3d.systems.RenderPass;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
@@ -45,9 +44,9 @@ public class HudRendererManager {
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private final DateTimeFormatter LONG_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter SHORT_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("mm:ss");
+    private final HudRenderContext hudRenderContext = new HudRenderContext();
     private volatile HudRenderData hudBaseData;
     private volatile HudRenderData imageDisplayData;
-    private ProgressBarData progressBarData;
     @Setter
     private volatile Layout baseLayout;
     private float contentInterval;
@@ -60,8 +59,6 @@ public class HudRendererManager {
                 String text = lyricLine.getText();
                 String translatedText = lyricLine.getTranslatedText();
 
-                ScrollingLyricLineRenderer.TextStyle style1 = new ScrollingLyricLineRenderer.TextStyle(text, Theme.HUD_EMPHASIZE_COLOR);
-                ScrollingLyricLineRenderer.TextStyle style2 = new ScrollingLyricLineRenderer.TextStyle(translatedText, Theme.HUD_FADE_COLOR);
 
                 Duration duration = lyricLine.getDuration();
                 long scrollMillis;
@@ -72,12 +69,15 @@ public class HudRendererManager {
                 }
                 scrollMillis = (long) (scrollMillis * 0.8);
 
+                ScrollingLyricLineRenderer.Line style1 = new ScrollingLyricLineRenderer.Line(lyricLine, text, Theme.HUD_FADE_COLOR , Theme.HUD_EMPHASIZE_COLOR, scrollMillis);
+                ScrollingLyricLineRenderer.Line style2 = new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis);
+
                 try {
                     Thread.sleep(300);
                 } catch (InterruptedException ignored) {
                 }
 
-                LYRICS_LINE_RENDERER.setLines(style1, scrollMillis, style2, scrollMillis, 300);
+                LYRICS_LINE_RENDERER.setLines(style1, style2, 300);
             });
         });
     }
@@ -107,6 +107,7 @@ public class HudRendererManager {
 
     public void updateLayoutFromConfig() {
         Layout layout = new Layout(
+                "Base",
                 clientConfig.getHudOffsetX(),
                 clientConfig.getHudOffsetY(),
                 clientConfig.getHudWidth(),
@@ -125,34 +126,35 @@ public class HudRendererManager {
     }
 
     public void refreshStyle() {
-        if (baseLayout.radius > baseLayout.height / 2) {
-            baseLayout.radius = baseLayout.height / 2;
+        float halfHeight = baseLayout.getHeight() / 2;
+        if (baseLayout.getRadius() > halfHeight) {
+            baseLayout.setRadius(halfHeight);
         }
 
         BackgroundImages bgImage = getBackgroundImagesOrElse(null);
         configureBaseRenderer(baseLayout, bgImage);
 
         Layout baseLayout = hudBaseData.getLayout();
-        contentPadding = Math.max(baseLayout.height / 10, 3);
+        contentPadding = Math.max(baseLayout.getHeight() / 10, 3);
 
-        float imageHeightAndWidth = baseLayout.height - 2 * contentPadding;
-        float imageRadius = Math.clamp(baseLayout.radius - contentPadding, 0, imageHeightAndWidth / 2f);
-        Layout imageLayout = new Layout(contentPadding, contentPadding, imageHeightAndWidth, imageHeightAndWidth, imageRadius);
+        float imageHeightAndWidth = baseLayout.getHeight() - 2 * contentPadding;
+        float imageRadius = Math.clamp(baseLayout.getRadius() - contentPadding, 0, imageHeightAndWidth / 2f);
+        Layout imageLayout = new Layout("Album", contentPadding, contentPadding, imageHeightAndWidth, imageHeightAndWidth, imageRadius);
         imageLayout.setParent(baseLayout);
 
         configureImageRenderer(imageLayout);
 
-        float contentHeight = baseLayout.height - contentPadding * 2;
+        float contentHeight = baseLayout.getHeight() - contentPadding * 2;
         float contentUnit = Math.max(contentHeight / 32f, 1);
         float titleSize = contentUnit * 7;
         boolean showProgress = contentHeight > 14f;
 
-        float progressWidth = baseLayout.width - imageHeightAndWidth - 3 * contentPadding - baseLayout.radius / 3;
+        float progressWidth = baseLayout.getWidth() - imageHeightAndWidth - 3 * contentPadding - baseLayout.getRadius() / 3;
         float progressHeight = showProgress ? contentUnit * 2 : 0;
         float mainContentX = contentPadding + imageHeightAndWidth + contentPadding;
         float progressY = contentPadding + imageHeightAndWidth - progressHeight - 1;
         float progressRadius = progressHeight / 2;
-        Layout progressLayout = new Layout(mainContentX, progressY, progressWidth, progressHeight, progressRadius);
+        Layout progressLayout = new Layout("Progress", mainContentX, progressY, progressWidth, progressHeight, progressRadius);
         progressLayout.setParent(baseLayout);
 
         configureProgressRenderer(progressLayout);
@@ -175,41 +177,41 @@ public class HudRendererManager {
         float aboveProgressY = progressY - infoTextSize - contentInterval;
         float progressRightX = mainContentX + progressWidth;
 
-        Layout layout1 = new Layout(headX, titleY, titleSize, titleSize, 0f);
+        Layout layout1 = new Layout("PlayerHead", headX, titleY, titleSize, titleSize, 0f);
         layout1.setParent(baseLayout);
         PLAYER_HEAD_RENDERER.configure(layout1);
 
         float maxTitleWidth = progressWidth - titleSize - contentInterval;
 
-        Layout statusLayout = new Layout(statusX, titleY, titleSize, titleSize, 0f);
+        Layout statusLayout = new Layout("Status", statusX, titleY, titleSize, titleSize, 0f);
         statusLayout.setParent(baseLayout);
         PLAYING_STATUS_RENDERER.configure(statusLayout);
         if (maxTitleWidth - 1.25 * titleSize <= 0) {
             PLAYING_STATUS_RENDERER.setVisibility(false);
         }
 
-        Layout titleLayout = Layout.ofTextLayout(mainContentX, titleY, maxTitleWidth, titleSize);
+        Layout titleLayout = Layout.ofTextLayout("Title", mainContentX, titleY, maxTitleWidth, titleSize);
         titleLayout.setParent(baseLayout);
         TITLE_RENDERER.configure(titleLayout, Theme.EMPHASIZE_TEXT_COLOR, TextRenderer.Position.LEFT);
 
         float lyricHeight = contentHeight - titleSize - progressHeight - infoTextSize - contentInterval * 2;
-        Layout layout = new Layout(mainContentX, lyricsY, progressWidth, lyricHeight, 0);
+        Layout layout = new Layout("MainContent", mainContentX, lyricsY, progressWidth, lyricHeight, 0);
         layout.setParent(baseLayout);
         LYRICS_LINE_RENDERER.setLayout(layout);
         LYRICS_LINE_RENDERER.setLine1Height(lyricsSize);
         LYRICS_LINE_RENDERER.setLine2Height(subLyricsSize);
         LYRICS_LINE_RENDERER.setLineSpacing((int) contentInterval);
 
-        Layout artistAndAlbumLayout = Layout.ofTextLayout(mainContentX, aboveProgressY, progressWidth, infoTextSize);
+        Layout artistAndAlbumLayout = Layout.ofTextLayout("InfoText", mainContentX, aboveProgressY, progressWidth, infoTextSize);
         artistAndAlbumLayout.setParent(baseLayout);
-        Layout playTimeLayout = Layout.ofTextLayout(progressRightX, aboveProgressY, progressWidth, infoTextSize);
+        Layout playTimeLayout = Layout.ofTextLayout("PlayTimeText", progressRightX, aboveProgressY, progressWidth, infoTextSize);
         playTimeLayout.setParent(baseLayout);
         ARTISTS_AND_ALBUM_RENDERER.configure(artistAndAlbumLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.LEFT);
         PLAY_TIME_RENDERER.configure(playTimeLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.RIGHT);
     }
 
     private void configureProgressRenderer(Layout layout) {
-        progressBarData = new ProgressBarData(
+        PROGRESS_RENDERER.setProgressData(new ProgressBarData(
                 layout,
                 Theme.HUD_PROGRESS_LEFT,
                 Theme.HUD_PROGRESS_CURRENT,
@@ -217,8 +219,7 @@ public class HudRendererManager {
                 12f,
                 2f,
                 0.01f
-        );
-        PROGRESS_RENDERER.setProgressData(progressBarData);
+        ));
     }
 
     private void configureBaseRenderer(@NotNull Layout layout, BackgroundImages bgImage) {
@@ -300,7 +301,6 @@ public class HudRendererManager {
         transitionable.startTransition(nextData);
     }
 
-    HudRenderContext hudRenderContext = new HudRenderContext();
     public void renderFrame(GuiGraphics graphics, DeltaTracker deltaTracker) {
         if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
             return;
@@ -312,7 +312,6 @@ public class HudRendererManager {
             return;
         }
         hudBaseData.getTransitionableBackground().updateTransition();
-        progressBarData.setProgress(nowPlayingInfo.getProgressRate());
 
         Duration playedDuration = nowPlayingInfo.getPlayedDuration();
         Duration musicDuration = nowPlayingInfo.getMusicDuration();
@@ -336,27 +335,22 @@ public class HudRendererManager {
         PLAYING_STATUS_RENDERER.render(hudRenderContext);
         PROGRESS_RENDERER.render(hudRenderContext);
 
-        float progressWidth = PROGRESS_RENDERER.getProgressData().getLayout().width;
+        float progressWidth = PROGRESS_RENDERER.getProgressData().getLayout().getWidth();
         Layout titleLayout = TITLE_RENDERER.getLayout();
-        float titleMaxWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().width - contentInterval;
+        float titleMaxWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().getWidth() - contentInterval;
         if (PLAYING_STATUS_RENDERER.isVisible()) {
-            titleLayout.width = titleMaxWidth - contentPadding - PLAYING_STATUS_RENDERER.getLayout().width;
+            titleLayout.setWidth(titleMaxWidth - contentPadding - PLAYING_STATUS_RENDERER.getLayout().getWidth());
         } else {
-            titleLayout.width = titleMaxWidth;
+            titleLayout.setWidth(titleMaxWidth);
         }
 
         TITLE_RENDERER.render(hudRenderContext);
         LYRICS_LINE_RENDERER.render(hudRenderContext);
 
-        ARTISTS_AND_ALBUM_RENDERER.getLayout().width = progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - 1f;
+        ARTISTS_AND_ALBUM_RENDERER.getLayout().setWidth(progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - 1f);
         ARTISTS_AND_ALBUM_RENDERER.render(hudRenderContext);
         PLAY_TIME_RENDERER.render(hudRenderContext);
-    }
 
-    public void updateRenderPass(RenderPass renderPass) {
-        hudRenderContext.updateRenderPass(renderPass);
-//        BACKGROUND_RENDERER.updateRenderPass(renderPass);
-//        IMAGE_RENDERER.updateRenderPass(renderPass);
-//        PROGRESS_RENDERER.updateRenderPass(renderPass);
+        hudRenderContext.prepareUniforms();
     }
 }
