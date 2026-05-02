@@ -47,7 +47,6 @@ public class HudRendererManager {
     private final HudRenderContext hudRenderContext = new HudRenderContext();
     private volatile HudRenderData hudBaseData;
     private volatile HudRenderData imageDisplayData;
-    private ProgressBarData progressBarData;
     @Setter
     private volatile Layout baseLayout;
     private float contentInterval;
@@ -60,8 +59,6 @@ public class HudRendererManager {
                 String text = lyricLine.getText();
                 String translatedText = lyricLine.getTranslatedText();
 
-                ScrollingLyricLineRenderer.TextStyle style1 = new ScrollingLyricLineRenderer.TextStyle(text, Theme.HUD_FADE_COLOR , Theme.HUD_EMPHASIZE_COLOR);
-                ScrollingLyricLineRenderer.TextStyle style2 = new ScrollingLyricLineRenderer.TextStyle(translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR);
 
                 Duration duration = lyricLine.getDuration();
                 long scrollMillis;
@@ -72,12 +69,15 @@ public class HudRendererManager {
                 }
                 scrollMillis = (long) (scrollMillis * 0.8);
 
+                ScrollingLyricLineRenderer.Line style1 = new ScrollingLyricLineRenderer.Line(lyricLine, text, Theme.HUD_FADE_COLOR , Theme.HUD_EMPHASIZE_COLOR, scrollMillis);
+                ScrollingLyricLineRenderer.Line style2 = new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis);
+
                 try {
                     Thread.sleep(300);
                 } catch (InterruptedException ignored) {
                 }
 
-                LYRICS_LINE_RENDERER.setLines(style1, scrollMillis, style2, scrollMillis, 300);
+                LYRICS_LINE_RENDERER.setLines(style1, style2, 300);
             });
         });
     }
@@ -211,7 +211,7 @@ public class HudRendererManager {
     }
 
     private void configureProgressRenderer(Layout layout) {
-        progressBarData = new ProgressBarData(
+        PROGRESS_RENDERER.setProgressData(new ProgressBarData(
                 layout,
                 Theme.HUD_PROGRESS_LEFT,
                 Theme.HUD_PROGRESS_CURRENT,
@@ -219,8 +219,7 @@ public class HudRendererManager {
                 12f,
                 2f,
                 0.01f
-        );
-        PROGRESS_RENDERER.setProgressData(progressBarData);
+        ));
     }
 
     private void configureBaseRenderer(@NotNull Layout layout, BackgroundImages bgImage) {

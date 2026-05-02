@@ -122,7 +122,7 @@ public class LyricHighlightTextView extends TextView {
         }
 
         // 使用二分查找定位当前短语索引
-        int phraseIndex = binarySearchPhraseIndex(playedDuration);
+        int phraseIndex = lyricLine.binarySearchPhraseIndex(playedDuration);
         if (phraseIndex < 0) phraseIndex = 0;
         Duration phraseStart, phraseEnd;
         LyricLine.Phrase currentPhrase;
@@ -279,21 +279,6 @@ public class LyricHighlightTextView extends TextView {
 
     private long getMillisBetween(Duration duration1, Duration duration2) {
         return duration1.minus(duration2).toMillis();
-    }
-
-    // 二分查找第一个结束时间 > playedDuration 的短语索引
-    private int binarySearchPhraseIndex(Duration playedDuration) {
-        List<LyricLine.Phrase> phrases = lyricLine.getPhrases();
-        int low = 0, high = phrases.size();
-        while (low < high) {
-            int mid = (low + high) >>> 1;
-            if (phrases.get(mid).getEndTime().compareTo(playedDuration) <= 0) {
-                low = mid + 1;
-            } else {
-                high = mid;
-            }
-        }
-        return low; // 返回第一个大于 playedDuration 的索引，可能等于 size()
     }
 
     // 动画过渡相关

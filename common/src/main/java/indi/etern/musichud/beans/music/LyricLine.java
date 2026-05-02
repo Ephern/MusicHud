@@ -118,20 +118,35 @@ public class LyricLine implements Comparable<LyricLine> {
         return span;
     }
 
+    // 二分查找第一个结束时间 > playedDuration 的短语索引
+    public int binarySearchPhraseIndex(Duration playedDuration) {
+        List<Phrase> phrases = getPhrases();
+        int low = 0, high = phrases.size();
+        while (low < high) {
+            int mid = (low + high) >>> 1;
+            if (phrases.get(mid).getEndTime().compareTo(playedDuration) <= 0) {
+                low = mid + 1;
+            } else {
+                high = mid;
+            }
+        }
+        return low; // 返回第一个大于 playedDuration 的索引，可能等于 size()
+    }
+
     public enum Type {
-        NORMAL, META_DATA, RHYTHM;
+        NORMAL, META_DATA, RHYTHM
     }
 
     @ToString
     @EqualsAndHashCode
     @Getter
     public static final class Phrase {
-        private final Integer endOffset;
+        private final int endOffset;
         private final Duration endTime;
         private final int durationMillis;
         private final List<HighlightSpan> spans;
 
-        public Phrase(Integer endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {
+        public Phrase(int endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {
             this.endOffset = endOffset;
             this.endTime = endTime;
             this.durationMillis = durationMillis;
