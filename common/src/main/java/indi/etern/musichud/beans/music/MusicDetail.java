@@ -15,7 +15,7 @@ import java.util.Objects;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MusicDetail {
-    public static final StreamCodec<RegistryFriendlyByteBuf, MusicDetail> CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, MusicDetail> CODEC = Codecs.composite(
             ByteBufCodecs.STRING_UTF8,
             MusicDetail::getName,
             ByteBufCodecs.VAR_LONG,

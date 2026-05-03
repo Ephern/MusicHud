@@ -19,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Playlist implements MusicCollection {
-    public static final StreamCodec<RegistryFriendlyByteBuf, Playlist> CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, Playlist> CODEC = Codecs.composite(
             ByteBufCodecs.VAR_LONG,
             Playlist::getId,
             ByteBufCodecs.STRING_UTF8,

@@ -1,6 +1,6 @@
 package indi.etern.musichud.fabric;
 
-import fuzs.forgeconfigapiport.fabric.api.v5.ModConfigEvents;
+import fuzs.forgeconfigapiport.fabric.api.neoforge.v4.NeoForgeModConfigEvents;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
@@ -21,7 +21,7 @@ public final class CommonInitializer implements ModInitializer {
         ServerConfig serverConfig = ServerConfig.getInstance();
         ClientConfig clientConfig = ClientConfig.getInstance();
         MusicHud.init();
-        ModConfigEvents.loading(MusicHud.MOD_ID).register(modConfig -> {
+        NeoForgeModConfigEvents.loading(MusicHud.MOD_ID).register(modConfig -> {
             IConfigSpec modConfigSpec = modConfig.getSpec();
             if (modConfigSpec.equals(ServerConfigDefinition.configure.getRight())) {
                 serverConfig.setConfigured(true);

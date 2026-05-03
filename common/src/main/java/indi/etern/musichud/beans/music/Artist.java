@@ -17,7 +17,7 @@ import java.util.concurrent.CompletableFuture;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Artist {
-    public static final StreamCodec<RegistryFriendlyByteBuf,Artist> CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf,Artist> CODEC = Codecs.composite(
             ByteBufCodecs.VAR_LONG,
             Artist::getId,
             ByteBufCodecs.STRING_UTF8,

@@ -12,20 +12,20 @@ public class HudRenderPipelines {
     // Note: ProjMat and ModelViewMat are plain uniforms from moj_import (not UBOs in 1.21.1)
 
     public static final HudShaderProgram BACKGROUND = HudShaderManager.getOrCreate(
-            MusicHud.location("core/background"),
-            MusicHud.location("core/background"),
+            MusicHud.location("shaders/core/background.vsh"),
+            MusicHud.location("shaders/core/background.fsh"),
             Map.of("MHBasePosition", 2, "MHNowPlayingThemeColor", 3, "MHDynamicStatus", 4)
     );
 
     public static final HudShaderProgram ROUNDED_ALBUM = HudShaderManager.getOrCreate(
-            MusicHud.location("core/album_image"),
-            MusicHud.location("core/album_image"),
+            MusicHud.location("shaders/core/album_image.vsh"),
+            MusicHud.location("shaders/core/album_image.fsh"),
             Map.of("MHAlbumPosition", 2, "MHDynamicStatus", 4)
     );
 
     public static final HudShaderProgram PROGRESS_BAR = HudShaderManager.getOrCreate(
-            MusicHud.location("core/progress_bar"),
-            MusicHud.location("core/progress_bar"),
+            MusicHud.location("shaders/core/progress_bar.vsh"),
+            MusicHud.location("shaders/core/progress_bar.fsh"),
             Map.of("MHProgressPosition", 2, "MHProgressStyle", 3, "MHDynamicStatus", 4)
     );
 }

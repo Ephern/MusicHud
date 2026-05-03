@@ -69,3 +69,69 @@ The `architectury_enabled_platforms` property in `gradle.properties` only lists 
 - Languages: `en_us`, `zh_cn`, `zh_hk`, `zh_tw`.
 - Custom GL shaders (`.vsh`/`.fsh`) for album cover, progress bar, fluid background.
 - `gradle.bac/` is a backup of a previous Gradle wrapper — not the active one (`gradle/` is live).
+
+## 1.21.8 → 1.21.1 Migration Status
+
+**Target**: Downgrade from MC 1.21.6~1.21.8 to 1.21.1 while preserving the custom shader-based HUD rendering.
+
+### gradle.properties changes
+- `minecraft_version = 1.21.1`
+- `minecraft_version_range = 1.21.1`
+- `parchment_version = 2024.11.17` (was 2025.07.20 for 1.21.8)
+- Fabric/NeoForge loader/api/forge_config versions adjusted accordingly
+
+### Removed APIs (1.21.6+ → 1.21.1)
+| 1.21.6+ API | 1.21.1 Replacement |
+|---|---|
+| `GuiRenderer` / `executeDrawRange()` | Does not exist — draw directly via `BufferUploader.draw()` |
+| `GuiRenderState` / `GuiElementRenderState` | Does not exist — render immediately in `HudRenderContext` |
+| `TextureSetup` | `RenderSystem.setShaderTexture(int, int)` with raw GL texture IDs |
+| `DynamicUniformStorage` | Custom UBO management via `HudShaderProgram.UniformBufferHandle` |
+| `RenderPipeline` / `RenderPipeline.Snippet` | `HudShaderManager` (raw GL program) or could use `ShaderInstance` |
+| `BlendFunction` / `UniformType` | Direct GL calls or `RenderSystem.enableBlend()` |
+| `SoundEngine.PlayResult` | Does not exist — `play()` returns `void` |
+| `RenderPipelines.GUI_TEXTURED` | Standard `GuiGraphics.blit()` |
+| `ByteBufCodecs.LONG` | `ByteBufCodecs.VAR_LONG` |
+| `DynamicTexture(Supplier, NativeImage)` | `DynamicTexture(NativeImage)` |
+| `NativeImage.getPixel()` / `getPointer()` | `getPixelRGBA()` / `.pixels` field via `VarHandle` |
+
+### Files created/replaced
+| File | Purpose |
+|---|---|
+| `Std140BufferWriter.java` | Replaces `Std140Builder`/`Std140SizeCalculator`. Writes std140-aligned data to `ByteBuffer`. Has inner `Calculator` for size computation. |
+| `HudShaderManager.java` | Compiles GLSL shaders from resource locations. Handles `#moj_import` resolution (hardcoded for `dynamictransforms.glsl` → `uniform mat4 ModelViewMat;` and `projection.glsl` → `uniform mat4 ProjMat;` since 1.21.1 ResourceManager can't read vanilla jar-internal shader includes). |
+| `HudShaderProgram.java` | Wraps compiled GL program ID + UBO binding point map + uniform location cache for `ProjMat`/`ModelViewMat`. Contains `UniformBufferHandle` for raw UBO management (`glGenBuffers` → `glBindBufferBase`). |
+
+### Files modified (rendering core)
+| File | Changes |
+|---|---|
+| `HudRenderContext.java` | Rewrote to call `glUseProgram` + upload UBOs + `BufferUploader.draw()` (MC-native vertex upload/draw, no shader interference). `currentPose()` strips translation (element position from UBO). `blit()` signatures match 1.21.1 `GuiGraphics` API. `Transforming` class uses `PoseStack` (not `Matrix3x2fStack`). |
+| `HudRenderState.java` | Removed `implements GuiElementRenderState`. `RenderPipeline` → `HudShaderProgram`. `TextureSetup` → `Integer[]` (raw texture IDs). |
+| `ProgressBarRenderState.java` | Same — removed `GuiElementRenderState`, `TextureSetup`, `RenderPipeline`. |
+| `HudRenderPipelines.java` | `RenderPipeline` fields → `HudShaderProgram` fields via `HudShaderManager.getOrCreate()`. UBO binding points: 2=Position, 3=Theme/Color, 4=DynamicStatus. |
+| `RenderStateUtil.java` | Stub — no-op since rendering is direct, not state-submission-based. |
+| `HudUniform.java` | Removed `extends DynamicUniformStorage.DynamicUniform`. `write(Std140Builder)` → `write(Std140BufferWriter)`. |
+| `Layout.java` / `BackgroundData.java` / `ProgressBarData.java` / `DynamicStatusUniform.java` | Import `Std140BufferWriter` instead of `Std140Builder`/`Std140SizeCalculator`. |
+| `BackgroundRenderer.java` / `AlbumImageRenderer.java` / `ProgressRenderer.java` | `TextureSetup` removed. Album textures passed as raw GL IDs (`DynamicTexture.getId()`). |
+| `PlayerHeadRenderer.java` / `PlayingStatusRenderer.java` | `RenderPipelines.GUI_TEXTURED` removed — uses legacy `blit()` signatures. |
+| `MixinGuiRendererHud.java` | Empty class — mixin removed from `music_hud.mixins.json` (target `GuiRenderer` doesn't exist). |
+| `SoundEngineMixin.java` | `CallbackInfoReturnable<SoundEngine.PlayResult>` → `CallbackInfo` (void return). |
+| `music_hud.mixins.json` | Removed `MixinGuiRendererHud` from client mixins. |
+| `ImageUtils.java` | `NativeImage.getPointer()` → VarHandle-reflected `.pixels` field. `DynamicTexture` constructor fixed. |
+| `ColorExtractor.java` | `NativeImage.getPixel()` → `getPixelRGBA()`. |
+| `Version.java` | `RegistryFriendlyByteBuf.readLongArray()` → manual `readLong`/`writeLong` codec. |
+
+### Known issues (in progress)
+1. **No visible rendering** — current `glUseProgram` + UBO + `BufferUploader.draw()` produces no output and no GL errors. Suspected cause: UBO-based shaders (`layout(std140) uniform ...`) conflict with MC 1.21.1's `#version 150` uniform-based pipeline. MC's `ShaderInstance`/`Uniform` classes don't support UBOs — all MC shaders use `#version 150` with independent `uniform` variables.
+2. **Two migration paths forward**:
+   - **Path A (keep UBOs)**: Fix invisible rendering bug in current code (verify shader link status, UBO bindings reach the shader, vertex coordinates are in clip space). Requires ongoing raw GL management.
+   - **Path B (MC-native uniforms)**: Create JSON shader definitions at `assets/music_hud/shaders/core/`, rewrite `.vsh`/`.fsh` to use `#version 150` independent `uniform` variables instead of UBO blocks, use `ShaderInstance` + `BufferUploader.drawWithShader()` for zero raw GL. Recommended for long-term stability.
+
+### 1.21.1 Rendering architecture notes
+- `ShaderInstance` loads shaders from JSON at `shaders/core/{name}.json` → reads `.vsh`/`.fsh` via `Program.compileShader()` → `GlslPreprocessor` handles `#moj_import` → links via `ProgramManager.linkShader()`
+- All MC GUI shaders use `#version 150` with `in`/`out` varyings, **not** UBO
+- `BufferUploader.drawWithShader(MeshData)` calls `shader.setDefaultUniforms()` → `shader.apply()` → `draw()` → `shader.clear()` — handles entire draw cycle
+- `BufferUploader.draw(MeshData)` only uploads + draws without touching shader — safe to use with custom `glUseProgram`
+- `RenderSystem.setShader(Supplier<ShaderInstance>)` sets current shader; `RenderSystem.getShader()` returns it
+- `VertexFormat.setupBufferState()` / `clearBufferState()` manage VAO attribute pointers
+- `VertexBuffer.bind()` must be called **before** `upload()` so `setupBufferState()` writes to the correct VAO
