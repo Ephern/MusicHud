@@ -7,7 +7,6 @@ import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
 import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
@@ -36,12 +35,12 @@ public class AlbumImageRenderer implements HudRenderer {
     public void render(HudRenderContext context) {
         if (currentData == null) return;
 
-        TextureSetup textureSetup = getMixedTextureSetup();
+        Integer[] textureIds = getMixedTextureIds();
         Layout layout = currentData.getLayout();
 
         HudRenderState hudRenderState = new HudRenderState(
                 HudRenderPipelines.ROUNDED_ALBUM,
-                textureSetup,
+                textureIds,
                 context.currentPose(),
                 layout,
                 layout,
@@ -50,7 +49,7 @@ public class AlbumImageRenderer implements HudRenderer {
         context.submitHudRenderState(hudRenderState);
     }
 
-    private @NotNull TextureSetup getMixedTextureSetup() {
+    private Integer[] getMixedTextureIds() {
         var background = currentData.getTransitionableBackground();
         BackgroundData next = background.getNext();
         BackgroundData current = background.getCurrent();
@@ -59,15 +58,11 @@ public class AlbumImageRenderer implements HudRenderer {
         DynamicTexture currentTexture = getDynamicTexture(currentUnblurredLocation);
         DynamicTexture nextTexture = getDynamicTexture(nextUnblurredLocation);
         DynamicTexture transitionTexture = background.isTransitioning() ? nextTexture : currentTexture;
-        TextureSetup textureSetup;
-        if (currentTexture != null) {
-            textureSetup = transitionTexture != null ?
-                    TextureSetup.doubleTexture(currentTexture.getTextureView(), transitionTexture.getTextureView())
-                    : TextureSetup.singleTexture(currentTexture.getTextureView());
-        } else {
-            textureSetup = TextureSetup.noTexture();
-        }
-        return textureSetup;
+
+        Integer sampler0 = currentTexture != null ? currentTexture.getId() : null;
+        Integer sampler1 = (background.isTransitioning() && nextTexture != null) ? nextTexture.getId() : null;
+
+        return new Integer[] { sampler0, sampler1 };
     }
 
     private DynamicTexture getDynamicTexture(ResourceLocation imageLocation) {

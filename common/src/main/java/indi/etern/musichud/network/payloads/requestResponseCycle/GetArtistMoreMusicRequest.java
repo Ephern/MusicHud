@@ -17,7 +17,7 @@ import java.util.List;
 
 public record GetArtistMoreMusicRequest(long id, int offset) implements C2SPayload {
     public static StreamCodec<RegistryFriendlyByteBuf, GetArtistMoreMusicRequest> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             GetArtistMoreMusicRequest::id,
             ByteBufCodecs.INT,
             GetArtistMoreMusicRequest::offset,

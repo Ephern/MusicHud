@@ -13,7 +13,7 @@ import net.minecraft.network.codec.StreamCodec;
 public record PhonePasswordLoginRequest(long phone, String md5password) implements C2SPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, PhonePasswordLoginRequest> CODEC =
             StreamCodec.composite(
-                    ByteBufCodecs.LONG,
+                    ByteBufCodecs.VAR_LONG,
                     PhonePasswordLoginRequest::phone,
                     ByteBufCodecs.STRING_UTF8,
                     PhonePasswordLoginRequest::md5password,

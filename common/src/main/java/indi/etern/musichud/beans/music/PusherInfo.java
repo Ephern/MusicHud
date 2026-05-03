@@ -14,7 +14,7 @@ import java.util.UUID;
 
 public final class PusherInfo {
     public static final StreamCodec<RegistryFriendlyByteBuf, PusherInfo> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             PusherInfo::getUid,
             Codecs.UUID,
             PusherInfo::getPlayerUUID,

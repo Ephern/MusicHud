@@ -12,7 +12,7 @@ import net.minecraft.network.codec.StreamCodec;
 
 public record VoteSkipCurrentMusicMessage(long id) implements C2SPayload {
     public static StreamCodec<RegistryFriendlyByteBuf, VoteSkipCurrentMusicMessage> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             VoteSkipCurrentMusicMessage::id,
             VoteSkipCurrentMusicMessage::new
     );

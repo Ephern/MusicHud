@@ -5,7 +5,6 @@ import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
 
 public class PlayingStatusRenderer implements HudRenderer {
@@ -68,7 +67,7 @@ public class PlayingStatusRenderer implements HudRenderer {
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
                     .then(transforming -> {
-                        hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentResourceLocation, screenX, screenY, 0, 0, width, height, width, height);
+                        hudRenderContext.blit(currentResourceLocation, screenX, screenY, 0, 0, width, height, width, height);
                     });
         }
     }

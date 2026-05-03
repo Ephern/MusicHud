@@ -4,7 +4,6 @@
   "package": "indi.etern.musichud.mixin",
   "compatibilityLevel": "JAVA_21",
   "client": [
-    "MixinGuiRendererHud",
     "SoundEngineMixin"
   ],
   "injectors": {

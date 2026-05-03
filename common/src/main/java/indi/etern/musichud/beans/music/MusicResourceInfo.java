@@ -14,13 +14,13 @@ import java.util.Objects;
 @Setter
 public class MusicResourceInfo {
     public static final StreamCodec<RegistryFriendlyByteBuf, MusicResourceInfo> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             MusicResourceInfo::getId,
             ByteBufCodecs.STRING_UTF8,
             MusicResourceInfo::getUrl,
             ByteBufCodecs.INT,
             MusicResourceInfo::getBitrate,
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             MusicResourceInfo::getSize,
             Codecs.ofEnum(FormatType.class),
             MusicResourceInfo::getType,

@@ -16,7 +16,7 @@ public record PhoneCodeLoginRequest(int regionCode, long phone, int code) implem
             StreamCodec.composite(
                     ByteBufCodecs.INT,
                     PhoneCodeLoginRequest::regionCode,
-                    ByteBufCodecs.LONG,
+                    ByteBufCodecs.VAR_LONG,
                     PhoneCodeLoginRequest::phone,
                     ByteBufCodecs.INT,
                     PhoneCodeLoginRequest::code,

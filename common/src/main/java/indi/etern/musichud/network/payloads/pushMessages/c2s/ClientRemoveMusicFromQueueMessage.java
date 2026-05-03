@@ -14,7 +14,7 @@ public record ClientRemoveMusicFromQueueMessage(int index, long id) implements C
     public static final StreamCodec<RegistryFriendlyByteBuf, ClientRemoveMusicFromQueueMessage> CODEC = StreamCodec.composite(
             ByteBufCodecs.INT,
             ClientRemoveMusicFromQueueMessage::index,
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             ClientRemoveMusicFromQueueMessage::id,
             ClientRemoveMusicFromQueueMessage::new
     );

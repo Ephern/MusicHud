@@ -15,7 +15,7 @@ import net.minecraft.network.codec.StreamCodec;
 
 public record GetPlaylistDetailRequest(long id) implements C2SPayload {
     public static StreamCodec<RegistryFriendlyByteBuf, GetPlaylistDetailRequest> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             GetPlaylistDetailRequest::id,
             GetPlaylistDetailRequest::new
     );

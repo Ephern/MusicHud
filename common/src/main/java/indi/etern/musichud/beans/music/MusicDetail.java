@@ -18,7 +18,7 @@ public class MusicDetail {
     public static final StreamCodec<RegistryFriendlyByteBuf, MusicDetail> CODEC = StreamCodec.composite(
             ByteBufCodecs.STRING_UTF8,
             MusicDetail::getName,
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             MusicDetail::getId,
             Codecs.ofList(() -> Artist.CODEC),
             MusicDetail::getArtists,

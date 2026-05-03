@@ -31,7 +31,7 @@ public class ImageBlurPostProcessor {
             ResourceLocation imageBlurredLocation = MusicHud.location("image_blurred_" + radius + "_" + bitmap.hashCode());
             AtomicReference<DynamicTexture> texture = new AtomicReference<>();
             Minecraft.getInstance().submit(() -> {
-                texture.set(new DynamicTexture(() -> "downloaded_blurred_" + originalImageData.getSource().hashCode(), nativeImage));
+                texture.set(new DynamicTexture(nativeImage));
             }).join();
             ImageTextureData imageTextureData = new ImageTextureData(
                     originalImageData.getSource(),

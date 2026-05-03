@@ -35,7 +35,7 @@ public class ColorExtractor {
 
         for (int y = 0; y < height; y += step) {
             for (int x = 0; x < width; x += step) {
-                int argb = image.getPixel(x, y);
+                int argb = image.getPixelRGBA(x, y);
                 if ((argb >>> 24) == 0) continue;
                 int rgb = argb & 0x00FFFFFF;
 

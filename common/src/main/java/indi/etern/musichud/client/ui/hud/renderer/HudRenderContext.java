@@ -1,35 +1,21 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.blaze3d.vertex.*;
+import com.mojang.math.Axis;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
-import indi.etern.musichud.client.ui.hud.pipelines.RenderStateUtil;
 import lombok.*;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.DynamicUniformStorage;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix3x2f;
-import org.joml.Matrix3x2fStack;
+import org.joml.Matrix4f;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.function.Consumer;
 
 public class HudRenderContext {
-    private static final RenderStateUtil UNIFORM_WRITER = new RenderStateUtil();
     @Getter
     private static HudRenderContext current;
-
-    private final Map<StorageKey, DynamicUniformStorage<?>> storageMap = new HashMap<>();
-    private final Map<StorageKey, HudUniform> pendingUniforms = new HashMap<>();
-    private final Map<StorageKey, GpuBufferSlice> uniformSlices = new HashMap<>();
-
-    private final Map<StorageKey, HudUniform> lastWrittenUniforms = new HashMap<>();
-    private final Map<StorageKey, GpuBufferSlice> lastSlices = new HashMap<>();
-
     @Setter
     private GuiGraphics graphics;
 
@@ -38,112 +24,65 @@ public class HudRenderContext {
     }
 
     public void clearContext() {
-        for (DynamicUniformStorage<?> storage : storageMap.values()) {
-            storage.endFrame();
-        }
-        pendingUniforms.clear();
-        uniformSlices.clear();
         graphics = null;
     }
 
-    public void prepareUniforms() {
-        for (Map.Entry<StorageKey, HudUniform> entry : pendingUniforms.entrySet()) {
-            StorageKey key = entry.getKey();
-            HudUniform uniform = entry.getValue();
+    public void submitHudRenderState(HudRenderState hudRenderState) {
+        // Shader rendering is delegated to a future platform-specific render path.
+        // In 1.21.1, custom shader rendering requires a different approach
+        // (no BufferUploader/VertexBuffer). Use the drawQuad delegate or
+        // GuiGraphics fallback below.
+        renderFallback(hudRenderState);
+    }
 
-            // skip re-upload if same uniform data was already written last frame
-            HudUniform lastWritten = lastWrittenUniforms.get(key);
-            if (lastWritten != null && lastWritten.shouldUseBuffer(uniform)) {
-                GpuBufferSlice cachedSlice = lastSlices.get(key);
-                if (cachedSlice != null) {
-                    uniformSlices.put(key, cachedSlice);
-                    lastWrittenUniforms.put(key, uniform);
-                    continue;
-                }
-            }
+    private void renderFallback(HudRenderState hudRenderState) {
+        // Fallback: render a colored rectangle using GuiGraphics
+        // Uniform data is still computed and can be accessed if needed
+        HudUniform[] uniforms = hudRenderState.uniforms();
+        // Uniforms are available for inspection but not uploaded to GPU in fallback mode
 
-            @SuppressWarnings("unchecked")
-            DynamicUniformStorage<HudUniform> storage = (DynamicUniformStorage<HudUniform>)
-                    storageMap.computeIfAbsent(key, k ->
-                            new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
-                    );
+        float left = graphics.guiWidth() / 2f + hudRenderState.pose().m20;
+        float top = graphics.guiHeight() / 2f + hudRenderState.pose().m21;
+        int x0 = (int)(left - hudRenderState.width() / 2f);
+        int y0 = (int)(top - hudRenderState.height() / 2f);
+        int x1 = (int)(left + hudRenderState.width() / 2f);
+        int y1 = (int)(top + hudRenderState.height() / 2f);
 
-            GpuBufferSlice slice = storage.writeUniform(uniform);
-            uniformSlices.put(key, slice);
-            lastSlices.put(key, slice);
-            lastWrittenUniforms.put(key, uniform);
-        }
+        graphics.fill(x0, y0, x1, y1, 0x33FFFFFF);
     }
 
     public @NonNull Matrix3x2f currentPose() {
-        return new Matrix3x2f(graphics.pose());
-    }
-
-    public void submitHudRenderState(HudRenderState hudRenderState) {
-        UNIFORM_WRITER.submitGuiElementRenderState(graphics, hudRenderState);
-
-        HudUniform[] uniforms = hudRenderState.uniforms();
-        if (uniforms != null) {
-            for (HudUniform uniform : uniforms) {
-                StorageKey key = new StorageKey(hudRenderState.pipeline(), uniform.getUBOName());
-                pendingUniforms.put(key, uniform);
-            }
-        }
-    }
-
-    /*public void prepareUniforms() {
-        for (Map.Entry<StorageKey, HudUniform> entry : pendingUniforms.entrySet()) {
-            StorageKey key = entry.getKey();
-            HudUniform uniform = entry.getValue();
-
-            @SuppressWarnings("unchecked")
-            DynamicUniformStorage<HudUniform> storage = (DynamicUniformStorage<HudUniform>)
-                    storageMap.computeIfAbsent(key, k ->
-                            new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
-                    );
-
-            GpuBufferSlice slice = storage.writeUniform(uniform);
-            uniformSlices.put(key, slice);
-//            MusicHud.LOGGER.info("[MusicHud] prepareUniforms wrote {} for pipeline {} size={}", uniform.getUBOName(), key.getPipeline(), uniform.getUBOSize());
-        }
-
-//        if (!pendingUniforms.isEmpty()) {
-//            MusicHud.LOGGER.info("[MusicHud] prepareUniforms: wrote {} uniforms, {} slices stored", pendingUniforms.size(), uniformSlices.size());
-//        }
-    }*/
-
-    public void bindAllUniforms(RenderPass pass) {
-        if (pass == null) return;
-        for (Map.Entry<StorageKey, GpuBufferSlice> entry : uniformSlices.entrySet()) {
-            StorageKey key = entry.getKey();
-            HudUniform uniform = pendingUniforms.get(key);
-            if (uniform == null) continue;
-            pass.setUniform(uniform.getUBOName(), entry.getValue());
-        }
-    }
-
-    public void nextStratum() {
-        graphics.nextStratum();
+        PoseStack.Pose last = graphics.pose().last();
+        Matrix4f pose = last.pose();
+        return new Matrix3x2f(
+                pose.m00(), pose.m01(),
+                pose.m10(), pose.m11(),
+                pose.m30(), pose.m31()
+        );
     }
 
     public Transforming transform() {
         return new Transforming(graphics);
     }
 
-    public void blit(RenderPipeline renderPipeline, ResourceLocation resourceLocation,
+    public void nextStratum() {
+        // no-op in 1.21.1
+    }
+
+    public void blit(ResourceLocation resourceLocation,
                      int targetX, int targetY, int sourceX, int sourceY,
                      int targetWidth, int targetHeight, int sourceWidth, int sourceHeight,
                      int textureWidth, int textureHeight) {
-        graphics.blit(renderPipeline, resourceLocation,
+        graphics.blit(resourceLocation,
                 targetX, targetY, sourceX, sourceY,
                 targetWidth, targetHeight, sourceWidth, sourceHeight,
                 textureWidth, textureHeight);
     }
 
-    public void blit(RenderPipeline renderPipeline, ResourceLocation resourceLocation,
+    public void blit(ResourceLocation resourceLocation,
                      int targetX, int targetY, int sourceX, int sourceY,
                      int targetWidth, int targetHeight, int sourceWidth, int sourceHeight) {
-        graphics.blit(renderPipeline, resourceLocation,
+        graphics.blit(resourceLocation,
                 targetX, targetY, sourceX, sourceY,
                 targetWidth, targetHeight, sourceWidth, sourceHeight);
     }
@@ -172,44 +111,44 @@ public class HudRenderContext {
         graphics.fill(fromX, fromY, toX, toY, color);
     }
 
-    @Data
-    @AllArgsConstructor
-    @EqualsAndHashCode
-    private static class StorageKey {
-        private final RenderPipeline pipeline;
-        private final String uboName;
+    public void bindAllUniforms() {
+        // no-op in 1.21.1
+    }
+
+    public void prepareUniforms() {
+        // no-op in 1.21.1
     }
 
     public static class Transforming {
-        private final Matrix3x2fStack pose;
+        private final PoseStack pose;
 
         private Transforming(GuiGraphics guiGraphics) {
             this.pose = guiGraphics.pose();
-            pose.pushMatrix();
+            pose.pushPose();
         }
 
         public Transforming translate(float x, float y) {
-            pose.translate(x, y);
+            pose.translate(x, y, 0);
             return this;
         }
 
         public Transforming rotate(float angle) {
-            pose.rotate(angle);
+            pose.mulPose(Axis.ZP.rotation(angle));
             return this;
         }
 
         public Transforming scale(float scale) {
-            pose.scale(scale);
+            pose.scale(scale, scale, 1);
             return this;
         }
 
         public void then(Consumer<Transforming> task) {
             task.accept(this);
-            pose.popMatrix();
+            pose.popPose();
         }
 
         public Transforming restore() {
-            pose.popMatrix();
+            pose.popPose();
             return this;
         }
     }

@@ -1,8 +1,7 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
+import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
 import indi.etern.musichud.client.ui.utils.ColorExtractor;
 import indi.etern.musichud.client.ui.utils.Mixable;
 import indi.etern.musichud.client.ui.utils.UniformDataUtils;
@@ -91,7 +90,7 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
         return (rA << 24) | (rR << 16) | (rG << 8) | rB;
     }
 
-    public static final int UBO_SIZE = new Std140SizeCalculator().putVec4().putVec4().putVec4().putVec4().align(16).get();
+    public static final int UBO_SIZE = new Std140BufferWriter.Calculator().putVec4().putVec4().putVec4().putVec4().align(16).get();
 
     @Override
     public String getUBOName() {
@@ -104,7 +103,7 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
     }
 
     @Override
-    public void write(Std140Builder builder) {
+    public void write(Std140BufferWriter builder) {
         builder.putVec4(UniformDataUtils.colorToVector(colors.primary));
         builder.putVec4(UniformDataUtils.colorToVector(colors.secondary));
         builder.putVec4(UniformDataUtils.colorToVector(colors.bright));

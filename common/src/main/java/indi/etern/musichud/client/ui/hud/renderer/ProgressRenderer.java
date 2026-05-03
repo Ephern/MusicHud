@@ -7,7 +7,6 @@ import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.gui.render.TextureSetup;
 import org.joml.Matrix3x2f;
 
 public class ProgressRenderer implements HudRenderer {
@@ -39,7 +38,7 @@ public class ProgressRenderer implements HudRenderer {
         hudRenderContext.submitHudRenderState(
                 new HudRenderState(
                         HudRenderPipelines.PROGRESS_BAR,
-                        TextureSetup.noTexture(),
+                        null,
                         new Matrix3x2f(hudRenderContext.currentPose()),
                         layout,
                         layout,

@@ -18,6 +18,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -52,8 +56,37 @@ public class ImageUtils {
     private static Semaphore downloadSemaphore;
     private static int maxConcurrentDownloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS;
 
+    private static final VarHandle NATIVE_IMAGE_PIXELS_HANDLE;
+
     static {
         initializeVirtualThreadExecutor();
+        VarHandle handle = null;
+        try {
+            Field found = null;
+            for (Field f : NativeImage.class.getDeclaredFields()) {
+                if (f.getType() == long.class && !Modifier.isFinal(f.getModifiers())) {
+                    if (found != null) {
+                        throw new IllegalStateException("Multiple long non-final fields in NativeImage");
+                    }
+                    found = f;
+                }
+            }
+            if (found == null) {
+                throw new IllegalStateException("No long non-final field found in NativeImage");
+            }
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(NativeImage.class, MethodHandles.lookup());
+            handle = lookup.unreflectVarHandle(found);
+        } catch (Throwable t) {
+            MusicHud.LOGGER.error("Failed to init VarHandle for NativeImage pixels", t);
+        }
+        NATIVE_IMAGE_PIXELS_HANDLE = handle;
+    }
+
+    private static long getNativeImagePixels(NativeImage image) {
+        if (NATIVE_IMAGE_PIXELS_HANDLE == null) {
+            throw new IllegalStateException("NativeImage pixels VarHandle not initialized");
+        }
+        return (long) NATIVE_IMAGE_PIXELS_HANDLE.get(image);
     }
 
     /**
@@ -210,7 +243,7 @@ public class ImageUtils {
                         ColorInfo.AT_UNPREMUL,   // 非预乘 alpha
                         ColorSpace.get(ColorSpace.Named.SRGB)),
                 null,  // 原生内存
-                nativeImage.getPointer(),  // NativeImage 的像素地址
+                getNativeImagePixels(nativeImage),  // NativeImage 的像素地址
                 width * 4  // 每行字节数
         );
 
@@ -243,7 +276,7 @@ public class ImageUtils {
                         ColorInfo.AT_UNPREMUL,
                         ColorSpace.get(ColorSpace.Named.SRGB)),
                 null,
-                nativeImage.getPointer(),
+                getNativeImagePixels(nativeImage),
                 width * 4
         );
 
@@ -309,7 +342,7 @@ public class ImageUtils {
         ResourceLocation imageLocation = MusicHud.location("image_" + nativeImage.hashCode());
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
         Minecraft.getInstance().submit(() -> {
-            texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), nativeImage));
+            texture.set(new DynamicTexture(nativeImage));
         }).join();
         return new ImageTextureData(data, imageLocation, texture.get(), false);
     }

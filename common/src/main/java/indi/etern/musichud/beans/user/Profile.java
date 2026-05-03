@@ -17,7 +17,7 @@ public class Profile {
                     Profile::getNickname,
                     ByteBufCodecs.STRING_UTF8,
                     Profile::getAvatarUrl,
-                    ByteBufCodecs.LONG,
+                    ByteBufCodecs.VAR_LONG,
                     Profile::getUserId,
                     Profile::new
             );

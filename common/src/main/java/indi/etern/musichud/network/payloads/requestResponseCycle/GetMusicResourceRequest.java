@@ -16,7 +16,7 @@ import net.minecraft.network.codec.StreamCodec;
 public record GetMusicResourceRequest(long id,Quality quality,String retryForUrl) implements C2SPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, GetMusicResourceRequest> CODEC =
             StreamCodec.composite(
-                    ByteBufCodecs.LONG,
+                    ByteBufCodecs.VAR_LONG,
                     GetMusicResourceRequest::id,
                     Codecs.ofEnum(Quality.class),
                     GetMusicResourceRequest::quality,

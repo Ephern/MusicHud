@@ -19,7 +19,7 @@ import java.util.concurrent.CompletableFuture;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Album implements MusicCollection{
     public static final StreamCodec<RegistryFriendlyByteBuf, Album> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             Album::getId,
             ByteBufCodecs.STRING_UTF8,
             Album::getName,

@@ -20,7 +20,7 @@ import java.util.Objects;
 @ToString
 public final class IdlePlaySource {
     public static final StreamCodec<ByteBuf, IdlePlaySource> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+            ByteBufCodecs.VAR_LONG,
             IdlePlaySource::getId,
             Codecs.CLASS,
             IdlePlaySource::getType,

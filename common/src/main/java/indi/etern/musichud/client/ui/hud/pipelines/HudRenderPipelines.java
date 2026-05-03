@@ -1,48 +1,31 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.shaders.UniformType;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
 import indi.etern.musichud.MusicHud;
 
+import java.util.Map;
+
 public class HudRenderPipelines {
-    public static final RenderPipeline.Snippet MATRICES_PROJECTION_SNIPPET =
-            RenderPipeline.builder()
-                    .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-                    .withUniform("Projection", UniformType.UNIFORM_BUFFER)
-                    .withBlend(BlendFunction.TRANSLUCENT)
-                    .buildSnippet();
+    // Uniform Buffer Object binding points for our custom uniforms
+    // binding 2: MH position uniforms (MHBasePosition/MHAlbumPosition/MHProgressPosition)
+    // binding 3: MHColor/Theme/ProgressStyle uniforms
+    // binding 4: MHDynamicStatus
+    // Note: ProjMat and ModelViewMat are plain uniforms from moj_import (not UBOs in 1.21.1)
 
-    public static final RenderPipeline BACKGROUND = RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
-            .withLocation(MusicHud.location("pipeline/background"))
-            .withVertexShader(MusicHud.location("core/background"))
-            .withFragmentShader(MusicHud.location("core/background"))
-            .withUniform("MHBasePosition", UniformType.UNIFORM_BUFFER)
-            .withUniform("MHNowPlayingThemeColor", UniformType.UNIFORM_BUFFER)
-            .withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-            .build();
+    public static final HudShaderProgram BACKGROUND = HudShaderManager.getOrCreate(
+            MusicHud.location("core/background"),
+            MusicHud.location("core/background"),
+            Map.of("MHBasePosition", 2, "MHNowPlayingThemeColor", 3, "MHDynamicStatus", 4)
+    );
 
-    public static final RenderPipeline ROUNDED_ALBUM = RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
-            .withLocation(MusicHud.location("pipeline/album_image"))
-            .withVertexShader(MusicHud.location("core/album_image"))
-            .withFragmentShader(MusicHud.location("core/album_image"))
-            .withUniform("MHAlbumPosition", UniformType.UNIFORM_BUFFER)
-            .withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER)
-            .withSampler("Sampler0")
-            .withSampler("Sampler1")
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-            .build();
+    public static final HudShaderProgram ROUNDED_ALBUM = HudShaderManager.getOrCreate(
+            MusicHud.location("core/album_image"),
+            MusicHud.location("core/album_image"),
+            Map.of("MHAlbumPosition", 2, "MHDynamicStatus", 4)
+    );
 
-    public static final RenderPipeline PROGRESS_BAR = RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
-            .withLocation(MusicHud.location("pipeline/progress_bar"))
-            .withVertexShader(MusicHud.location("core/progress_bar"))
-            .withFragmentShader(MusicHud.location("core/progress_bar"))
-            .withUniform("MHProgressPosition", UniformType.UNIFORM_BUFFER)
-            .withUniform("MHProgressStyle", UniformType.UNIFORM_BUFFER)
-            .withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-            .build();
+    public static final HudShaderProgram PROGRESS_BAR = HudShaderManager.getOrCreate(
+            MusicHud.location("core/progress_bar"),
+            MusicHud.location("core/progress_bar"),
+            Map.of("MHProgressPosition", 2, "MHProgressStyle", 3, "MHDynamicStatus", 4)
+    );
 }

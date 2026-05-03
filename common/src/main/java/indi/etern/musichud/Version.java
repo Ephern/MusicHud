@@ -13,11 +13,14 @@ public record Version(long mayor, long minor, long patch, BuildType build) imple
     static {
         PACKET_CODEC = new StreamCodec<ByteBuf, Version>() {
             public @NotNull Version decode(@NotNull ByteBuf byteBuf) {
-                return Version.ofLongArray(RegistryFriendlyByteBuf.readLongArray(byteBuf));
+                return new Version(byteBuf.readLong(), byteBuf.readLong(), byteBuf.readLong(), BuildType.ofOrdinal(byteBuf.readInt()));
             }
 
             public void encode(@NotNull ByteBuf byteBuf, @NotNull Version version) {
-                RegistryFriendlyByteBuf.writeLongArray(byteBuf, version.toLongArray());
+                byteBuf.writeLong(version.mayor);
+                byteBuf.writeLong(version.minor);
+                byteBuf.writeLong(version.patch);
+                byteBuf.writeInt(version.build.ordinal());
             }
         };
     }

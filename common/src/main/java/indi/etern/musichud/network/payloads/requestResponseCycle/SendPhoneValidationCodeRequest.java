@@ -15,7 +15,7 @@ public record SendPhoneValidationCodeRequest(int regionCode, long phone) impleme
             StreamCodec.composite(
                     ByteBufCodecs.INT,
                     SendPhoneValidationCodeRequest::regionCode,
-                    ByteBufCodecs.LONG,
+                    ByteBufCodecs.VAR_LONG,
                     SendPhoneValidationCodeRequest::phone,
                     SendPhoneValidationCodeRequest::new
             );
