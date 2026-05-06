@@ -31,6 +31,7 @@ public class WordByWordLyricParser {
             Duration startTime = metaData.startTime;
             LyricLine lyricLine = map.get(startTime);
             String lyricString = metaData.lyric == null ? "" : metaData.lyric;
+            lyricString = lyricString.replace('\n', ' ').trim();
             if (lyricLine == null) {
                 lyricLine = LyricLine.builder()
                         .startTime(startTime)
@@ -40,7 +41,7 @@ public class WordByWordLyricParser {
                 if (startTime == null && lyricLine.getText() != null && !lyricLine.getText().startsWith("}")) {
                     lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
-            } else {
+            } else if (!lyricString.isEmpty()){
                 lyricLine.setText(lyricLine.getText() + "\n" + lyricString);
             }
             if (metaData.phraseEndingOffsetMap != null) {
@@ -158,9 +159,9 @@ public class WordByWordLyricParser {
             StringBuilder lineText = new StringBuilder();
             int charIndex = 0;
             while (phraseMatcher.find()) {
-                String phraseStartTimestamp = phraseMatcher.group(1);
+//                String phraseStartTimestamp = phraseMatcher.group(1);
                 String phraseDurationMillis = phraseMatcher.group(2);
-                String unknown = phraseMatcher.group(3);
+//                String unknown = phraseMatcher.group(3);
                 String phraseText = phraseMatcher.group(4);
                 String suffix = phraseText.endsWith(" ") ? " " : "";
                 phraseText = phraseText.replace('\u00A0', ' ').replace("\n", "").trim() + suffix;

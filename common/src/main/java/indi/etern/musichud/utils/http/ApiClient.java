@@ -22,12 +22,18 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Executors;
+import java.util.stream.Collectors;
 
 public class ApiClient {
     public static final HttpClient CLIENT;
     private static final int maxTrial = 5;
+    private static final Set<String> COOKIE_ATTRIBUTE_NAMES = Set.of(
+            "max-age", "expires", "path", "domain", "secure", "httponly", "samesite"
+    );
     private static final Logger LOGGER = MusicHud.getLogger(ApiClient.class);
     private static final ServerConfig serverConfig = ServerConfig.getInstance();
 
@@ -73,8 +79,9 @@ public class ApiClient {
                     JsonElement payload = requestBody instanceof JsonElement element ? element : JsonUtil.gson.toJsonTree(requestBody);
                     if (payload instanceof JsonObject jsonObject) {
                         if (formattedUserCookie != null && !formattedUserCookie.isEmpty()) {
-                            for (String cookieItem : formattedUserCookie.split(";;")) {
-                                requestBuilder.header("Cookie", cookieItem);
+                            String cleanCookie = cleanCookie(formattedUserCookie);
+                            if (!cleanCookie.isEmpty()) {
+                                requestBuilder.header("Cookie", cleanCookie);
                             }
                         } else {
                             jsonObject.addProperty("noCookie", true);
@@ -89,8 +96,9 @@ public class ApiClient {
                     }
                 } else {
                     if (formattedUserCookie != null && !formattedUserCookie.isEmpty()) {
-                        for (String cookieItem : formattedUserCookie.split(";;")) {
-                            requestBuilder.header("Cookie", cookieItem);
+                        String cleanCookie = cleanCookie(formattedUserCookie);
+                        if (!cleanCookie.isEmpty()) {
+                            requestBuilder.header("Cookie", cleanCookie);
                         }
                     }
                     requestBuilder.POST(HttpRequest.BodyPublishers.noBody());
@@ -145,8 +153,9 @@ public class ApiClient {
                 HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                         .uri(urlMeta.toURI());
                 if (formattedUserCookie != null && !formattedUserCookie.isEmpty()) {
-                    for (String cookieItem : formattedUserCookie.split(";;")) {
-                        requestBuilder.header("Cookie", cookieItem);
+                    String cleanCookie = cleanCookie(formattedUserCookie);
+                    if (!cleanCookie.isEmpty()) {
+                        requestBuilder.header("Cookie", cleanCookie);
                     }
                 }
                 HttpRequest request = requestBuilder
@@ -197,6 +206,24 @@ public class ApiClient {
                 connection.disconnect();
             }
         }
+    }
+
+    private static String cleanCookie(String rawCookie) {
+        if (rawCookie == null || rawCookie.isEmpty()) {
+            return "";
+        }
+        return Arrays.stream(rawCookie.split(";+"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .filter(s -> {
+                    int eqIdx = s.indexOf('=');
+                    if (eqIdx <= 0) {
+                        return false;
+                    }
+                    String name = s.substring(0, eqIdx).trim().toLowerCase(Locale.ROOT);
+                    return !COOKIE_ATTRIBUTE_NAMES.contains(name);
+                })
+                .collect(Collectors.joining("; "));
     }
 
     private record CodeOnlyResponse(int code) {

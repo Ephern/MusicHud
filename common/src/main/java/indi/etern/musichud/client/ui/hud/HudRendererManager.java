@@ -159,7 +159,7 @@ public class HudRendererManager {
 
         configureProgressRenderer(progressLayout);
 
-        contentInterval = Math.min(contentUnit * 3, 2f);
+        contentInterval = Math.min(contentUnit * 2.5f, 2f);
 
         float titleY = showProgress ? contentPadding + 1f : contentPadding + (contentHeight - titleSize) / 2;
         float headX = Math.max(mainContentX + progressWidth - titleSize, imageHeightAndWidth + contentPadding - titleSize);

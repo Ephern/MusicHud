@@ -145,7 +145,7 @@ public class ServerApiMeta {
                 "/user/account",
                 null,
                 null,
-                false,
+                true,
                 false,
                 false,
                 true,
