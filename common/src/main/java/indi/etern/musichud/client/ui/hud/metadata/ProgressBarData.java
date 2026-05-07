@@ -11,12 +11,12 @@ import java.util.Objects;
 
 public class ProgressBarData implements HudUniform {
     public static final int UBO_SIZE = new Std140SizeCalculator().putVec3().putVec4().putVec4().putVec4().align(16).get();
-    public int playedColor;
-    public int currentColor;
-    public int backgroundColor;
-    public float gradientLength;
-    public float gradientRightOffset;
-    public float transitionBorderRate;
+    public final int playedColor;
+    public final int currentColor;
+    public final int backgroundColor;
+    public final float gradientLength;
+    public final float gradientRightOffset;
+    public final float transitionBorderRate;
     @Getter
     @Setter
     private Layout layout;

@@ -121,15 +121,14 @@ public class LyricHighlightTextView extends TextView {
             statusUpdateProcessing = false;
         }
 
-        // 使用二分查找定位当前短语索引
         int phraseIndex = lyricLine.binarySearchPhraseIndex(playedDuration);
         if (phraseIndex < 0) phraseIndex = 0;
         Duration phraseStart, phraseEnd;
         LyricLine.Phrase currentPhrase;
         if (phraseIndex == 0) {
             phraseStart = lyricLine.getStartTime();
-            phraseEnd = phrases.getFirst().endTime();
-            currentPhrase = phrases.get(phraseIndex);
+            currentPhrase = phrases.getFirst();
+            phraseEnd = currentPhrase.endTime();
         } else if (phraseIndex >= phrases.size()) {
             // 已经超过最后一个短语，整行显示强调色（已唱完）
             super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
@@ -172,7 +171,6 @@ public class LyricHighlightTextView extends TextView {
         startOffset = Math.min(textLength, startOffset);
         endOffset = Math.min(textLength, endOffset);
 
-        // 2. 预计算每行的逻辑起始坐标（累积宽度）
         int lineCount = layout.getLineCount();
         float[] lineLogicalStart = new float[lineCount];
         float cumulative = 0;
@@ -194,7 +192,6 @@ public class LyricHighlightTextView extends TextView {
         float gradientLeftLogical = gradientPointLogicalX - dp(16);
         float gradientRightLogical = gradientPointLogicalX + dp(36);
 
-        // 3. 遍历可见行，设置样式
         int firstLine = (int) (range >>> 32);
         int lastLine = (int) (range & 0xFFFFFFFFL);
         for (int line = firstLine; line <= lastLine; line++) {

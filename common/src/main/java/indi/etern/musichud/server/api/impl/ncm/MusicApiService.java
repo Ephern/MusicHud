@@ -466,10 +466,11 @@ public class MusicApiService implements IMusicApiService {
         @Getter
         int code;
         @SerializedName("playlist")
+        final
         List<Playlist> playlists = List.of();
 
         public List<Playlist> getPlaylists() {
-            if (playlists == null || playlists.isEmpty()) {
+            if (playlists.isEmpty()) {
                 return List.of();
             }
             return playlists.stream().filter(Objects::nonNull).toList();

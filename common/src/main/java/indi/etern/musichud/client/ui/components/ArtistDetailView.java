@@ -150,11 +150,8 @@ public class ArtistDetailView extends LinearLayout {
 
         scrollView.addView(musicListWrapper, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-        scrollView.setOnScrollChangeListener(new OnScrollChangeListener() {
-            @Override
-            public void onScrollChange(View v, int scrollX, int scrollY, int oldScrollX, int oldScrollY) {
-                checkInfiniteScroll(scrollY, scrollView);
-            }
+        scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
+            checkInfiniteScroll(scrollY, scrollView);
         });
 
         artist.loadDetail().thenAcceptAsync(artist1 -> {

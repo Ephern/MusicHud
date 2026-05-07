@@ -48,7 +48,7 @@ public class RhythmAnimator extends ValueAnimator {
         this.mainText = mainText;
 
         this.fadeOutStartTime = stayDuration;
-        this.phaseOffsetMs = computePhaseOffset(stayDuration - FADE_IN_END, BREATHE_CYCLE_MS);
+        this.phaseOffsetMs = computePhaseOffset(stayDuration - FADE_IN_END);
 
         long totalDuration = fadeOutStartTime + FADE_OUT_DURATION;
 
@@ -123,8 +123,8 @@ public class RhythmAnimator extends ValueAnimator {
      * Computes the smallest non-negative offset such that
      * {@code (breatheMs + offset) % cycleMs == 0}.
      */
-    private static long computePhaseOffset(long breatheMs, long cycleMs) {
-        long remainder = breatheMs % cycleMs;
-        return remainder == 0 ? 0 : cycleMs - remainder;
+    private static long computePhaseOffset(long breatheMs) {
+        long remainder = breatheMs % RhythmAnimator.BREATHE_CYCLE_MS;
+        return remainder == 0 ? 0 : RhythmAnimator.BREATHE_CYCLE_MS - remainder;
     }
 }

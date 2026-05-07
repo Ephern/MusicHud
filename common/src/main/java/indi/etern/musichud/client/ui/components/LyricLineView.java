@@ -28,7 +28,7 @@ public class LyricLineView extends LinearLayout {
     private final LinearLayout row;
     private final LyricLine lyricLine;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    View mainText;
+    final View mainText;
     TextView subText;
     private Animator emphasizeAnim;
 

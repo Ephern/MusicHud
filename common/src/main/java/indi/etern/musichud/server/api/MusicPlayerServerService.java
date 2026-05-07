@@ -41,7 +41,7 @@ public class MusicPlayerServerService {
             .build();
     @Getter
     ArrayDeque<MusicDetail> musicQueue = new ArrayDeque<>();
-    Map<ServerPlayer, Set<IdlePlaySource>> idlePlaySources = new ConcurrentHashMap<>();
+    final Map<ServerPlayer, Set<IdlePlaySource>> idlePlaySources = new ConcurrentHashMap<>();
     boolean continuable;
     @Getter
     private volatile MusicDetail currentMusicDetail = MusicDetail.NONE;

@@ -373,8 +373,6 @@ public class StreamAudioPlayer {
 
                 // 先填充一些数据到缓冲区
                 int initialBuffers = 0;
-//                long startTimeForSpeedCalc = System.currentTimeMillis();
-//                long totalBytesForSpeedCalc = 0;
                 while (shouldContinueDownloading && initialBuffers < BUFFER_COUNT * 2) {
                     byte[] audioData = decoder.readChunk(BUFFER_SIZE);
                     if (audioData == null) break;
@@ -385,23 +383,6 @@ public class StreamAudioPlayer {
                     }
                     totalBufferedBytes.addAndGet(audioData.length);
                     initialBuffers++;
-//                    totalBytesForSpeedCalc += audioData.length;
-
-/*
-                    if (initialBuffers == 5) { // 收集5个数据块后计算速度
-                        long elapsedTime = System.currentTimeMillis() - startTimeForSpeedCalc;
-                        if (elapsedTime > 0) {
-                            bytesPerSecond = (totalBytesForSpeedCalc * 1000L) / elapsedTime;
-                            LOGGER.debug("Calculated download speed: {} bytes/sec", bytesPerSecond);
-                        }
-                    }
-*/
-
-/*
-                    if (calculateBufferedSeconds(decoder.getFormat()) >= 2) {
-                        setStatus(Status.PLAYING);
-                    }
-*/
                 }
 
                 // 继续下载剩余数据
@@ -506,16 +487,6 @@ public class StreamAudioPlayer {
         };
     }
 
-    /*private float calculateBufferedSeconds(int format) {
-        if (bytesPerSecond == 0) return 0;
-        int bytesPerSample = getBytesPerSample(format);
-        long samplesPerSecond = bytesPerSecond / bytesPerSample;
-        if (samplesPerSecond == 0) return 0;
-
-        long bufferedSamples = totalBufferedBytes.get() / bytesPerSample;
-        return (float) bufferedSamples / samplesPerSecond;
-    }*/
-
     private void checkALError(String operation) {
         int error = AL10.alGetError();
         if (error != AL10.AL_NO_ERROR) {
@@ -598,6 +569,7 @@ public class StreamAudioPlayer {
                     }
 
                     // 3. 解绑所有已处理的缓冲区
+                    //noinspection SpellCheckingInspection
                     int unqueueCount = 0;
                     for (int i = 0; i < processed; i++) {
                         int[] buffer = new int[1];

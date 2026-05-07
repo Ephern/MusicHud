@@ -38,7 +38,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private final LinearLayout container;
     private final ScrollController scrollController;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    Set<LyricLineView> staggeringLyricViews = new HashSet<>();
+    final Set<LyricLineView> staggeringLyricViews = new HashSet<>();
     Runnable staggeringEndListener = null;
     boolean firstStagger = true;
     boolean scrollFinished = false;

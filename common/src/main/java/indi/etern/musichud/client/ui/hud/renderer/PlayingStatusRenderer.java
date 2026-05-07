@@ -46,9 +46,10 @@ public class PlayingStatusRenderer implements HudRenderer {
 
     @Override
     public void render(HudRenderContext hudRenderContext) {
-        if (currentResourceLocation != null && visibility) {
+        ResourceLocation currentResourceLocation1 = currentResourceLocation;
+        if (currentResourceLocation1 != null && visibility) {
             float rotationRadians;
-            if (currentResourceLocation == ERROR_ICON_LOCATION) {
+            if (currentResourceLocation1 == ERROR_ICON_LOCATION) {
                 rotationRadians = 0;
             } else {
                 rotationRadians = (float) ((Math.PI * 2) * ((float) (System.currentTimeMillis() % 1000) / 1000));
@@ -68,7 +69,7 @@ public class PlayingStatusRenderer implements HudRenderer {
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
                     .then(transforming -> {
-                        hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentResourceLocation, screenX, screenY, 0, 0, width, height, width, height);
+                        hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height);
                     });
         }
     }

@@ -16,7 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 public final class BackgroundData implements Mixable<BackgroundData>, HudUniform {
     private final BackgroundImages image;
     private final ThemedColors colors;
-    public static BackgroundData NONE = new BackgroundData(null, ColorExtractor.getDefaultColors());
+    public static final BackgroundData NONE = new BackgroundData(null, ColorExtractor.getDefaultColors());
 
     public BackgroundData(
             BackgroundImages image

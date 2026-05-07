@@ -376,8 +376,7 @@ public class RouterContainer extends FrameLayout {
      * 根据 key 获取对应的 View
      */
     private View getViewByKey(Object key) {
-        if (key instanceof String) {
-            String keyStr = (String) key;
+        if (key instanceof String keyStr) {
             if (keyStr.startsWith("dynamic_")) {
                 return dynamicViews.get(keyStr);
             } else {

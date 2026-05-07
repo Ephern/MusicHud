@@ -11,7 +11,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 
 public record AddToIdlePlaySourceMessage(IdlePlaySource idlePlaySource) implements C2SPayload {
-    public static StreamCodec<RegistryFriendlyByteBuf, AddToIdlePlaySourceMessage> CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, AddToIdlePlaySourceMessage> CODEC = StreamCodec.composite(
             IdlePlaySource.CODEC,
             AddToIdlePlaySourceMessage::idlePlaySource,
             AddToIdlePlaySourceMessage::new

@@ -364,26 +364,5 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         }
     }
 
-    public static class Line {
-        public LyricLine lyricLine;
-        public String text;
-        public int fadeColor;
-        public int emphasizeColor;
-        long scrollMs;
-
-        public Line(LyricLine lyricLine, String text, int fadeColor, int emphasizeColor, long scrollMs) {
-            this.lyricLine = lyricLine;
-            this.text = text;
-            this.fadeColor = fadeColor;
-            this.emphasizeColor = emphasizeColor;
-            this.scrollMs = scrollMs;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) return true;
-            if (!(obj instanceof Line other)) return false;
-            return text.equals(other.text) && fadeColor == other.fadeColor && scrollMs == other.scrollMs;
-        }
-    }
+    public record Line(LyricLine lyricLine, String text, int fadeColor, int emphasizeColor, long scrollMs) {}
 }

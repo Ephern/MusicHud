@@ -31,6 +31,7 @@ import java.util.stream.Collectors;
 public class ApiClient {
     public static final HttpClient CLIENT;
     private static final int maxTrial = 5;
+    @SuppressWarnings("SpellCheckingInspection")
     private static final Set<String> COOKIE_ATTRIBUTE_NAMES = Set.of(
             "max-age", "expires", "path", "domain", "secure", "httponly", "samesite"
     );
