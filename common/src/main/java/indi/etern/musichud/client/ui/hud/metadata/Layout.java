@@ -17,7 +17,7 @@ public class Layout implements HudUniform {
     private volatile float radius;
     private volatile HorizontalAlign horizontalAlign;
     private volatile VerticalAlign verticalAlign;
-    private String targetElementName = "";
+    private String targetElementName;
     private volatile Layout parent;
     private boolean dirty;
     private AbsolutePosition lastAbsolutePosition;

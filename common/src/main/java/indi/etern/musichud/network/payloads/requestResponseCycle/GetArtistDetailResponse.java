@@ -20,7 +20,7 @@ public record GetArtistDetailResponse(Artist artist) implements S2CPayload {
                     GetArtistDetailResponse::new
             );
 
-    static Map<Long, Consumer<Artist>> consumerMap = new HashMap<>();
+    static final Map<Long, Consumer<Artist>> consumerMap = new HashMap<>();
     public static void setReceiver(long id, Consumer<Artist> consumer) {
         if (consumerMap.containsKey(id)) {
             consumerMap.get(id).accept(null);

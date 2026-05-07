@@ -32,7 +32,7 @@ public class NowPlayingInfo {
     private final Set<Consumer<LyricLine>> lyricLineUpdateListener = new HashSet<>();
     @Setter
     @Getter
-    private Duration updateInAdvanceDuration = Duration.of(400, ChronoUnit.MILLIS);
+    private Duration updateInAdvanceDuration = Duration.of(500, ChronoUnit.MILLIS);
     @Getter
     private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
     @Getter
@@ -49,7 +49,7 @@ public class NowPlayingInfo {
     private LyricLine currentLyricLine;
     private Thread lyricUpdaterVThread;
 
-    Runnable lyricUpdater = () -> {
+    final Runnable lyricUpdater = () -> {
         Thread thread = Thread.currentThread();
         lyricUpdaterVThread = thread;
         thread.setName("MH-Lyrics-Updater");

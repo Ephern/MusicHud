@@ -62,7 +62,7 @@ public class HudRenderContext {
                 }
             }
 
-            @SuppressWarnings("unchecked")
+            @SuppressWarnings({"unchecked", "resource"})
             DynamicUniformStorage<HudUniform> storage = (DynamicUniformStorage<HudUniform>)
                     storageMap.computeIfAbsent(key, k ->
                             new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
@@ -90,27 +90,6 @@ public class HudRenderContext {
             }
         }
     }
-
-    /*public void prepareUniforms() {
-        for (Map.Entry<StorageKey, HudUniform> entry : pendingUniforms.entrySet()) {
-            StorageKey key = entry.getKey();
-            HudUniform uniform = entry.getValue();
-
-            @SuppressWarnings("unchecked")
-            DynamicUniformStorage<HudUniform> storage = (DynamicUniformStorage<HudUniform>)
-                    storageMap.computeIfAbsent(key, k ->
-                            new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
-                    );
-
-            GpuBufferSlice slice = storage.writeUniform(uniform);
-            uniformSlices.put(key, slice);
-//            MusicHud.LOGGER.info("[MusicHud] prepareUniforms wrote {} for pipeline {} size={}", uniform.getUBOName(), key.getPipeline(), uniform.getUBOSize());
-        }
-
-//        if (!pendingUniforms.isEmpty()) {
-//            MusicHud.LOGGER.info("[MusicHud] prepareUniforms: wrote {} uniforms, {} slices stored", pendingUniforms.size(), uniformSlices.size());
-//        }
-    }*/
 
     public void bindAllUniforms(RenderPass pass) {
         if (pass == null) return;
@@ -172,12 +151,7 @@ public class HudRenderContext {
         graphics.fill(fromX, fromY, toX, toY, color);
     }
 
-    @Data
-    @AllArgsConstructor
-    @EqualsAndHashCode
-    private static class StorageKey {
-        private final RenderPipeline pipeline;
-        private final String uboName;
+    private record StorageKey(RenderPipeline pipeline, String uboName) {
     }
 
     public static class Transforming {

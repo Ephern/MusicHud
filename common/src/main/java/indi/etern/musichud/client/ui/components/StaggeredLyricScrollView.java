@@ -20,7 +20,6 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 
-import java.time.Duration;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -39,7 +38,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private final LinearLayout container;
     private final ScrollController scrollController;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    Set<LyricLineView> staggeringLyricViews = new HashSet<>();
+    final Set<LyricLineView> staggeringLyricViews = new HashSet<>();
     Runnable staggeringEndListener = null;
     boolean firstStagger = true;
     boolean scrollFinished = false;
@@ -47,6 +46,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private volatile ScrollStatus scrollStatus = ScrollStatus.FOLLOW_LYRICS;
     @Getter
     private long lastUserScrollTime = 0;
+    private long lastAutoScrollTime = (long) -STAGGERED_BASE_DURATION_MILLIS;
     @Getter
     private int currentScrollPosition = 0;
     private LyricLine justHighlightedLyricLine;
@@ -203,9 +203,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             justHighlightedLyricLine = lyricLine;
 
             if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.FOLLOW_LYRICS) {
-                Duration duration = lyricLine.getDuration();
-                long lineDuration = duration != null ? duration.toMillis() : nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
-                scrollToLyric(target, lyricLine.getType() == LyricLine.Type.META_DATA || lineDuration < STAGGERED_BASE_DURATION_MILLIS / 2);
+                long now = MuiModApi.getElapsedTime();
+                boolean disableStagger = lyricLine.getType() == LyricLine.Type.META_DATA || now - lastAutoScrollTime < STAGGERED_BASE_DURATION_MILLIS * 2 / 3;
+                if (!disableStagger) {
+                    lastAutoScrollTime = MuiModApi.getElapsedTime();
+                    scrollToLyric(target);
+                }
             }
         });
     }
@@ -219,7 +222,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (targetLine != null) {
             LyricLineView target = lyricLines.get(targetLine);
             if (target != null) {
-                scrollToLyric(target, false);
+                scrollToLyric(target);
             }
         }
     }
@@ -258,13 +261,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         scrollStatus = ScrollStatus.IDLE;
     }
 
-    private void scrollToLyric(LyricLineView target, boolean forceDisableStagger) {
+    private void scrollToLyric(LyricLineView target) {
         if (target == null || scrollController == null) return;
         int targetTop = target.getScrollPosition(this);
 
         int scrollViewHeight = getHeight();
         if (scrollViewHeight <= 0) {
-            post(() -> scrollToLyric(target, false));
+            post(() -> scrollToLyric(target));
             return;
         }
         int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
@@ -288,9 +291,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
         calcLoggedDelay(targetIndex);
         startScrollMillis = Core.timeMillis();
-        if (forceDisableStagger) {
-            staggeredActive = false;
-        } else if (targetIndex >= 0 && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
+        if (targetIndex >= 0 && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
             staggeredActive = true;
         }
 

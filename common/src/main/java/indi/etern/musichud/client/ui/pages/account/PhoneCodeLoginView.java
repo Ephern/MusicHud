@@ -153,13 +153,9 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
                             MuiModApi.postToUiThread(() -> {
                                 long seconds = timeout - Duration.between(lastSentCodeTime, ZonedDateTime.now()).getSeconds();
                                 if (seconds <= 1) {
-                                    try {
-                                        setSendingButtonEnable();
-                                        sendCodeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.sendCode"));
-                                        scheduledRefreshTask.stop();
-                                    } catch (InterruptedException e) {
-                                        throw new RuntimeException(e);
-                                    }
+                                    setSendingButtonEnable();
+                                    sendCodeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.sendCode"));
+                                    scheduledRefreshTask.stop();
                                 } else {
                                     sendCodeButton.setText(String.valueOf(seconds));
                                 }
@@ -236,11 +232,7 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
             @Override
             public void onViewDetachedFromWindow(View view) {
                 if (scheduledRefreshTask != null) {
-                    try {
-                        scheduledRefreshTask.stop();
-                    } catch (InterruptedException e) {
-                        throw new RuntimeException(e);
-                    }
+                    scheduledRefreshTask.stop();
                 }
             }
         });

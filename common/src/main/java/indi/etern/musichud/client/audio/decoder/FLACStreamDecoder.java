@@ -16,6 +16,7 @@ public class FLACStreamDecoder implements AudioDecoder {
     private final BufferedInputStream inputStream;
     private final int format;
     private final int sampleRate;
+    private final int frameSize;
     private boolean convert24bitsTo16bits = false;
 
     public FLACStreamDecoder(BufferedInputStream inputStream) throws IOException {
@@ -53,6 +54,7 @@ public class FLACStreamDecoder implements AudioDecoder {
             } else {
                 throw new UnsupportedEncodingException("More than 2 channels");
             }
+            frameSize = bitsPerSample * channels * sampleRate / 8;
         } catch (Exception e) {
             throw new IOException("Failed to initialize FLAC decoder", e);
         }
@@ -119,6 +121,11 @@ public class FLACStreamDecoder implements AudioDecoder {
     @Override
     public int getSampleRate() {
         return sampleRate;
+    }
+
+    @Override
+    public int getFrameSize() {
+        return frameSize;
     }
 
     @Override

@@ -20,7 +20,7 @@ public record GetMusicResourceResponse(MusicResourceInfo musicResourceInfo) impl
                     GetMusicResourceResponse::new
             );
 
-    static Map<Long, Consumer<MusicResourceInfo>> consumerMap = new HashMap<>();
+    static final Map<Long, Consumer<MusicResourceInfo>> consumerMap = new HashMap<>();
     public static void setReceiver(long id, Consumer<MusicResourceInfo> consumer) {
         if (consumerMap.containsKey(id)) {
             consumerMap.get(id).accept(null);
