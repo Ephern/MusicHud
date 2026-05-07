@@ -11,7 +11,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 public record ClientPushMusicToQueueMessage(long id) implements C2SPayload {
-    public static StreamCodec<RegistryFriendlyByteBuf, ClientPushMusicToQueueMessage> CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, ClientPushMusicToQueueMessage> CODEC = StreamCodec.composite(
             ByteBufCodecs.LONG,
             ClientPushMusicToQueueMessage::id,
             ClientPushMusicToQueueMessage::new

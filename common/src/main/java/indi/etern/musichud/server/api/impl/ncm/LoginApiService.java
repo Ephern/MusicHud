@@ -34,13 +34,13 @@ public class LoginApiService implements ILoginApiService {
     private static final Logger logger = MusicHud.getLogger(LoginApiService.class);
     private static final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private static volatile LoginApiService loginApiService;
-    Map<ServerPlayer, Runnable> pollingMap = new HashMap<>();
+    final Map<ServerPlayer, Runnable> pollingMap = new HashMap<>();
     @Getter
     Map<ServerPlayer, PlayerLoginInfo> playerInfoMap = new HashMap<>();
     @Getter
     Set<Consumer<Map<ServerPlayer, PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
     volatile String anonymousCookie;
-    Cache<ServerPlayer, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
+    final Cache<ServerPlayer, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
             .maximumSize(Long.MAX_VALUE)
             .softValues()

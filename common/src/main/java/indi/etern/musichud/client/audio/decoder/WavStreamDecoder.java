@@ -15,6 +15,7 @@ public class WavStreamDecoder implements AudioDecoder {
     private final int sampleRate;
     private final int format;          // OpenAL 格式常量
     private final long dataSize;       // 音频数据总字节数
+    private final int frameSize;
     private long bytesRead;            // 已读取的音频数据字节数
 
     /**
@@ -40,23 +41,21 @@ public class WavStreamDecoder implements AudioDecoder {
         }
 
         // 2. 查找 fmt 块
-        int audioFormat = 0;
-        int channels = 0;
-        int sampleRateTmp = 0;
-        int bitsPerSample = 0;
-        boolean foundFmt = false;
+        int audioFormat;
+        int channels;
+        int sampleRateTmp;
+        int bitsPerSample;
         while (true) {
             byte[] chunkId = new byte[4];
             readFully(chunkId);
             long chunkSize = readIntLE();
             if (new String(chunkId).equals("fmt ")) {
-                foundFmt = true;
-                audioFormat = (int) readShortLE();   // 格式标签，1 表示 PCM
-                channels = (int) readShortLE();
-                sampleRateTmp = (int) readIntLE();
+                audioFormat = readShortLE();   // 格式标签，1 表示 PCM
+                channels = readShortLE();
+                sampleRateTmp = readIntLE();
                 readIntLE();      // 字节率（跳过）
                 readShortLE();    // 块对齐（跳过）
-                bitsPerSample = (int) readShortLE();
+                bitsPerSample = readShortLE();
 
                 // 跳过 fmt 块中可能存在的额外数据
                 long extra = chunkSize - 16;
@@ -75,22 +74,17 @@ public class WavStreamDecoder implements AudioDecoder {
                 }
             }
         }
-        if (!foundFmt) {
-            throw new IOException("No fmt chunk found in WAV file");
-        }
         if (audioFormat != 1) {
             throw new IOException("Unsupported audio format: " + audioFormat + " (only PCM supported)");
         }
 
         // 3. 查找 data 块
-        long dataSizeTmp = 0;
-        boolean foundData = false;
+        long dataSizeTmp;
         while (true) {
             byte[] chunkId = new byte[4];
             readFully(chunkId);
             long chunkSize = readIntLE();
             if (new String(chunkId).equals("data")) {
-                foundData = true;
                 dataSizeTmp = chunkSize;
                 break;
             } else {
@@ -100,13 +94,11 @@ public class WavStreamDecoder implements AudioDecoder {
                 }
             }
         }
-        if (!foundData) {
-            throw new IOException("No data chunk found in WAV file");
-        }
 
-        this.sampleRate = sampleRateTmp;
-        this.dataSize = dataSizeTmp;
-        this.bytesRead = 0;
+        sampleRate = sampleRateTmp;
+        dataSize = dataSizeTmp;
+        frameSize = sampleRate * channels * bitsPerSample / 8;
+        bytesRead = 0;
 
         // 确定 OpenAL 格式常量
         if (channels == 1 && bitsPerSample == 8) {
@@ -174,6 +166,11 @@ public class WavStreamDecoder implements AudioDecoder {
     @Override
     public int getSampleRate() {
         return sampleRate;
+    }
+
+    @Override
+    public int getFrameSize() {
+        return frameSize;
     }
 
 

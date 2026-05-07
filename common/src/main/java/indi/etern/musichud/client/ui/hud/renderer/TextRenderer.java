@@ -197,7 +197,7 @@ public class TextRenderer implements HudRenderer{
 
     public static class TextStyle {
         public String text;
-        public int baseColor;
+        public final int baseColor;
 
         public TextStyle(String text, int baseColor) {
             this.text = text;

@@ -14,7 +14,7 @@ import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
 public record GetAlbumDetailRequest(long id) implements C2SPayload {
-    public static StreamCodec<RegistryFriendlyByteBuf, GetAlbumDetailRequest> CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, GetAlbumDetailRequest> CODEC = StreamCodec.composite(
             ByteBufCodecs.LONG,
             GetAlbumDetailRequest::id,
             GetAlbumDetailRequest::new

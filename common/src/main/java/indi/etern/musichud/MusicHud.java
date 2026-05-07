@@ -29,7 +29,7 @@ public final class MusicHud {
     @Getter
     private static ConnectStatus status = ConnectStatus.NOT_CONNECTED;
     @Getter
-    private static Set<Consumer<ConnectStatus>> connectStatusListeners = new HashSet<>();
+    private static final Set<Consumer<ConnectStatus>> connectStatusListeners = new HashSet<>();
     @Getter
     @Setter
     private static Environment currentEnvironment;
@@ -96,7 +96,7 @@ public final class MusicHud {
 
     @FunctionalInterface
     public interface ScheduledTask {
-        void stop() throws InterruptedException;
+        void stop();
     }
 
     public static void setStatus(ConnectStatus status) {

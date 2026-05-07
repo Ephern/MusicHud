@@ -265,16 +265,16 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             Duration currentPhraseStartTime = lineStart;
             if (currentPhraseIndex >= 1) {
                 LyricLine.Phrase previousPhrase = phrases.get(currentPhraseIndex - 1);
-                currentPhraseStartOffset = previousPhrase.getEndOffset();
-                currentPhraseStartTime = previousPhrase.getEndTime();
+                currentPhraseStartOffset = previousPhrase.endOffset();
+                currentPhraseStartTime = previousPhrase.endTime();
                 phraseStartOffest = calcTextWidth(line.text.substring(0, currentPhraseStartOffset), lineHeight);
                 currentPhraseStartOffset += 1;
             }
             LyricLine.Phrase currentPhrase = currentPhraseIndex < phrases.size() ? phrases.get(currentPhraseIndex) : null;
             float phraseWidth = 0;
             if (currentPhrase != null) {
-                float rate = (float) playedDuration.minus(currentPhraseStartTime).toMillis() / currentPhrase.getDurationMillis();
-                phraseWidth = calcTextWidth(line.text.substring(currentPhraseStartOffset, currentPhrase.getEndOffset()) + " ", lineHeight) * Math.clamp(rate, 0, 1);
+                float rate = (float) playedDuration.minus(currentPhraseStartTime).toMillis() / currentPhrase.durationMillis();
+                phraseWidth = calcTextWidth(line.text.substring(currentPhraseStartOffset, currentPhrase.endOffset()) + " ", lineHeight) * Math.clamp(rate, 0, 1);
             }
             return phraseStartOffest + phraseWidth;
         } else {
@@ -364,26 +364,5 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         }
     }
 
-    public static class Line {
-        public LyricLine lyricLine;
-        public String text;
-        public int fadeColor;
-        public int emphasizeColor;
-        long scrollMs;
-
-        public Line(LyricLine lyricLine, String text, int fadeColor, int emphasizeColor, long scrollMs) {
-            this.lyricLine = lyricLine;
-            this.text = text;
-            this.fadeColor = fadeColor;
-            this.emphasizeColor = emphasizeColor;
-            this.scrollMs = scrollMs;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) return true;
-            if (!(obj instanceof Line other)) return false;
-            return text.equals(other.text) && fadeColor == other.fadeColor && scrollMs == other.scrollMs;
-        }
-    }
+    public record Line(LyricLine lyricLine, String text, int fadeColor, int emphasizeColor, long scrollMs) {}
 }

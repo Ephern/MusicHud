@@ -124,7 +124,7 @@ public class LyricLine implements Comparable<LyricLine> {
         int low = 0, high = phrases.size();
         while (low < high) {
             int mid = (low + high) >>> 1;
-            if (phrases.get(mid).getEndTime().compareTo(playedDuration) <= 0) {
+            if (phrases.get(mid).endTime().compareTo(playedDuration) <= 0) {
                 low = mid + 1;
             } else {
                 high = mid;
@@ -137,22 +137,7 @@ public class LyricLine implements Comparable<LyricLine> {
         NORMAL, META_DATA, RHYTHM
     }
 
-    @ToString
-    @EqualsAndHashCode
-    @Getter
-    public static final class Phrase {
-        private final int endOffset;
-        private final Duration endTime;
-        private final int durationMillis;
-        private final List<HighlightSpan> spans;
-
-        public Phrase(int endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {
-            this.endOffset = endOffset;
-            this.endTime = endTime;
-            this.durationMillis = durationMillis;
-            this.spans = spans;
-        }
-    }
+    public record Phrase(int endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {}
 
     @ToString
     @Getter
@@ -192,7 +177,8 @@ public class LyricLine implements Comparable<LyricLine> {
                          @Nonnull TextPaint paint) {
             canvas.save();
             canvas.scale(scale, scale, x + 0.5f * cachedWidth, y + 0.5f * textHeight);
-            canvas.drawShapedText(cachedShapedText, x, y + yOffset, paint);
+            canvas.translate(0, yOffset);
+            canvas.drawShapedText(cachedShapedText, x, y, paint);
             canvas.restore();
         }
     }

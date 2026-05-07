@@ -6,19 +6,19 @@ import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.Identifier;
+import net.minecraft.resources.ResourceLocation;
 
-public class PlayingStatusRenderer implements HudRenderer{
-    public static final Identifier LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
-    public static final Identifier RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
-    public static final Identifier ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
+public class PlayingStatusRenderer implements HudRenderer {
+    public static final ResourceLocation LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
+    public static final ResourceLocation RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
+    public static final ResourceLocation ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
     private static volatile PlayingStatusRenderer instance;
     StreamAudioPlayer.Status status;
     @Getter
     private Layout layout;
     @Setter
     private boolean visibility = true;
-    private Identifier currentLocation;
+    private ResourceLocation currentResourceLocation;
 
     public static PlayingStatusRenderer getInstance() {
         if (instance == null) {
@@ -36,7 +36,7 @@ public class PlayingStatusRenderer implements HudRenderer{
 
     public void setStatus(StreamAudioPlayer.Status status) {
         this.status = status;
-        currentLocation = switch (status) {
+        currentResourceLocation = switch (status) {
             case BUFFERING -> LOADING_ICON_LOCATION;
             case RETRYING -> RETRYING_ICON_LOCATION;
             case ERROR -> ERROR_ICON_LOCATION;
@@ -46,9 +46,10 @@ public class PlayingStatusRenderer implements HudRenderer{
 
     @Override
     public void render(HudRenderContext hudRenderContext) {
-        if (currentLocation != null && visibility) {
+        ResourceLocation currentResourceLocation1 = currentResourceLocation;
+        if (currentResourceLocation1 != null && visibility) {
             float rotationRadians;
-            if (currentLocation == ERROR_ICON_LOCATION) {
+            if (currentResourceLocation1 == ERROR_ICON_LOCATION) {
                 rotationRadians = 0;
             } else {
                 rotationRadians = (float) ((Math.PI * 2) * ((float) (System.currentTimeMillis() % 1000) / 1000));
@@ -68,12 +69,12 @@ public class PlayingStatusRenderer implements HudRenderer{
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
                     .then(transforming -> {
-                        hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentLocation, screenX, screenY, 0, 0, width, height, width, height);
+                        hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height);
                     });
         }
     }
 
     public boolean isVisible() {
-        return visibility && currentLocation != null;
+        return visibility && currentResourceLocation != null;
     }
 }
