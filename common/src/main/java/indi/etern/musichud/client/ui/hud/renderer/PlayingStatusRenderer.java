@@ -6,19 +6,19 @@ import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public class PlayingStatusRenderer implements HudRenderer {
-    public static final ResourceLocation LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
-    public static final ResourceLocation RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
-    public static final ResourceLocation ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
+    public static final Identifier LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
+    public static final Identifier RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
+    public static final Identifier ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
     private static volatile PlayingStatusRenderer instance;
     StreamAudioPlayer.Status status;
     @Getter
     private Layout layout;
     @Setter
     private boolean visibility = true;
-    private ResourceLocation currentResourceLocation;
+    private Identifier currentResourceLocation;
 
     public static PlayingStatusRenderer getInstance() {
         if (instance == null) {
@@ -46,7 +46,7 @@ public class PlayingStatusRenderer implements HudRenderer {
 
     @Override
     public void render(HudRenderContext hudRenderContext) {
-        ResourceLocation currentResourceLocation1 = currentResourceLocation;
+        Identifier currentResourceLocation1 = currentResourceLocation;
         if (currentResourceLocation1 != null && visibility) {
             float rotationRadians;
             if (currentResourceLocation1 == ERROR_ICON_LOCATION) {
