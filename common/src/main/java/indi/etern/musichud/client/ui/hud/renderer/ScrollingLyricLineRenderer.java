@@ -216,7 +216,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         float x = absolutePosition.x();
         float y = absolutePosition.y();
-        scissor(context, x, y);
+        context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
         if (isTransitioning && nextLine1.line != null && nextLine2.line != null) {
             // 旧文本向上移出
             float easedProgress = Easings.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
@@ -329,10 +329,6 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                     });
             context.popScissor();
         }
-    }
-
-    private void scissor(HudRenderContext context, float x, float y) {
-        context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
     }
 
     private static class LineState {
