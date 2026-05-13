@@ -159,8 +159,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         } else {
             rawWidth = font.width(text);
         }
-        float scale = lineHeight / font.lineHeight;
-        return rawWidth * scale;
+        return rawWidth * lineHeight / font.lineHeight;
     }
 
     private void updateAnimations() {
@@ -278,7 +277,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             if (currentPhrase != null) {
                 float rate = (float) playedDuration.minus(currentPhraseStartTime).toMillis() / currentPhrase.durationMillis();
                 if (currentPhrase.endOffset() <= text.length()) {
-                    phraseWidth = calcTextWidth(text.substring(currentPhraseStartOffset, currentPhrase.endOffset()) + " ", lineHeight) * Math.clamp(rate, 0, 1);
+                    phraseWidth = calcTextWidth(text.substring(currentPhraseStartOffset, currentPhrase.endOffset()), lineHeight) * Math.clamp(rate, 0, 1);
                 }
             }
             return phraseStartOffest + phraseWidth;
