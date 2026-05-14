@@ -235,7 +235,7 @@ public class LyricHighlightTextView extends TextView {
             float t = Math.clamp((float) progressMillis / totalDuration, 0, 1);
             span.setYOffset(-phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t));
         } else {
-            float staggerRate = 0.3f; // 错开比例，最后一个比第一个晚 totalDuration * staggerRate 毫秒
+            float staggerRate = 0.2f; // 错开比例，最后一个比第一个晚 totalDuration * staggerRate 毫秒
             long staggerDuration = (long) (totalDuration * staggerRate); // 错开总时长
             long animDuration = totalDuration - staggerDuration; // 每个 span 的动画时长
             if (animDuration <= 0) animDuration = 1;
@@ -254,7 +254,7 @@ public class LyricHighlightTextView extends TextView {
                 } else {
                     float t = (float) (nowMillis - animStart) / animDuration;
                     span.setYOffset(-phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t));
-                    span.setScale(1 + 0.3f * Math.min(phrase.durationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
+                    span.setScale(1 + 0.35f * Math.min(phrase.durationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
                 }
             }
         }

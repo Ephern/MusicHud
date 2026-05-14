@@ -419,6 +419,7 @@ public class StreamAudioPlayer {
                 if (e instanceof SocketException e1 && e1.getMessage().equals("Closed by interrupt")) break;
                 LOGGER.error("Download error (attempt {})\n{} : {}", localRetryCount + 1, e.getClass().getSimpleName(), e.getMessage());
 
+                playedBytes = 0;
                 forceSyncInternal = true;
                 localRetryCount++;
                 setStatus(Status.RETRYING);
