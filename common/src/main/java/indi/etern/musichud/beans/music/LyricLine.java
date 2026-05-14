@@ -20,10 +20,7 @@ import java.util.*;
 @Builder
 public class LyricLine implements Comparable<LyricLine> {
     public static final int DURABLE_PHRASE_MILLIS = 1000;
-    public static final int FULL_DURABLE_PHRASE_MILLIS = 1500;
-
-    @Builder.Default
-    private boolean phraseParsed = false;
+    public static final int FULL_DURABLE_PHRASE_MILLIS = 1200;
     @Builder.Default
     Type type = Type.NORMAL;
     Duration startTime;
@@ -43,6 +40,18 @@ public class LyricLine implements Comparable<LyricLine> {
     @Builder.Default
     boolean wordByWord = false;
     SpannableString spannableString;
+    @Builder.Default
+    private boolean phraseParsed = false;
+
+    private static LyricLine.HighlightSpan applySpan(SpannableString spannableString, int start, int end) {
+        LyricLine.HighlightSpan span = new LyricLine.HighlightSpan(0);
+        spannableString.setSpan(
+                span,
+                start, end,
+                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+        );
+        return span;
+    }
 
     public Map<Duration, Integer> getPhraseEndingOffsetMap() {
         if (phraseEndingOffsetMap == null) {
@@ -77,6 +86,7 @@ public class LyricLine implements Comparable<LyricLine> {
             forceParsePhrases();
         }
     }
+
     public void forceParsePhrases() {
         phraseParsed = true;
         spannableString = new SpannableString(text);
@@ -92,12 +102,17 @@ public class LyricLine implements Comparable<LyricLine> {
                 Duration endTime = entry.getKey();
                 List<LyricLine.HighlightSpan> spans = new ArrayList<>(1);
                 int durationMillis = Math.toIntExact(endTime.minus(lastEndTime).toMillis());
+
                 if (durationMillis > DURABLE_PHRASE_MILLIS) {
                     for (int i = lastPhraseEnd; i < phraseEnd; i++) {
-                        spans.add(applySpan(spannableString, i, i + 1));
+                        if (i + 1 <= spannableString.length()) {
+                            spans.add(applySpan(spannableString, i, i + 1));
+                        }
                     }
                 } else {
-                    spans.add(applySpan(spannableString, lastPhraseEnd, phraseEnd));
+                    if (phraseEnd <= spannableString.length()) {
+                        spans.add(applySpan(spannableString, lastPhraseEnd, phraseEnd));
+                    }
                 }
                 lastPhraseEnd = phraseEnd;
                 LyricLine.Phrase phrase = new LyricLine.Phrase(entry.getValue(), endTime, durationMillis, spans);
@@ -106,16 +121,6 @@ public class LyricLine implements Comparable<LyricLine> {
                 lastEndTime = endTime;
             }
         }
-    }
-
-    private static LyricLine.HighlightSpan applySpan(SpannableString spannableString, int start, int end) {
-        LyricLine.HighlightSpan span = new LyricLine.HighlightSpan(0);
-        spannableString.setSpan(
-                span,
-                start, end,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-        );
-        return span;
     }
 
     // 二分查找第一个结束时间 > playedDuration 的短语索引
@@ -137,12 +142,40 @@ public class LyricLine implements Comparable<LyricLine> {
         NORMAL, META_DATA, RHYTHM
     }
 
-    public record Phrase(int endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {}
+    public record Phrase(int endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {
+    }
 
     @ToString
     @Getter
     @Setter
     public static class HighlightSpan extends ReplacementSpan {
+        // Edging value for SkFont::kSubpixelAntiAlias_Edging in native Skia
+//        private static final byte SUBPIXEL_EDGING = (byte) 2;
+//        private static final VarHandle SHAPED_TEXT_NATIVE_FONT;
+//        private static final VarHandle FONT_EDGING;
+
+/*
+        static {
+            VarHandle nativeFontHandle = null;
+            VarHandle edgingHandle = null;
+            try {
+                MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(ShapedText.class, MethodHandles.lookup());
+                nativeFontHandle = lookup.findVarHandle(
+                        ShapedText.class, "mNativeFont", icyllis.arc3d.sketch.Font.class);
+                lookup = MethodHandles.privateLookupIn(
+                        icyllis.arc3d.sketch.Font.class, MethodHandles.lookup());
+                edgingHandle = lookup.findVarHandle(
+                        icyllis.arc3d.sketch.Font.class, "mEdging", byte.class);
+            } catch (Exception ignored) {
+            }
+            SHAPED_TEXT_NATIVE_FONT = nativeFontHandle;
+            FONT_EDGING = edgingHandle;
+        }
+*/
+
+        // Large Y offset for far-pivot scale trick — encodes yOffset as a near-identity
+        // non-uniform Y scale, which Skia renders at sub-pixel precision unlike translate.
+        private static final float Y_OFFSET_PIVOT_DISTANCE = 100000.0f;
         float yOffset;
         float scale = 1;
         ShapedText cachedShapedText;
@@ -164,6 +197,19 @@ public class LyricLine implements Comparable<LyricLine> {
                 );
                 cachedWidth = Math.round(cachedShapedText.getAdvance());
                 textHeight = cachedShapedText.getDescent() - cachedShapedText.getAscent();
+
+                // Enable SkFont subpixel anti-aliasing edging via VarHandle.
+                // Must happen before getTextBlob() lazily builds the native TextBlob.
+/*
+                if (SHAPED_TEXT_NATIVE_FONT != null && FONT_EDGING != null) {
+                    try {
+                        if (SHAPED_TEXT_NATIVE_FONT.get(cachedShapedText) instanceof icyllis.arc3d.sketch.Font nativeFont) {
+                            FONT_EDGING.set(nativeFont, SUBPIXEL_EDGING);
+                        }
+                    } catch (Exception ignored) {
+                    }
+                }
+*/
             }
             if (fm != null) {
                 paint.getFontMetricsInt(fm);
@@ -175,9 +221,12 @@ public class LyricLine implements Comparable<LyricLine> {
         public void draw(@Nonnull Canvas canvas, CharSequence text,
                          int start, int end, float x, int top, int y, int bottom,
                          @Nonnull TextPaint paint) {
+            float pivotX = x + 0.5f * cachedWidth;
             canvas.save();
-            canvas.scale(scale, scale, x + 0.5f * cachedWidth, y + 0.5f * textHeight);
-            canvas.translate(0, yOffset);
+//            canvas.translate(0, yOffset);
+            float sy = 1.0f + yOffset / Y_OFFSET_PIVOT_DISTANCE;
+            canvas.scale(1.0f, sy, pivotX, y - Y_OFFSET_PIVOT_DISTANCE);
+            canvas.scale(scale, scale, pivotX, y + 0.4f * textHeight);
             canvas.drawShapedText(cachedShapedText, x, y, paint);
             canvas.restore();
         }

@@ -13,12 +13,15 @@ import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.Easings;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
+import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -33,12 +36,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final float MAX_STRETCH_MILLIS = 300;
     public static final float LOG_DELAY_FACTOR = 9;
     public static final float STAGGERED_BASE_DURATION_MILLIS = 800;
+    final Set<LyricLineView> staggeringLyricViews = new HashSet<>();
     private final Map<LyricLine, LyricLineView> lyricLines = new LinkedHashMap<>();
     private final List<LyricLineView> lineList = new ArrayList<>();
     private final LinearLayout container;
     private final ScrollController scrollController;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    final Set<LyricLineView> staggeringLyricViews = new HashSet<>();
     Runnable staggeringEndListener = null;
     boolean firstStagger = true;
     boolean scrollFinished = false;
@@ -79,6 +82,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             }
         }
     };
+    private static Logger logger;
 
     public StaggeredLyricScrollView(Context context) {
         super(context);
@@ -112,32 +116,39 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     public void setLyrics(Collection<LyricLine> lyrics) {
-        if (!continueUpdate) {
-            startUpdateLoop();
-        }
-        firstStagger = true;
-        justHighlightedLyricLine = null;
-        lastHighlightedLyricLine = null;
-        staggeringLyricViews.clear();
-        if (container.getChildCount() > 0) {
-            ObjectAnimator slideOut = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0, -getWidth());
-            slideOut.setInterpolator(Easings.EASE_IN_OUT_QUINT);
-            slideOut.setDuration(300);
-            slideOut.addListener(new AnimatorListener() {
-                @Override
-                public void onAnimationEnd(@NonNull Animator animation) {
-                    container.removeAllViews();
-                    buildLyricRows(lyrics);
-                    container.setTranslationX(getWidth());
-                    ObjectAnimator slideIn = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0);
-                    slideIn.setInterpolator(Easings.EASE_IN_OUT_QUINT);
-                    slideIn.setDuration(300);
-                    slideIn.start();
-                }
-            });
-            slideOut.start();
-        } else {
-            buildLyricRows(lyrics);
+        try {
+            if (!continueUpdate) {
+                startUpdateLoop();
+            }
+            firstStagger = true;
+            justHighlightedLyricLine = null;
+            lastHighlightedLyricLine = null;
+            staggeringLyricViews.clear();
+            if (container.getChildCount() > 0) {
+                ObjectAnimator slideOut = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0, -getWidth());
+                slideOut.setInterpolator(Easings.EASE_IN_OUT_QUINT);
+                slideOut.setDuration(300);
+                slideOut.addListener(new AnimatorListener() {
+                    @Override
+                    public void onAnimationEnd(@NonNull Animator animation) {
+                        container.removeAllViews();
+                        buildLyricRows(lyrics);
+                        container.setTranslationX(getWidth());
+                        ObjectAnimator slideIn = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0);
+                        slideIn.setInterpolator(Easings.EASE_IN_OUT_QUINT);
+                        slideIn.setDuration(300);
+                        slideIn.start();
+                    }
+                });
+                slideOut.start();
+            } else {
+                buildLyricRows(lyrics);
+            }
+        } catch (Exception e) {
+            if (logger == null) {
+                logger = MusicHud.getLogger(HudRendererManager.class);
+            }
+            logger.error("While switch lyrics", e);
         }
     }
 

@@ -159,8 +159,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         } else {
             rawWidth = font.width(text);
         }
-        float scale = lineHeight / font.lineHeight;
-        return rawWidth * scale;
+        return rawWidth * lineHeight / font.lineHeight;
     }
 
     private void updateAnimations() {
@@ -216,7 +215,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         float x = absolutePosition.x();
         float y = absolutePosition.y();
-        scissor(context, x, y);
+        context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
         if (isTransitioning && nextLine1.line != null && nextLine2.line != null) {
             // 旧文本向上移出
             float easedProgress = Easings.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
@@ -249,7 +248,8 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
     private float calcHighlightWidth(LineState lineState,float lineHeight) {
         Line line = lineState.line;
-        float textWidth = calcTextWidth(line.text, lineHeight);
+        String text = line.text;
+        float textWidth = calcTextWidth(text, lineHeight);
         LyricLine currentLyricLine = line.lyricLine;
         if (currentLyricLine == null) {
             return 0;
@@ -267,14 +267,18 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                 LyricLine.Phrase previousPhrase = phrases.get(currentPhraseIndex - 1);
                 currentPhraseStartOffset = previousPhrase.endOffset();
                 currentPhraseStartTime = previousPhrase.endTime();
-                phraseStartOffest = calcTextWidth(line.text.substring(0, currentPhraseStartOffset), lineHeight);
+                if (currentPhraseStartOffset <= text.length()) {
+                    phraseStartOffest = calcTextWidth(text.substring(0, currentPhraseStartOffset), lineHeight);
+                }
                 currentPhraseStartOffset += 1;
             }
             LyricLine.Phrase currentPhrase = currentPhraseIndex < phrases.size() ? phrases.get(currentPhraseIndex) : null;
             float phraseWidth = 0;
             if (currentPhrase != null) {
                 float rate = (float) playedDuration.minus(currentPhraseStartTime).toMillis() / currentPhrase.durationMillis();
-                phraseWidth = calcTextWidth(line.text.substring(currentPhraseStartOffset, currentPhrase.endOffset()) + " ", lineHeight) * Math.clamp(rate, 0, 1);
+                if (currentPhrase.endOffset() <= text.length()) {
+                    phraseWidth = calcTextWidth(text.substring(currentPhraseStartOffset, currentPhrase.endOffset()), lineHeight) * Math.clamp(rate, 0, 1);
+                }
             }
             return phraseStartOffest + phraseWidth;
         } else {
@@ -324,10 +328,6 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                     });
             context.popScissor();
         }
-    }
-
-    private void scissor(HudRenderContext context, float x, float y) {
-        context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
     }
 
     private static class LineState {
