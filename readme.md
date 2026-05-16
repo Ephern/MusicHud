@@ -2,8 +2,8 @@
 ![Static Badge](https://img.shields.io/badge/Java-21-red?style=for-the-badge)
 ![Static Badge](https://img.shields.io/badge/License-LGPLv3-brightgreen?style=for-the-badge)
 
-![Banner](https://cdn.modrinth.com/data/7Rnb6oJr/images/82adebdd95d53dd3d97c41ae2f60d24b033c9fb3.png)
-![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/2d00c770f54f44fc194f46842f5876e307ab54e5.png)
+![Banner](https://cdn.modrinth.com/data/7Rnb6oJr/images/0ec5142f5e4ea723ce955e2aa3774be6df349270.png)
+![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/5e716f6b0c4a3c5c710e3fc4598aefdf51feee5b.png)
 
 #### A GUI-based Full Server Song Request Mod / Plugin
 
@@ -18,7 +18,7 @@
 ## Prerequisites
 - ModernUI (only client)
 - Forge Config API Port (only fabric)
-- Architectury API (Mod edition, 1.2.0 and below)
+- ~~Architectury API~~ (Mod edition, 1.2.0 and below)
 
 ## Features
 - With graceful GUI, providing an in-game operation interface and a easily configurable HUD.
@@ -55,7 +55,7 @@ You don't need to deploy an API server, but the server or LAN multiplayer host n
 ### Server
 All you need is to deploy an API server
 
-### How to Deploy an API server
+### How to Deploy an API Server
 There are 2 methods to deploy
 #### Deploy bound with mod (recommend for client)
 > This method allows to MusicHUD manage lifecycle of api server.
@@ -90,7 +90,7 @@ There are 2 methods to deploy
 ## 前置依赖
 - ModernUI （仅客户端）
 - Forge Config API Port （仅 Fabric）
-- Architectury API （模组版，1.2.0 以及更低版本）
+- ~~Architectury API~~ （模组版，1.2.0 以及更低版本）
 
 ## 特点
 - 具有优雅的 GUI，提供游戏内操作界面，以及易配置的 HUD
@@ -170,7 +170,7 @@ There are 2 methods to deploy
 
 [第三方bukkit插件实现 1](https://github.com/Shiroiame-Kusu/MusicHud-Bukkit) (1.0.5 stable -)
 
-[第三方bukkit插件实现 2](https://github.com/MOPELotus/MusicHud-Paper) (1.1.4 hotfix +,，目前已部分合并至主仓库)
+[第三方bukkit插件实现 2](https://github.com/MOPELotus/MusicHud-Paper) (1.1.4 hotfix +，目前已部分合并至主仓库)
 
 ## 前置依赖
 - ModernUI （仅客户端）
