@@ -270,7 +270,6 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                 if (currentPhraseStartOffset <= text.length()) {
                     phraseStartOffest = calcTextWidth(text.substring(0, currentPhraseStartOffset), lineHeight);
                 }
-                currentPhraseStartOffset += 1;
             }
             LyricLine.Phrase currentPhrase = currentPhraseIndex < phrases.size() ? phrases.get(currentPhraseIndex) : null;
             float phraseWidth = 0;

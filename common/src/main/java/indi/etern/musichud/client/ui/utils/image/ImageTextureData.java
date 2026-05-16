@@ -2,36 +2,36 @@ package indi.etern.musichud.client.ui.utils.image;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import icyllis.modernui.graphics.Bitmap;
-import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
-import org.apache.logging.log4j.Logger;
 
 import java.io.Closeable;
+import java.lang.ref.Cleaner;
 import java.util.Objects;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 
 @Getter
 public final class ImageTextureData implements Closeable {
-    private static final Logger logger = MusicHud.getLogger(ImageTextureData.class);
     private final String source;
-    private final ResourceLocation location;
     private final DynamicTexture texture;
-    private volatile boolean registered;
+    private static final Cleaner CLEANER = Cleaner.create();
+    private final Cleaner.Cleanable cleanable;
 
     public ImageTextureData(
-            String source, ResourceLocation location, DynamicTexture texture, boolean registered
+            String source, DynamicTexture texture
     ) {
         this.source = source;
-        this.location = location;
         this.texture = texture;
-        this.registered = registered;
+        this.cleanable = CLEANER.register(this, () -> {
+            try {
+                //noinspection ResultOfMethodCallIgnored
+                Minecraft.getInstance().submit(texture::close);
+            } catch (Exception ignored) {}
+        });
     }
 
     @Override
@@ -41,11 +41,13 @@ public final class ImageTextureData implements Closeable {
             AtomicReference<BiConsumer<MusicDetail, MusicDetail>> atomicListenerReference = new AtomicReference<>();
             atomicListenerReference.set((previous, current) -> {
                 NowPlayingInfo.getInstance().getMusicSwitchListener().remove(atomicListenerReference.get());
-                release();
+                //noinspection ResultOfMethodCallIgnored
+                Minecraft.getInstance().submit(texture::close);
             });
             NowPlayingInfo.getInstance().getMusicSwitchListener().add(atomicListenerReference.get());
         } else {
-            release();
+            //noinspection ResultOfMethodCallIgnored
+            Minecraft.getInstance().submit(texture::close);
         }
     }
 
@@ -58,6 +60,7 @@ public final class ImageTextureData implements Closeable {
         }
     }
 
+/*
     public CompletableFuture<Void> register() {
         if (!registered) {
             synchronized (source) {
@@ -81,15 +84,7 @@ public final class ImageTextureData implements Closeable {
             return CompletableFuture.completedFuture(null);
         }
     }
-
-    public void release() {
-        //noinspection ResultOfMethodCallIgnored
-        Minecraft.getInstance().submit(() -> {
-            Minecraft.getInstance().getTextureManager().release(location);
-            logger.debug("Released texture {} : {}", location, texture);
-            registered = true;
-        });
-    }
+*/
 
     @Override
     public boolean equals(Object obj) {
@@ -97,22 +92,18 @@ public final class ImageTextureData implements Closeable {
         if (obj == null || obj.getClass() != this.getClass()) return false;
         var that = (ImageTextureData) obj;
         return Objects.equals(this.source, that.source) &&
-                Objects.equals(this.location, that.location) &&
-                Objects.equals(this.texture, that.texture) &&
-                this.registered == that.registered;
+                Objects.equals(this.texture, that.texture);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, location, texture, registered);
+        return Objects.hash(source, texture);
     }
 
     @Override
     public String toString() {
         return "ImageTextureData[" +
                 "source=" + source + ", " +
-                "location=" + location + ", " +
-                "texture=" + texture + ", " +
-                "registered=" + registered + ']';
+                "texture=" + texture + ']';
     }
 }

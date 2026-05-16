@@ -7,6 +7,7 @@ import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.RoundedImageDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.util.ColorStateList;
@@ -245,16 +246,20 @@ public class UrlImageView extends FrameLayout {
 
     private void loadBase64Image(String base64String) {
         loadFuture = CompletableFuture.runAsync(() -> {
+            ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
             MuiModApi.postToUiThread(() -> {
-                try {
-                    ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
-                    Bitmap bitmap = imageTextureData.convertToBitmap();
+                try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
                     if (bitmap == null) {
                         throw new RuntimeException("failed to load image from base64 string");
                     }
-                    createDrawable(bitmap);
+                    Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
+                    if (textureFromBitmap != null) {
+                        createDrawable(textureFromBitmap);
+                    }
                 } catch (Exception e) {
                     showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
+                } finally {
+                    imageTextureData.close();
                 }
             });
         }, MusicHud.EXECUTOR);
@@ -264,15 +269,23 @@ public class UrlImageView extends FrameLayout {
         loadFuture = CompletableFuture.runAsync(() -> {
             try {
                 ImageUtils.downloadAsync(urlString).thenAcceptAsync(imageTextureData -> {
-                    if (imageTextureData != null) {
-                        Bitmap bitmap = imageTextureData.convertToBitmap();
-                        if (bitmap == null) {
-                            throw new RuntimeException("failed to load image");
+                    MuiModApi.postToUiThread(() -> {
+                        if (imageTextureData != null) {
+                            try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
+                                if (bitmap == null) {
+                                    throw new RuntimeException("failed to load image");
+                                }
+                                Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
+                                if (textureFromBitmap != null) {
+                                    createDrawable(textureFromBitmap);
+                                }
+                            } catch (Exception e) {
+                                showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
+                            }
+                        } else {
+                            showError(I18n.get(MusicHud.MOD_ID + ".button.downloadError"));
                         }
-                        MuiModApi.postToUiThread(() -> createDrawable(bitmap));
-                    } else {
-                        MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.downloadError")));
-                    }
+                    });
                 }, MusicHud.EXECUTOR).exceptionally((e) -> {
                     MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
                     return null;
@@ -283,14 +296,14 @@ public class UrlImageView extends FrameLayout {
         }, MusicHud.EXECUTOR);
     }
 
-    private void createDrawable(Bitmap bitmap) {
-        float ratio = (float) bitmap.getWidth() / bitmap.getHeight();
+    private void createDrawable(Image image) {
+        float ratio = (float) image.getWidth() / image.getHeight();
         setAspectRatio(ratio);
 
         //noinspection UnstableApiUsage
         RoundedImageDrawable drawable = new RoundedImageDrawable(
                 getContext().getResources(),
-                Image.createTextureFromBitmap(bitmap)
+                image
         );
         drawable.setFilter(false);
 
@@ -300,10 +313,10 @@ public class UrlImageView extends FrameLayout {
         } else {
             // 使用 OnLayoutChangeListener 确保在布局完成后设置圆角
             setImageWithAnimation(drawable);
-            int bitmapHeight = bitmap.getHeight();
+            int imageHeight = image.getHeight();
             int height = getHeight();
             if (height > 0) {
-                float actualCornerRadius = (float) (cornerRadius * bitmapHeight) / height;
+                float actualCornerRadius = (float) (cornerRadius * imageHeight) / height;
                 drawable.setCornerRadius(actualCornerRadius);
             }
             addOnLayoutChangeListener(new OnLayoutChangeListener() {
@@ -312,7 +325,7 @@ public class UrlImageView extends FrameLayout {
                                            int oldLeft, int oldTop, int oldRight, int oldBottom) {
                     int height = bottom - top;
                     if (height > 0) {
-                        float actualCornerRadius = (float) (cornerRadius * bitmapHeight) / height;
+                        float actualCornerRadius = (float) (cornerRadius * imageHeight) / height;
                         drawable.setCornerRadius(actualCornerRadius);
                         invalidate();
                         removeOnLayoutChangeListener(this);
@@ -337,9 +350,16 @@ public class UrlImageView extends FrameLayout {
         animatorSet.addListener(new AnimatorListener() {
             @Override
             public void onAnimationEnd(@Nonnull Animator animation) {
+                Drawable previousDrawable = imageView.getDrawable();
                 ImageView temp = imageView;
                 imageView = nextImageView;
                 nextImageView = temp;
+                if (previousDrawable instanceof RoundedImageDrawable imageDrawable) {
+                    Image image = imageDrawable.getImage();
+//                    if (image != null) {
+//                        image.close();
+//                    }
+                }
             }
         });
         animatorSet.start();

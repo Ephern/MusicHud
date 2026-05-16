@@ -8,7 +8,6 @@ import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
-import indi.etern.musichud.client.ui.utils.Transitionable;
 import indi.etern.musichud.client.ui.utils.image.ImageBlurPostProcessor;
 import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
@@ -17,9 +16,7 @@ import indi.etern.musichud.interfaces.IClientEventService;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -136,35 +133,35 @@ public class HudRendererManager {
 
     public void refreshStyle() {
         try {
-            float halfHeight = baseLayout.getHeight() / 2;
+            float height = baseLayout.getHeight();
+            float halfHeight = height / 2;
             if (baseLayout.getRadius() > halfHeight) {
                 baseLayout.setRadius(halfHeight);
             }
 
-            BackgroundImages bgImage = getBackgroundImagesOrElse(null);
-            configureBaseRenderer(baseLayout, bgImage);
+            configureBaseRenderer(baseLayout);
 
             Layout baseLayout = hudBaseData.getLayout();
-            contentPadding = Math.max(baseLayout.getHeight() / 10, 3);
+            contentPadding = Math.max(height / 10, 3);
 
-            float imageHeightAndWidth = baseLayout.getHeight() - 2 * contentPadding;
+            float imageHeightAndWidth = height - 2 * contentPadding;
             float imageRadius = Math.clamp(baseLayout.getRadius() - contentPadding, 0, imageHeightAndWidth / 2f);
             Layout imageLayout = new Layout("Album", contentPadding, contentPadding, imageHeightAndWidth, imageHeightAndWidth, imageRadius);
             imageLayout.setParent(baseLayout);
 
             configureImageRenderer(imageLayout);
 
-            float contentHeight = baseLayout.getHeight() - contentPadding * 2;
+            float contentHeight = height - contentPadding * 2;
+            float contentWidth = baseLayout.getWidth() - imageHeightAndWidth - 3 * contentPadding - baseLayout.getRadius() / 3;
             float contentUnit = Math.max(contentHeight / 32f, 1);
             float titleSize = contentUnit * 7;
             boolean showProgress = contentHeight > 14f;
 
-            float progressWidth = baseLayout.getWidth() - imageHeightAndWidth - 3 * contentPadding - baseLayout.getRadius() / 3;
             float progressHeight = showProgress ? contentUnit * 2 : 0;
             float mainContentX = contentPadding + imageHeightAndWidth + contentPadding;
             float progressY = contentPadding + imageHeightAndWidth - progressHeight - 1;
             float progressRadius = progressHeight / 2;
-            Layout progressLayout = new Layout("Progress", mainContentX, progressY, progressWidth, progressHeight, progressRadius);
+            Layout progressLayout = new Layout("Progress", mainContentX, progressY, contentWidth, progressHeight, progressRadius);
             progressLayout.setParent(baseLayout);
 
             configureProgressRenderer(progressLayout);
@@ -172,7 +169,7 @@ public class HudRendererManager {
             contentInterval = Math.min(contentUnit * 2.5f, 2f);
 
             float titleY = showProgress ? contentPadding + 1f : contentPadding + (contentHeight - titleSize) / 2;
-            float headX = Math.max(mainContentX + progressWidth - titleSize, imageHeightAndWidth + contentPadding - titleSize);
+            float headX = Math.max(mainContentX + contentWidth - titleSize, imageHeightAndWidth + contentPadding - titleSize);
             float statusX = headX - titleSize - contentPadding;
 
             boolean showInfoLine = contentHeight - titleSize > 11f;
@@ -185,13 +182,13 @@ public class HudRendererManager {
 
             float lyricsY = contentPadding + titleSize + contentInterval;
             float aboveProgressY = progressY - infoTextSize - contentInterval;
-            float progressRightX = mainContentX + progressWidth;
+            float progressRightX = mainContentX + contentWidth;
 
             Layout layout1 = new Layout("PlayerHead", headX, titleY, titleSize, titleSize, 0f);
             layout1.setParent(baseLayout);
             PLAYER_HEAD_RENDERER.configure(layout1);
 
-            float maxTitleWidth = progressWidth - titleSize - contentInterval;
+            float maxTitleWidth = contentWidth - titleSize - contentInterval;
 
             Layout statusLayout = new Layout("Status", statusX, titleY, titleSize, titleSize, 0f);
             statusLayout.setParent(baseLayout);
@@ -205,16 +202,16 @@ public class HudRendererManager {
             TITLE_RENDERER.configure(titleLayout, Theme.EMPHASIZE_TEXT_COLOR, TextRenderer.Position.LEFT);
 
             float lyricHeight = contentHeight - titleSize - progressHeight - infoTextSize - contentInterval * 2;
-            Layout layout = new Layout("MainContent", mainContentX, lyricsY, progressWidth, lyricHeight, 0);
+            Layout layout = new Layout("MainContent", mainContentX, lyricsY, contentWidth, lyricHeight, 0);
             layout.setParent(baseLayout);
             LYRICS_LINE_RENDERER.setLayout(layout);
             LYRICS_LINE_RENDERER.setLine1Height(lyricsSize);
             LYRICS_LINE_RENDERER.setLine2Height(subLyricsSize);
             LYRICS_LINE_RENDERER.setLineSpacing((int) contentInterval);
 
-            Layout artistAndAlbumLayout = Layout.ofTextLayout("InfoText", mainContentX, aboveProgressY, progressWidth, infoTextSize);
+            Layout artistAndAlbumLayout = Layout.ofTextLayout("InfoText", mainContentX, aboveProgressY, contentWidth, infoTextSize);
             artistAndAlbumLayout.setParent(baseLayout);
-            Layout playTimeLayout = Layout.ofTextLayout("PlayTimeText", progressRightX, aboveProgressY, progressWidth, infoTextSize);
+            Layout playTimeLayout = Layout.ofTextLayout("PlayTimeText", progressRightX, aboveProgressY, contentWidth, infoTextSize);
             playTimeLayout.setParent(baseLayout);
             ARTISTS_AND_ALBUM_RENDERER.configure(artistAndAlbumLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.LEFT);
             PLAY_TIME_RENDERER.configure(playTimeLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.RIGHT);
@@ -238,7 +235,8 @@ public class HudRendererManager {
         ));
     }
 
-    private void configureBaseRenderer(@NotNull Layout layout, BackgroundImages bgImage) {
+    private void configureBaseRenderer(@NotNull Layout layout) {
+        BackgroundImages bgImage = getBackgroundImagesOrElse(null);
         if (hudBaseData == null) {
             hudBaseData = new HudRenderData(layout, bgImage);
         } else {
@@ -279,15 +277,14 @@ public class HudRendererManager {
                         .orElse("");
                 ARTISTS_AND_ALBUM_RENDERER.setText(artists + " - " + musicDetail.getAlbum().getName());
                 LYRICS_LINE_RENDERER.clear();
-                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-                PLAYER_HEAD_RENDERER.setPlayerInfo(pusherPlayerInfo);
+                PLAYER_HEAD_RENDERER.setPlayerInfo(nowPlayingInfo.getPusherPlayerInfo());
                 ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
                         .thenAccept(imageTextureData -> {
-                            imageTextureData.register().thenAcceptAsync((v) -> {
+//                            imageTextureData.register().thenAcceptAsync((v) -> {
                                 ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 16);
-                                blurredImageTextureData.register().thenAccept((v1) -> Minecraft.getInstance().execute(() -> {
+//                                blurredImageTextureData.register().thenAccept((v1) -> Minecraft.getInstance().execute(() -> {
                                     if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
-                                        BackgroundImages backgroundImages = new BackgroundImages(blurredImageTextureData.getLocation(), imageTextureData.getLocation(), 1f);
+                                        BackgroundImages backgroundImages = new BackgroundImages(blurredImageTextureData, imageTextureData, 1f);
                                         var nextData = new BackgroundData(backgroundImages);
                                         hudBaseData.getTransitionableBackground().startTransition(nextData);
                                         Duration musicDuration = nowPlayingInfo.getMusicDuration();
@@ -296,8 +293,8 @@ public class HudRendererManager {
                                                 SHORT_DATE_TIME_FORMATTER;
                                         musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
                                     }
-                                }));
-                            }, MusicHud.EXECUTOR);
+//                                }));
+//                            }, MusicHud.EXECUTOR);
                         }).exceptionally(e -> {
                             var nextData = BackgroundData.NONE;
                             hudBaseData.getTransitionableBackground().startTransition(nextData);
@@ -320,8 +317,7 @@ public class HudRendererManager {
         PLAYER_HEAD_RENDERER.setPlayerInfo(null);
         musicDurationString = "";
         var nextData = BackgroundData.NONE;
-        Transitionable<BackgroundData> transitionable = hudBaseData.getTransitionableBackground();
-        transitionable.startTransition(nextData);
+        hudBaseData.getTransitionableBackground().startTransition(nextData);
     }
 
     public void renderFrame(GuiGraphics graphics, DeltaTracker deltaTracker) {
