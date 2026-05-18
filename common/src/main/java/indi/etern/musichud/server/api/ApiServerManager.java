@@ -32,6 +32,7 @@ public class ApiServerManager implements ServerRegister {
     private BinaryApiServerStatus binaryApiServerStatus = BinaryApiServerStatus.STOPPED;
     private int triedCount = 0;
     private boolean initialized = false;
+    private Thread hook;
 
     public void log(String s, boolean error) {
         if (error || s.contains("[ERROR]")) {
@@ -60,6 +61,8 @@ public class ApiServerManager implements ServerRegister {
         if (process != null) {
             continueRestart = false;
             process.destroy();
+            process = null;
+            removeShutdownHook();
         }
     }
 
@@ -67,6 +70,20 @@ public class ApiServerManager implements ServerRegister {
         triedCount = 0;
         stopApiServer();
         launchApiServerInternal();
+    }
+
+    private void addShutdownHook() {
+        if (hook == null) {//first call
+            hook = new Thread(this::stopApiServer);
+            IClientEventService.getInstance().registerClientLifecycleStopping(this::stopApiServer);
+        }
+        Runtime.getRuntime().addShutdownHook(hook);
+    }
+
+    private void removeShutdownHook() {
+        if (hook != null) {
+            Runtime.getRuntime().removeShutdownHook(hook);
+        }
     }
 
     private void launchApiServerInternal() {
@@ -78,9 +95,9 @@ public class ApiServerManager implements ServerRegister {
                 startEmbeddedApiServer();
                 Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
                 if (side == Environment.Side.CLIENT) {
-                    IClientEventService.getInstance().registerClientLifecycleStopping(this::stopApiServer);
+                    addShutdownHook();
                 } else if (side == Environment.Side.SERVER) {
-                    IServerEventService.getInstance().registerServerLifecycleStopping(this::stopApiServer);
+                    addShutdownHook();
                 }
             } else {
                 apiLogger.info("API Server has been launched externally");
@@ -89,6 +106,9 @@ public class ApiServerManager implements ServerRegister {
     }
 
     private void startEmbeddedApiServer() {
+        if (process != null) {
+            return;
+        }
         int maxTries = 5;
         if (triedCount >= maxTries) {
             apiLogger.error("Embedded API Server has been stopped due to maximum tries reached.");

@@ -19,7 +19,6 @@ public class Theme {
     public static final int EMPHASIZE_TEXT_COLOR = 0xFFFFFFFF;
     public static final int NORMAL_TEXT_COLOR = 0xFFE0E0E0;
     public static final int SECONDARY_TEXT_COLOR = 0xFFA0A0A0;
-    public static final int FADE_TEXT_COLOR = 0xFF606060;
 
     public static final int ERROR_TEXT_COLOR = 0xFFFF4F4F;
 
@@ -65,7 +64,7 @@ public class Theme {
     public static final int MAIN_LYRIC_SIZE = 24;
     public static final int SUB_LYRIC_SIZE = 15;
     public static final float EMPHASIZE_LYRIC_ALPHA = 0.9f;
-    public static final float FADE_LYRIC_ALPHA = 0.3f;
+    public static final float FADE_LYRIC_ALPHA = 0.25f;
     public static final int EMPHASIZE_LYRIC_COLOR = 0xD6FFFFFF;
     public static final int GLOW_LYRIC_COLOR = 0xFFFFFFFF;
     public static final int FADE_LYRIC_COLOR = 0x4BFFFFFF;

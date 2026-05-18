@@ -8,6 +8,7 @@ import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.utils.Easings;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -23,6 +24,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     private final LineState nextLine1;
     private final LineState nextLine2;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+    private final ClientConfig clientConfig = ClientConfig.getInstance();
     ModernStringSplitter modernStringSplitter;
     @Setter
     private float line1Height;
@@ -226,13 +228,17 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             } else {
                 renderLine(context, currentLine1, currentLine1.line.emphasizeColor, cachedContainerX, startY, line1Height, oldYOffset);
             }
-            renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, oldYOffset);
+            if (clientConfig.getShowTranslatedCnLyrics()) {
+                renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, oldYOffset);
+            }
 
             // 新文本从下方向上移入
             float newYOffset = (1 - easedProgress) * layout.getHeight();
             int color = nextLine1.line.lyricLine.isWordByWord() ? nextLine1.line.fadeColor : nextLine1.line.emphasizeColor;
             renderLine(context, nextLine1, color, cachedContainerX, startY, line1Height, newYOffset);
-            renderLine(context, nextLine2, nextLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, newYOffset);
+            if (clientConfig.getShowTranslatedCnLyrics()) {
+                renderLine(context, nextLine2, nextLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, newYOffset);
+            }
         } else {
             if (currentLine1.line.lyricLine == null || currentLine1.line.lyricLine.isWordByWord()) {
                 renderLine(context, currentLine1, currentLine1.line.fadeColor, cachedContainerX, startY, line1Height, 0);
@@ -241,7 +247,9 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                 renderLine(context, currentLine1, currentLine1.line.emphasizeColor, cachedContainerX, startY, line1Height, 0);
             }
 
-            renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, 0);
+            if (clientConfig.getShowTranslatedCnLyrics()) {
+                renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, 0);
+            }
         }
         context.popScissor();
     }
@@ -270,7 +278,6 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                 if (currentPhraseStartOffset <= text.length()) {
                     phraseStartOffest = calcTextWidth(text.substring(0, currentPhraseStartOffset), lineHeight);
                 }
-                currentPhraseStartOffset += 1;
             }
             LyricLine.Phrase currentPhrase = currentPhraseIndex < phrases.size() ? phrases.get(currentPhraseIndex) : null;
             float phraseWidth = 0;

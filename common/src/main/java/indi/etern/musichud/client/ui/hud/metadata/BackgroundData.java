@@ -7,10 +7,6 @@ import indi.etern.musichud.client.ui.utils.ColorExtractor;
 import indi.etern.musichud.client.ui.utils.Mixable;
 import indi.etern.musichud.client.ui.utils.UniformDataUtils;
 import lombok.EqualsAndHashCode;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.AbstractTexture;
-import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.Identifier;
 
 @EqualsAndHashCode
 public final class BackgroundData implements Mixable<BackgroundData>, HudUniform {
@@ -22,23 +18,12 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
             BackgroundImages image
     ) {
         this.image = image;
-        this.colors = ColorExtractor.adjustColors(ColorExtractor.extractColors(getDynamicTexture(image.blurredLocation)), 1.15f, 0.45f, 0.76f);
+        this.colors = ColorExtractor.mixBaseColorsWithAlpha(ColorExtractor.extractColors(image.current.getTexture()), 0xFF1A1A1A, 0.25f);
     }
 
     BackgroundData(BackgroundImages image, ThemedColors colors) {
         this.image = image;
         this.colors = colors;
-    }
-
-    private DynamicTexture getDynamicTexture(Identifier imageLocation) {
-        if (imageLocation == null) return null;
-        AbstractTexture texture = Minecraft.getInstance()
-                .getTextureManager()
-                .getTexture(imageLocation);
-        if (texture instanceof DynamicTexture dynamicTexture) {
-            return dynamicTexture;
-        }
-        return null;
     }
 
     public ThemedColors color() {

@@ -16,6 +16,8 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.DynamicIntegerOption;
+import indi.etern.musichud.client.ui.components.LyricLineView;
+import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
@@ -86,11 +88,22 @@ public class ConfigView extends LinearLayout {
                     LoginService.getInstance().logout();
                 }
             });
-            new PreferencesFragment.BooleanOption(context,
+            PreferencesFragment.BooleanOption translatedLyricOption = new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.showTranslatedCnLyrics"),
                     clientConfig::getShowTranslatedCnLyrics,
-                    clientConfig::setShowTranslatedCnLyrics)
-                    .create(commonCategory);
+                    clientConfig::setShowTranslatedCnLyrics);
+            translatedLyricOption.create(commonCategory);
+            translatedLyricOption.setOnChanged(() -> {
+                HomeView homeView = HomeView.getInstance();
+                if (homeView != null) {
+                    StaggeredLyricScrollView staggeredLyricScrollView = homeView.getStaggeredLyricScrollView();
+                    if (staggeredLyricScrollView != null) {
+                        MuiModApi.postToUiThread(() -> {
+                            staggeredLyricScrollView.getLyricLineViewList().forEach(LyricLineView::refreshSubLyricLine);
+                        });
+                    }
+                }
+            });
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.disableVanillaMusicWhilePlaying"),
                     clientConfig::getDisableVanillaMusic,
@@ -366,6 +379,7 @@ public class ConfigView extends LinearLayout {
             LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params1.setMargins(0, dp(6), 0, dp(128));
             view.addView(embeddedServerCategory, params1);
+
 
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
                 @Override

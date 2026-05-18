@@ -2,6 +2,7 @@ package indi.etern.musichud.client.audio.decoder;
 
 import lombok.SneakyThrows;
 import org.lwjgl.openal.AL10;
+
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.ByteBuffer;
@@ -12,10 +13,10 @@ import java.nio.ByteOrder;
  */
 public class WavStreamDecoder implements AudioDecoder {
     private final InputStream inputStream;
-    private final int sampleRate;
-    private final int format;          // OpenAL 格式常量
-    private final long dataSize;       // 音频数据总字节数
-    private final int frameSize;
+    private int sampleRate;
+    private int format;          // OpenAL 格式常量
+    private long dataSize;       // 音频数据总字节数
+    private int frameSize;
     private long bytesRead;            // 已读取的音频数据字节数
 
     /**
@@ -27,91 +28,95 @@ public class WavStreamDecoder implements AudioDecoder {
     public WavStreamDecoder(InputStream inputStream) {
         this.inputStream = inputStream;
 
-        // 1. 读取 RIFF 头
-        byte[] riff = new byte[4];
-        readFully(riff);
-        if (!new String(riff).equals("RIFF")) {
-            throw new IOException("Not a WAV file: missing RIFF header");
-        }
-        readIntLE(); // 文件总大小（跳过）
-        byte[] wave = new byte[4];
-        readFully(wave);
-        if (!new String(wave).equals("WAVE")) {
-            throw new IOException("Not a WAV file: missing WAVE identifier");
-        }
+        try {
+            // 1. 读取 RIFF 头
+            byte[] riff = new byte[4];
+            readFully(riff);
+            if (!new String(riff).equals("RIFF")) {
+                throw new IOException("Not a WAV file: missing RIFF header");
+            }
+            readIntLE(); // 文件总大小（跳过）
+            byte[] wave = new byte[4];
+            readFully(wave);
+            if (!new String(wave).equals("WAVE")) {
+                throw new IOException("Not a WAV file: missing WAVE identifier");
+            }
 
-        // 2. 查找 fmt 块
-        int audioFormat;
-        int channels;
-        int sampleRateTmp;
-        int bitsPerSample;
-        while (true) {
-            byte[] chunkId = new byte[4];
-            readFully(chunkId);
-            long chunkSize = readIntLE();
-            if (new String(chunkId).equals("fmt ")) {
-                audioFormat = readShortLE();   // 格式标签，1 表示 PCM
-                channels = readShortLE();
-                sampleRateTmp = readIntLE();
-                readIntLE();      // 字节率（跳过）
-                readShortLE();    // 块对齐（跳过）
-                bitsPerSample = readShortLE();
+            // 2. 查找 fmt 块
+            int audioFormat;
+            int channels;
+            int sampleRateTmp;
+            int bitsPerSample;
+            while (true) {
+                byte[] chunkId = new byte[4];
+                readFully(chunkId);
+                long chunkSize = readIntLE();
+                if (new String(chunkId).equals("fmt ")) {
+                    audioFormat = readShortLE();   // 格式标签，1 表示 PCM
+                    channels = readShortLE();
+                    sampleRateTmp = readIntLE();
+                    readIntLE();      // 字节率（跳过）
+                    readShortLE();    // 块对齐（跳过）
+                    bitsPerSample = readShortLE();
 
-                // 跳过 fmt 块中可能存在的额外数据
-                long extra = chunkSize - 16;
-                if (extra > 0) {
-                    long skipped = inputStream.skip(extra);
-                    if (skipped != extra) {
-                        throw new IOException("Failed to skip fmt chunk extra data");
+                    // 跳过 fmt 块中可能存在的额外数据
+                    long extra = chunkSize - 16;
+                    if (extra > 0) {
+                        long skipped = inputStream.skip(extra);
+                        if (skipped != extra) {
+                            throw new IOException("Failed to skip fmt chunk extra data");
+                        }
+                    }
+                    break;
+                } else {
+                    // 忽略其他块
+                    long skipped = inputStream.skip(chunkSize);
+                    if (skipped != chunkSize) {
+                        throw new IOException("Failed to skip chunk");
                     }
                 }
-                break;
-            } else {
-                // 忽略其他块
-                long skipped = inputStream.skip(chunkSize);
-                if (skipped != chunkSize) {
-                    throw new IOException("Failed to skip chunk");
+            }
+            if (audioFormat != 1) {
+                throw new IOException("Unsupported audio format: " + audioFormat + " (only PCM supported)");
+            }
+
+            // 3. 查找 data 块
+            long dataSizeTmp;
+            while (true) {
+                byte[] chunkId = new byte[4];
+                readFully(chunkId);
+                long chunkSize = readIntLE();
+                if (new String(chunkId).equals("data")) {
+                    dataSizeTmp = chunkSize;
+                    break;
+                } else {
+                    long skipped = inputStream.skip(chunkSize);
+                    if (skipped != chunkSize) {
+                        throw new IOException("Failed to skip chunk");
+                    }
                 }
             }
-        }
-        if (audioFormat != 1) {
-            throw new IOException("Unsupported audio format: " + audioFormat + " (only PCM supported)");
-        }
 
-        // 3. 查找 data 块
-        long dataSizeTmp;
-        while (true) {
-            byte[] chunkId = new byte[4];
-            readFully(chunkId);
-            long chunkSize = readIntLE();
-            if (new String(chunkId).equals("data")) {
-                dataSizeTmp = chunkSize;
-                break;
+            sampleRate = sampleRateTmp;
+            dataSize = dataSizeTmp;
+            frameSize = sampleRate * channels * bitsPerSample / 8;
+            bytesRead = 0;
+
+            // 确定 OpenAL 格式常量
+            if (channels == 1 && bitsPerSample == 8) {
+                this.format = AL10.AL_FORMAT_MONO8;
+            } else if (channels == 1 && bitsPerSample == 16) {
+                this.format = AL10.AL_FORMAT_MONO16;
+            } else if (channels == 2 && bitsPerSample == 8) {
+                this.format = AL10.AL_FORMAT_STEREO8;
+            } else if (channels == 2 && bitsPerSample == 16) {
+                this.format = AL10.AL_FORMAT_STEREO16;
             } else {
-                long skipped = inputStream.skip(chunkSize);
-                if (skipped != chunkSize) {
-                    throw new IOException("Failed to skip chunk");
-                }
+                throw new IOException("Unsupported channel count (" + channels +
+                        ") or bits per sample (" + bitsPerSample + ")");
             }
-        }
-
-        sampleRate = sampleRateTmp;
-        dataSize = dataSizeTmp;
-        frameSize = sampleRate * channels * bitsPerSample / 8;
-        bytesRead = 0;
-
-        // 确定 OpenAL 格式常量
-        if (channels == 1 && bitsPerSample == 8) {
-            this.format = AL10.AL_FORMAT_MONO8;
-        } else if (channels == 1 && bitsPerSample == 16) {
-            this.format = AL10.AL_FORMAT_MONO16;
-        } else if (channels == 2 && bitsPerSample == 8) {
-            this.format = AL10.AL_FORMAT_STEREO8;
-        } else if (channels == 2 && bitsPerSample == 16) {
-            this.format = AL10.AL_FORMAT_STEREO16;
-        } else {
-            throw new IOException("Unsupported channel count (" + channels +
-                    ") or bits per sample (" + bitsPerSample + ")");
+        } catch (Exception e) {
+            inputStream.close();
         }
     }
 
@@ -175,9 +180,10 @@ public class WavStreamDecoder implements AudioDecoder {
 
 
     @Override
-    @SneakyThrows
     public void close() {
-        inputStream.close();
+        try {
+            inputStream.close();
+        } catch (Exception ignored) {}
     }
 
     // ---------- 辅助方法 ----------

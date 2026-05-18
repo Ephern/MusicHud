@@ -81,8 +81,6 @@ public class MP3StreamDecoder implements AudioDecoder {
     public void close() {
         try {
             bitstream.close();
-        } catch (Exception e) {
-            // 忽略关闭错误
-        }
+        } catch (Exception ignored) {}
     }
 }

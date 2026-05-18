@@ -7,7 +7,6 @@ import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.drawable.Drawable;
-import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.util.DataSet;
@@ -25,9 +24,9 @@ import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
-import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
+import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -241,9 +240,6 @@ public class MainFragment extends Fragment {
             var base = new LinearLayout(context);
             base.setPadding(base.dp(24), 0, base.dp(24), 0);
 
-            var baseBackground = new ShapeDrawable();
-            baseBackground.setColor(Theme.BASE_BACKGROUND_COLOR);
-            base.setBackground(baseBackground);
             var baseParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
             base.setLayoutParams(baseParams);
             base.setOrientation(LinearLayout.HORIZONTAL);

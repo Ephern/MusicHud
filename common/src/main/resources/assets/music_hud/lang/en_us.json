@@ -72,7 +72,7 @@
   "music_hud.button.back": "Back",
   "music_hud.config.category.common": "Common",
   "music_hud.config.common.switch.enable": "Enable Music Hud",
-  "music_hud.config.common.switch.showTranslatedCnLyrics": "Show translated Chinese lyrics, take effect after switched to the next music",
+  "music_hud.config.common.switch.showTranslatedCnLyrics": "Show translated Chinese lyrics",
   "music_hud.config.common.switch.disableVanillaMusicWhilePlaying": "Disable vanilla music while playing",
   "music_hud.config.common.switch.enableHud": "Enable HUD",
   "music_hud.config.common.switch.autoHide": "Auto hide when idle",
