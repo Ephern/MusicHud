@@ -54,8 +54,8 @@ public class AlbumImageRenderer implements HudRenderer {
         var background = currentData.getTransitionableBackground();
         BackgroundData next = background.getNext();
         BackgroundData current = background.getCurrent();
-        DynamicTexture currentTexture = current == null || current.image() == null || current.image().unblurred == null ? getIconTexture() : current.image().unblurred.getTexture();
-        DynamicTexture nextTexture = next == null || next.image() == null || next.image().unblurred == null ? getIconTexture() : next.image().unblurred.getTexture();
+        DynamicTexture currentTexture = current == null || current.image() == null || current.image().current == null ? getIconTexture() : current.image().current.getTexture();
+        DynamicTexture nextTexture = next == null || next.image() == null || next.image().current == null ? getIconTexture() : next.image().current.getTexture();
         DynamicTexture transitionTexture = background.isTransitioning() ? nextTexture : currentTexture;
         TextureSetup textureSetup;
         if (currentTexture != null) {

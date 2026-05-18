@@ -36,15 +36,21 @@ public final class ImageTextureData implements Closeable {
 
     @Override
     public void close() {
-        String nowPlayingAlbumUrl = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail().getAlbum().getPicUrl();
-        if (nowPlayingAlbumUrl.equals(source) || source.contains(nowPlayingAlbumUrl)) {
-            AtomicReference<BiConsumer<MusicDetail, MusicDetail>> atomicListenerReference = new AtomicReference<>();
-            atomicListenerReference.set((previous, current) -> {
-                NowPlayingInfo.getInstance().getMusicSwitchListener().remove(atomicListenerReference.get());
+        MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+        if (currentlyPlayingMusicDetail != null) {
+            String nowPlayingAlbumUrl = currentlyPlayingMusicDetail.getAlbum().getPicUrl();
+            if (nowPlayingAlbumUrl.equals(source) || source.contains(nowPlayingAlbumUrl)) {
+                AtomicReference<BiConsumer<MusicDetail, MusicDetail>> atomicListenerReference = new AtomicReference<>();
+                atomicListenerReference.set((previous, current) -> {
+                    NowPlayingInfo.getInstance().getMusicSwitchListener().remove(atomicListenerReference.get());
+                    //noinspection ResultOfMethodCallIgnored
+                    Minecraft.getInstance().submit(texture::close);
+                });
+                NowPlayingInfo.getInstance().getMusicSwitchListener().add(atomicListenerReference.get());
+            } else {
                 //noinspection ResultOfMethodCallIgnored
                 Minecraft.getInstance().submit(texture::close);
-            });
-            NowPlayingInfo.getInstance().getMusicSwitchListener().add(atomicListenerReference.get());
+            }
         } else {
             //noinspection ResultOfMethodCallIgnored
             Minecraft.getInstance().submit(texture::close);
@@ -59,32 +65,6 @@ public final class ImageTextureData implements Closeable {
             return ImageUtils.convertNativeImageToBitmap(pixels);
         }
     }
-
-/*
-    public CompletableFuture<Void> register() {
-        if (!registered) {
-            synchronized (source) {
-                if (!registered) {
-                    CompletableFuture<Void> completableFuture = new CompletableFuture<>();
-                    Minecraft.getInstance().submit(() -> {
-                        Minecraft.getInstance().getTextureManager().register(location, texture);
-                        logger.debug("Registered texture {} : {}", location, texture);
-                        registered = true;
-                    }).thenAcceptAsync((v) -> {
-                        completableFuture.complete(null);
-                    }, MusicHud.EXECUTOR);
-                    return completableFuture;
-                } else {
-                    logger.debug("Texture already registered (concurrent access detected) {} : {}", location, texture);
-                    return CompletableFuture.completedFuture(null);
-                }
-            }
-        } else {
-            logger.debug("Texture already registered {} : {}", location, texture);
-            return CompletableFuture.completedFuture(null);
-        }
-    }
-*/
 
     @Override
     public boolean equals(Object obj) {

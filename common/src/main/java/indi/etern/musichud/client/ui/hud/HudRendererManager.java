@@ -8,8 +8,6 @@ import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
-import indi.etern.musichud.client.ui.utils.image.ImageBlurPostProcessor;
-import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientEventService;
@@ -106,23 +104,23 @@ public class HudRendererManager {
 
     public void updateLayoutFromConfig() {
         try {
-        Layout layout = new Layout(
-                "Base",
-                clientConfig.getHudOffsetX(),
-                clientConfig.getHudOffsetY(),
-                clientConfig.getHudWidth(),
-                clientConfig.getHudHeight(),
-                clientConfig.getHudCornerRadius(),
-                clientConfig.getHudHorizontalPosition(),
-                clientConfig.getHudVerticalPosition()
-        );
-        setBaseLayout(layout);
-        IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
-            MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-            if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
-                reset();
-            }
-        });
+            Layout layout = new Layout(
+                    "Base",
+                    clientConfig.getHudOffsetX(),
+                    clientConfig.getHudOffsetY(),
+                    clientConfig.getHudWidth(),
+                    clientConfig.getHudHeight(),
+                    clientConfig.getHudCornerRadius(),
+                    clientConfig.getHudHorizontalPosition(),
+                    clientConfig.getHudVerticalPosition()
+            );
+            setBaseLayout(layout);
+            IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
+                MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+                if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
+                    reset();
+                }
+            });
         } catch (Exception e) {
             if (logger == null) {
                 logger = MusicHud.getLogger(HudRendererManager.class);
@@ -281,18 +279,18 @@ public class HudRendererManager {
                 ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
                         .thenAccept(imageTextureData -> {
 //                            imageTextureData.register().thenAcceptAsync((v) -> {
-                                ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 16);
+//                                ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 16);
 //                                blurredImageTextureData.register().thenAccept((v1) -> Minecraft.getInstance().execute(() -> {
-                                    if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
-                                        BackgroundImages backgroundImages = new BackgroundImages(blurredImageTextureData, imageTextureData, 1f);
-                                        var nextData = new BackgroundData(backgroundImages);
-                                        hudBaseData.getTransitionableBackground().startTransition(nextData);
-                                        Duration musicDuration = nowPlayingInfo.getMusicDuration();
-                                        DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
-                                                LONG_DATE_TIME_FORMATTER :
-                                                SHORT_DATE_TIME_FORMATTER;
-                                        musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
-                                    }
+                            if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
+                                BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
+                                var nextData = new BackgroundData(backgroundImages);
+                                hudBaseData.getTransitionableBackground().startTransition(nextData);
+                                Duration musicDuration = nowPlayingInfo.getMusicDuration();
+                                DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
+                                        LONG_DATE_TIME_FORMATTER :
+                                        SHORT_DATE_TIME_FORMATTER;
+                                musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
+                            }
 //                                }));
 //                            }, MusicHud.EXECUTOR);
                         }).exceptionally(e -> {

@@ -529,15 +529,6 @@ public class StreamAudioPlayer {
             downloadFuture = null;
         }
 
-        if (currentDecoder != null) {
-            try {
-                currentDecoder.close();
-            } catch (Exception e) {
-                // Ignore
-            }
-            currentDecoder = null;
-        }
-
         lastVolume = 1;
         cleanup();
     }
@@ -616,6 +607,14 @@ public class StreamAudioPlayer {
                 audioBuffer.clear();
                 totalBufferedBytes.set(0);
                 playedBytes = 0;
+                if (currentDecoder != null) {
+                    try {
+                        currentDecoder.close();
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                    currentDecoder = null;
+                }
                 LOGGER.debug("Cleanup completed");
             } catch (Exception e) {
                 LOGGER.error("Unexpected error during cleanup", e);

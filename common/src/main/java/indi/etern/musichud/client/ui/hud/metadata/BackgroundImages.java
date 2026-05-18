@@ -5,13 +5,11 @@ import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode
 public class BackgroundImages {
-    public volatile ImageTextureData blurred;
-    public volatile ImageTextureData unblurred;
+    public volatile ImageTextureData current;
     public volatile float imageAspect;
 
-    public BackgroundImages(ImageTextureData currentBlurred, ImageTextureData currentUnblurred, float imageAspect) {
-        this.blurred = currentBlurred;
-        this.unblurred = currentUnblurred;
+    public BackgroundImages(ImageTextureData current, float imageAspect) {
+        this.current = current;
         this.imageAspect = imageAspect;
     }
 }

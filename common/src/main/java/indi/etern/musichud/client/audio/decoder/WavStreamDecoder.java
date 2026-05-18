@@ -180,9 +180,10 @@ public class WavStreamDecoder implements AudioDecoder {
 
 
     @Override
-    @SneakyThrows
     public void close() {
-        inputStream.close();
+        try {
+            inputStream.close();
+        } catch (Exception ignored) {}
     }
 
     // ---------- 辅助方法 ----------

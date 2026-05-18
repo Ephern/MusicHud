@@ -3,7 +3,6 @@ package indi.etern.musichud.client.ui.pages.search;
 import icyllis.modernui.animation.MotionEasingUtils;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.view.Gravity;
@@ -65,9 +64,7 @@ public class SearchResultTabPage extends FrameLayout {
         tabLayout.setTabMode(TabLayout.MODE_AUTO);
         tabLayout.setTabGravity(TabLayout.GRAVITY_CENTER);
         tabLayout.setupWithViewPager(pager);
-        ShapeDrawable background = new ShapeDrawable();
-        background.setColor(0x00000000);
-        tabLayout.setBackground(background);
+        tabLayout.setBackground(null);
 
         var lp = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;

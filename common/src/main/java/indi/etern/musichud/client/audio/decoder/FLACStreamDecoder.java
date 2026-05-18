@@ -134,8 +134,6 @@ public class FLACStreamDecoder implements AudioDecoder {
             if (inputStream != null) {
                 inputStream.close();
             }
-        } catch (IOException e) {
-            // 忽略关闭错误
-        }
+        } catch (IOException ignored) {}
     }
 }
