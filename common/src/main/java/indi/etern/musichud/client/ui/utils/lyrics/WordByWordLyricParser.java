@@ -41,7 +41,7 @@ public class WordByWordLyricParser {
                 if (startTime == null && lyricLine.getText() != null && !lyricLine.getText().startsWith("}")) {
                     lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
-            } else if (!lyricString.isEmpty()){
+            } else if (!lyricString.isEmpty()) {
                 lyricLine.setText(lyricLine.getText() + "\n" + lyricString);
             }
             if (metaData.phraseEndingOffsetMap != null) {
@@ -50,26 +50,24 @@ public class WordByWordLyricParser {
             }
             map.put(startTime, lyricLine);
         });
-        if (clientConfig.getShowTranslatedCnLyrics()) {
-            FullLineLyricParser.matchLine(translatedLyric, (metaData) -> {
-                Duration startTime = metaData.startTime();
-                LyricLine lyricLine = map.get(startTime);
-                if (lyricLine == null) {
-                    lyricLine = LyricLine.builder().startTime(startTime).build();
-                    if (startTime != null) {
-                        map.put(startTime, lyricLine);
-                    } else {
-                        lyricLinesWithoutValidTimestamp.add(lyricLine);
-                    }
-                }
-                String lyric1 = metaData.lyric();
-                if (lyric1 != null) {
-                    lyricLine.setTranslatedText(lyric1.replace('\u00A0', ' ').trim());
+        FullLineLyricParser.matchLine(translatedLyric, (metaData) -> {
+            Duration startTime = metaData.startTime();
+            LyricLine lyricLine = map.get(startTime);
+            if (lyricLine == null) {
+                lyricLine = LyricLine.builder().startTime(startTime).build();
+                if (startTime != null) {
+                    map.put(startTime, lyricLine);
                 } else {
-                    lyricLine.setTranslatedText("");
+                    lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
-            });
-        }
+            }
+            String lyric1 = metaData.lyric();
+            if (lyric1 != null) {
+                lyricLine.setTranslatedText(lyric1.replace('\u00A0', ' ').trim());
+            } else {
+                lyricLine.setTranslatedText("");
+            }
+        });
         ArrayDeque<LyricLine> lyricLines = new ArrayDeque<>(lyricLinesWithoutValidTimestamp);
         lyricLines.addAll(map.values());
         List<LyricLine> list = lyricLines.stream().sorted(Comparator.comparing(LyricLine::getStartTime)).toList();

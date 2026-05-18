@@ -220,6 +220,7 @@ public class UrlImageView extends FrameLayout {
      * 公开的加载方法,设置待加载的 URL
      */
     public void loadUrl(String urlString) {
+        cancelLoad();
         currentURLString = urlString;
         pendingUrl = urlString;
         hasLoadedImage = false;
@@ -245,58 +246,70 @@ public class UrlImageView extends FrameLayout {
     }
 
     private void loadBase64Image(String base64String) {
+        cancelLoad();
         loadFuture = CompletableFuture.runAsync(() -> {
-            ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
-            MuiModApi.postToUiThread(() -> {
-                try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
-                    if (bitmap == null) {
-                        throw new RuntimeException("failed to load image from base64 string");
+            if (base64String.equals(currentURLString)) {
+                ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
+                MuiModApi.postToUiThread(() -> {
+                    if (base64String.equals(currentURLString)) {
+                        try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
+                            if (bitmap == null) {
+                                throw new RuntimeException("failed to load image from base64 string");
+                            }
+                            Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
+                            if (textureFromBitmap != null) {
+                                createDrawable(textureFromBitmap, base64String);
+                            }
+                        } catch (Exception e) {
+                            showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
+                        } finally {
+                            imageTextureData.close();
+                        }
                     }
-                    Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
-                    if (textureFromBitmap != null) {
-                        createDrawable(textureFromBitmap);
-                    }
-                } catch (Exception e) {
-                    showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
-                } finally {
-                    imageTextureData.close();
-                }
-            });
+                });
+            }
         }, MusicHud.EXECUTOR);
     }
 
     private void loadNetworkImage(String urlString) {
         loadFuture = CompletableFuture.runAsync(() -> {
-            try {
-                ImageUtils.downloadAsync(urlString).thenAcceptAsync(imageTextureData -> {
-                    MuiModApi.postToUiThread(() -> {
-                        if (imageTextureData != null) {
-                            try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
-                                if (bitmap == null) {
-                                    throw new RuntimeException("failed to load image");
+            if (urlString.equals(currentURLString)) {
+                try {
+                    ImageUtils.downloadAsync(urlString).thenAcceptAsync(imageTextureData -> {
+                        if (urlString.equals(currentURLString)) {
+                            MuiModApi.postToUiThread(() -> {
+                                if (imageTextureData != null) {
+                                    try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
+                                        if (bitmap == null) {
+                                            throw new RuntimeException("failed to load image");
+                                        }
+                                        Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
+                                        if (textureFromBitmap != null) {
+                                            createDrawable(textureFromBitmap, urlString);
+                                        }
+                                    } catch (Exception e) {
+                                        showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
+                                    }
+                                } else {
+                                    showError(I18n.get(MusicHud.MOD_ID + ".button.downloadError"));
                                 }
-                                Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
-                                if (textureFromBitmap != null) {
-                                    createDrawable(textureFromBitmap);
-                                }
-                            } catch (Exception e) {
-                                showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
-                            }
-                        } else {
-                            showError(I18n.get(MusicHud.MOD_ID + ".button.downloadError"));
+                            });
                         }
+                    }, MusicHud.EXECUTOR).exceptionally((e) -> {
+                        MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
+                        return null;
                     });
-                }, MusicHud.EXECUTOR).exceptionally((e) -> {
+                } catch (Exception e) {
                     MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
-                    return null;
-                });
-            } catch (Exception e) {
-                MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
+                }
             }
         }, MusicHud.EXECUTOR);
     }
 
-    private void createDrawable(Image image) {
+    private void createDrawable(Image image, String urlString) {
+        if (!urlString.equals(currentURLString)) {
+            return;
+        }
         float ratio = (float) image.getWidth() / image.getHeight();
         setAspectRatio(ratio);
 

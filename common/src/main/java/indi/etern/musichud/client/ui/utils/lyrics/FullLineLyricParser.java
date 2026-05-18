@@ -49,42 +49,40 @@ public class FullLineLyricParser {
                 } else if (lyricLine.getText() != null && !lyricLine.getText().startsWith("}")) {
                     lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
-            } else if (!lyricString.isEmpty()){
+            } else if (!lyricString.isEmpty()) {
                 lyricLine.setText(lyricLine.getText() + "\n" + lyricString);
             }
         });
-        if (clientConfig.getShowTranslatedCnLyrics()) {
-            matchLine(translatedLyric, (metaData) -> {
-                Duration startTime = metaData.startTime;
-                LyricLine lyricLine = map.get(startTime);
-                if (lyricLine == null) {
-                    lyricLine = LyricLine.builder()
-                            .startTime(startTime)
-                            .build();
-                    if (startTime != null) {
-                        map.put(startTime, lyricLine);
-                    } else {
-                        lyricLinesWithoutValidTimestamp.add(lyricLine);
-                    }
-                }
-                String s = metaData.lyric;
-                String lyricLineTranslatedText = lyricLine.getTranslatedText();
-                if (s != null && !s.isEmpty()) {
-                    s = s.replace('\n', ' ').replace('\u00A0', ' ').trim();
-                    if (lyricLineTranslatedText == null || lyricLineTranslatedText.isEmpty()) {
-                        lyricLine.setTranslatedText(s);
-                    } else {
-                        lyricLine.setTranslatedText(lyricLineTranslatedText + "\n" + s);
-                    }
+        matchLine(translatedLyric, (metaData) -> {
+            Duration startTime = metaData.startTime;
+            LyricLine lyricLine = map.get(startTime);
+            if (lyricLine == null) {
+                lyricLine = LyricLine.builder()
+                        .startTime(startTime)
+                        .build();
+                if (startTime != null) {
+                    map.put(startTime, lyricLine);
                 } else {
-                    if (lyricLineTranslatedText == null || lyricLineTranslatedText.isEmpty()) {
-                        lyricLine.setTranslatedText("");
-                    } else {
-                        lyricLine.setTranslatedText(lyricLineTranslatedText);
-                    }
+                    lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
-            });
-        }
+            }
+            String s = metaData.lyric;
+            String lyricLineTranslatedText = lyricLine.getTranslatedText();
+            if (s != null && !s.isEmpty()) {
+                s = s.replace('\n', ' ').replace('\u00A0', ' ').trim();
+                if (lyricLineTranslatedText == null || lyricLineTranslatedText.isEmpty()) {
+                    lyricLine.setTranslatedText(s);
+                } else {
+                    lyricLine.setTranslatedText(lyricLineTranslatedText + "\n" + s);
+                }
+            } else {
+                if (lyricLineTranslatedText == null || lyricLineTranslatedText.isEmpty()) {
+                    lyricLine.setTranslatedText("");
+                } else {
+                    lyricLine.setTranslatedText(lyricLineTranslatedText);
+                }
+            }
+        });
         ArrayDeque<LyricLine> lyricLines = new ArrayDeque<>(lyricLinesWithoutValidTimestamp);
         lyricLines.addAll(map.values());
         List<LyricLine> list = lyricLines.stream().sorted(Comparator.comparing(LyricLine::getStartTime)).toList();
