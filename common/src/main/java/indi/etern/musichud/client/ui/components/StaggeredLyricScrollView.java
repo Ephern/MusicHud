@@ -3,9 +3,14 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorListener;
 import icyllis.modernui.animation.ObjectAnimator;
+import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.core.Core;
+import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.LinearGradient;
+import icyllis.modernui.graphics.Paint;
+import icyllis.modernui.graphics.Shader;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ScrollController;
 import icyllis.modernui.mc.ui.ClampingScrollView;
@@ -88,7 +93,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         super(context);
         setVerticalScrollBarEnabled(false);
         setHorizontalScrollBarEnabled(false);
-        setVerticalFadingEdgeEnabled(true);
 
         setAlpha(0);
 
@@ -121,10 +125,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             if (!continueUpdate) {
                 startUpdateLoop();
             }
-            firstStagger = true;
-            justHighlightedLyricLine = null;
-            lastHighlightedLyricLine = null;
-            animatingLyricViews.clear();
             if (container.getChildCount() > 0) {
                 ObjectAnimator slideOut = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0, -getWidth());
                 slideOut.setInterpolator(Easings.EASE_IN_OUT_QUINT);
@@ -132,6 +132,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 slideOut.addListener(new AnimatorListener() {
                     @Override
                     public void onAnimationEnd(@NonNull Animator animation) {
+                        firstStagger = true;
+                        justHighlightedLyricLine = null;
+                        lastHighlightedLyricLine = null;
+                        animatingLyricViews.clear();
                         container.removeAllViews();
                         buildLyricRows(lyrics);
                         container.setTranslationX(getWidth());
