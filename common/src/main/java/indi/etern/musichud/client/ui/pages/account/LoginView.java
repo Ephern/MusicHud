@@ -3,7 +3,6 @@ package indi.etern.musichud.client.ui.pages.account;
 import icyllis.modernui.animation.MotionEasingUtils;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.OneShotPreDrawListener;
@@ -37,7 +36,6 @@ public class LoginView extends FrameLayout implements ILoginView{
             pager.setFocusableInTouchMode(true);
             pager.setKeyboardNavigationCluster(true);
 
-            // 添加进入动画
             OneShotPreDrawListener.add(pager, () -> {
                 var animator = ObjectAnimator.ofFloat(pager,
                         View.ROTATION_Y, pager.isLayoutRtl() ? -45 : 45, 0);
@@ -51,9 +49,7 @@ public class LoginView extends FrameLayout implements ILoginView{
         tabLayout.setTabMode(TabLayout.MODE_AUTO);
         tabLayout.setTabGravity(TabLayout.GRAVITY_CENTER);
         tabLayout.setupWithViewPager(pager);
-        ShapeDrawable background = new ShapeDrawable();
-        background.setColor(0x00000000);
-        tabLayout.setBackground(background);
+        tabLayout.setBackground(null);
 
         var lp = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
@@ -95,7 +91,7 @@ public class LoginView extends FrameLayout implements ILoginView{
     private class Adapter extends PagerAdapter {
         @Override
         public int getCount() {
-            return 2; // 页面数量
+            return 2;
         }
 
         @NonNull

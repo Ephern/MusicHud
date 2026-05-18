@@ -32,19 +32,12 @@ import java.util.List;
 import java.util.function.Consumer;
 
 public class LoginService {
-    private static volatile LoginService instance = null;
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private final static ClientConfig clientConfig = ClientConfig.getInstance();
-    @Setter
-    private Consumer<StartQRLoginResponse> loginResponseHandler;
+    private static final Logger logger = MusicHud.getLogger(LoginService.class);
+    private static volatile LoginService instance = null;
     @Getter
     private final List<Consumer<LoginCookieInfo>> loginCompleteListeners = new ArrayList<>();
-    @Getter
-    NetworkReceiver<StartQRLoginResponse> qrLoginResponseReceiver = (qrLoginResponse, player) -> {
-        if (loginResponseHandler != null)
-            loginResponseHandler.accept(qrLoginResponse);
-    };
-    private static final Logger logger = MusicHud.getLogger(LoginService.class);
     @Getter
     NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, player) -> {
         MusicHud.EXECUTOR.submit(() -> {
@@ -95,6 +88,13 @@ public class LoginService {
             }
         });
     };
+    @Setter
+    private Consumer<StartQRLoginResponse> loginResponseHandler;
+    @Getter
+    NetworkReceiver<StartQRLoginResponse> qrLoginResponseReceiver = (qrLoginResponse, player) -> {
+        if (loginResponseHandler != null)
+            loginResponseHandler.accept(qrLoginResponse);
+    };
 
     public static LoginService getInstance() {
         if (instance == null) {
@@ -116,27 +116,12 @@ public class LoginService {
 
     public void logout() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
-    }
-
-    @RegisterMark
-    public static final class RegisterImpl implements ClientRegister {
-        @Override
-        public void register() {
-            IClientEventService eventService = IClientEventService.getInstance();
-            eventService.registerClientPlayerJoin((player) -> {
-                getInstance().sendConnectMessageToServer();
-            });
-            eventService.registerClientPlayerQuit((player) -> {
-                getInstance().setDisconnected();
-            });
-        }
+        setDisconnected();
     }
 
     public void setDisconnected() {
-        if (clientConfig.getEnable()) {
-            MusicHud.setStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
-            Profile.setCurrent(Profile.ANONYMOUS);
-        }
+        MusicHud.setStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
+        Profile.setCurrent(Profile.ANONYMOUS);
     }
 
     public void sendConnectMessageToServer() {
@@ -163,6 +148,20 @@ public class LoginService {
             clientNetworkService.sendToServer(new CookieLoginRequest(loginCookieInfo, false));
         } else {
             clientNetworkService.sendToServer(AnonymousLoginRequest.REQUEST);
+        }
+    }
+
+    @RegisterMark
+    public static final class RegisterImpl implements ClientRegister {
+        @Override
+        public void register() {
+            IClientEventService eventService = IClientEventService.getInstance();
+            eventService.registerClientPlayerJoin((player) -> {
+                getInstance().sendConnectMessageToServer();
+            });
+            eventService.registerClientPlayerQuit((player) -> {
+                getInstance().setDisconnected();
+            });
         }
     }
 }
