@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.utils.image;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
+import icyllis.arc3d.core.ColorSpace;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
 import lombok.AccessLevel;
@@ -185,7 +186,16 @@ public class ImageUtils {
         NativeImage nativeImage = new NativeImage(width, height, false);
 
         //noinspection UnstableApiUsage
-        try (Bitmap wrap = Bitmap.wrap(nativeImage.getPointer(), width * 4, null, width, height, Bitmap.Format.RGBA_8888, false, null)){
+        try (Bitmap wrap = Bitmap.wrap(
+                nativeImage.getPointer(),
+                width * 4,
+                null,
+                width,
+                height,
+                Bitmap.Format.RGBA_8888,
+                false,
+                ColorSpace.get(ColorSpace.Named.SRGB)
+        )){
             wrap.setPixels(bitmap, 0, 0, 0, 0, width, height);
         }
         return nativeImage;
@@ -196,7 +206,14 @@ public class ImageUtils {
         int height = nativeImage.getHeight();
 
         //noinspection UnstableApiUsage
-        return Bitmap.wrap(nativeImage.getPointer(), width * 4, null, width, height, Bitmap.Format.RGBA_8888, false, null);
+        return Bitmap.wrap(nativeImage.getPointer(),
+                width * 4,
+                null,
+                width,
+                height,
+                Bitmap.Format.RGBA_8888,
+                false,
+                ColorSpace.get(ColorSpace.Named.SRGB));
     }
 
     @SuppressWarnings("unused")
