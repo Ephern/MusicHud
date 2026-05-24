@@ -13,13 +13,13 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public record GetPlaylistDetailResponse(Playlist playlist) implements S2CPayload {
-    public static StreamCodec<RegistryFriendlyByteBuf, GetPlaylistDetailResponse> CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, GetPlaylistDetailResponse> CODEC = StreamCodec.composite(
             Playlist.CODEC,
             GetPlaylistDetailResponse::playlist,
             GetPlaylistDetailResponse::new
     );
 
-    static Map<Long, Consumer<Playlist>> consumerMap = new HashMap<>();
+    static final Map<Long, Consumer<Playlist>> consumerMap = new HashMap<>();
     public static void setReceiver(long id, Consumer<Playlist> consumer) {
         if (consumerMap.containsKey(id)) {
             consumerMap.get(id).accept(null);

@@ -121,15 +121,14 @@ public class LyricHighlightTextView extends TextView {
             statusUpdateProcessing = false;
         }
 
-        // 使用二分查找定位当前短语索引
         int phraseIndex = lyricLine.binarySearchPhraseIndex(playedDuration);
         if (phraseIndex < 0) phraseIndex = 0;
         Duration phraseStart, phraseEnd;
         LyricLine.Phrase currentPhrase;
         if (phraseIndex == 0) {
             phraseStart = lyricLine.getStartTime();
-            phraseEnd = phrases.getFirst().getEndTime();
-            currentPhrase = phrases.get(phraseIndex);
+            currentPhrase = phrases.getFirst();
+            phraseEnd = currentPhrase.endTime();
         } else if (phraseIndex >= phrases.size()) {
             // 已经超过最后一个短语，整行显示强调色（已唱完）
             super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
@@ -142,12 +141,12 @@ public class LyricHighlightTextView extends TextView {
             }
             return;
         } else {
-            phraseStart = phrases.get(phraseIndex - 1).getEndTime();
+            phraseStart = phrases.get(phraseIndex - 1).endTime();
             currentPhrase = phrases.get(phraseIndex);
-            phraseEnd = currentPhrase.getEndTime();
+            phraseEnd = currentPhrase.endTime();
         }
         for (int i = 0; i < phraseIndex; i++) {
-            List<LyricLine.HighlightSpan> spans = phrases.get(i).getSpans();
+            List<LyricLine.HighlightSpan> spans = phrases.get(i).spans();
             for (LyricLine.HighlightSpan span : spans) {
                 span.setYOffset(-phraseRaiseY);
             }
@@ -165,14 +164,13 @@ public class LyricHighlightTextView extends TextView {
 
         long playedInPhrase = Math.min(playedDuration.minus(phraseStart).toMillis(), phraseDurationMillis);
         LyricLine.Phrase lastPhrase = lyricLine.getPhraseEndDurationMap().get(phraseStart);
-        int startOffset = lastPhrase == null ? 0 : lastPhrase.getEndOffset();
-        int endOffset = currentPhrase.getEndOffset();
+        int startOffset = lastPhrase == null ? 0 : lastPhrase.endOffset();
+        int endOffset = currentPhrase.endOffset();
 
         int textLength = layout.getText().length();
         startOffset = Math.min(textLength, startOffset);
         endOffset = Math.min(textLength, endOffset);
 
-        // 2. 预计算每行的逻辑起始坐标（累积宽度）
         int lineCount = layout.getLineCount();
         float[] lineLogicalStart = new float[lineCount];
         float cumulative = 0;
@@ -192,9 +190,8 @@ public class LyricHighlightTextView extends TextView {
         float endLogicalX = getLogicalX.apply(endOffset);
         float gradientPointLogicalX = startLogicalX + (endLogicalX - startLogicalX) * playedInPhrase / phraseDurationMillis;
         float gradientLeftLogical = gradientPointLogicalX - dp(16);
-        float gradientRightLogical = gradientPointLogicalX + dp(12);
+        float gradientRightLogical = gradientPointLogicalX + dp(36);
 
-        // 3. 遍历可见行，设置样式
         int firstLine = (int) (range >>> 32);
         int lastLine = (int) (range & 0xFFFFFFFFL);
         for (int line = firstLine; line <= lastLine; line++) {
@@ -232,19 +229,19 @@ public class LyricHighlightTextView extends TextView {
         long progressMillis = nowMillis - startAtMillis;
         if (totalDuration <= 0) return;
 
-        int spanCount = phrase.getSpans().size();
+        int spanCount = phrase.spans().size();
         if (spanCount == 1) {
-            LyricLine.HighlightSpan span = phrase.getSpans().getFirst();
+            LyricLine.HighlightSpan span = phrase.spans().getFirst();
             float t = Math.clamp((float) progressMillis / totalDuration, 0, 1);
             span.setYOffset(-phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t));
         } else {
-            float staggerRate = 0.3f; // 错开比例，最后一个比第一个晚 totalDuration * staggerRate 毫秒
+            float staggerRate = 0.2f; // 错开比例，最后一个比第一个晚 totalDuration * staggerRate 毫秒
             long staggerDuration = (long) (totalDuration * staggerRate); // 错开总时长
             long animDuration = totalDuration - staggerDuration; // 每个 span 的动画时长
             if (animDuration <= 0) animDuration = 1;
 
             for (int i = 0; i < spanCount; i++) {
-                LyricLine.HighlightSpan span = phrase.getSpans().get(i);
+                LyricLine.HighlightSpan span = phrase.spans().get(i);
                 // 错开偏移量：i / (spanCount-1) * staggerDuration，最后一个偏移 staggerDuration
                 long delay = (i == spanCount - 1) ? staggerDuration : (long) ((double) i / (spanCount - 1) * staggerDuration);
                 long animStart = startAtMillis + delay;
@@ -257,7 +254,7 @@ public class LyricHighlightTextView extends TextView {
                 } else {
                     float t = (float) (nowMillis - animStart) / animDuration;
                     span.setYOffset(-phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t));
-                    span.setScale(1 + 0.3f * Math.min(phrase.getDurationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
+                    span.setScale(1 + 0.35f * Math.min(phrase.durationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
                 }
             }
         }
@@ -274,7 +271,7 @@ public class LyricHighlightTextView extends TextView {
         float t = Math.clamp((float) (nowMillis - startAtMillis) / (endAtMillis - startAtMillis), 0, 1);
         float yOffset = -phraseRaiseY * Easings.EASE_OUT_QUAD.getInterpolation(t);
 
-        phrase.getSpans().forEach(span -> span.setYOffset(yOffset));
+        phrase.spans().forEach(span -> span.setYOffset(yOffset));
     }
 
     private long getMillisBetween(Duration duration1, Duration duration2) {

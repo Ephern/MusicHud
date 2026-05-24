@@ -31,6 +31,7 @@ public class WordByWordLyricParser {
             Duration startTime = metaData.startTime;
             LyricLine lyricLine = map.get(startTime);
             String lyricString = metaData.lyric == null ? "" : metaData.lyric;
+            lyricString = lyricString.replace('\n', ' ').trim();
             if (lyricLine == null) {
                 lyricLine = LyricLine.builder()
                         .startTime(startTime)
@@ -40,7 +41,7 @@ public class WordByWordLyricParser {
                 if (startTime == null && lyricLine.getText() != null && !lyricLine.getText().startsWith("}")) {
                     lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
-            } else {
+            } else if (!lyricString.isEmpty()) {
                 lyricLine.setText(lyricLine.getText() + "\n" + lyricString);
             }
             if (metaData.phraseEndingOffsetMap != null) {
@@ -49,26 +50,24 @@ public class WordByWordLyricParser {
             }
             map.put(startTime, lyricLine);
         });
-        if (clientConfig.getShowTranslatedCnLyrics()) {
-            FullLineLyricParser.matchLine(translatedLyric, (metaData) -> {
-                Duration startTime = metaData.startTime();
-                LyricLine lyricLine = map.get(startTime);
-                if (lyricLine == null) {
-                    lyricLine = LyricLine.builder().startTime(startTime).build();
-                    if (startTime != null) {
-                        map.put(startTime, lyricLine);
-                    } else {
-                        lyricLinesWithoutValidTimestamp.add(lyricLine);
-                    }
-                }
-                String lyric1 = metaData.lyric();
-                if (lyric1 != null) {
-                    lyricLine.setTranslatedText(lyric1.replace('\u00A0', ' ').trim());
+        FullLineLyricParser.matchLine(translatedLyric, (metaData) -> {
+            Duration startTime = metaData.startTime();
+            LyricLine lyricLine = map.get(startTime);
+            if (lyricLine == null) {
+                lyricLine = LyricLine.builder().startTime(startTime).build();
+                if (startTime != null) {
+                    map.put(startTime, lyricLine);
                 } else {
-                    lyricLine.setTranslatedText("");
+                    lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
-            });
-        }
+            }
+            String lyric1 = metaData.lyric();
+            if (lyric1 != null) {
+                lyricLine.setTranslatedText(lyric1.replace('\u00A0', ' ').trim());
+            } else {
+                lyricLine.setTranslatedText("");
+            }
+        });
         ArrayDeque<LyricLine> lyricLines = new ArrayDeque<>(lyricLinesWithoutValidTimestamp);
         lyricLines.addAll(map.values());
         List<LyricLine> list = lyricLines.stream().sorted(Comparator.comparing(LyricLine::getStartTime)).toList();
@@ -158,9 +157,9 @@ public class WordByWordLyricParser {
             StringBuilder lineText = new StringBuilder();
             int charIndex = 0;
             while (phraseMatcher.find()) {
-                String phraseStartTimestamp = phraseMatcher.group(1);
+//                String phraseStartTimestamp = phraseMatcher.group(1);
                 String phraseDurationMillis = phraseMatcher.group(2);
-                String unknown = phraseMatcher.group(3);
+//                String unknown = phraseMatcher.group(3);
                 String phraseText = phraseMatcher.group(4);
                 String suffix = phraseText.endsWith(" ") ? " " : "";
                 phraseText = phraseText.replace('\u00A0', ' ').replace("\n", "").trim() + suffix;

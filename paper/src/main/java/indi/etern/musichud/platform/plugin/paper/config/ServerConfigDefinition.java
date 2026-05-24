@@ -88,7 +88,7 @@ public final class ServerConfigDefinition implements ServerConfig {
     }
 
     private double clampRate(double rate) {
-        return Math.max(0.0D, Math.min(1.0D, rate));
+        return Math.clamp(rate, 0.0D, 1.0D);
     }
 
     private FileConfiguration requireConfig() {

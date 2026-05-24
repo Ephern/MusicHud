@@ -12,6 +12,7 @@ public class MP3StreamDecoder implements AudioDecoder {
     private final Decoder decoder;
     private int format;
     private int sampleRate;
+    private int frameSize;
     private boolean initialized = false;
 
     public MP3StreamDecoder(BufferedInputStream inputStream) {
@@ -33,6 +34,7 @@ public class MP3StreamDecoder implements AudioDecoder {
                     this.sampleRate = header.frequency();
                     int channels = header.mode() == Header.SINGLE_CHANNEL ? 1 : 2;
                     this.format = channels == 1 ? AL10.AL_FORMAT_MONO16 : AL10.AL_FORMAT_STEREO16;
+                    frameSize = sampleRate * channels * 16 / 8/*bitsPerSample*/;
                     initialized = true;
                 }
 
@@ -71,11 +73,14 @@ public class MP3StreamDecoder implements AudioDecoder {
     }
 
     @Override
+    public int getFrameSize() {
+        return frameSize;
+    }
+
+    @Override
     public void close() {
         try {
             bitstream.close();
-        } catch (Exception e) {
-            // 忽略关闭错误
-        }
+        } catch (Exception ignored) {}
     }
 }

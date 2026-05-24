@@ -28,7 +28,7 @@ public record GetArtistMoreMusicResponse(long artistId, int offset, List<MusicDe
             );
 
     public record RequestData(long artistId, int offset){}
-    static Map<RequestData, Consumer<List<MusicDetail>>> consumerMap = new HashMap<>();
+    static final Map<RequestData, Consumer<List<MusicDetail>>> consumerMap = new HashMap<>();
     public static void setReceiver(RequestData requestData, Consumer<List<MusicDetail>> consumer) {
         if (consumerMap.containsKey(requestData)) {
             consumerMap.get(requestData).accept(null);

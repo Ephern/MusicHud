@@ -8,6 +8,7 @@ import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.utils.Easings;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -23,6 +24,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     private final LineState nextLine1;
     private final LineState nextLine2;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+    private final ClientConfig clientConfig = ClientConfig.getInstance();
     ModernStringSplitter modernStringSplitter;
     @Setter
     private float line1Height;
@@ -159,8 +161,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         } else {
             rawWidth = font.width(text);
         }
-        float scale = lineHeight / font.lineHeight;
-        return rawWidth * scale;
+        return rawWidth * lineHeight / font.lineHeight;
     }
 
     private void updateAnimations() {
@@ -216,7 +217,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         float x = absolutePosition.x();
         float y = absolutePosition.y();
-        scissor(context, x, y);
+        context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
         if (isTransitioning && nextLine1.line != null && nextLine2.line != null) {
             // 旧文本向上移出
             float easedProgress = Easings.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
@@ -227,13 +228,17 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             } else {
                 renderLine(context, currentLine1, currentLine1.line.emphasizeColor, cachedContainerX, startY, line1Height, oldYOffset);
             }
-            renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, oldYOffset);
+            if (clientConfig.getShowTranslatedCnLyrics()) {
+                renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, oldYOffset);
+            }
 
             // 新文本从下方向上移入
             float newYOffset = (1 - easedProgress) * layout.getHeight();
             int color = nextLine1.line.lyricLine.isWordByWord() ? nextLine1.line.fadeColor : nextLine1.line.emphasizeColor;
             renderLine(context, nextLine1, color, cachedContainerX, startY, line1Height, newYOffset);
-            renderLine(context, nextLine2, nextLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, newYOffset);
+            if (clientConfig.getShowTranslatedCnLyrics()) {
+                renderLine(context, nextLine2, nextLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, newYOffset);
+            }
         } else {
             if (currentLine1.line.lyricLine == null || currentLine1.line.lyricLine.isWordByWord()) {
                 renderLine(context, currentLine1, currentLine1.line.fadeColor, cachedContainerX, startY, line1Height, 0);
@@ -242,14 +247,17 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                 renderLine(context, currentLine1, currentLine1.line.emphasizeColor, cachedContainerX, startY, line1Height, 0);
             }
 
-            renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, 0);
+            if (clientConfig.getShowTranslatedCnLyrics()) {
+                renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, 0);
+            }
         }
         context.popScissor();
     }
 
     private float calcHighlightWidth(LineState lineState,float lineHeight) {
         Line line = lineState.line;
-        float textWidth = calcTextWidth(line.text, lineHeight);
+        String text = line.text;
+        float textWidth = calcTextWidth(text, lineHeight);
         LyricLine currentLyricLine = line.lyricLine;
         if (currentLyricLine == null) {
             return 0;
@@ -265,16 +273,19 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             Duration currentPhraseStartTime = lineStart;
             if (currentPhraseIndex >= 1) {
                 LyricLine.Phrase previousPhrase = phrases.get(currentPhraseIndex - 1);
-                currentPhraseStartOffset = previousPhrase.getEndOffset();
-                currentPhraseStartTime = previousPhrase.getEndTime();
-                phraseStartOffest = calcTextWidth(line.text.substring(0, currentPhraseStartOffset), lineHeight);
-                currentPhraseStartOffset += 1;
+                currentPhraseStartOffset = previousPhrase.endOffset();
+                currentPhraseStartTime = previousPhrase.endTime();
+                if (currentPhraseStartOffset <= text.length()) {
+                    phraseStartOffest = calcTextWidth(text.substring(0, currentPhraseStartOffset), lineHeight);
+                }
             }
             LyricLine.Phrase currentPhrase = currentPhraseIndex < phrases.size() ? phrases.get(currentPhraseIndex) : null;
             float phraseWidth = 0;
             if (currentPhrase != null) {
-                float rate = (float) playedDuration.minus(currentPhraseStartTime).toMillis() / currentPhrase.getDurationMillis();
-                phraseWidth = calcTextWidth(line.text.substring(currentPhraseStartOffset, currentPhrase.getEndOffset()) + " ", lineHeight) * Math.clamp(rate, 0, 1);
+                float rate = (float) playedDuration.minus(currentPhraseStartTime).toMillis() / currentPhrase.durationMillis();
+                if (currentPhrase.endOffset() <= text.length()) {
+                    phraseWidth = calcTextWidth(text.substring(currentPhraseStartOffset, currentPhrase.endOffset()), lineHeight) * Math.clamp(rate, 0, 1);
+                }
             }
             return phraseStartOffest + phraseWidth;
         } else {
@@ -326,10 +337,6 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         }
     }
 
-    private void scissor(HudRenderContext context, float x, float y) {
-        context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
-    }
-
     private static class LineState {
         Line line;
         boolean needScroll;
@@ -364,26 +371,5 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         }
     }
 
-    public static class Line {
-        public LyricLine lyricLine;
-        public String text;
-        public int fadeColor;
-        public int emphasizeColor;
-        long scrollMs;
-
-        public Line(LyricLine lyricLine, String text, int fadeColor, int emphasizeColor, long scrollMs) {
-            this.lyricLine = lyricLine;
-            this.text = text;
-            this.fadeColor = fadeColor;
-            this.emphasizeColor = emphasizeColor;
-            this.scrollMs = scrollMs;
-        }
-
-        @Override
-        public boolean equals(Object obj) {
-            if (this == obj) return true;
-            if (!(obj instanceof Line other)) return false;
-            return text.equals(other.text) && fadeColor == other.fadeColor && scrollMs == other.scrollMs;
-        }
-    }
+    public record Line(LyricLine lyricLine, String text, int fadeColor, int emphasizeColor, long scrollMs) {}
 }

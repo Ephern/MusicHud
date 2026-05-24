@@ -19,7 +19,7 @@ import net.minecraft.network.codec.StreamCodec;
 import java.util.List;
 
 public record ConnectRequest(Version clientVersion) implements C2SPayload {
-    public static StreamCodec<RegistryFriendlyByteBuf, ConnectRequest> CODEC =
+    public static final StreamCodec<RegistryFriendlyByteBuf, ConnectRequest> CODEC =
             StreamCodec.composite(Version.PACKET_CODEC, ConnectRequest::clientVersion, ConnectRequest::new);
 
     @RegisterMark

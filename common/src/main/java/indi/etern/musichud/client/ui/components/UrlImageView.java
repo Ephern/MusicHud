@@ -7,6 +7,7 @@ import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.RoundedImageDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.util.ColorStateList;
@@ -117,92 +118,6 @@ public class UrlImageView extends FrameLayout {
         requestLayout();
     }
 
-/*
-    @Override
-    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        int widthMode = MeasureSpec.getMode(widthMeasureSpec);
-        int heightMode = MeasureSpec.getMode(heightMeasureSpec);
-        int widthSize = MeasureSpec.getSize(widthMeasureSpec);
-        int heightSize = MeasureSpec.getSize(heightMeasureSpec);
-
-        if (aspectRatio <= 0) {
-            // 没有比例要求，走默认测量
-            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-            return;
-        }
-
-        // 计算满足比例的最小尺寸对
-        int minWidth, minHeight;
-        if (aspectRatio >= 1) {
-            // 宽度 ≥ 高度，以高度为基准
-            minHeight = getMinimumHeight();
-            minWidth = Math.round(minHeight * aspectRatio);
-        } else {
-            // 高度 > 宽度，以宽度为基准
-            minWidth = getMinimumWidth();
-            minHeight = Math.round(minWidth / aspectRatio);
-        }
-
-        int finalWidth, finalHeight;
-
-        // 根据父布局约束确定最终尺寸
-        if (widthMode == MeasureSpec.EXACTLY && heightMode == MeasureSpec.EXACTLY) {
-            // 双方向精确，必须遵循父布局（可能不满足比例，但父布局强制）
-            finalWidth = widthSize;
-            finalHeight = heightSize;
-        } else if (widthMode == MeasureSpec.EXACTLY) {
-            // 宽度精确，高度按比例计算，并受高度模式限制
-            finalWidth = widthSize;
-            int calcHeight = Math.round(finalWidth / aspectRatio);
-            if (heightMode == MeasureSpec.AT_MOST) {
-                finalHeight = Math.min(calcHeight, heightSize);
-            } else { // UNSPECIFIED
-                finalHeight = calcHeight;
-            }
-        } else if (heightMode == MeasureSpec.EXACTLY) {
-            // 高度精确，宽度按比例计算，并受宽度模式限制
-            finalHeight = heightSize;
-            int calcWidth = Math.round(finalHeight * aspectRatio);
-            if (widthMode == MeasureSpec.AT_MOST) {
-                finalWidth = Math.min(calcWidth, widthSize);
-            } else {
-                finalWidth = calcWidth;
-            }
-        } else {
-            // 两个方向都不是精确的（AT_MOST 或 UNSPECIFIED）
-            // 从最小尺寸开始，再根据 AT_MOST 限制进行调整
-            finalWidth = minWidth;
-            finalHeight = minHeight;
-
-            if (widthMode == MeasureSpec.AT_MOST && finalWidth > widthSize) {
-                finalWidth = widthSize;
-                finalHeight = Math.round(finalWidth / aspectRatio);
-            }
-            if (heightMode == MeasureSpec.AT_MOST && finalHeight > heightSize) {
-                finalHeight = heightSize;
-                finalWidth = Math.round(finalHeight * aspectRatio);
-            }
-            // 二次检查（可能因高度调整导致宽度重新超出）
-            if (widthMode == MeasureSpec.AT_MOST && finalWidth > widthSize) {
-                finalWidth = widthSize;
-                finalHeight = Math.round(finalWidth / aspectRatio);
-            }
-            if (heightMode == MeasureSpec.AT_MOST && finalHeight > heightSize) {
-                finalHeight = heightSize;
-                finalWidth = Math.round(finalHeight * aspectRatio);
-            }
-        }
-
-        // 用 resolveSizeAndState 确保最终值符合父布局的 MeasureSpec
-        int measuredWidth = resolveSizeAndState(finalWidth, widthMeasureSpec, 0);
-        int measuredHeight = resolveSizeAndState(finalHeight, heightMeasureSpec, 0);
-        setMeasuredDimension(measuredWidth, measuredHeight);
-
-        // 注意：不需要手动设置内部 ImageView 的 LayoutParams，
-        // 因为它们已经是 MATCH_PARENT，会自动填满父视图。
-    }
-*/
-
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
@@ -305,6 +220,7 @@ public class UrlImageView extends FrameLayout {
      * 公开的加载方法,设置待加载的 URL
      */
     public void loadUrl(String urlString) {
+        cancelLoad();
         currentURLString = urlString;
         pendingUrl = urlString;
         hasLoadedImage = false;
@@ -330,53 +246,77 @@ public class UrlImageView extends FrameLayout {
     }
 
     private void loadBase64Image(String base64String) {
+        cancelLoad();
         loadFuture = CompletableFuture.runAsync(() -> {
-            MuiModApi.postToUiThread(() -> {
-                try {
-                    ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
-                    Bitmap bitmap = imageTextureData.convertToBitmap();
-                    if (bitmap == null) {
-                        throw new RuntimeException("failed to load image from base64 string");
+            if (base64String.equals(currentURLString)) {
+                ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
+                MuiModApi.postToUiThread(() -> {
+                    if (base64String.equals(currentURLString)) {
+                        try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
+                            if (bitmap == null) {
+                                throw new RuntimeException("failed to load image from base64 string");
+                            }
+                            Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
+                            if (textureFromBitmap != null) {
+                                createDrawable(textureFromBitmap, base64String);
+                            }
+                        } catch (Exception e) {
+                            showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
+                        } finally {
+                            imageTextureData.close();
+                        }
                     }
-                    createDrawable(bitmap);
-                } catch (Exception e) {
-                    showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
-                }
-            });
+                });
+            }
         }, MusicHud.EXECUTOR);
     }
 
     private void loadNetworkImage(String urlString) {
         loadFuture = CompletableFuture.runAsync(() -> {
-            try {
-                ImageUtils.downloadAsync(urlString).thenAcceptAsync(imageTextureData -> {
-                    if (imageTextureData != null) {
-                        Bitmap bitmap = imageTextureData.convertToBitmap();
-                        if (bitmap == null) {
-                            throw new RuntimeException("failed to load image");
+            if (urlString.equals(currentURLString)) {
+                try {
+                    ImageUtils.downloadAsync(urlString).thenAcceptAsync(imageTextureData -> {
+                        if (urlString.equals(currentURLString)) {
+                            MuiModApi.postToUiThread(() -> {
+                                if (imageTextureData != null) {
+                                    try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
+                                        if (bitmap == null) {
+                                            throw new RuntimeException("failed to load image");
+                                        }
+                                        Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
+                                        if (textureFromBitmap != null) {
+                                            createDrawable(textureFromBitmap, urlString);
+                                        }
+                                    } catch (Exception e) {
+                                        showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
+                                    }
+                                } else {
+                                    showError(I18n.get(MusicHud.MOD_ID + ".button.downloadError"));
+                                }
+                            });
                         }
-                        MuiModApi.postToUiThread(() -> createDrawable(bitmap));
-                    } else {
-                        MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.downloadError")));
-                    }
-                }, MusicHud.EXECUTOR).exceptionally((e) -> {
+                    }, MusicHud.EXECUTOR).exceptionally((e) -> {
+                        MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
+                        return null;
+                    });
+                } catch (Exception e) {
                     MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
-                    return null;
-                });
-            } catch (Exception e) {
-                MuiModApi.postToUiThread(() -> showError(I18n.get(MusicHud.MOD_ID + ".button.loadingError")));
+                }
             }
         }, MusicHud.EXECUTOR);
     }
 
-    private void createDrawable(Bitmap bitmap) {
-        float ratio = (float) bitmap.getWidth() / bitmap.getHeight();
+    private void createDrawable(Image image, String urlString) {
+        if (!urlString.equals(currentURLString)) {
+            return;
+        }
+        float ratio = (float) image.getWidth() / image.getHeight();
         setAspectRatio(ratio);
 
         //noinspection UnstableApiUsage
         RoundedImageDrawable drawable = new RoundedImageDrawable(
                 getContext().getResources(),
-                Image.createTextureFromBitmap(bitmap)
+                image
         );
         drawable.setFilter(false);
 
@@ -386,10 +326,10 @@ public class UrlImageView extends FrameLayout {
         } else {
             // 使用 OnLayoutChangeListener 确保在布局完成后设置圆角
             setImageWithAnimation(drawable);
-            int bitmapHeight = bitmap.getHeight();
+            int imageHeight = image.getHeight();
             int height = getHeight();
             if (height > 0) {
-                float actualCornerRadius = (float) (cornerRadius * bitmapHeight) / height;
+                float actualCornerRadius = (float) (cornerRadius * imageHeight) / height;
                 drawable.setCornerRadius(actualCornerRadius);
             }
             addOnLayoutChangeListener(new OnLayoutChangeListener() {
@@ -398,7 +338,7 @@ public class UrlImageView extends FrameLayout {
                                            int oldLeft, int oldTop, int oldRight, int oldBottom) {
                     int height = bottom - top;
                     if (height > 0) {
-                        float actualCornerRadius = (float) (cornerRadius * bitmapHeight) / height;
+                        float actualCornerRadius = (float) (cornerRadius * imageHeight) / height;
                         drawable.setCornerRadius(actualCornerRadius);
                         invalidate();
                         removeOnLayoutChangeListener(this);
@@ -423,9 +363,16 @@ public class UrlImageView extends FrameLayout {
         animatorSet.addListener(new AnimatorListener() {
             @Override
             public void onAnimationEnd(@Nonnull Animator animation) {
+                Drawable previousDrawable = imageView.getDrawable();
                 ImageView temp = imageView;
                 imageView = nextImageView;
                 nextImageView = temp;
+                if (previousDrawable instanceof RoundedImageDrawable imageDrawable) {
+                    Image image = imageDrawable.getImage();
+//                    if (image != null) {
+//                        image.close();
+//                    }
+                }
             }
         });
         animatorSet.start();

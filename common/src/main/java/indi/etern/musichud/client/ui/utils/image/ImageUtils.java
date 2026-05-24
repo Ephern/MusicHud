@@ -3,16 +3,14 @@ package indi.etern.musichud.client.ui.utils.image;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
-import icyllis.arc3d.core.*;
+import icyllis.arc3d.core.ColorSpace;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
-import indi.etern.musichud.MusicHud;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -34,20 +32,11 @@ import static indi.etern.musichud.MusicHud.getLogger;
 public class ImageUtils {
     private static final Logger LOGGER = getLogger(ImageUtils.class);
 
-    // 默认最大并发下载数(虚拟线程模式下可以设置更高)
     private static final int DEFAULT_MAX_CONCURRENT_DOWNLOADS = 40;
-    // 使用 Guava Cache
     @Getter(AccessLevel.PACKAGE)
     private static final Cache<String, ImageTextureData> cachedTexturesData = CacheBuilder.newBuilder()
             .expireAfterAccess(20, TimeUnit.MINUTES)
-            .maximumSize(100)
-            .removalListener(notification -> {
-                Object value = notification.getValue();
-                if (value instanceof ImageTextureData imageTextureData) {
-                    imageTextureData.close();
-                    LOGGER.debug("Removed cached texture: {}", notification.getKey());
-                }
-            })
+            .maximumSize(64)
             .build();
     private static final ConcurrentHashMap<String, CompletableFuture<ImageTextureData>> pendingDownloads =
             new ConcurrentHashMap<>();
@@ -162,7 +151,6 @@ public class ImageUtils {
         return pendingDownloads.computeIfAbsent(url, k ->
                 CompletableFuture.supplyAsync(() -> {
                     try {
-                        // 获取信号量许可
                         downloadSemaphore.acquire();
                         try {
                             LOGGER.debug("Starting download for URL: {} (active: {}, queued: {})",
@@ -173,7 +161,6 @@ public class ImageUtils {
                             LOGGER.debug("Successfully downloaded and cached: {}", url);
                             return imageTextureData;
                         } finally {
-                            // 释放信号量许可
                             downloadSemaphore.release();
                         }
                     } catch (InterruptedException e) {
@@ -214,11 +201,10 @@ public class ImageUtils {
             try (InputStream stream = connection.getInputStream()) {
                 var opts = new BitmapFactory.Options();
                 opts.inPreferredFormat = Bitmap.Format.RGBA_8888;
-                Bitmap source = BitmapFactory.decodeStream(stream, opts);
-                NativeImage nativeImage = convertBitmapToNativeImage(source);
 
-                assert nativeImage != null;
-                return getImageTextureData(url, source, nativeImage);
+                try (Bitmap source = BitmapFactory.decodeStream(stream, opts)){
+                    return getImageTextureData(url, source);
+                }
             }
         } finally {
             if (connection != null) {
@@ -230,35 +216,21 @@ public class ImageUtils {
     public static NativeImage convertBitmapToNativeImage(Bitmap bitmap) {
         int width = bitmap.getWidth();
         int height = bitmap.getHeight();
-
-        // 创建 NativeImage
         NativeImage nativeImage = new NativeImage(width, height, false);
 
-        // 使用 Pixmap 进行像素转换
         //noinspection UnstableApiUsage
-        Pixmap srcPixmap = bitmap.getPixmap();  // 获取 Bitmap 的 Pixmap 视图
-        Pixmap dstPixmap = new Pixmap(
-                ImageInfo.make(width, height,
-                        ColorInfo.CT_RGBA_8888,  // NativeImage 使用 RGBA
-                        ColorInfo.AT_UNPREMUL,   // 非预乘 alpha
-                        ColorSpace.get(ColorSpace.Named.SRGB)),
-                null,  // 原生内存
-                getNativeImagePixels(nativeImage),  // NativeImage 的像素地址
-                width * 4  // 每行字节数
-        );
-
-        boolean success = PixelUtils.convertPixels(
-                srcPixmap.getInfo(), srcPixmap.getBase(), srcPixmap.getAddress(), srcPixmap.getRowBytes(),
-                dstPixmap.getInfo(), dstPixmap.getBase(), dstPixmap.getAddress(), dstPixmap.getRowBytes(),
-                false
-        );
-
-        if (!success) {
-            LOGGER.error("Failed to convert Bitmap to NativeImage");
-            nativeImage.close();
-            return null;
+        try (Bitmap wrap = Bitmap.wrap(
+                nativeImage.getPointer(),
+                width * 4,
+                null,
+                width,
+                height,
+                Bitmap.Format.RGBA_8888,
+                false,
+                ColorSpace.get(ColorSpace.Named.SRGB)
+        )){
+            wrap.setPixels(bitmap, 0, 0, 0, 0, width, height);
         }
-
         return nativeImage;
     }
 
@@ -266,35 +238,15 @@ public class ImageUtils {
         int width = nativeImage.getWidth();
         int height = nativeImage.getHeight();
 
-        // 创建 Bitmap
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Format.RGBA_8888);
-
-        // 使用 Pixmap 进行像素转换
-        Pixmap srcPixmap = new Pixmap(
-                ImageInfo.make(width, height,
-                        ColorInfo.CT_RGBA_8888,
-                        ColorInfo.AT_UNPREMUL,
-                        ColorSpace.get(ColorSpace.Named.SRGB)),
+        //noinspection UnstableApiUsage
+        return Bitmap.wrap(nativeImage.getPointer(),
+                width * 4,
                 null,
-                getNativeImagePixels(nativeImage),
-                width * 4
-        );
-
-        Pixmap dstPixmap = bitmap.getPixmap();
-
-        boolean success = PixelUtils.convertPixels(
-                srcPixmap.getInfo(), srcPixmap.getBase(), srcPixmap.getAddress(), srcPixmap.getRowBytes(),
-                dstPixmap.getInfo(), dstPixmap.getBase(), dstPixmap.getAddress(), dstPixmap.getRowBytes(),
-                false
-        );
-
-        if (!success) {
-            LOGGER.error("Failed to convert NativeImage to Bitmap");
-            bitmap.recycle();
-            return null;
-        }
-
-        return bitmap;
+                width,
+                height,
+                Bitmap.Format.RGBA_8888,
+                false,
+                ColorSpace.get(ColorSpace.Named.SRGB));
     }
 
     @SuppressWarnings("unused")
@@ -329,21 +281,18 @@ public class ImageUtils {
     public static ImageTextureData loadBase64(String data) {
         String base64Data = data.split(",")[1];
         byte[] imageBytes = Base64.getDecoder().decode(base64Data);
-        Bitmap source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length);
-        NativeImage nativeImage = convertBitmapToNativeImage(source);
-        if (nativeImage == null) {
-            throw new RuntimeException("Failed to convert Bitmap to NativeImage");
+        try (Bitmap source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length)){
+            return getImageTextureData(data, source);
         }
-        return getImageTextureData(data, source, nativeImage);
     }
 
     @NotNull
-    private static ImageTextureData getImageTextureData(String data, Bitmap source, NativeImage nativeImage) {
-        ResourceLocation imageLocation = MusicHud.location("image_" + nativeImage.hashCode());
+    private static ImageTextureData getImageTextureData(String data, Bitmap source) {
+//        ResourceLocation imageLocation = MusicHud.location("image_" + source.hashCode());
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
         Minecraft.getInstance().submit(() -> {
-            texture.set(new DynamicTexture(nativeImage));
+            texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), convertBitmapToNativeImage(source)));
         }).join();
-        return new ImageTextureData(data, imageLocation, texture.get(), false);
+        return new ImageTextureData(data, texture.get());
     }
 }

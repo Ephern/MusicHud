@@ -56,7 +56,8 @@ public class StreamAudioPlayer {
     private volatile boolean shouldContinuePlaying = false;
     private volatile boolean shouldContinueDownloading = false;
     private volatile AudioDecoder currentDecoder;
-    private volatile long bytesPerSecond = 0;
+//    private volatile long bytesPerSecond = 0;
+    private long playedBytes = 0;
     private volatile boolean isBuffering = false;
     private volatile ZonedDateTime serverStartTime;
     private MusicDetail currentMusicDetail;
@@ -211,7 +212,7 @@ public class StreamAudioPlayer {
                         finished = true;
                     } else {// 从缓冲区填充初始数据
                         for (int i = 0; i < BUFFER_COUNT; i++) {
-                            byte[] audioData = audioBuffer.poll(1, TimeUnit.SECONDS);
+                            byte[] audioData = audioBuffer.poll(0, TimeUnit.SECONDS);
                             if (audioData == null) break;
 
                             ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
@@ -253,7 +254,7 @@ public class StreamAudioPlayer {
                                     //noinspection SpellCheckingInspection
                                     checkALError("alSourceUnqueueBuffers");
 
-                                    byte[] audioData = audioBuffer.poll(500, TimeUnit.MILLISECONDS);
+                                    byte[] audioData = audioBuffer.poll(0, TimeUnit.MILLISECONDS);
 
                                     if (audioData == null) {
                                         if (audioBuffer.isEmpty() && NowPlayingInfo.getInstance().isCompleted()) {
@@ -367,29 +368,11 @@ public class StreamAudioPlayer {
                 }
 
                 if (forceSyncInternal) {
-                    int bytesPerSample = getBytesPerSample(decoder.getFormat());
-                    int bytesPerSecond = decoder.getSampleRate() * bytesPerSample;
-
-                    long bytesSkipped = 0;
-                    long startSyncTimestamp = System.currentTimeMillis();
-                    while (shouldContinueDownloading) {
-                        long millis = Duration.between(serverStartTime, ZonedDateTime.now()).toMillis();
-                        long skipBytes = millis * bytesPerSecond / 1000;
-                        if (bytesSkipped >= skipBytes) {
-                            break;
-                        }
-                        byte[] chunk = decoder.readChunk(skipBytes - bytesSkipped);
-                        if (chunk == null) break;
-                        bytesSkipped += chunk.length;
-                    }
-                    long current = System.currentTimeMillis();
-                    LOGGER.debug("Skipped {} bytes in {} millis", bytesSkipped, current - startSyncTimestamp);
+                    syncPlaying();
                 }
 
                 // 先填充一些数据到缓冲区
                 int initialBuffers = 0;
-                long startTimeForSpeedCalc = System.currentTimeMillis();
-                long totalBytesForSpeedCalc = 0;
                 while (shouldContinueDownloading && initialBuffers < BUFFER_COUNT * 2) {
                     byte[] audioData = decoder.readChunk(BUFFER_SIZE);
                     if (audioData == null) break;
@@ -400,25 +383,15 @@ public class StreamAudioPlayer {
                     }
                     totalBufferedBytes.addAndGet(audioData.length);
                     initialBuffers++;
-                    totalBytesForSpeedCalc += audioData.length;
-
-                    if (initialBuffers == 5) { // 收集5个数据块后计算速度
-                        long elapsedTime = System.currentTimeMillis() - startTimeForSpeedCalc;
-                        if (elapsedTime > 0) {
-                            bytesPerSecond = (totalBytesForSpeedCalc * 1000L) / elapsedTime;
-                            LOGGER.debug("Calculated download speed: {} bytes/sec", bytesPerSecond);
-                        }
-                    }
-
-                    if (calculateBufferedSeconds(decoder.getFormat()) >= 2) {
-                        setStatus(Status.PLAYING);
-                    }
                 }
 
                 // 继续下载剩余数据
                 while (shouldContinueDownloading) {
-                    byte[] audioData = decoder.readChunk(BUFFER_SIZE);
+                    if (audioBuffer.size() <= 1) {
+                        syncPlaying();
+                    }
 
+                    byte[] audioData = decoder.readChunk(BUFFER_SIZE);
                     // 如果缓冲区已满，等待一会儿
                     while (shouldContinueDownloading && audioBuffer.remainingCapacity() == 0) {
                         Thread.sleep(50);
@@ -428,6 +401,7 @@ public class StreamAudioPlayer {
                     if (!shouldContinueDownloading) break;
 
                     audioBuffer.put(audioData);
+                    playedBytes += audioData.length;
                     totalBufferedBytes.addAndGet(audioData.length);
                 }
 
@@ -445,6 +419,7 @@ public class StreamAudioPlayer {
                 if (e instanceof SocketException e1 && e1.getMessage().equals("Closed by interrupt")) break;
                 LOGGER.error("Download error (attempt {})\n{} : {}", localRetryCount + 1, e.getClass().getSimpleName(), e.getMessage());
 
+                playedBytes = 0;
                 forceSyncInternal = true;
                 localRetryCount++;
                 setStatus(Status.RETRYING);
@@ -463,6 +438,23 @@ public class StreamAudioPlayer {
         }
 
         LOGGER.debug("Download task finished");
+    }
+
+    private void syncPlaying() {
+        if (serverStartTime == null || currentDecoder == null) return;
+        int bytesPerSample = getBytesPerSample(currentDecoder.getFormat());
+        int bytesPerSecond = currentDecoder.getSampleRate() * bytesPerSample;
+
+        while (shouldContinueDownloading) {
+            long millis = Duration.between(serverStartTime, ZonedDateTime.now()).toMillis();
+            long skipBytes = millis * bytesPerSecond / 1000;
+            if (playedBytes > skipBytes - currentDecoder.getFrameSize()) {
+                break;
+            }
+            byte[] chunk = currentDecoder.readChunk(skipBytes - playedBytes);
+            if (chunk == null) break;
+            playedBytes += chunk.length;
+        }
     }
 
     private void updateVolumeIfNecessary() {
@@ -494,16 +486,6 @@ public class StreamAudioPlayer {
             case AL10.AL_FORMAT_STEREO16 -> 4;
             default -> 4;
         };
-    }
-
-    private float calculateBufferedSeconds(int format) {
-        if (bytesPerSecond == 0) return 0;
-        int bytesPerSample = getBytesPerSample(format);
-        long samplesPerSecond = bytesPerSecond / bytesPerSample;
-        if (samplesPerSecond == 0) return 0;
-
-        long bufferedSamples = totalBufferedBytes.get() / bytesPerSample;
-        return (float) bufferedSamples / samplesPerSecond;
     }
 
     private void checkALError(String operation) {
@@ -547,15 +529,6 @@ public class StreamAudioPlayer {
             downloadFuture = null;
         }
 
-        if (currentDecoder != null) {
-            try {
-                currentDecoder.close();
-            } catch (Exception e) {
-                // Ignore
-            }
-            currentDecoder = null;
-        }
-
         lastVolume = 1;
         cleanup();
     }
@@ -588,6 +561,7 @@ public class StreamAudioPlayer {
                     }
 
                     // 3. 解绑所有已处理的缓冲区
+                    //noinspection SpellCheckingInspection
                     int unqueueCount = 0;
                     for (int i = 0; i < processed; i++) {
                         int[] buffer = new int[1];
@@ -632,6 +606,15 @@ public class StreamAudioPlayer {
                 lastVolume = 1;
                 audioBuffer.clear();
                 totalBufferedBytes.set(0);
+                playedBytes = 0;
+                if (currentDecoder != null) {
+                    try {
+                        currentDecoder.close();
+                    } catch (Exception e) {
+                        // Ignore
+                    }
+                    currentDecoder = null;
+                }
                 LOGGER.debug("Cleanup completed");
             } catch (Exception e) {
                 LOGGER.error("Unexpected error during cleanup", e);

@@ -72,7 +72,7 @@
   "music_hud.button.back": "返回",
   "music_hud.config.category.common": "通用",
   "music_hud.config.common.switch.enable": "启用 Music Hud",
-  "music_hud.config.common.switch.showTranslatedCnLyrics": "显示中文歌词翻译，切换音乐后生效",
+  "music_hud.config.common.switch.showTranslatedCnLyrics": "显示中文歌词翻译",
   "music_hud.config.common.switch.disableVanillaMusicWhilePlaying": "播放时禁用原版音乐",
   "music_hud.config.common.switch.enableHud": "启用 HUD",
   "music_hud.config.common.switch.autoHide": "无音乐时隐藏 HUD",

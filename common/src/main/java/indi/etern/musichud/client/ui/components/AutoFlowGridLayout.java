@@ -73,8 +73,7 @@ public class AutoFlowGridLayout extends GridLayout {
             );
             minWidth = Math.min(minWidth, child.getMeasuredWidth());
         }
-        int i = minWidth == Integer.MAX_VALUE ? rowMinWidth : minWidth;
-        return i;
+        return minWidth == Integer.MAX_VALUE ? rowMinWidth : minWidth;
     }
 
     @Override

@@ -16,7 +16,7 @@ import net.minecraft.network.codec.StreamCodec;
 import java.util.List;
 
 public record GetArtistMoreMusicRequest(long id, int offset) implements C2SPayload {
-    public static StreamCodec<RegistryFriendlyByteBuf, GetArtistMoreMusicRequest> CODEC = StreamCodec.composite(
+    public static final StreamCodec<RegistryFriendlyByteBuf, GetArtistMoreMusicRequest> CODEC = StreamCodec.composite(
             ByteBufCodecs.VAR_LONG,
             GetArtistMoreMusicRequest::id,
             ByteBufCodecs.INT,
