@@ -20,8 +20,8 @@ public interface IClientEventService {
         throw new UnsupportedOperationException();
     }
 
-    void registerClientPlayerJoin(Consumer<Player> listener);
-    void registerClientPlayerQuit(Consumer<Player> listener);
-    void registerClientTickPost(Runnable listener);
-    void registerClientLifecycleStopping(Runnable listener);
+    Unregister registerClientPlayerJoin(Consumer<Player> listener);
+    Unregister registerClientPlayerQuit(Consumer<Player> listener);
+    Unregister registerClientTickPost(Runnable listener);
+    Unregister registerClientLifecycleStopping(Runnable listener);
 }

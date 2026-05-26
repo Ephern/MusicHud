@@ -11,11 +11,6 @@ import indi.etern.musichud.platform.Environment;
 import java.util.function.Supplier;
 
 public interface ClientConfig {
-    @FunctionalInterface
-    interface Unregister {
-        void unregister();
-    }
-
     static ClientConfig getInstance() {
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         Supplier<ClientConfig> supplier = platform.getClientConfigSupplier();
