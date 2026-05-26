@@ -37,9 +37,6 @@ dependencies {
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     shadowBundle project(path: ':common', configuration: 'transformProductionNeoForge')
 
-    implementation("net.neoforged.fancymodloader:bootstraplauncher:${rootProject.fancymodloader_version}")
-    implementation("net.neoforged.fancymodloader:earlydisplay:${rootProject.fancymodloader_version}")
-    implementation("net.neoforged.fancymodloader:securejarhandler:${rootProject.fancymodloader_version}")
 
     implementation("icyllis.modernui:ModernUI-NeoForge:1.21.1-${rootProject.modernui_version}.+")
     modImplementation("icyllis.modernui:ModernUI-Core:${modernui_version}") {
@@ -71,6 +68,7 @@ dependencies {
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
     shadowBundle "org.jflac:jflac-codec:$rootProject.jflac_version"
     forgeRuntimeLibrary "org.jflac:jflac-codec:$rootProject.jflac_version"
+
 }
 processResources {
     inputs.property 'version', project.version
@@ -94,6 +92,12 @@ loom {
     runs {
         client {
             runDir = "run/client"
+            // Bootstraplauncher has a default ignoreList=asm,securejarhandler
+            // which excludes all jars with filenames starting with "asm" from the module path.
+            // Mixin requires ASM modules, so we must clear this.
+            vmArgs.addAll(
+                "-DignoreList="
+            )
         }
         server {
             runDir = "run/server"
