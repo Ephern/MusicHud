@@ -75,7 +75,11 @@ public class ApiServerManager implements ServerRegister {
     private void addShutdownHook() {
         if (hook == null) {//first call
             hook = new Thread(this::stopApiServer);
-            IClientEventService.getInstance().registerClientLifecycleStopping(this::stopApiServer);
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                IClientEventService.getInstance().registerClientLifecycleStopping(this::stopApiServer);
+            } else {
+                IServerEventService.getInstance().registerServerLifecycleStopping(this::stopApiServer);
+            }
         }
         Runtime.getRuntime().addShutdownHook(hook);
     }

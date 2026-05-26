@@ -20,6 +20,6 @@ public interface IServerEventService {
         throw new UnsupportedOperationException();
     }
 
-    void registerCommonPlayerQuit(Consumer<ServerPlayer> listener);
-    void registerServerLifecycleStopping(Runnable listener);
+    Unregister registerCommonPlayerQuit(Consumer<ServerPlayer> listener);
+    Unregister registerServerLifecycleStopping(Runnable listener);
 }
