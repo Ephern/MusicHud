@@ -43,13 +43,22 @@ public class HudShaderProgram {
         return uniformBlockBindingPoints.get(blockName);
     }
 
+    public void cacheSamplerLocation(String name) {
+        int loc = glGetUniformLocation(programId, name);
+        if (loc != -1) {
+            uniformLocations.put(name, loc);
+        }
+    }
+
     public static final class UniformBufferHandle {
         private final int uboId;
         private final int bindingPoint;
+        private final int size;
 
-        public UniformBufferHandle(int uboId, int bindingPoint) {
+        public UniformBufferHandle(int uboId, int bindingPoint, int size) {
             this.uboId = uboId;
             this.bindingPoint = bindingPoint;
+            this.size = size;
         }
 
         public int getUboId() {
@@ -61,24 +70,25 @@ public class HudShaderProgram {
         }
 
         public static UniformBufferHandle createAndUpload(int bindingPoint, ByteBuffer data) {
+            int dataSize = data.remaining();
             int[] ubo = new int[1];
             glGenBuffers(ubo);
             int uboId = ubo[0];
             glBindBuffer(GL_UNIFORM_BUFFER, uboId);
             glBufferData(GL_UNIFORM_BUFFER, data, GL_DYNAMIC_DRAW);
-            glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, uboId);
-            return new UniformBufferHandle(uboId, bindingPoint);
+            glBindBufferRange(GL_UNIFORM_BUFFER, bindingPoint, uboId, 0, dataSize);
+            return new UniformBufferHandle(uboId, bindingPoint, dataSize);
         }
 
         public void upload(ByteBuffer data) {
             data.rewind();
             glBindBuffer(GL_UNIFORM_BUFFER, uboId);
-            glBufferData(GL_UNIFORM_BUFFER, data, GL_DYNAMIC_DRAW);
-            glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, uboId);
+            glBufferSubData(GL_UNIFORM_BUFFER, 0, data);
+            glBindBufferRange(GL_UNIFORM_BUFFER, bindingPoint, uboId, 0, size);
         }
 
         public void bind() {
-            glBindBufferBase(GL_UNIFORM_BUFFER, bindingPoint, uboId);
+            glBindBufferRange(GL_UNIFORM_BUFFER, bindingPoint, uboId, 0, size);
         }
 
         public void delete() {

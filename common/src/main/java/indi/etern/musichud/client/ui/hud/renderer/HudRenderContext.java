@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
 import indi.etern.musichud.client.ui.hud.pipelines.HudShaderProgram;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
@@ -21,6 +22,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
+import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL13.*;
 import static org.lwjgl.opengl.GL20.*;
 
 public class HudRenderContext {
@@ -34,6 +37,17 @@ public class HudRenderContext {
         current = this;
     }
 
+    private static void checkGLError(String stage) {
+        int err;
+        boolean first = true;
+        while ((err = glGetError()) != GL_NO_ERROR) {
+            if (first) {
+                MusicHud.LOGGER.error("GL error 0x{} ({}) at stage: {}", Integer.toHexString(err), err, stage);
+                first = false;
+            }
+        }
+    }
+
     public void clearContext() {
         graphics = null;
     }
@@ -45,30 +59,58 @@ public class HudRenderContext {
             return;
         }
 
-        glUseProgram(program.getProgramId());
+        // Drain stale GL errors from previous operations
+        while (glGetError() != GL_NO_ERROR);
 
-        setBuiltinUniforms(program);
+        // Save MC's GL state before we take over
+        int[] savedProgram = new int[1];
+        glGetIntegerv(GL_CURRENT_PROGRAM, savedProgram);
+        int[] savedActiveTexture = new int[1];
+        glGetIntegerv(GL_ACTIVE_TEXTURE, savedActiveTexture);
 
-        HudUniform[] uniforms = hudRenderState.uniforms();
-        if (uniforms != null) {
-            for (HudUniform uniform : uniforms) {
-                uploadUniform(program, uniform);
-            }
-        }
+        try {
+            glUseProgram(program.getProgramId());
+            checkGLError("glUseProgram");
 
-        Integer[] textures = hudRenderState.textures();
-        if (textures != null) {
-            for (int i = 0; i < textures.length; i++) {
-                if (textures[i] != null) {
-                    RenderSystem.setShaderTexture(i, textures[i]);
+            setBuiltinUniforms(program);
+            checkGLError("setBuiltinUniforms");
+
+            HudUniform[] uniforms = hudRenderState.uniforms();
+            if (uniforms != null) {
+                for (HudUniform uniform : uniforms) {
+                    uploadUniform(program, uniform);
                 }
             }
+            checkGLError("uploadUniforms");
+
+            Integer[] textures = hudRenderState.textures();
+            if (textures != null) {
+                for (int i = 0; i < textures.length; i++) {
+                    if (textures[i] != null) {
+                        glActiveTexture(GL_TEXTURE0 + i);
+                        glBindTexture(GL_TEXTURE_2D, textures[i]);
+                        int samplerLoc = program.getUniformLocation("Sampler" + i);
+                        if (samplerLoc >= 0) {
+                            glUniform1i(samplerLoc, i);
+                        }
+                    }
+                }
+            }
+            checkGLError("textures");
+
+            RenderSystem.enableBlend();
+            RenderSystem.defaultBlendFunc();
+
+            drawQuad(hudRenderState.pose(), hudRenderState.width(), hudRenderState.height());
+            checkGLError("drawQuad");
+        } finally {
+            // Restore MC's GL state so subsequent MC-native rendering
+            // (text, blit via GuiGraphics) uses the correct shader/texture context
+            glUseProgram(savedProgram[0]);
+            glActiveTexture(savedActiveTexture[0]);
+            // Drain any remaining GL errors so they don't appear as MC errors
+            while (glGetError() != GL_NO_ERROR);
         }
-
-        RenderSystem.enableBlend();
-        RenderSystem.defaultBlendFunc();
-
-        drawQuad(hudRenderState.pose(), hudRenderState.width(), hudRenderState.height());
     }
 
     private void renderFallback(HudRenderState hudRenderState) {
@@ -91,8 +133,13 @@ public class HudRenderContext {
         }
         int mvLoc = program.getUniformLocation("ModelViewMat");
         if (mvLoc >= 0) {
+            // Compute ModelView that converts screen-center-relative coords
+            // (used by u_Translation UBO) to absolute screen coordinates
+            // [0..guiWidth] that MC's orthographic projection expects.
+            Matrix4f mv = new Matrix4f();
+            mv.translate(guiWidth() / 2f, guiHeight() / 2f, 0);
             float[] mvBuf = new float[16];
-            RenderSystem.getModelViewMatrix().get(mvBuf);
+            mv.get(mvBuf);
             glUniformMatrix4fv(mvLoc, false, mvBuf);
         }
     }
@@ -102,25 +149,43 @@ public class HudRenderContext {
         Integer bindingPoint = program.getUniformBlockBindingPoint(uboName);
         if (bindingPoint == null) return;
 
+        int uboSize = uniform.getUBOSize();
         String cacheKey = program.getProgramId() + "/" + uboName;
 
-        ByteBuffer buffer = ByteBuffer.allocateDirect(uniform.getUBOSize()).order(ByteOrder.nativeOrder());
+        ByteBuffer buffer = ByteBuffer.allocateDirect(uboSize).order(ByteOrder.nativeOrder());
         uniform.write(buffer);
+
+        // Defense: if write() didn't advance position (known issue with some
+        // uniform types using putVec4(Vector4f) due to class mismatch), fill manually
+        if (buffer.position() == 0 && uboSize > 0) {
+            MusicHud.LOGGER.warn("uniform.write() did not advance buffer for {} (size={}), using fallback",
+                    uboName, uboSize);
+            // Fill with placeholder data so the shader receives valid-sized buffer
+            while (buffer.position() < uboSize) {
+                buffer.putFloat(1.0f);
+            }
+        }
         buffer.flip();
 
         HudShaderProgram.UniformBufferHandle handle = uboHandles.computeIfAbsent(cacheKey,
-                k -> HudShaderProgram.UniformBufferHandle.createAndUpload(bindingPoint, buffer));
+                k -> {
+                    HudShaderProgram.UniformBufferHandle h = HudShaderProgram.UniformBufferHandle.createAndUpload(bindingPoint, buffer);
+                    checkGLError("createAndUpload " + uboName);
+                    return h;
+                });
         handle.upload(buffer);
+        checkGLError("upload " + uboName);
         handle.bind();
+        checkGLError("bind " + uboName);
     }
+
+    private static final Matrix4f IDENTITY = new Matrix4f();
 
     private void drawQuad(Matrix3x2f pose, float width, float height) {
         float left = -width / 2f;
         float right = width / 2f;
         float top = -height / 2f;
         float bottom = height / 2f;
-
-        Matrix4f m = graphics.pose().last().pose();
 
         BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
 
@@ -133,12 +198,15 @@ public class HudRenderContext {
         float x4 = pose.m00 * left + pose.m10 * top;
         float y4 = pose.m01 * left + pose.m11 * top;
 
-        builder.addVertex(m, x1, y1, 0).setColor(-1);
-        builder.addVertex(m, x2, y2, 0).setColor(-1);
-        builder.addVertex(m, x3, y3, 0).setColor(-1);
-        builder.addVertex(m, x1, y1, 0).setColor(-1);
-        builder.addVertex(m, x3, y3, 0).setColor(-1);
-        builder.addVertex(m, x4, y4, 0).setColor(-1);
+        // Use identity matrix — u_Translation UBO handles element position,
+        // ProjMat * ModelViewMat in the shader handles orthographic projection.
+        // Do NOT apply graphics.pose() here to avoid double-transforming.
+        builder.addVertex(IDENTITY, x1, y1, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x2, y2, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x3, y3, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x1, y1, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x3, y3, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x4, y4, 0).setColor(-1);
 
         // BufferUploader.draw() uploads + draws without touching the shader —
         // our glUseProgram() sticks.

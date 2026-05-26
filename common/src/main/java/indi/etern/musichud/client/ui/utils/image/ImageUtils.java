@@ -66,7 +66,7 @@ public class ImageUtils {
             MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(NativeImage.class, MethodHandles.lookup());
             handle = lookup.unreflectVarHandle(found);
         } catch (Throwable t) {
-            MusicHud.LOGGER.error("Failed to init VarHandle for NativeImage pixels", t);
+            LOGGER.error("Failed to init VarHandle for NativeImage pixels", t);
         }
         NATIVE_IMAGE_PIXELS_HANDLE = handle;
     }
@@ -218,9 +218,11 @@ public class ImageUtils {
         int height = bitmap.getHeight();
         NativeImage nativeImage = new NativeImage(width, height, false);
 
+        long pointer = getNativeImagePixels(nativeImage);
+
         //noinspection UnstableApiUsage
         try (Bitmap wrap = Bitmap.wrap(
-                nativeImage.getPointer(),
+                pointer,
                 width * 4,
                 null,
                 width,
@@ -238,8 +240,10 @@ public class ImageUtils {
         int width = nativeImage.getWidth();
         int height = nativeImage.getHeight();
 
+        long pointer = getNativeImagePixels(nativeImage);
+
         //noinspection UnstableApiUsage
-        return Bitmap.wrap(nativeImage.getPointer(),
+        return Bitmap.wrap(pointer,
                 width * 4,
                 null,
                 width,
@@ -291,7 +295,7 @@ public class ImageUtils {
 //        ResourceLocation imageLocation = MusicHud.location("image_" + source.hashCode());
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
         Minecraft.getInstance().submit(() -> {
-            texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), convertBitmapToNativeImage(source)));
+            texture.set(new DynamicTexture(convertBitmapToNativeImage(source)));
         }).join();
         return new ImageTextureData(data, texture.get());
     }

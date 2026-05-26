@@ -43,10 +43,13 @@ public class ProgressBarData implements HudUniform {
 
     @Override
     public void write(Std140BufferWriter builder) {
-        builder.putVec3(gradientLength, gradientRightOffset, transitionBorderRate)
-               .putVec4(UniformDataUtils.colorToVector(playedColor))
-               .putVec4(UniformDataUtils.colorToVector(currentColor))
-               .putVec4(UniformDataUtils.colorToVector(backgroundColor));
+        builder.putVec3(gradientLength, gradientRightOffset, transitionBorderRate);
+        org.joml.Vector4f v = UniformDataUtils.colorToVector(playedColor);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(currentColor);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(backgroundColor);
+        builder.putVec4(v.x, v.y, v.z, v.w);
     }
 
     @Override

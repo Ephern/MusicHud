@@ -48,13 +48,28 @@ public class Std140BufferWriter {
         return this;
     }
 
-    // std140: vec4 = 16 bytes, aligned to 16
-    public Std140BufferWriter putVec4(Vector4f vec) {
-        align(16);
-        vec.get(buffer);
+    // std140: vec2 = 8 bytes, aligned to 8
+    public Std140BufferWriter putVec2(float x, float y) {
+        align(8);
+        buffer.putFloat(x).putFloat(y);
         return this;
     }
 
+    // std140: float = 4 bytes, aligned to 4
+    public Std140BufferWriter putFloat(float f) {
+        align(4);
+        buffer.putFloat(f);
+        return this;
+    }
+
+    // std140: int = 4 bytes, aligned to 4
+    public Std140BufferWriter putInt(int i) {
+        align(4);
+        buffer.putInt(i);
+        return this;
+    }
+
+    // std140: vec4 = 16 bytes, aligned to 16
     public Std140BufferWriter putVec4(float x, float y, float z, float w) {
         align(16);
         buffer.putFloat(x).putFloat(y).putFloat(z).putFloat(w);
@@ -95,6 +110,20 @@ public class Std140BufferWriter {
 
         public Calculator putVec4() {
             size = align16(size) + 16;
+            return this;
+        }
+
+        public Calculator putVec2() {
+            int remainder = size % 8;
+            if (remainder != 0) size += 8 - remainder;
+            size += 8;
+            return this;
+        }
+
+        public Calculator putFloat() {
+            int remainder = size % 4;
+            if (remainder != 0) size += 4 - remainder;
+            size += 4;
             return this;
         }
 

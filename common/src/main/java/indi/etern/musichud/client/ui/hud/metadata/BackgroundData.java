@@ -89,10 +89,15 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
 
     @Override
     public void write(Std140BufferWriter builder) {
-        builder.putVec4(UniformDataUtils.colorToVector(colors.primary));
-        builder.putVec4(UniformDataUtils.colorToVector(colors.secondary));
-        builder.putVec4(UniformDataUtils.colorToVector(colors.bright));
-        builder.putVec4(UniformDataUtils.colorToVector(colors.dark));
+        // Use float overload to avoid JOML Vector4f.get(ByteBuffer) being stripped by transformers
+        org.joml.Vector4f v = UniformDataUtils.colorToVector(colors.primary);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(colors.secondary);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(colors.bright);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(colors.dark);
+        builder.putVec4(v.x, v.y, v.z, v.w);
     }
 
     @Override

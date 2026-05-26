@@ -30,16 +30,30 @@ public class HudShaderManager {
         return programs.computeIfAbsent(vertexShaderLocation, k -> {
             try {
                 HudShaderProgram program = createProgram(vertexShaderLocation, fragmentShaderLocation);
+                // Query the number of active uniform blocks to sanity-check
+                int numBlocks = glGetProgrami(program.getProgramId(), GL_ACTIVE_UNIFORM_BLOCKS);
+                MusicHud.LOGGER.debug("Shader program {} has {} active uniform blocks",
+                        program.getProgramId(), numBlocks);
+
                 for (Map.Entry<String, Integer> entry : uniformBlockBindingPoints.entrySet()) {
                     int index = glGetUniformBlockIndex(program.getProgramId(), entry.getKey());
                     if (index != GL_INVALID_INDEX) {
                         glUniformBlockBinding(program.getProgramId(), index, entry.getValue());
                         program.setUniformBlockBindingPoint(entry.getKey(), entry.getValue());
+                        MusicHud.LOGGER.debug("  Bound '{}' (index={}) to bp {}",
+                                entry.getKey(), index, entry.getValue());
+                    } else {
+                        MusicHud.LOGGER.warn("  Uniform block '{}' NOT FOUND in program {} (vs={}), data will NOT be uploaded",
+                                entry.getKey(), program.getProgramId(), vertexShaderLocation);
                     }
                 }
                 // Cache uniform locations for built-in matrices (plain uniforms from moj_import)
                 program.cacheUniformLocation("ModelViewMat");
                 program.cacheUniformLocation("ProjMat");
+                // Cache sampler uniform locations for manual texture binding
+                program.cacheSamplerLocation("Sampler0");
+                program.cacheSamplerLocation("Sampler1");
+                MusicHud.LOGGER.debug("Created shader program {} for {}", program.getProgramId(), vertexShaderLocation);
                 return program;
             } catch (Exception e) {
                 MusicHud.LOGGER.error("Failed to create shader program for {}", vertexShaderLocation, e);
@@ -53,6 +67,9 @@ public class HudShaderManager {
         if (programId <= 0) {
             throw new IllegalStateException("Failed to create program");
         }
+
+        // Drain any stale GL errors before we begin
+        while (glGetError() != GL_NO_ERROR);
 
         String vertexSource = readShaderSourceWithImports(vertexLocation);
         String fragmentSource = readShaderSourceWithImports(fragmentLocation);
@@ -78,6 +95,14 @@ public class HudShaderManager {
         glDetachShader(programId, fs);
         glDeleteShader(vs);
         glDeleteShader(fs);
+
+        // Drain any GL errors from shader compilation/linking
+        // so they don't pollute subsequent rendering error checks
+        int err;
+        while ((err = glGetError()) != GL_NO_ERROR) {
+            MusicHud.LOGGER.debug("Drained stale GL error 0x{} after creating program {}",
+                    Integer.toHexString(err), programId);
+        }
 
         return new HudShaderProgram(programId);
     }
