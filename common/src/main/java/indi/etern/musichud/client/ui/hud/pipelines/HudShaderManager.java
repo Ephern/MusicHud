@@ -56,8 +56,7 @@ public class HudShaderManager {
                 program.cacheUniformLocation("u_MVP");
                 program.cacheUniformLocation("ModelViewMat");
                 program.cacheUniformLocation("ProjMat");
-                // Log the actual locations found
-                MusicHud.LOGGER.info("[SHADER DEBUG] program={} u_MVP={} ModelViewMat={} ProjMat={}",
+                MusicHud.LOGGER.debug("Program {}: u_MVP={} ModelViewMat={} ProjMat={}",
                         program.getProgramId(),
                         program.getUniformLocation("u_MVP"),
                         program.getUniformLocation("ModelViewMat"),

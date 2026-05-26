@@ -34,13 +34,17 @@ public class Std140BufferWriter {
     }
 
     // std140: mat4 = 4 * vec4 = 64 bytes, aligned to 16
-    // Uses manual float writes to avoid JOML's get(ByteBuffer) being stripped by transformers
+    // Writes in column-major order as GLSL expects
     public Std140BufferWriter putMat4f(Matrix4f mat) {
         align(16);
-        buffer.putFloat(mat.m00()).putFloat(mat.m01()).putFloat(mat.m02()).putFloat(mat.m03());
-        buffer.putFloat(mat.m10()).putFloat(mat.m11()).putFloat(mat.m12()).putFloat(mat.m13());
-        buffer.putFloat(mat.m20()).putFloat(mat.m21()).putFloat(mat.m22()).putFloat(mat.m23());
-        buffer.putFloat(mat.m30()).putFloat(mat.m31()).putFloat(mat.m32()).putFloat(mat.m33());
+        // Column 0
+        buffer.putFloat(mat.m00()).putFloat(mat.m10()).putFloat(mat.m20()).putFloat(mat.m30());
+        // Column 1
+        buffer.putFloat(mat.m01()).putFloat(mat.m11()).putFloat(mat.m21()).putFloat(mat.m31());
+        // Column 2
+        buffer.putFloat(mat.m02()).putFloat(mat.m12()).putFloat(mat.m22()).putFloat(mat.m32());
+        // Column 3
+        buffer.putFloat(mat.m03()).putFloat(mat.m13()).putFloat(mat.m23()).putFloat(mat.m33());
         return this;
     }
 

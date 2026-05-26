@@ -11,11 +11,10 @@ public class HudRenderPipelines {
     // binding 4: MHDynamicStatus
     // Note: ProjMat and ModelViewMat are plain uniforms from moj_import (not UBOs in 1.21.1)
 
-    // STEP: test MHBasePosition UBO only
     public static final HudShaderProgram BACKGROUND = HudShaderManager.getOrCreate(
             MusicHud.location("shaders/core/background.vsh"),
             MusicHud.location("shaders/core/background.fsh"),
-            Map.of("MHBasePosition", 2)
+            Map.of("MHBasePosition", 2, "MHNowPlayingThemeColor", 3, "MHDynamicStatus", 4)
     );
 
     public static final HudShaderProgram ROUNDED_ALBUM = HudShaderManager.getOrCreate(

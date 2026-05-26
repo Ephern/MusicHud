@@ -13,7 +13,6 @@ out vec2 f_Position;
 
 void main() {
     f_Position = Position.xy;
-//    vec4 localPos = u_Translation * vec4(Position, 1.0);
-//    gl_Position = u_MVP * vec4(localPos.xy, Position.z, 1.0);
-    gl_Position = u_MVP * vec4(Position, 1.0);
+    vec4 localPos = u_Translation * vec4(Position, 1.0);
+    gl_Position = u_MVP * vec4(localPos.xy, Position.z, 1.0);
 }

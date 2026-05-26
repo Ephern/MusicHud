@@ -1,7 +1,7 @@
 #version 150
 
-#moj_import <minecraft:dynamictransforms.glsl>
-#moj_import <minecraft:projection.glsl>
+uniform mat4 ProjMat;
+uniform mat4 ModelViewMat;
 
 layout(std140) uniform MHAlbumPosition {
     mat4 u_Translation;

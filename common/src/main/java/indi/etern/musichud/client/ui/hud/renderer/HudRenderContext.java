@@ -125,9 +125,6 @@ public class HudRenderContext {
     }
 
     private void setBuiltinUniforms(HudShaderProgram program) {
-        // Compute MVP = ProjMat * ModelViewMat on the Java side
-        // ModelView must translate z into ProjMat's depth range
-        // OpenGL camera looks along -Z; ortho(n=1000,f=21000) expects z in [-21000,-1000]
         Matrix4f proj = new Matrix4f(RenderSystem.getProjectionMatrix());
         Matrix4f mv = new Matrix4f().translate(guiWidth() / 2f, guiHeight() / 2f, -2000);
         Matrix4f mvp = new Matrix4f(proj).mul(mv);
@@ -142,14 +139,7 @@ public class HudRenderContext {
         if (mvpLoc >= 0) {
             float[] buf = new float[16];
             mvp.get(buf);
-            MusicHud.LOGGER.info("[MVP DEBUG] row0=[{} {} {} {}] row1=[{} {} {} {}] row2=[{} {} {} {}] row3=[{} {} {} {}]",
-                    buf[0], buf[1], buf[2], buf[3],
-                    buf[4], buf[5], buf[6], buf[7],
-                    buf[8], buf[9], buf[10], buf[11],
-                    buf[12], buf[13], buf[14], buf[15]);
             glUniformMatrix4fv(mvpLoc, false, buf);
-            int err = glGetError();
-            if (err != GL_NO_ERROR) MusicHud.LOGGER.error("[MVP DEBUG] glUniformMatrix4fv error 0x{}", Integer.toHexString(err));
         } else {
             int projLoc = program.getUniformLocation("ProjMat");
             if (projLoc >= 0) {
@@ -176,22 +166,6 @@ public class HudRenderContext {
 
         ByteBuffer buffer = ByteBuffer.allocateDirect(uboSize).order(ByteOrder.nativeOrder());
         uniform.write(buffer);
-        int posAfterWrite = buffer.position();
-        if (posAfterWrite != uboSize) {
-            MusicHud.LOGGER.error("[UBO WRITE] {} write incomplete: pos={} expected={}",
-                    uboName, posAfterWrite, uboSize);
-        }
-
-        // Defense: if write() didn't advance position (known issue with some
-        // uniform types using putVec4(Vector4f) due to class mismatch), fill manually
-        if (buffer.position() == 0 && uboSize > 0) {
-            MusicHud.LOGGER.warn("uniform.write() did not advance buffer for {} (size={}), using fallback",
-                    uboName, uboSize);
-            // Fill with placeholder data so the shader receives valid-sized buffer
-            while (buffer.position() < uboSize) {
-                buffer.putFloat(1.0f);
-            }
-        }
         buffer.flip();
 
         HudShaderProgram.UniformBufferHandle handle = uboHandles.computeIfAbsent(cacheKey,
