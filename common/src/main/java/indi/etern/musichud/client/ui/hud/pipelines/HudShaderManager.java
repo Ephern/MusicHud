@@ -20,14 +20,19 @@ import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL31.*;
 
 public class HudShaderManager {
-    private static final Map<ResourceLocation, HudShaderProgram> programs = new HashMap<>();
+    private static final Map<String, HudShaderProgram> programs = new HashMap<>();
+
+    private static String cacheKey(ResourceLocation vs, ResourceLocation fs) {
+        return vs + "|" + fs;
+    }
     private static final Pattern MOJ_IMPORT = Pattern.compile("#moj_import\\s+<([^>]+)>");
 
     public static HudShaderProgram getOrCreate(
             ResourceLocation vertexShaderLocation,
             ResourceLocation fragmentShaderLocation,
             Map<String, Integer> uniformBlockBindingPoints) {
-        return programs.computeIfAbsent(vertexShaderLocation, k -> {
+        String key = cacheKey(vertexShaderLocation, fragmentShaderLocation);
+        return programs.computeIfAbsent(key, k -> {
             try {
                 HudShaderProgram program = createProgram(vertexShaderLocation, fragmentShaderLocation);
                 // Query the number of active uniform blocks to sanity-check
@@ -47,9 +52,16 @@ public class HudShaderManager {
                                 entry.getKey(), program.getProgramId(), vertexShaderLocation);
                     }
                 }
-                // Cache uniform locations for built-in matrices (plain uniforms from moj_import)
+                // Cache uniform locations for built-in matrices (plain uniforms)
+                program.cacheUniformLocation("u_MVP");
                 program.cacheUniformLocation("ModelViewMat");
                 program.cacheUniformLocation("ProjMat");
+                // Log the actual locations found
+                MusicHud.LOGGER.info("[SHADER DEBUG] program={} u_MVP={} ModelViewMat={} ProjMat={}",
+                        program.getProgramId(),
+                        program.getUniformLocation("u_MVP"),
+                        program.getUniformLocation("ModelViewMat"),
+                        program.getUniformLocation("ProjMat"));
                 // Cache sampler uniform locations for manual texture binding
                 program.cacheSamplerLocation("Sampler0");
                 program.cacheSamplerLocation("Sampler1");

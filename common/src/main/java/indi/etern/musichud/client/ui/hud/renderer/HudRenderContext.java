@@ -125,22 +125,44 @@ public class HudRenderContext {
     }
 
     private void setBuiltinUniforms(HudShaderProgram program) {
-        int projLoc = program.getUniformLocation("ProjMat");
-        if (projLoc >= 0) {
-            float[] projBuf = new float[16];
-            RenderSystem.getProjectionMatrix().get(projBuf);
-            glUniformMatrix4fv(projLoc, false, projBuf);
-        }
-        int mvLoc = program.getUniformLocation("ModelViewMat");
-        if (mvLoc >= 0) {
-            // Compute ModelView that converts screen-center-relative coords
-            // (used by u_Translation UBO) to absolute screen coordinates
-            // [0..guiWidth] that MC's orthographic projection expects.
-            Matrix4f mv = new Matrix4f();
-            mv.translate(guiWidth() / 2f, guiHeight() / 2f, 0);
-            float[] mvBuf = new float[16];
-            mv.get(mvBuf);
-            glUniformMatrix4fv(mvLoc, false, mvBuf);
+        // Compute MVP = ProjMat * ModelViewMat on the Java side
+        // ModelView must translate z into ProjMat's depth range
+        // OpenGL camera looks along -Z; ortho(n=1000,f=21000) expects z in [-21000,-1000]
+        Matrix4f proj = new Matrix4f(RenderSystem.getProjectionMatrix());
+        Matrix4f mv = new Matrix4f().translate(guiWidth() / 2f, guiHeight() / 2f, -2000);
+        Matrix4f mvp = new Matrix4f(proj).mul(mv);
+
+        int mvpLoc = program.getUniformLocation("u_MVP");
+        MusicHud.LOGGER.info("[UNIFORM DEBUG] pid={} mvpLoc={} projLoc={} mvLoc={} guiSize=({},{})",
+                program.getProgramId(), mvpLoc,
+                program.getUniformLocation("ProjMat"),
+                program.getUniformLocation("ModelViewMat"),
+                guiWidth(), guiHeight());
+
+        if (mvpLoc >= 0) {
+            float[] buf = new float[16];
+            mvp.get(buf);
+            MusicHud.LOGGER.info("[MVP DEBUG] row0=[{} {} {} {}] row1=[{} {} {} {}] row2=[{} {} {} {}] row3=[{} {} {} {}]",
+                    buf[0], buf[1], buf[2], buf[3],
+                    buf[4], buf[5], buf[6], buf[7],
+                    buf[8], buf[9], buf[10], buf[11],
+                    buf[12], buf[13], buf[14], buf[15]);
+            glUniformMatrix4fv(mvpLoc, false, buf);
+            int err = glGetError();
+            if (err != GL_NO_ERROR) MusicHud.LOGGER.error("[MVP DEBUG] glUniformMatrix4fv error 0x{}", Integer.toHexString(err));
+        } else {
+            int projLoc = program.getUniformLocation("ProjMat");
+            if (projLoc >= 0) {
+                float[] projBuf = new float[16];
+                proj.get(projBuf);
+                glUniformMatrix4fv(projLoc, false, projBuf);
+            }
+            int mvLoc = program.getUniformLocation("ModelViewMat");
+            if (mvLoc >= 0) {
+                float[] mvBuf = new float[16];
+                mv.get(mvBuf);
+                glUniformMatrix4fv(mvLoc, false, mvBuf);
+            }
         }
     }
 
