@@ -2,6 +2,7 @@ package indi.etern.musichud.platform.plugin.paper.event;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.IServerEventService;
+import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.server.level.ServerPlayer;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.craftbukkit.entity.CraftPlayer;
@@ -10,15 +11,15 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 
-import java.util.List;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 public final class PaperEventService implements IServerEventService, Listener {
     private static volatile PaperEventService instance;
     private final Logger logger = MusicHud.getLogger(PaperEventService.class);
-    private final List<Consumer<ServerPlayer>> commonPlayerQuitListeners = new CopyOnWriteArrayList<>();
-    private final List<Runnable> serverLifecycleStoppingListeners = new CopyOnWriteArrayList<>();
+    private final Set<Consumer<ServerPlayer>> disconnectListeners = new HashSet<>();
+    private final Set<Runnable> stoppingListeners = new HashSet<>();
     private JavaPlugin plugin;
 
     private PaperEventService() {
@@ -44,34 +45,28 @@ public final class PaperEventService implements IServerEventService, Listener {
     }
 
     @Override
-    public void registerCommonPlayerQuit(Consumer<ServerPlayer> listener) {
-        commonPlayerQuitListeners.add(listener);
+    public Unregister registerCommonPlayerQuit(Consumer<ServerPlayer> listener) {
+        disconnectListeners.add(listener);
+        return () -> {
+            disconnectListeners.remove(listener);
+        };
     }
 
     @Override
-    public void registerServerLifecycleStopping(Runnable listener) {
-        serverLifecycleStoppingListeners.add(listener);
+    public Unregister registerServerLifecycleStopping(Runnable listener) {
+        stoppingListeners.add(listener);
+        return () -> {
+            stoppingListeners.remove(listener);
+        };
     }
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
         ServerPlayer serverPlayer = ((CraftPlayer) event.getPlayer()).getHandle();
-        for (Consumer<ServerPlayer> listener : commonPlayerQuitListeners) {
-            runSafely(() -> listener.accept(serverPlayer), "common player quit");
-        }
+        disconnectListeners.forEach(d -> d.accept(serverPlayer));
     }
 
     public void fireServerStopping() {
-        for (Runnable listener : serverLifecycleStoppingListeners) {
-            runSafely(listener, "server stopping");
-        }
-    }
-
-    private void runSafely(Runnable runnable, String phase) {
-        try {
-            runnable.run();
-        } catch (RuntimeException e) {
-            logger.error("Failed to run Paper event listener during {}", phase, e);
-        }
+        stoppingListeners.forEach(Runnable::run);
     }
 }

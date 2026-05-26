@@ -116,7 +116,7 @@ public class LoginService {
 
     public void logout() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
-        setDisconnected();
+        Profile.setCurrent(Profile.ANONYMOUS);
     }
 
     public void setDisconnected() {

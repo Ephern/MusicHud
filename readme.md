@@ -3,7 +3,7 @@
 ![Static Badge](https://img.shields.io/badge/License-LGPLv3-brightgreen?style=for-the-badge)
 
 ![Banner](https://cdn.modrinth.com/data/7Rnb6oJr/images/0ec5142f5e4ea723ce955e2aa3774be6df349270.png)
-![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/5e716f6b0c4a3c5c710e3fc4598aefdf51feee5b.png)
+![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/b1ab5a9d276489d9f2ef4ecce3fd318e58290553.png)
 
 #### A GUI-based Full Server Song Request Mod / Plugin
 
