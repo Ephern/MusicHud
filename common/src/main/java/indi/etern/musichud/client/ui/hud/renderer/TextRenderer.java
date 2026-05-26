@@ -11,7 +11,7 @@ import net.minecraft.network.chat.Style;
 
 @Getter
 @Setter
-public class TextRenderer implements HudRenderer{
+public class TextRenderer implements HudRenderer {
     private ModernStringSplitter modernStringSplitter = null;
     private TextStyle currentTextData;
     private Layout layout;
@@ -122,13 +122,14 @@ public class TextRenderer implements HudRenderer{
         if (!isTransitioning || nextTextData == null) {
             renderText(context, currentTextData, absolutePosition, scale, 1.0f);
         } else {
-            // 渲染淡出的旧文本
+            // Use drawManaged to force flush between old and new text
+            // Render old text (fading out)
             float oldAlpha = 1.0f - transitionProgress;
             if (oldAlpha > 0) {
                 renderText(context, currentTextData, absolutePosition, scale, oldAlpha);
             }
 
-            // 渲染淡入的新文本
+            // Render new text (fading in)
             float newAlpha = transitionProgress;
             if (newAlpha > 0) {
                 renderText(context, nextTextData, absolutePosition, scale, newAlpha);
@@ -145,7 +146,7 @@ public class TextRenderer implements HudRenderer{
         if (trimmedText.isEmpty()) return;
 
         // 计算带透明度的颜色
-        int color = getColorWithAlpha(textData.baseColor, alpha);
+        int color = getColorWithAlpha(baseColor, alpha);
 
         // 计算位置
         float x = position.computeX(absolutePosition.x(), scale, trimmedText, this::measureWidth);
@@ -160,8 +161,8 @@ public class TextRenderer implements HudRenderer{
     private int getColorWithAlpha(int baseColor, float alpha) {
         float a = ((baseColor >> 24) & 0xff) / 255.0f;
         int alphaValue = (int) (a * alpha * 255);
-        // 确保 alpha 值在 0-255 范围内
-        alphaValue = Math.clamp(alphaValue, 0, 255);
+        // 确保 alpha 值在 4-255 范围内（MC 把较低 alpha 视为不透明）
+        alphaValue = Math.clamp(alphaValue, 4, 255);
         // 将 Alpha 通道合并到颜色中 (ARGB 格式)
         return (alphaValue << 24) | (baseColor & 0x00FFFFFF);
     }
@@ -172,42 +173,6 @@ public class TextRenderer implements HudRenderer{
         } else {
             return measureWidth(currentTextData.text) * (layout.getHeight() / Minecraft.getInstance().font.lineHeight);
         }
-    }
-
-    public enum Position {
-        LEFT {
-            @Override
-            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
-                return startX;
-            }
-        }, CENTER {
-            @Override
-            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
-                return startX - 0.5f * widthFn.measure(text) * scale;
-            }
-        }, RIGHT {
-            @Override
-            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
-                return startX - widthFn.measure(text) * scale;
-            }
-        };
-
-        abstract float computeX(float startX, float scale, String text, WidthFunction widthFn);
-    }
-
-    public static class TextStyle {
-        public String text;
-        public final int baseColor;
-
-        public TextStyle(String text, int baseColor) {
-            this.text = text;
-            this.baseColor = baseColor;
-        }
-    }
-
-    @FunctionalInterface
-    private interface WidthFunction {
-        float measure(String text);
     }
 
     private ModernStringSplitter tryGetSplitter() {
@@ -268,5 +233,41 @@ public class TextRenderer implements HudRenderer{
             return splitter.measureText(text);
         }
         return Minecraft.getInstance().font.width(text);
+    }
+
+    public enum Position {
+        LEFT {
+            @Override
+            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
+                return startX;
+            }
+        }, CENTER {
+            @Override
+            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
+                return startX - 0.5f * widthFn.measure(text) * scale;
+            }
+        }, RIGHT {
+            @Override
+            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
+                return startX - widthFn.measure(text) * scale;
+            }
+        };
+
+        abstract float computeX(float startX, float scale, String text, WidthFunction widthFn);
+    }
+
+    @FunctionalInterface
+    private interface WidthFunction {
+        float measure(String text);
+    }
+
+    public static class TextStyle {
+        public final int baseColor;
+        public String text;
+
+        public TextStyle(String text, int baseColor) {
+            this.text = text;
+            this.baseColor = baseColor;
+        }
     }
 }
