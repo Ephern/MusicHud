@@ -1,26 +1,24 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
-import org.lwjgl.BufferUtils;
+import lombok.Getter;
 
 import java.nio.ByteBuffer;
 import java.util.HashMap;
 import java.util.Map;
 
 import static org.lwjgl.opengl.GL15.*;
-import static org.lwjgl.opengl.GL20.*;
-import static org.lwjgl.opengl.GL31.*;
+import static org.lwjgl.opengl.GL20.glGetUniformLocation;
+import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
+import static org.lwjgl.opengl.GL31.glBindBufferRange;
 
 public class HudShaderProgram {
+    @Getter
     private final int programId;
     private final Map<String, Integer> uniformBlockBindingPoints = new HashMap<>();
     private final Map<String, Integer> uniformLocations = new HashMap<>();
 
     public HudShaderProgram(int programId) {
         this.programId = programId;
-    }
-
-    public int getProgramId() {
-        return programId;
     }
 
     public void cacheUniformLocation(String name) {

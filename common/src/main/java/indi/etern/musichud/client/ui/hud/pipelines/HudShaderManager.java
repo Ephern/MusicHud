@@ -36,38 +36,40 @@ public class HudShaderManager {
             try {
                 HudShaderProgram program = createProgram(vertexShaderLocation, fragmentShaderLocation);
                 // Query the number of active uniform blocks to sanity-check
-                int numBlocks = glGetProgrami(program.getProgramId(), GL_ACTIVE_UNIFORM_BLOCKS);
-                MusicHud.LOGGER.info("Shader program {} has {} active uniform blocks",
-                        program.getProgramId(), numBlocks);
+//                int numBlocks = glGetProgrami(program.getProgramId(), GL_ACTIVE_UNIFORM_BLOCKS);
+//                MusicHud.LOGGER.info("Shader program {} has {} active uniform blocks",
+//                        program.getProgramId(), numBlocks);
 
                 for (Map.Entry<String, Integer> entry : uniformBlockBindingPoints.entrySet()) {
                     int index = glGetUniformBlockIndex(program.getProgramId(), entry.getKey());
                     if (index != GL_INVALID_INDEX) {
                         glUniformBlockBinding(program.getProgramId(), index, entry.getValue());
                         program.setUniformBlockBindingPoint(entry.getKey(), entry.getValue());
-                        MusicHud.LOGGER.info("  Bound '{}' (index={}) to bp {}",
-                                entry.getKey(), index, entry.getValue());
-                    } else {
+//                        MusicHud.LOGGER.info("  Bound '{}' (index={}) to bp {}",
+//                                entry.getKey(), index, entry.getValue());
+                    }/* else {
                         MusicHud.LOGGER.warn("  Uniform block '{}' NOT FOUND in program {} (vs={}), data will NOT be uploaded",
                                 entry.getKey(), program.getProgramId(), vertexShaderLocation);
-                    }
+                    }*/
                 }
                 // Cache uniform locations for built-in matrices (plain uniforms)
                 program.cacheUniformLocation("u_MVP");
                 program.cacheUniformLocation("ModelViewMat");
                 program.cacheUniformLocation("ProjMat");
+/*
                 MusicHud.LOGGER.debug("Program {}: u_MVP={} ModelViewMat={} ProjMat={}",
                         program.getProgramId(),
                         program.getUniformLocation("u_MVP"),
                         program.getUniformLocation("ModelViewMat"),
                         program.getUniformLocation("ProjMat"));
+*/
                 // Cache sampler uniform locations for manual texture binding
                 program.cacheSamplerLocation("Sampler0");
                 program.cacheSamplerLocation("Sampler1");
-                MusicHud.LOGGER.info("Created shader program {} for {}", program.getProgramId(), vertexShaderLocation);
+//                MusicHud.LOGGER.info("Created shader program {} for {}", program.getProgramId(), vertexShaderLocation);
                 return program;
             } catch (Exception e) {
-                MusicHud.LOGGER.info("Failed to create shader program for {}", vertexShaderLocation, e);
+//                MusicHud.LOGGER.info("Failed to create shader program for {}", vertexShaderLocation, e);
                 return new HudShaderProgram(0); // invalid program, fallback rendering will be used
             }
         });
@@ -111,7 +113,7 @@ public class HudShaderManager {
         // so they don't pollute subsequent rendering error checks
         int err;
         while ((err = glGetError()) != GL_NO_ERROR) {
-            MusicHud.LOGGER.info("Drained stale GL error 0x{} after creating program {}",
+            MusicHud.LOGGER.error("Drained stale GL error 0x{} after creating program {}",
                     Integer.toHexString(err), programId);
         }
 

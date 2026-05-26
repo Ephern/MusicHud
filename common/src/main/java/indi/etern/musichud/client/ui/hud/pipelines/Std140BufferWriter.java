@@ -1,11 +1,13 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
+import lombok.Getter;
 import org.joml.Matrix4f;
 import org.joml.Vector4f;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+@Getter
 public class Std140BufferWriter {
     private final ByteBuffer buffer;
 
@@ -19,10 +21,6 @@ public class Std140BufferWriter {
 
     public static Std140BufferWriter allocate(int capacity) {
         return new Std140BufferWriter(ByteBuffer.allocate(capacity).order(ByteOrder.nativeOrder()));
-    }
-
-    public ByteBuffer getBuffer() {
-        return buffer;
     }
 
     public int position() {
