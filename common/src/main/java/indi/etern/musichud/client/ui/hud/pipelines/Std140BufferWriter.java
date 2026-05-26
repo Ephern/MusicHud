@@ -34,9 +34,13 @@ public class Std140BufferWriter {
     }
 
     // std140: mat4 = 4 * vec4 = 64 bytes, aligned to 16
+    // Uses manual float writes to avoid JOML's get(ByteBuffer) being stripped by transformers
     public Std140BufferWriter putMat4f(Matrix4f mat) {
         align(16);
-        mat.get(buffer);
+        buffer.putFloat(mat.m00()).putFloat(mat.m01()).putFloat(mat.m02()).putFloat(mat.m03());
+        buffer.putFloat(mat.m10()).putFloat(mat.m11()).putFloat(mat.m12()).putFloat(mat.m13());
+        buffer.putFloat(mat.m20()).putFloat(mat.m21()).putFloat(mat.m22()).putFloat(mat.m23());
+        buffer.putFloat(mat.m30()).putFloat(mat.m31()).putFloat(mat.m32()).putFloat(mat.m33());
         return this;
     }
 
@@ -73,6 +77,12 @@ public class Std140BufferWriter {
     public Std140BufferWriter putVec4(float x, float y, float z, float w) {
         align(16);
         buffer.putFloat(x).putFloat(y).putFloat(z).putFloat(w);
+        return this;
+    }
+
+    public Std140BufferWriter putVec4(Vector4f vec) {
+        align(16);
+        buffer.putFloat(vec.x()).putFloat(vec.y()).putFloat(vec.z()).putFloat(vec.w());
         return this;
     }
 

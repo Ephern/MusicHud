@@ -176,6 +176,11 @@ public class HudRenderContext {
 
         ByteBuffer buffer = ByteBuffer.allocateDirect(uboSize).order(ByteOrder.nativeOrder());
         uniform.write(buffer);
+        int posAfterWrite = buffer.position();
+        if (posAfterWrite != uboSize) {
+            MusicHud.LOGGER.error("[UBO WRITE] {} write incomplete: pos={} expected={}",
+                    uboName, posAfterWrite, uboSize);
+        }
 
         // Defense: if write() didn't advance position (known issue with some
         // uniform types using putVec4(Vector4f) due to class mismatch), fill manually
