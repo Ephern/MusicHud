@@ -59,10 +59,9 @@ public class Layout implements HudUniform {
 
     @Override
     public void write(Std140BufferWriter builder) {
-        Matrix3x2f localMatrix = new Matrix3x2f();
         Layout.AbsolutePosition absolutePosition = calcAbsoluteCenterPosition(HudRenderContext.getCurrent());
-        localMatrix.translate(absolutePosition.x(), absolutePosition.y());
-        builder.putMat4f(new Matrix4f().mul(localMatrix)).putVec3(width / 2, height / 2, radius);
+        Matrix4f mat = new Matrix4f().translate(absolutePosition.x(), absolutePosition.y(), 0);
+        builder.putMat4f(mat).putVec3(width / 2, height / 2, radius);
         if (dirty) {
             dirty = false;
         }

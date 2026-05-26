@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
@@ -67,9 +68,23 @@ public class HudRenderContext {
         glGetIntegerv(GL_CURRENT_PROGRAM, savedProgram);
         int[] savedActiveTexture = new int[1];
         glGetIntegerv(GL_ACTIVE_TEXTURE, savedActiveTexture);
+        boolean depthEnabled = glIsEnabled(GL_DEPTH_TEST);
+        boolean blendEnabled = glIsEnabled(GL_BLEND);
+        // Save blend func in case MC text rendering expects a different one
+        int[] savedBlendSrcRgb = new int[1], savedBlendDstRgb = new int[1];
+        int[] savedBlendSrcAlpha = new int[1], savedBlendDstAlpha = new int[1];
+        if (blendEnabled) {
+            glGetIntegerv(GL_BLEND_SRC_RGB, savedBlendSrcRgb);
+            glGetIntegerv(GL_BLEND_DST_RGB, savedBlendDstRgb);
+            glGetIntegerv(GL_BLEND_SRC_ALPHA, savedBlendSrcAlpha);
+            glGetIntegerv(GL_BLEND_DST_ALPHA, savedBlendDstAlpha);
+        }
 
         try {
             glUseProgram(program.getProgramId());
+            if (depthEnabled) glDisable(GL_DEPTH_TEST);
+            if (!blendEnabled) glEnable(GL_BLEND);
+            GlStateManager._blendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
             checkGLError("glUseProgram");
 
             setBuiltinUniforms(program);
@@ -98,16 +113,22 @@ public class HudRenderContext {
             }
             checkGLError("textures");
 
-            RenderSystem.enableBlend();
-            RenderSystem.defaultBlendFunc();
-
             drawQuad(hudRenderState.pose(), hudRenderState.width(), hudRenderState.height());
             checkGLError("drawQuad");
         } finally {
             // Restore MC's GL state so subsequent MC-native rendering
-            // (text, blit via GuiGraphics) uses the correct shader/texture context
+            // (text, blit via GuiGraphics) uses the correct context
             glUseProgram(savedProgram[0]);
             glActiveTexture(savedActiveTexture[0]);
+            // Restore blend func that MC text rendering expects
+            if (blendEnabled) {
+                GlStateManager._blendFuncSeparate(
+                        savedBlendSrcRgb[0], savedBlendDstRgb[0],
+                        savedBlendSrcAlpha[0], savedBlendDstAlpha[0]);
+            } else {
+                glDisable(GL_BLEND);
+            }
+            if (depthEnabled) glEnable(GL_DEPTH_TEST);
             // Drain any remaining GL errors so they don't appear as MC errors
             while (glGetError() != GL_NO_ERROR);
         }
@@ -126,15 +147,19 @@ public class HudRenderContext {
 
     private void setBuiltinUniforms(HudShaderProgram program) {
         Matrix4f proj = new Matrix4f(RenderSystem.getProjectionMatrix());
-        Matrix4f mv = new Matrix4f().translate(guiWidth() / 2f, guiHeight() / 2f, -2000);
+        // z=-2000 puts vertices into ortho(n=1000,f=21000) depth range
+        // No XY translation — Layout already uses absolute screen coordinates
+        Matrix4f mv = new Matrix4f().translate(0, 0, -1000);
         Matrix4f mvp = new Matrix4f(proj).mul(mv);
 
         int mvpLoc = program.getUniformLocation("u_MVP");
+/*
         MusicHud.LOGGER.info("[UNIFORM DEBUG] pid={} mvpLoc={} projLoc={} mvLoc={} guiSize=({},{})",
                 program.getProgramId(), mvpLoc,
                 program.getUniformLocation("ProjMat"),
                 program.getUniformLocation("ModelViewMat"),
                 guiWidth(), guiHeight());
+*/
 
         if (mvpLoc >= 0) {
             float[] buf = new float[16];
@@ -166,6 +191,12 @@ public class HudRenderContext {
 
         ByteBuffer buffer = ByteBuffer.allocateDirect(uboSize).order(ByteOrder.nativeOrder());
         uniform.write(buffer);
+        int pos = buffer.position();
+        // Use absolute get to peek at buffer data without changing position
+//        float f0 = pos > 0 ? buffer.getFloat(0) : Float.NaN;
+//        float f12 = pos > 48 ? buffer.getFloat(48) : Float.NaN;
+//        float f13 = pos > 52 ? buffer.getFloat(52) : Float.NaN;
+//        MusicHud.LOGGER.info("[UBO DATA] {} sz={} wr={} col0_a={} tx_b48={} ty_b52={}", uboName, uboSize, pos, f0, f12, f13);
         buffer.flip();
 
         HudShaderProgram.UniformBufferHandle handle = uboHandles.computeIfAbsent(cacheKey,
@@ -258,29 +289,26 @@ public class HudRenderContext {
         graphics.blit(resourceLocation, x, y, width, height, u0, v0, uWidth, vHeight, texWidth, texHeight);
     }
 
-    /** Legacy 12-int blit (texel coords) — converts to 1.21.1 UV-based blit. */
+    /** Legacy 12-int blit (texel coords) — passes raw texels, GuiGraphics does UV conversion internally */
     public void blit(ResourceLocation resourceLocation,
                      int targetX, int targetY,
                      int sourceX, int sourceY,
                      int targetWidth, int targetHeight,
                      int sourceWidth, int sourceHeight,
                      int textureWidth, int textureHeight) {
-        float u0 = (float)sourceX / textureWidth;
-        float v0 = (float)sourceY / textureHeight;
+        // Pass raw texel coords — GuiGraphics.blit converts to UV via (texel/texSize)
         graphics.blit(resourceLocation, targetX, targetY, targetWidth, targetHeight,
-                u0, v0, sourceWidth, sourceHeight, textureWidth, textureHeight);
+                (float)sourceX, (float)sourceY, sourceWidth, sourceHeight, textureWidth, textureHeight);
     }
 
-    /** Legacy 8-int blit (target=source size) — converts to UV-based. */
+    /** Legacy 8-int blit (target=source size) — passes raw texels */
     public void blit(ResourceLocation resourceLocation,
                      int targetX, int targetY,
                      int sourceX, int sourceY,
                      int targetWidth, int targetHeight,
                      int sourceWidth, int sourceHeight) {
-        float u0 = (float)sourceX / sourceWidth;
-        float v0 = (float)sourceY / sourceHeight;
         graphics.blit(resourceLocation, targetX, targetY, targetWidth, targetHeight,
-                u0, v0, sourceWidth, sourceHeight, sourceWidth, sourceHeight);
+                (float)sourceX, (float)sourceY, sourceWidth, sourceHeight, sourceWidth, sourceHeight);
     }
 
     public int guiWidth() {
