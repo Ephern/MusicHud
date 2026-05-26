@@ -105,27 +105,43 @@ The `architectury_enabled_platforms` property in `gradle.properties` only lists 
 ### Files modified (rendering core)
 | File | Changes |
 |---|---|
-| `HudRenderContext.java` | Rewrote to call `glUseProgram` + upload UBOs + `BufferUploader.draw()` (MC-native vertex upload/draw, no shader interference). `currentPose()` strips translation (element position from UBO). `blit()` signatures match 1.21.1 `GuiGraphics` API. `Transforming` class uses `PoseStack` (not `Matrix3x2fStack`). |
+| `HudRenderContext.java` | Rewrote to call `glUseProgram` + upload UBOs + `BufferUploader.draw()` (MC-native vertex upload/draw, no shader interference). `currentPose()` strips translation (element position from UBO). `blit()` signatures match 1.21.1 `GuiGraphics` API — passes raw texels (not UV fractions, since GuiGraphics divides internally). `Transforming` class uses `PoseStack` (not `Matrix3x2fStack`). `setBuiltinUniforms()` sets `ProjMat`+`ModelViewMat` (z=-1000). Saves/restores GL state (program, texture, blend func, depth test) to prevent leakage into MC rendering. |
 | `HudRenderState.java` | Removed `implements GuiElementRenderState`. `RenderPipeline` → `HudShaderProgram`. `TextureSetup` → `Integer[]` (raw texture IDs). |
 | `ProgressBarRenderState.java` | Same — removed `GuiElementRenderState`, `TextureSetup`, `RenderPipeline`. |
 | `HudRenderPipelines.java` | `RenderPipeline` fields → `HudShaderProgram` fields via `HudShaderManager.getOrCreate()`. UBO binding points: 2=Position, 3=Theme/Color, 4=DynamicStatus. |
 | `RenderStateUtil.java` | Stub — no-op since rendering is direct, not state-submission-based. |
 | `HudUniform.java` | Removed `extends DynamicUniformStorage.DynamicUniform`. `write(Std140Builder)` → `write(Std140BufferWriter)`. |
-| `Layout.java` / `BackgroundData.java` / `ProgressBarData.java` / `DynamicStatusUniform.java` | Import `Std140BufferWriter` instead of `Std140Builder`/`Std140SizeCalculator`. |
+| `Layout.java` / `BackgroundData.java` / `ProgressBarData.java` / `DynamicStatusUniform.java` | Import `Std140BufferWriter` instead of `Std140Builder`/`Std140SizeCalculator`. Layout now uses `Matrix4f.translate()` directly. BackgroundData/ProgressBarData use `putVec4(float,float,float,float)` to avoid JOML `Vector4f.get(ByteBuffer)`. |
+| `Std140BufferWriter.java` | `putMat4f` uses `mat.get(float[])` → manual `putFloat` to avoid JOML `get(ByteBuffer)` not advancing position. `putVec4(Vector4f)` uses manual `putFloat(vec.x/y/z/w)`. `putVec4(float,float,float,float)` also present. |
+| `HudShaderManager.java` | Shader cache key is `vsh|fsh` (both paths). Resolves `#moj_import` for `dynamictransforms.glsl`/`projection.glsl` via hardcoded strings. Drains stale GL errors after program creation. Logs block binding status. |
+| `HudShaderProgram.java` | `UniformBufferHandle.upload()` uses `glBufferSubData` (not reallocation) + stored `this.size` for binding. |
 | `BackgroundRenderer.java` / `AlbumImageRenderer.java` / `ProgressRenderer.java` | `TextureSetup` removed. Album textures passed as raw GL IDs (`DynamicTexture.getId()`). |
 | `PlayerHeadRenderer.java` / `PlayingStatusRenderer.java` | `RenderPipelines.GUI_TEXTURED` removed — uses legacy `blit()` signatures. |
+| `TextRenderer.java` | Transition flicker fix: don't swap `currentTextData = nextTextData` during active transition. Alpha clamped to [2,255] (MC treats 0/1 as opaque). Uses `textData.baseColor` not renderer's `baseColor`. |
 | `MixinGuiRendererHud.java` | Empty class — mixin removed from `music_hud.mixins.json` (target `GuiRenderer` doesn't exist). |
 | `SoundEngineMixin.java` | `CallbackInfoReturnable<SoundEngine.PlayResult>` → `CallbackInfo` (void return). |
 | `music_hud.mixins.json` | Removed `MixinGuiRendererHud` from client mixins. |
 | `ImageUtils.java` | `NativeImage.getPointer()` → VarHandle-reflected `.pixels` field. `DynamicTexture` constructor fixed. |
-| `ColorExtractor.java` | `NativeImage.getPixel()` → `getPixelRGBA()`. |
+| `ColorExtractor.java` | `NativeImage.getPixel()` → `getPixelRGBA()`. Fixed R/B extraction: 1.21.1 layout is `0xAABBGGRR` (ABGR byte order). |
 | `Version.java` | `RegistryFriendlyByteBuf.readLongArray()` → manual `readLong`/`writeLong` codec. |
 
-### Known issues (in progress)
-1. **No visible rendering** — current `glUseProgram` + UBO + `BufferUploader.draw()` produces no output and no GL errors. Suspected cause: UBO-based shaders (`layout(std140) uniform ...`) conflict with MC 1.21.1's `#version 150` uniform-based pipeline. MC's `ShaderInstance`/`Uniform` classes don't support UBOs — all MC shaders use `#version 150` with independent `uniform` variables.
-2. **Two migration paths forward**:
-   - **Path A (keep UBOs)**: Fix invisible rendering bug in current code (verify shader link status, UBO bindings reach the shader, vertex coordinates are in clip space). Requires ongoing raw GL management.
-   - **Path B (MC-native uniforms)**: Create JSON shader definitions at `assets/music_hud/shaders/core/`, rewrite `.vsh`/`.fsh` to use `#version 150` independent `uniform` variables instead of UBO blocks, use `ShaderInstance` + `BufferUploader.drawWithShader()` for zero raw GL. Recommended for long-term stability.
+### Known issues (resolved)
+1. **No visible rendering** — RESOLVED. Root causes:
+   - **z-clip**: `ProjMat` ortho(n=1000,f=21000) requires z ∈ [-21000,-1000]; passing z=0 clipped everything. Fixed with `ModelViewMat.translate(0,0,-1000)`.
+   - **JOML `get(ByteBuffer)` broken at runtime**: `mat.get(buffer)` and `vec.get(buffer)` don't advance buffer position. Fixed by using manual `putFloat()` and `mat.get(float[])` workarounds in `Std140BufferWriter`.
+   - **putMat4f row-major bug**: Manual float writes initially used row-major ordering; GLSL/UBO expects column-major. Fixed.
+   - **UBO size=0**: `putVec4(Vector4f)` failed silently → `buffer.remaining()=0` → `glBindBufferRange(...,0)` → GL_INVALID_VALUE. Fixed by using `putVec4(float,float,float,float)`.
+   - **GL state leak**: `glUseProgram` + blend state not restored, causing MC text/blit rendering artifacts. Fixed with save/restore in finally block.
+   - **Shader cache key**: Only used vsh path; changing fsh wouldn't recompile. Fixed: key = `vsh|fsh`.
+   - **Text flickering**: `setText` during transition called `currentTextData = nextTextData`, flashing intermediate text at full opacity. Fixed by not swapping during active transition.
+   - **Blit UV double-division**: `HudRenderContext.blit` converted texels to UV fractions, but `GuiGraphics.blit` divides by texWidth again internally. Fixed by passing raw texels.
+   - **`getPixelRGBA` returns ABGR**: In 1.21.1 the pixel layout is `0xAABBGGRR`, not `0xAARRGGBB`. Fixed R/B channel extraction in `ColorExtractor`.
+
+### Verified working
+- All three rendering pipelines (background, album, progress) render correctly with UBOs
+- UBO block bindings: MHBasePosition(2), MHAlbumPosition(2), MHProgressPosition(2), MHNowPlayingThemeColor(3), MHProgressStyle(3), MHDynamicStatus(4)
+- All shaders unified to `ProjMat * ModelViewMat * Position` pattern (no u_MVP special case)
+- `ByteBuffer` allocations cached per UBO name to avoid per-frame allocation
 
 ### 1.21.1 Rendering architecture notes
 - `ShaderInstance` loads shaders from JSON at `shaders/core/{name}.json` → reads `.vsh`/`.fsh` via `Program.compileShader()` → `GlslPreprocessor` handles `#moj_import` → links via `ProgramManager.linkShader()`

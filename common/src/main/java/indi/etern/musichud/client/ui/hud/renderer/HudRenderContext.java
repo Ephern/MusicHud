@@ -33,6 +33,7 @@ public class HudRenderContext {
     @Setter
     private GuiGraphics graphics;
     private final Map<String, HudShaderProgram.UniformBufferHandle> uboHandles = new HashMap<>();
+    private final Map<String, ByteBuffer> uboBuffers = new HashMap<>();
 
     public HudRenderContext() {
         current = this;
@@ -147,37 +148,18 @@ public class HudRenderContext {
 
     private void setBuiltinUniforms(HudShaderProgram program) {
         Matrix4f proj = new Matrix4f(RenderSystem.getProjectionMatrix());
-        // z=-2000 puts vertices into ortho(n=1000,f=21000) depth range
-        // No XY translation — Layout already uses absolute screen coordinates
         Matrix4f mv = new Matrix4f().translate(0, 0, -1000);
-        Matrix4f mvp = new Matrix4f(proj).mul(mv);
-
-        int mvpLoc = program.getUniformLocation("u_MVP");
-/*
-        MusicHud.LOGGER.info("[UNIFORM DEBUG] pid={} mvpLoc={} projLoc={} mvLoc={} guiSize=({},{})",
-                program.getProgramId(), mvpLoc,
-                program.getUniformLocation("ProjMat"),
-                program.getUniformLocation("ModelViewMat"),
-                guiWidth(), guiHeight());
-*/
-
-        if (mvpLoc >= 0) {
+        int projLoc = program.getUniformLocation("ProjMat");
+        if (projLoc >= 0) {
             float[] buf = new float[16];
-            mvp.get(buf);
-            glUniformMatrix4fv(mvpLoc, false, buf);
-        } else {
-            int projLoc = program.getUniformLocation("ProjMat");
-            if (projLoc >= 0) {
-                float[] projBuf = new float[16];
-                proj.get(projBuf);
-                glUniformMatrix4fv(projLoc, false, projBuf);
-            }
-            int mvLoc = program.getUniformLocation("ModelViewMat");
-            if (mvLoc >= 0) {
-                float[] mvBuf = new float[16];
-                mv.get(mvBuf);
-                glUniformMatrix4fv(mvLoc, false, mvBuf);
-            }
+            proj.get(buf);
+            glUniformMatrix4fv(projLoc, false, buf);
+        }
+        int mvLoc = program.getUniformLocation("ModelViewMat");
+        if (mvLoc >= 0) {
+            float[] buf = new float[16];
+            mv.get(buf);
+            glUniformMatrix4fv(mvLoc, false, buf);
         }
     }
 
@@ -189,26 +171,17 @@ public class HudRenderContext {
         int uboSize = uniform.getUBOSize();
         String cacheKey = program.getProgramId() + "/" + uboName;
 
-        ByteBuffer buffer = ByteBuffer.allocateDirect(uboSize).order(ByteOrder.nativeOrder());
+        // Reuse buffer per UBO name to avoid allocation each frame
+        ByteBuffer buffer = uboBuffers.computeIfAbsent(cacheKey,
+                k -> ByteBuffer.allocateDirect(uboSize).order(ByteOrder.nativeOrder()));
+        buffer.clear();
         uniform.write(buffer);
-        int pos = buffer.position();
-        // Use absolute get to peek at buffer data without changing position
-//        float f0 = pos > 0 ? buffer.getFloat(0) : Float.NaN;
-//        float f12 = pos > 48 ? buffer.getFloat(48) : Float.NaN;
-//        float f13 = pos > 52 ? buffer.getFloat(52) : Float.NaN;
-//        MusicHud.LOGGER.info("[UBO DATA] {} sz={} wr={} col0_a={} tx_b48={} ty_b52={}", uboName, uboSize, pos, f0, f12, f13);
         buffer.flip();
 
         HudShaderProgram.UniformBufferHandle handle = uboHandles.computeIfAbsent(cacheKey,
-                k -> {
-                    HudShaderProgram.UniformBufferHandle h = HudShaderProgram.UniformBufferHandle.createAndUpload(bindingPoint, buffer);
-                    checkGLError("createAndUpload " + uboName);
-                    return h;
-                });
+                k -> HudShaderProgram.UniformBufferHandle.createAndUpload(bindingPoint, buffer));
+        // upload updates buffer data + binds — no separate bind() needed
         handle.upload(buffer);
-        checkGLError("upload " + uboName);
-        handle.bind();
-        checkGLError("bind " + uboName);
     }
 
     private static final Matrix4f IDENTITY = new Matrix4f();

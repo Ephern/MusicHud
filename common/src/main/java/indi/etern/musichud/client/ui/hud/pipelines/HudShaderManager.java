@@ -53,16 +53,12 @@ public class HudShaderManager {
                     }*/
                 }
                 // Cache uniform locations for built-in matrices (plain uniforms)
-                program.cacheUniformLocation("u_MVP");
                 program.cacheUniformLocation("ModelViewMat");
                 program.cacheUniformLocation("ProjMat");
-/*
-                MusicHud.LOGGER.debug("Program {}: u_MVP={} ModelViewMat={} ProjMat={}",
+                MusicHud.LOGGER.debug("Program {}: ModelViewMat={} ProjMat={}",
                         program.getProgramId(),
-                        program.getUniformLocation("u_MVP"),
                         program.getUniformLocation("ModelViewMat"),
                         program.getUniformLocation("ProjMat"));
-*/
                 // Cache sampler uniform locations for manual texture binding
                 program.cacheSamplerLocation("Sampler0");
                 program.cacheSamplerLocation("Sampler1");
