@@ -1,18 +1,34 @@
 package indi.etern.musichud.platform.mod.fabric.event;
 
 import indi.etern.musichud.interfaces.IClientEventService;
+import indi.etern.musichud.interfaces.Unregister;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.world.entity.player.Player;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @SuppressWarnings("unused")
 public class FabricClientEventService implements IClientEventService {
     private static volatile FabricClientEventService instance;
+    private final Set<Consumer<Player>> joinListeners = new HashSet<>();
+    private final Set<Consumer<Player>> quitListeners = new HashSet<>();
+    private final Set<Runnable> tickPostListeners = new HashSet<>();
+    private final Set<Runnable> stoppingListeners = new HashSet<>();
 
-    private FabricClientEventService() {}
+    private FabricClientEventService() {
+        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> joinListeners.forEach(l -> l.accept(client.player)));
+        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
+            if (client.player != null) {
+                quitListeners.forEach(q -> q.accept(client.player));
+            }
+        });
+        ClientTickEvents.END_CLIENT_TICK.register(client -> tickPostListeners.forEach(Runnable::run));
+        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> stoppingListeners.forEach(Runnable::run));
+    }
 
     public static FabricClientEventService getInstance() {
         if (instance == null) {
@@ -26,28 +42,34 @@ public class FabricClientEventService implements IClientEventService {
     }
 
     @Override
-    public void registerClientPlayerJoin(Consumer<Player> listener) {
-        // CLIENT_PLAYER_JOIN 在 Fabric 中对应 ClientPlayConnectionEvents.JOIN
-        ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> listener.accept(client.player));
+    public Unregister registerClientPlayerJoin(Consumer<Player> listener) {
+        joinListeners.add(listener);
+        return () -> {
+            joinListeners.remove(listener);
+        };
     }
 
     @Override
-    public void registerClientPlayerQuit(Consumer<Player> listener) {
-        // CLIENT_PLAYER_QUIT 对应 ClientPlayConnectionEvents.DISCONNECT
-        ClientPlayConnectionEvents.DISCONNECT.register((handler, client) -> {
-            if (client.player != null) {
-                listener.accept(client.player);
-            }
-        });
+    public Unregister registerClientPlayerQuit(Consumer<Player> listener) {
+        quitListeners.add(listener);
+        return () -> {
+            quitListeners.remove(listener);
+        };
     }
 
     @Override
-    public void registerClientTickPost(Runnable listener) {
-        ClientTickEvents.END_CLIENT_TICK.register(client -> listener.run());
+    public Unregister registerClientTickPost(Runnable listener) {
+        tickPostListeners.add(listener);
+        return () -> {
+            tickPostListeners.remove(listener);
+        };
     }
 
     @Override
-    public void registerClientLifecycleStopping(Runnable listener) {
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> listener.run());
+    public Unregister registerClientLifecycleStopping(Runnable listener) {
+        stoppingListeners.add(listener);
+        return () -> {
+            stoppingListeners.remove(listener);
+        };
     }
 }

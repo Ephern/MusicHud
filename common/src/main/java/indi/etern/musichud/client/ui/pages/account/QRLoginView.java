@@ -102,7 +102,9 @@ public class QRLoginView extends LinearLayout implements ILoginView{
 
             @Override
             public void onViewDetachedFromWindow(View v) {
-                clientNetworkService.sendToServer(CancelQRLoginRequest.REQUEST);
+                if (MusicHud.getStatus() == MusicHud.ConnectStatus.CONNECTED) {
+                    clientNetworkService.sendToServer(CancelQRLoginRequest.REQUEST);
+                }
             }
         });
     }

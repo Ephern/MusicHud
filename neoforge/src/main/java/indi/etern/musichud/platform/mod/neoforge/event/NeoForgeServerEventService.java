@@ -1,45 +1,52 @@
 package indi.etern.musichud.platform.mod.neoforge.event;
 
 import indi.etern.musichud.interfaces.IServerEventService;
+import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 
+import java.util.HashSet;
+import java.util.Set;
 import java.util.function.Consumer;
 
 public class NeoForgeServerEventService implements IServerEventService {
     private static volatile NeoForgeServerEventService instance;
-    private Consumer<ServerPlayer> playerQuitListener;
-    private Runnable serverStoppingListener;
+    private final Set<Consumer<ServerPlayer>> disconnectListeners = new HashSet<>();
+    private final Set<Runnable> stoppingListeners = new HashSet<>();
 
     private NeoForgeServerEventService() {
         NeoForge.EVENT_BUS.register(this);
     }
 
     @Override
-    public void registerCommonPlayerQuit(Consumer<ServerPlayer> listener) {
-        this.playerQuitListener = listener;
+    public Unregister registerCommonPlayerQuit(Consumer<ServerPlayer> listener) {
+        disconnectListeners.add(listener);
+        return () -> {
+            disconnectListeners.remove(listener);
+        };
     }
 
     @Override
-    public void registerServerLifecycleStopping(Runnable listener) {
-        this.serverStoppingListener = listener;
+    public Unregister registerServerLifecycleStopping(Runnable listener) {
+        stoppingListeners.add(listener);
+        return () -> {
+            stoppingListeners.remove(listener);
+        };
     }
 
     @SubscribeEvent
     public void onPlayerQuit(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (playerQuitListener != null && event.getEntity() instanceof ServerPlayer serverPlayer) {
-            playerQuitListener.accept(serverPlayer);
+        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
+            disconnectListeners.forEach(d -> d.accept(serverPlayer));
         }
     }
 
     @SubscribeEvent
     public void onServerStopping(ServerStoppingEvent event) {
-        if (serverStoppingListener != null) {
-            serverStoppingListener.run();
-        }
+        stoppingListeners.forEach(Runnable::run);
     }
 
     public static NeoForgeServerEventService getInstance() {
