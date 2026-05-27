@@ -5,7 +5,7 @@
 ![Banner](https://cdn.modrinth.com/data/7Rnb6oJr/images/0ec5142f5e4ea723ce955e2aa3774be6df349270.png)
 ![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/b1ab5a9d276489d9f2ef4ecce3fd318e58290553.png)
 
-#### A GUI-based Full Server Song Request Mod / Plugin
+#### A GUI-based, server-wide song request mod/plugin designed with zero modifications to game mechanics
 
 > Due to service scope provided by NetEase, this mod might not work well outside China
 
@@ -56,7 +56,7 @@ All you need is to deploy an API server.
 ### How to Deploy an API Server
 There are 2 methods to deploy.
 #### Deploy bound with mod (recommend for client)
-> This method allows to MusicHUD manage lifecycle of api server.
+> This method allows MusicHUD to manage lifecycle of api server.
 >
 > Due to some limitations, API Server may not be auto-closed when game exit abnormal (e.g., due to a crash)
 
@@ -74,7 +74,7 @@ There are 2 methods to deploy.
 ---
 ## CN version description
 
-#### 一个 GUI 化的全服点歌模组/插件
+#### 图形化的全服点歌模组/插件，设计上不修改任何游戏机制
 
 ## 相关链接
 
