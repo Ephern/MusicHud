@@ -6,6 +6,8 @@ import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.IServerNetworkService;
 import lombok.*;
 
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.util.function.Supplier;
 
 @Getter
@@ -85,7 +87,10 @@ public class Environment {
 
         @SneakyThrows
         static <T> T load(String className, Class<T> expectedType) {
-            Object instance = Class.forName(className).getMethod("getInstance").invoke(null);
+            Class<?> clazz = Class.forName(className);
+            Object instance = MethodHandles.lookup()
+                    .findStatic(clazz, "getInstance", MethodType.methodType(clazz))
+                    .invoke();
             return expectedType.cast(instance);
         }
     }

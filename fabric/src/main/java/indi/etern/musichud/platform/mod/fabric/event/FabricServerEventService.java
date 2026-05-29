@@ -4,7 +4,7 @@ import indi.etern.musichud.interfaces.IServerEventService;
 import indi.etern.musichud.interfaces.Unregister;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayConnectionEvents;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -13,7 +13,7 @@ import java.util.function.Consumer;
 @SuppressWarnings("unused")
 public class FabricServerEventService implements IServerEventService {
     private static volatile FabricServerEventService instance;
-    private final Set<Consumer<ServerPlayer>> disconnectListeners = new HashSet<>();
+    private final Set<Consumer<Player>> disconnectListeners = new HashSet<>();
     private final Set<Runnable> stoppingListeners = new HashSet<>();
 
     private FabricServerEventService() {
@@ -24,7 +24,7 @@ public class FabricServerEventService implements IServerEventService {
     }
 
     @Override
-    public Unregister registerCommonPlayerQuit(Consumer<ServerPlayer> listener) {
+    public Unregister registerCommonPlayerQuit(Consumer<Player> listener) {
         disconnectListeners.add(listener);
         return () -> {
             disconnectListeners.remove(listener);

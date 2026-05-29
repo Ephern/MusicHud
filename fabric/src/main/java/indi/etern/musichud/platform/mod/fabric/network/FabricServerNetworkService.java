@@ -7,7 +7,6 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 
-import java.util.Collection;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -28,14 +27,7 @@ public class FabricServerNetworkService implements IServerNetworkService {
     }
 
     @Override
-    public void sendToPlayer(ServerPlayer player, S2CPayload payload) {
-        ServerPlayNetworking.send(player, payload);
-    }
-
-    @Override
-    public void sendToPlayers(Collection<ServerPlayer> players, S2CPayload payload) {
-        for (ServerPlayer player : players) {
-            ServerPlayNetworking.send(player, payload);
-        }
+    public void sendToNetworkPlayer(ServerPlayer serverPlayer, S2CPayload payload) {
+        ServerPlayNetworking.send(serverPlayer, payload);
     }
 }

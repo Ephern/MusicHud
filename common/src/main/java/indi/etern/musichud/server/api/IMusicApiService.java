@@ -3,7 +3,7 @@ package indi.etern.musichud.server.api;
 import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import javax.annotation.Nullable;
 import java.util.List;
@@ -18,7 +18,7 @@ public interface IMusicApiService {
         throw new IllegalArgumentException("Invalid api provider");
     }
 
-    Playlist getPlaylistDetail(long id, @Nullable ServerPlayer serverPlayer);
+    Playlist getPlaylistDetail(long id, @Nullable Player player);
 
     List<Album> searchAlbums(String keywords, int offset);
 
@@ -30,21 +30,21 @@ public interface IMusicApiService {
 
     <T> T search(String keywords, int offset, int limit, SearchType searchType, Function<String, T> transformer);
 
-    List<MusicDetail> getMusicDetailByIds(List<Long> ids, ServerPlayer serverPlayer);
+    List<MusicDetail> getMusicDetailByIds(List<Long> ids, Player player);
 
-    Album getAlbumInfoDetail(long id, ServerPlayer serverPlayer);
+    Album getAlbumInfoDetail(long id, Player player);
 
-    Artist getArtistDetail(long id, ServerPlayer serverPlayer);
+    Artist getArtistDetail(long id, Player player);
 
-    List<MusicDetail> getArtistMoreMusic(long id, int offset, ServerPlayer serverPlayer);
+    List<MusicDetail> getArtistMoreMusic(long id, int offset, Player player);
 
-    MusicResourceInfo getResourceInfo(MusicDetail musicDetail, Quality quality, ServerPlayer serverPlayer);
+    MusicResourceInfo getResourceInfo(MusicDetail musicDetail, Quality quality, Player player);
 
-    List<Playlist> getPlayersUserSubscribedPlaylists(ServerPlayer player);
+    List<Playlist> getPlayersUserSubscribedPlaylists(Player player);
 
-    List<Album> getPlayersUserSubscribedAlbums(ServerPlayer player);
+    List<Album> getPlayersUserSubscribedAlbums(Player player);
 
-    List<Artist> getPlayersUserSubscribedArtists(ServerPlayer player);
+    List<Artist> getPlayersUserSubscribedArtists(Player player);
 
     LyricInfo getLyricInfo(MusicDetail musicDetail);
 }

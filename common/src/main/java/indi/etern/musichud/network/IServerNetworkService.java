@@ -3,15 +3,15 @@ package indi.etern.musichud.network;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.Collection;
 import java.util.function.Supplier;
 
 public interface IServerNetworkService {
-    void sendToPlayer(ServerPlayer player, S2CPayload payload);
-    void sendToPlayers(Collection<ServerPlayer> players, S2CPayload payload);
-
     static IServerNetworkService getInstance() {
         Environment.Platform platform = MusicHud.getCurrentEnvironment().getPlatform();
         Supplier<IServerNetworkService> supplier = platform.getServerNetworkServiceSupplier();
@@ -22,5 +22,31 @@ public interface IServerNetworkService {
             }
         }
         throw new UnsupportedOperationException();
+    }
+
+    void sendToNetworkPlayer(ServerPlayer player, S2CPayload payload);
+
+    default <T extends S2CPayload> void sendToPlayer(Player player, T payload) {
+        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT
+                && (Minecraft.getInstance().getCurrentServer() == null || player instanceof LocalPlayer)) {
+            //noinspection unchecked
+            NetworkReceiver<T> receiver = (NetworkReceiver<T>) INetworkRegister.getInstance()
+                    .getMetaDataOrNew(payload.getClass(), null).receiver();
+            if (receiver != null) {
+                receiver.receive(payload, player);
+            } else {
+                throw new IllegalStateException();
+            }
+        } else if (player instanceof ServerPlayer serverPlayer) {
+            sendToNetworkPlayer(serverPlayer, payload);
+        } else {
+            throw new IllegalStateException();
+        }
+    }
+
+    default void sendToPlayers(Collection<Player> players, S2CPayload payload) {
+        for (Player player : players) {
+            sendToPlayer(player, payload);
+        }
     }
 }

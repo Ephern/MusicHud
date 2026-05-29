@@ -101,7 +101,7 @@ public class Playlist implements MusicCollection {
 
     @Override
     public String getNameI18nKey() {
-        return "music_hud.text.playlist";
+        return MusicHud.MOD_ID + ".text.playlist";
     }
 
     @Override

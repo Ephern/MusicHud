@@ -3,17 +3,16 @@ package indi.etern.musichud.client.ui.pages;
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.mc.ConfigItem;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.PreferencesFragment;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.client.audio.NowPlayingInfo;
-import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.LoginService;
-import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.DynamicIntegerOption;
 import indi.etern.musichud.client.ui.components.LyricLineView;
@@ -33,6 +32,8 @@ import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.Util;
 import net.minecraft.client.resources.language.I18n;
+import org.apache.commons.lang3.Range;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.Arrays;
@@ -44,6 +45,8 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 @Slf4j
 public class ConfigView extends LinearLayout {
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final ServerConfig serverConfig = ServerConfig.getInstance();
     @Getter
     static volatile ConfigView instance;
 
@@ -69,8 +72,6 @@ public class ConfigView extends LinearLayout {
 
             HudRendererManager hudRendererManager = HudRendererManager.getInstance();
 
-            ClientConfig clientConfig = ClientConfig.getInstance();
-
             var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
             PreferencesFragment.BooleanOption booleanOption = new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.enable"),
@@ -80,12 +81,9 @@ public class ConfigView extends LinearLayout {
             booleanOption.setOnChanged(() -> {
                 MuiModApi.postToUiThread(MainFragment::refresh);
                 if (clientConfig.getEnable()) {
-                    LoginService.getInstance().sendConnectMessageToServer();
+                    LoginService.getInstance().connectToExternalServer();
                 } else {
-                    MusicService.RegisterImpl.reset();
-                    NowPlayingInfo.getInstance().stop();
-                    StreamAudioPlayer.getInstance().stop();
-                    LoginService.getInstance().logout();
+                    LoginService.getInstance().disconnectToExternalOrIntegratedServer();
                 }
             });
             PreferencesFragment.BooleanOption translatedLyricOption = new PreferencesFragment.BooleanOption(context,
@@ -131,7 +129,7 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(Quality.LOSSLESS)
                     .create(commonCategory);
             view.addView(commonCategory);
-            var positionCategory = PreferencesFragment.createCategoryList(view, I18n.get("music_hud.config.category.layout"));
+            var positionCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.layout"));
             new PreferencesFragment.DropDownOption<>(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.verticalAlign"),
@@ -206,7 +204,7 @@ public class ConfigView extends LinearLayout {
             widthOption.setDefaultValue(150);
             PreferencesFragment.IntegerOption heightOption = new PreferencesFragment.IntegerOption(
                     context,
-                    I18n.get("music_hud.config.layout.hudHeight"),
+                    I18n.get(MusicHud.MOD_ID + ".config.layout.hudHeight"),
                     clientConfig::getHudHeight,
                     clientConfig::setHudHeight)
                     .setOnChanged(() -> {
@@ -222,19 +220,112 @@ public class ConfigView extends LinearLayout {
             cornerRadiusOption.create(positionCategory);
             view.addView(positionCategory);
 
-            var embeddedServerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.embeddedServer"));
-
-            PreferencesFragment.BooleanOption enableEmbeddedServerOption = new PreferencesFragment.BooleanOption(
+            var multiplayerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.externalServer"));
+            PreferencesFragment.BooleanOption autoConnectToServerOption = new PreferencesFragment.BooleanOption(
                     context,
-                    I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.enable"),
-                    clientConfig::getEnableEmbeddedServer,
-                    clientConfig::setEnableEmbeddedServer)
+                    I18n.get(MusicHud.MOD_ID + ".config.externalServer.autoConnect"),
+                    clientConfig::getEnableAutoConnect,
+                    clientConfig::setEnableAutoConnect)
                     .setDefaultValue(true);
-            enableEmbeddedServerOption.create(embeddedServerCategory);
+            autoConnectToServerOption.create(multiplayerCategory);
+
+            PreferencesFragment.BooleanOption enableIsolatedMode = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.externalServer.enableIsolatedMode"),
+                    clientConfig::getEnableIsolatedMode,
+                    clientConfig::setEnableIsolatedMode)
+                    .setDefaultValue(true);
+            enableIsolatedMode.create(multiplayerCategory);
+
+            AutoConnectServerFilterType[] filterTypes = {AutoConnectServerFilterType.BLACK_LIST, AutoConnectServerFilterType.WHITE_LIST};
+            List<AutoConnectServerFilterType> filterTypeList = Arrays.stream(filterTypes).toList();
+            new PreferencesFragment.DropDownOption<>(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.externalServer.serverFilterType"),
+                    filterTypes,
+                    filterTypeList::indexOf,
+                    clientConfig::getConnectServerFilterType,
+                    clientConfig::setConnectServerFilterType)
+                    .setDefaultValue(AutoConnectServerFilterType.BLACK_LIST)
+                    .create(multiplayerCategory);
+
+            LinearLayout blackList = PreferencesFragment.createStringListOption(
+                    context,
+                    MusicHud.MOD_ID + ".config.externalServer.blackList",
+                    new ConfigItem<>() {
+                        @Override
+                        public List<String> getPath() {
+                            return List.of(MusicHud.MOD_ID, "config", "externalServer", "blackList");
+                        }
+
+                        @Override
+                        public void set(List<? extends String> value) {
+                            //noinspection unchecked
+                            clientConfig.setBlackList((List<String>) value);
+                        }
+
+                        @Override
+                        public List<? extends String> getDefault() {
+                            return List.of();
+                        }
+
+                        @Override
+                        public @Nullable Range<List<? extends String>> getRange() {
+                            return null;
+                        }
+
+                        @Override
+                        public List<? extends String> get() {
+                            return clientConfig.getBlackList();
+                        }
+                    }, clientConfig::save);
+            LinearLayout whiteList = PreferencesFragment.createStringListOption(
+                    context,
+                    MusicHud.MOD_ID + ".config.externalServer.whiteList",
+                    new ConfigItem<>() {
+                        @Override
+                        public List<String> getPath() {
+                            return List.of(MusicHud.MOD_ID, "config", "externalServer", "whiteList");
+                        }
+
+                        @Override
+                        public void set(List<? extends String> value) {
+                            //noinspection unchecked
+                            clientConfig.setWhiteList((List<String>) value);
+                        }
+
+                        @Override
+                        public List<? extends String> getDefault() {
+                            return List.of();
+                        }
+
+                        @Override
+                        public @Nullable Range<List<? extends String>> getRange() {
+                            return null;
+                        }
+
+                        @Override
+                        public List<? extends String> get() {
+                            return clientConfig.getWhiteList();
+                        }
+                    }, clientConfig::save);
+            multiplayerCategory.addView(blackList);
+            multiplayerCategory.addView(whiteList);
+            view.addView(multiplayerCategory);
+
+            var integratedServerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.integratedServer"));
+
+            PreferencesFragment.BooleanOption enableInIntegratedServerOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.enable"),
+                    clientConfig::getEnabledInIntegratedServer,
+                    clientConfig::setEnabledInIntegratedServer)
+                    .setDefaultValue(true);
+            enableInIntegratedServerOption.create(integratedServerCategory);
             ApiServerManager apiServerManager = ApiServerManager.getInstance();
-            enableEmbeddedServerOption.setOnChanged(() -> {
+            enableInIntegratedServerOption.setOnChanged(() -> {
                 ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
-                if (clientConfig.getEnableEmbeddedServer()) {
+                if (clientConfig.getEnabledInIntegratedServer()) {
                     if (apiServerManager != null) {
                         apiServerManager.restartApiServer();
                     }
@@ -248,9 +339,8 @@ public class ConfigView extends LinearLayout {
                 }
             });
 
-            ServerConfig serverConfig = ServerConfig.getInstance();
             {
-                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.serverApiBaseUrl"));
+                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.integratedServer.serverApiBaseUrl"));
                 EditText input = inputBox.findViewById(R.id.input);
                 if (input != null) {
                     input.setMinimumWidth(dp(256));
@@ -269,19 +359,19 @@ public class ConfigView extends LinearLayout {
                         }
                     });
                 }
-                embeddedServerCategory.addView(inputBox);
+                integratedServerCategory.addView(inputBox);
             }
 
             PreferencesFragment.BooleanOption startupBinaryApiServerOption = new PreferencesFragment.BooleanOption(
                     context,
-                    I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.startupBinaryApiServerWhenLaunch"),
+                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.startupBinaryApiServerWhenLaunch"),
                     serverConfig::getStartupBinaryApiServerWhenLaunch,
                     serverConfig::setStartupBinaryApiServerWhenLaunch)
                     .setDefaultValue(true);
-            startupBinaryApiServerOption.create(embeddedServerCategory);
+            startupBinaryApiServerOption.create(integratedServerCategory);
 
             {
-                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.serverApiBinaryExecutablePath"));
+                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.integratedServer.serverApiBinaryExecutablePath"));
                 EditText input = inputBox.findViewById(R.id.input);
                 if (input != null) {
                     input.setMinimumWidth(dp(256));
@@ -300,7 +390,7 @@ public class ConfigView extends LinearLayout {
                         }
                     });
                 }
-                embeddedServerCategory.addView(inputBox);
+                integratedServerCategory.addView(inputBox);
             }
 
             LinearLayout layout = new LinearLayout(context);
@@ -358,27 +448,27 @@ public class ConfigView extends LinearLayout {
             layout.addView(apiStatusLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
             layout.addView(stopApiServerButton);
             layout.addView(restartApiServerButton);
-            embeddedServerCategory.addView(layout);
+            integratedServerCategory.addView(layout);
 
             PreferencesFragment.FloatOption pusherVoteAdditionalRateOption = new PreferencesFragment.FloatOption(
                     context,
-                    I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.pusherVoteAdditionalRate"),
+                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.pusherVoteAdditionalRate"),
                     serverConfig::getPusherVoteAdditionalRate,
                     serverConfig::setPusherVoteAdditionalRate)
                     .setRange(0, 1)
                     .setDefaultValue(0.5);
-            pusherVoteAdditionalRateOption.create(embeddedServerCategory);
+            pusherVoteAdditionalRateOption.create(integratedServerCategory);
 
             PreferencesFragment.BooleanOption useRandomCnIpOption = new PreferencesFragment.BooleanOption(
                     context,
-                    I18n.get(MusicHud.MOD_ID + ".config.embeddedServer.useRandomCnIp"),
+                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.useRandomCnIp"),
                     serverConfig::getUseRandomCnIp,
                     serverConfig::setUseRandomCnIp)
                     .setDefaultValue(true);
-            useRandomCnIpOption.create(embeddedServerCategory);
+            useRandomCnIpOption.create(integratedServerCategory);
             LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params1.setMargins(0, dp(6), 0, dp(128));
-            view.addView(embeddedServerCategory, params1);
+            view.addView(integratedServerCategory, params1);
 
 
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {

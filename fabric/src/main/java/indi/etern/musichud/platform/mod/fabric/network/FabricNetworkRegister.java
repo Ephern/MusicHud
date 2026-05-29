@@ -12,15 +12,10 @@ import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import org.apache.commons.lang3.StringUtils;
-
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings("unused")
 public class FabricNetworkRegister implements INetworkRegister {
     private static volatile FabricNetworkRegister instance;
-    private final Map<Class<? extends IPayload>, CustomPacketPayload.Type<?>> typeMap = new ConcurrentHashMap<>();
 
     public static FabricNetworkRegister getInstance() {
         if (instance == null) {
@@ -34,21 +29,12 @@ public class FabricNetworkRegister implements INetworkRegister {
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <T extends IPayload> CustomPacketPayload.Type<T> getType(Class<T> customPacketPayloadClass) {
-        return (CustomPacketPayload.Type<T>) typeMap.computeIfAbsent(customPacketPayloadClass, clazz -> {
-            String name = String.join("_", StringUtils.splitByCharacterTypeCamelCase(clazz.getSimpleName())).toLowerCase();
-            return new CustomPacketPayload.Type<>(MusicHud.location(name));
-        });
-    }
-
-    @Override
     public <T extends IPayload> void registerC2SPayload(
             Class<T> clazz,
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             NetworkReceiver<T> serverReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getType(clazz);
+        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, serverReceiver).type();
         PayloadTypeRegistry.playC2S().register(type, codec);
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
@@ -64,7 +50,7 @@ public class FabricNetworkRegister implements INetworkRegister {
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             NetworkReceiver<T> clientReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getType(clazz);
+        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, clientReceiver).type();
         PayloadTypeRegistry.playS2C().register(type, codec);
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();

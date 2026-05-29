@@ -12,6 +12,7 @@ import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.PagerAdapter;
 import icyllis.modernui.widget.TabLayout;
 import icyllis.modernui.widget.ViewPager;
+import indi.etern.musichud.MusicHud;
 import lombok.Getter;
 import lombok.NonNull;
 import net.minecraft.client.resources.language.I18n;
@@ -131,8 +132,8 @@ public class LoginView extends FrameLayout implements ILoginView{
         @Override
         public CharSequence getPageTitle(int position) {
             return I18n.get(switch (position) {
-                case 0 -> "music_hud.text.login.page.qrCode";
-                case 1 -> "music_hud.text.login.page.deviceCode";
+                case 0 -> MusicHud.MOD_ID + ".text.login.page.qrCode";
+                case 1 -> MusicHud.MOD_ID + ".text.login.page.deviceCode";
                 default -> "";
             });
         }

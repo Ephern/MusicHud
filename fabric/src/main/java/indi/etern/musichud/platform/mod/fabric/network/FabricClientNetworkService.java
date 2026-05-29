@@ -26,7 +26,7 @@ public class FabricClientNetworkService implements IClientNetworkService {
     }
 
     @Override
-    public void sendToServer(C2SPayload payload) {
+    public void sendToNetworkServer(C2SPayload payload) {
         ClientPlayNetworking.send(payload);
     }
 }

@@ -296,9 +296,9 @@ public class MusicService {
     }
 
     public void keyBindsVoteSkipCurrent() {
-        long currentTimeMillis = System.currentTimeMillis();
         MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
         if (currentlyPlayingMusicDetail != null && currentlyPlayingMusicDetail != MusicDetail.NONE) {
+            long currentTimeMillis = System.currentTimeMillis();
             if (currentTimeMillis - lastPressTime <= 3000) {
                 lastPressTime = 0;
                 voteForSkipCurrent();
@@ -415,26 +415,26 @@ public class MusicService {
         return completableFuture;
     }
 
+    public static void reset() {
+        if (instance != null) {
+            instance.switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
+            instance.idlePlaySourceLoaded = false;
+            instance.musicQueue.clear();
+            instance.localIdlePlaySourceAddListeners.clear();
+            instance.localIdlePlaySourceRemoveListeners.clear();
+            instance.localIdlePlaySourceChangeListeners.clear();
+            instance.musicQueueRefreshListeners.clear();
+            instance.musicQueuePushListeners.clear();
+            instance.musicQueueRemoveListeners.clear();
+        }
+        if (HudRendererManager.isLoaded()) {
+            HudRendererManager.getInstance().reset();
+        }
+        NowPlayingInfo.getInstance().switchMusicInfo(MusicDetail.NONE, MusicDetail.NONE);
+    }
+
     @RegisterMark
     public static class RegisterImpl implements ClientRegister {
-        public static void reset() {
-            if (instance != null) {
-                instance.switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
-                instance.idlePlaySourceLoaded = false;
-                instance.musicQueue.clear();
-                instance.localIdlePlaySourceAddListeners.clear();
-                instance.localIdlePlaySourceRemoveListeners.clear();
-                instance.localIdlePlaySourceChangeListeners.clear();
-                instance.musicQueueRefreshListeners.clear();
-                instance.musicQueuePushListeners.clear();
-                instance.musicQueueRemoveListeners.clear();
-            }
-            if (HudRendererManager.isLoaded()) {
-                HudRendererManager.getInstance().reset();
-            }
-            NowPlayingInfo.getInstance().switchMusicInfo(MusicDetail.NONE, MusicDetail.NONE);
-        }
-
         @Override
         public void register() {
             LoginService.getInstance().getLoginCompleteListeners().add((loginCookieInfo) -> {

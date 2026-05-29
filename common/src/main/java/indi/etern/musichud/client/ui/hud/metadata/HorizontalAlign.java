@@ -18,7 +18,7 @@ public enum HorizontalAlign {
         float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
             return (float) renderContext.guiWidth() / 2 + x - hudLayout.getWidth() / 2;
         }
-    }, RIGHT("music_hud.config.layout.horizontalAlign.RIGHT", Gravity.RIGHT) {
+    }, RIGHT(MusicHud.MOD_ID + ".config.layout.horizontalAlign.RIGHT", Gravity.RIGHT) {
         @Override
         float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
             return renderContext.guiWidth() - hudLayout.getWidth() - x;

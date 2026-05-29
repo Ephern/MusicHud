@@ -36,7 +36,7 @@ public class MusicCollectionCard extends LinearLayout {
     @Getter
     MusicCollection musicCollection;
 
-    public MusicCollectionCard(Context context, MusicCollection musicCollection) {
+    public MusicCollectionCard(Context context, MusicCollection musicCollection) {//FIXME Button state & updating
         super(context);
         this.musicCollection = musicCollection;
 
@@ -84,11 +84,11 @@ public class MusicCollectionCard extends LinearLayout {
                     .build().newBackgroundDrawable();
             addToIdleSourceButton.setBackground(background1);
             addToIdleSourceButton.setOnClickListener((v) -> {
-                if (musicService.getLocalIdlePlaySources().contains(musicCollection)) {
+                if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
                     ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
                     musicService.removeFromIdlePlaySource(musicCollection);
                 } else {
-                    ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
+                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
                     musicService.addToIdlePlaySource(musicCollection);
                 }
             });
@@ -148,9 +148,9 @@ public class MusicCollectionCard extends LinearLayout {
 
     private void updateButton(Button addToIdleSourceButton) {
         if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
-            addToIdleSourceButton.setText(I18n.get("music_hud.button.removeFromIdlePlaySource"));
+            addToIdleSourceButton.setText(I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"));
         } else {
-            addToIdleSourceButton.setText(I18n.get("music_hud.button.addToIdlePlaySource"));
+            addToIdleSourceButton.setText(I18n.get(MusicHud.MOD_ID + ".button.addToIdlePlaySource"));
         }
     }
 }

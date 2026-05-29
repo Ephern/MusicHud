@@ -4,7 +4,6 @@ import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.Button;
@@ -65,13 +64,15 @@ public class HomeView extends LinearLayout {
         removeAllViews();
         MusicService musicService = MusicService.getInstance();
 
+/*
         boolean enabled = clientConfig.getEnable();
-        if (MusicHud.getStatus() != MusicHud.ConnectStatus.CONNECTED || !enabled) {
+        if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED || !enabled) {
             setGravity(Gravity.CENTER);
             TextView textView = Theme.getNotificationTextView(context, enabled);
             addView(textView);
             return;
         }
+*/
 
         setOrientation(HORIZONTAL);
         {
