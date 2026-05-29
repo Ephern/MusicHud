@@ -49,7 +49,9 @@ public class HudShaderProgram {
     }
 
     public static final class UniformBufferHandle {
+        @Getter
         private final int uboId;
+        @Getter
         private final int bindingPoint;
         private final int size;
 
@@ -57,14 +59,6 @@ public class HudShaderProgram {
             this.uboId = uboId;
             this.bindingPoint = bindingPoint;
             this.size = size;
-        }
-
-        public int getUboId() {
-            return uboId;
-        }
-
-        public int getBindingPoint() {
-            return bindingPoint;
         }
 
         public static UniformBufferHandle createAndUpload(int bindingPoint, ByteBuffer data) {

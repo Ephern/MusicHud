@@ -4,7 +4,6 @@ import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
-import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
 import indi.etern.musichud.client.ui.hud.pipelines.HudShaderProgram;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
@@ -39,30 +38,16 @@ public class HudRenderContext {
         current = this;
     }
 
-    private static void checkGLError(String stage) {
-        int err;
-        boolean first = true;
-        while ((err = glGetError()) != GL_NO_ERROR) {
-            if (first) {
-                MusicHud.LOGGER.error("GL error 0x{} ({}) at stage: {}", Integer.toHexString(err), err, stage);
-                first = false;
-            }
-        }
-    }
-
     public void clearContext() {
         graphics = null;
     }
 
     public void submitHudRenderState(HudRenderState hudRenderState) {
         HudShaderProgram program = hudRenderState.pipeline();
-        if (program == null || program.getProgramId() <= 0) {
+        if (program.getProgramId() <= 0) {
             renderFallback(hudRenderState);
             return;
         }
-
-        // Drain stale GL errors from previous operations
-        while (glGetError() != GL_NO_ERROR);
 
         // Save MC's GL state before we take over
         int[] savedProgram = new int[1];
@@ -71,7 +56,6 @@ public class HudRenderContext {
         glGetIntegerv(GL_ACTIVE_TEXTURE, savedActiveTexture);
         boolean depthEnabled = glIsEnabled(GL_DEPTH_TEST);
         boolean blendEnabled = glIsEnabled(GL_BLEND);
-        // Save blend func in case MC text rendering expects a different one
         int[] savedBlendSrcRgb = new int[1], savedBlendDstRgb = new int[1];
         int[] savedBlendSrcAlpha = new int[1], savedBlendDstAlpha = new int[1];
         if (blendEnabled) {
@@ -86,10 +70,8 @@ public class HudRenderContext {
             if (depthEnabled) glDisable(GL_DEPTH_TEST);
             if (!blendEnabled) glEnable(GL_BLEND);
             GlStateManager._blendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
-            checkGLError("glUseProgram");
 
             setBuiltinUniforms(program);
-            checkGLError("setBuiltinUniforms");
 
             HudUniform[] uniforms = hudRenderState.uniforms();
             if (uniforms != null) {
@@ -97,7 +79,6 @@ public class HudRenderContext {
                     uploadUniform(program, uniform);
                 }
             }
-            checkGLError("uploadUniforms");
 
             Integer[] textures = hudRenderState.textures();
             if (textures != null) {
@@ -112,16 +93,11 @@ public class HudRenderContext {
                     }
                 }
             }
-            checkGLError("textures");
 
             drawQuad(hudRenderState.pose(), hudRenderState.width(), hudRenderState.height());
-            checkGLError("drawQuad");
         } finally {
-            // Restore MC's GL state so subsequent MC-native rendering
-            // (text, blit via GuiGraphics) uses the correct context
             glUseProgram(savedProgram[0]);
             glActiveTexture(savedActiveTexture[0]);
-            // Restore blend func that MC text rendering expects
             if (blendEnabled) {
                 GlStateManager._blendFuncSeparate(
                         savedBlendSrcRgb[0], savedBlendDstRgb[0],
@@ -130,8 +106,6 @@ public class HudRenderContext {
                 glDisable(GL_BLEND);
             }
             if (depthEnabled) glEnable(GL_DEPTH_TEST);
-            // Drain any remaining GL errors so they don't appear as MC errors
-            while (glGetError() != GL_NO_ERROR);
         }
     }
 
