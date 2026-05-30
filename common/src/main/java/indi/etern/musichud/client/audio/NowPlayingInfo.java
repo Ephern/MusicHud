@@ -145,6 +145,7 @@ public class NowPlayingInfo {
         List.copyOf(musicSwitchListener).forEach(consumer -> {
             consumer.accept(previous, musicDetail);
         });
+        callLyricsUpdateListeners(null);
     }
 
     public void startAt(ZonedDateTime zonedDateTime) {

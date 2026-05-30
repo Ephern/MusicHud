@@ -11,7 +11,7 @@ public enum AutoConnectServerFilterType{
     public String toString() {
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
         if (side == Environment.Side.CLIENT) {
-            return I18n.get(MusicHud.MOD_ID + ".config.multiplayer.autoConnectServerFilterType." + this.name());
+            return I18n.get(MusicHud.MOD_ID + ".config.externalServer.serverFilterType." + this.name());
         } else {
             return this.name();
         }

@@ -53,18 +53,19 @@ public class HudRendererManager {
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
             MusicHud.EXECUTOR.execute(() -> {
-                String text = lyricLine.getText();
-                String translatedText = lyricLine.getTranslatedText();
+                String text = lyricLine == null ? "" : lyricLine.getText();
+                String translatedText = lyricLine == null ? "" : lyricLine.getTranslatedText();
 
-
-                Duration duration = lyricLine.getDuration();
-                long scrollMillis;
-                if (duration != null) {
-                    scrollMillis = duration.toMillis();
-                } else {
-                    scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
+                long scrollMillis = -1;
+                if (lyricLine != null) {
+                    Duration duration = lyricLine.getDuration();
+                    if (duration != null) {
+                        scrollMillis = duration.toMillis();
+                    } else {
+                        scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
+                    }
+                    scrollMillis = (long) (scrollMillis * 0.8);
                 }
-                scrollMillis = (long) (scrollMillis * 0.8);
 
                 ScrollingLyricLineRenderer.Line style1 = new ScrollingLyricLineRenderer.Line(lyricLine, text, Theme.HUD_FADE_COLOR, Theme.HUD_EMPHASIZE_COLOR, scrollMillis);
                 ScrollingLyricLineRenderer.Line style2 = new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis);
@@ -191,9 +192,7 @@ public class HudRendererManager {
             Layout statusLayout = new Layout("Status", statusX, titleY, titleSize, titleSize, 0f);
             statusLayout.setParent(baseLayout);
             PLAYING_STATUS_RENDERER.configure(statusLayout);
-            if (maxTitleWidth - 1.25 * titleSize <= 0) {
-                PLAYING_STATUS_RENDERER.setVisibility(false);
-            }
+            PLAYING_STATUS_RENDERER.setVisibility(!(maxTitleWidth - 1.25 * titleSize <= 0));
 
             Layout titleLayout = Layout.ofTextLayout("Title", mainContentX, titleY, maxTitleWidth, titleSize);
             titleLayout.setParent(baseLayout);

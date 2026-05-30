@@ -419,13 +419,19 @@ public class MusicService {
         if (instance != null) {
             instance.switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
             instance.idlePlaySourceLoaded = false;
+            instance.localIdlePlaySourceRemoveListeners.forEach(l -> instance.localIdlePlaySources.forEach(l));
+            instance.localIdlePlaySourceChangeListeners.forEach(l -> instance.localIdlePlaySources.forEach(l));
+            instance.serverIdlePlaySourceRemoveListeners.forEach(l -> instance.serverIdlePlaySources.forEach(l));
+            instance.serverIdlePlaySourceChangeListeners.forEach(l -> instance.serverIdlePlaySources.forEach(l));
+            instance.localIdlePlaySources.clear();
+            instance.serverIdlePlaySources.clear();
             instance.musicQueue.clear();
-            instance.localIdlePlaySourceAddListeners.clear();
-            instance.localIdlePlaySourceRemoveListeners.clear();
-            instance.localIdlePlaySourceChangeListeners.clear();
-            instance.musicQueueRefreshListeners.clear();
-            instance.musicQueuePushListeners.clear();
-            instance.musicQueueRemoveListeners.clear();
+//            instance.localIdlePlaySourceAddListeners.clear();
+//            instance.localIdlePlaySourceRemoveListeners.clear();
+//            instance.localIdlePlaySourceChangeListeners.clear();
+//            instance.musicQueueRefreshListeners.clear();
+//            instance.musicQueuePushListeners.clear();
+//            instance.musicQueueRemoveListeners.clear();
         }
         if (HudRendererManager.isLoaded()) {
             HudRendererManager.getInstance().reset();

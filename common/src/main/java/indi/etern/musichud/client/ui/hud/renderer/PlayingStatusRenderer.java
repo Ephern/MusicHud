@@ -60,7 +60,7 @@ public class PlayingStatusRenderer implements HudRenderer {
         ResourceLocation currentResourceLocation1 = currentResourceLocation;
         if (currentResourceLocation1 != null && visibility) {
             float rotationRadians;
-            if (currentResourceLocation1 == ERROR_ICON_LOCATION || currentResourceLocation1 == LOADING_ICON_LOCATION) {
+            if (currentResourceLocation1 == RETRYING_ICON_LOCATION || currentResourceLocation1 == LOADING_ICON_LOCATION) {
                 rotationRadians = (float) ((Math.PI * 2) * ((float) (System.currentTimeMillis() % 1000) / 1000));
             } else {
                 rotationRadians = 0;

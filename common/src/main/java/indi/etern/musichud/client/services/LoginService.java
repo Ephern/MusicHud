@@ -177,6 +177,7 @@ public class LoginService {
         MusicService.reset();
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();
+
         MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
 //        Profile.setCurrent(Profile.ANONYMOUS);
     }
