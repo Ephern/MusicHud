@@ -34,7 +34,7 @@ public class FabricNetworkRegister implements INetworkRegister {
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             NetworkReceiver<T> serverReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getType(clazz);
+        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, serverReceiver).type();
         PayloadTypeRegistry.serverboundPlay().register(type, codec);
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
@@ -50,7 +50,7 @@ public class FabricNetworkRegister implements INetworkRegister {
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             NetworkReceiver<T> clientReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getType(clazz);
+        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, clientReceiver).type();
         PayloadTypeRegistry.clientboundPlay().register(type, codec);
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
