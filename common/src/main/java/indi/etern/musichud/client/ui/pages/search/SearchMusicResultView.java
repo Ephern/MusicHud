@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.pages.search;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.Toast;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
@@ -64,7 +65,7 @@ public class SearchMusicResultView extends LinearLayout {
                 .map(Artist::getName).collect(Collectors.joining(" / "));
         musicLayout.setOnClickListener((view) -> {
             MusicService.getInstance().sendPushMusicToQueue(musicDetail);
-            ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
+            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
         addView(musicLayout, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
     }

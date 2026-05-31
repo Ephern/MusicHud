@@ -17,10 +17,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 import net.neoforged.neoforge.network.registration.PayloadRegistrar;
-import org.apache.commons.lang3.StringUtils;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -65,21 +63,12 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     }
 
     @Override
-    @SuppressWarnings("unchecked")
-    public <T extends IPayload> CustomPacketPayload.Type<T> getType(Class<T> customPacketPayloadClass) {
-        return (CustomPacketPayload.Type<T>) typeMap.computeIfAbsent(customPacketPayloadClass, clazz -> {
-            String name = String.join("_", StringUtils.splitByCharacterTypeCamelCase(clazz.getSimpleName())).toLowerCase();
-            return new CustomPacketPayload.Type<>(MusicHud.location(name));
-        });
-    }
-
-    @Override
     public <T extends IPayload> void registerC2SPayload(
             Class<T> clazz,
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             NetworkReceiver<T> serverReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getType(clazz);
+        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, serverReceiver).type();
         RegistrationInfo<T> registrationInfo = new RegistrationInfo<>(clazz, type, codec, null, serverReceiver);
         pendingRegistrations.add(registrationInfo);
     }
@@ -90,7 +79,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             NetworkReceiver<T> clientReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getType(clazz);
+        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, clientReceiver).type();
         RegistrationInfo<T> registrationInfo = new RegistrationInfo<>(clazz, type, codec, clientReceiver, null);
         pendingRegistrations.add(registrationInfo);
     }
@@ -119,20 +108,13 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     }
 
     @Override
-    public void sendToServer(C2SPayload payload) {
+    public void sendToNetworkServer(C2SPayload payload) {
         PacketDistributor.sendToServer(payload);
     }
 
     @Override
-    public void sendToPlayer(ServerPlayer player, S2CPayload payload) {
-        PacketDistributor.sendToPlayer(player, payload);
-    }
-
-    @Override
-    public void sendToPlayers(Collection<ServerPlayer> players, S2CPayload payload) {
-        for (ServerPlayer player : players) {
-            PacketDistributor.sendToPlayer(player, payload);
-        }
+    public void sendToNetworkPlayer(ServerPlayer serverPlayer, S2CPayload payload) {
+        PacketDistributor.sendToPlayer(serverPlayer, payload);
     }
 
     private record RegistrationInfo<T extends IPayload>(

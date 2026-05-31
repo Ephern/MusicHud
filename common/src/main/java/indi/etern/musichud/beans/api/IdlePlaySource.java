@@ -12,7 +12,8 @@ import lombok.Setter;
 import lombok.ToString;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.Objects;
 
@@ -29,7 +30,7 @@ public final class IdlePlaySource {
     private final long id;
     private final Class<?> type;
     @Setter
-    transient private ServerPlayer player;
+    transient private Player player;
     @Getter
     transient private boolean dataLoaded = false;
     transient private MusicCollection musicCollection;
@@ -39,7 +40,7 @@ public final class IdlePlaySource {
         this.type = type;
     }
 
-    public void serverLoadMusicCollection(ServerPlayer player) {
+    public void serverLoadMusicCollection(Player player) {
         if (musicCollection == null) {
             if (type.equals(Album.class)) {
                 dataLoaded = true;

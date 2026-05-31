@@ -26,9 +26,9 @@ public class GetUserArtistsRequest implements C2SPayload {
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetUserArtistsRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((getUserPlaylistRequest, serverPlayer) -> {
-                        List<Artist> playersUserArtists = IMusicApiService.getInstance(ApiProvider.NCM).getPlayersUserSubscribedArtists(serverPlayer);
-                        IServerNetworkService.getInstance().sendToPlayer(serverPlayer, new GetUserArtistsResponse(playersUserArtists));
+                    ServerDataPacketVThreadExecutor.execute((getUserPlaylistRequest, player) -> {
+                        List<Artist> playersUserArtists = IMusicApiService.getInstance(ApiProvider.NCM).getPlayersUserSubscribedArtists(player);
+                        IServerNetworkService.getInstance().sendToPlayer(player, new GetUserArtistsResponse(playersUserArtists));
                     })
             );
         }

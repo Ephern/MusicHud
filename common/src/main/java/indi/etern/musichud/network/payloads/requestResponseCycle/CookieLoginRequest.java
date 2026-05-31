@@ -34,14 +34,14 @@ public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRef
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     CookieLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((loginRequest, serverPlayer) -> {
+                    ServerDataPacketVThreadExecutor.execute((loginRequest, player) -> {
                         ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
                         IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
                         if (loginRequest.tryRefresh) {
                             try {
-                                loginApiService.refreshAndSend(serverPlayer, loginRequest.loginCookieInfo);
+                                loginApiService.refreshAndSend(player, loginRequest.loginCookieInfo);
                             } catch (Exception e) {
-                                serverNetworkService.sendToPlayer(serverPlayer,
+                                serverNetworkService.sendToPlayer(player,
                                         new LoginResultMessage(false,
                                                 "",
                                                 loginRequest.loginCookieInfo,
@@ -52,8 +52,8 @@ public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRef
                         } else if (loginRequest.loginCookieInfo.type() != LoginType.ANONYMOUS) {
                             try {
                                 Profile profile =
-                                        loginApiService.loadUserProfile(serverPlayer, loginRequest.loginCookieInfo);
-                                serverNetworkService.sendToPlayer(serverPlayer,
+                                        loginApiService.loadUserProfile(player, loginRequest.loginCookieInfo);
+                                serverNetworkService.sendToPlayer(player,
                                         new LoginResultMessage(true,
                                                 "",
                                                 loginRequest.loginCookieInfo,
@@ -61,7 +61,7 @@ public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRef
                                         )
                                 );
                             } catch (Exception e) {
-                                serverNetworkService.sendToPlayer(serverPlayer,
+                                serverNetworkService.sendToPlayer(player,
                                         new LoginResultMessage(false,
                                                 "",
                                                 loginRequest.loginCookieInfo,
@@ -70,7 +70,7 @@ public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRef
                                 );
                             }
                         }
-                        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(serverPlayer));
+                        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
                     })
             );
         }

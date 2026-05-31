@@ -31,10 +31,11 @@ public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, 
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
+        private static final ClientConfig clientConfig = ClientConfig.getInstance();
+
         public void register() {
             NetworkReceiver<SwitchMusicMessage> receiver = NetworkReceiver.noop();
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
-                ClientConfig clientConfig = ClientConfig.getInstance();
                 receiver = (message, player) -> {
                     MusicHud.EXECUTOR.execute(() -> {
                         if (!clientConfig.getEnable()) {

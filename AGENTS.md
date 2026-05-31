@@ -1,4 +1,4 @@
-# Music Hud - Agent Guide
+# Music HUD - Agent Guide
 
 Multi-loader Minecraft mod (Fabric + NeoForge + Paper) for 1.21.8 (Java 21). A GUI-based full-server song request system powered by Netease Cloud Music API.
 

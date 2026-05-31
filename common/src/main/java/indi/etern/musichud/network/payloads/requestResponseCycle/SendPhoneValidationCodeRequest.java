@@ -24,8 +24,8 @@ public record SendPhoneValidationCodeRequest(int regionCode, long phone) impleme
         @Override
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(SendPhoneValidationCodeRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((request, serverPlayer) -> {
-                        ILoginApiService.getInstance(ApiProvider.NCM).requestValidationCodeFor(request.regionCode, request.phone, serverPlayer);
+                    ServerDataPacketVThreadExecutor.execute((request, player) -> {
+                        ILoginApiService.getInstance(ApiProvider.NCM).requestValidationCodeFor(request.regionCode, request.phone, player);
                     })
             );
         }

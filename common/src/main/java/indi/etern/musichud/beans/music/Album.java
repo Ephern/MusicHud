@@ -107,6 +107,11 @@ public class Album implements MusicCollection{
     }
 
     @Override
+    public boolean equalsLoose(Object obj) {
+        return obj instanceof Album album && id == album.id;
+    }
+
+    @Override
     public int hashCode() {
         return Objects.hash(id, pusherInfo.getPlayerUUID());
     }
