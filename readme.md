@@ -1,4 +1,4 @@
-# Music Hud
+# Music HUD
 ![Static Badge](https://img.shields.io/badge/Java-21-red?style=for-the-badge)
 ![Static Badge](https://img.shields.io/badge/License-LGPLv3-brightgreen?style=for-the-badge)
 

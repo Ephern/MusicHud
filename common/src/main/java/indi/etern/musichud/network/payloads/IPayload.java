@@ -8,6 +8,6 @@ public interface IPayload extends CustomPacketPayload {
     @Override
     @NonNull
     default Type<? extends IPayload> type() {
-        return INetworkRegister.getInstance().getType(getClass());
+        return INetworkRegister.getInstance().getMetaDataOrNew(getClass(), null).type();
     }
 }

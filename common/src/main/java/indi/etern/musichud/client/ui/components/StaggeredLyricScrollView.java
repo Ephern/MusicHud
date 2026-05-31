@@ -29,6 +29,7 @@ import lombok.NonNull;
 import lombok.Setter;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -222,7 +223,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         alpha.start();
     }
 
-    void highlightLine(LyricLine lyricLine) {
+    void highlightLine(@Nullable LyricLine lyricLine) {
         MuiModApi.postToUiThread(() -> {
             if (lyricLine == null) {
                 justHighlightedLyricLine = null;
@@ -449,7 +450,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             float lastTargetOffset = line.getTargetOffset(lastHighlightedLyricLine);
             float targetOffset = line.getTargetOffset(justHighlightedLyricLine);
 
-            float fromOffset = staggerFromOffsets != null
+            float fromOffset = staggerFromOffsets != null && i < staggerFromOffsets.length
                     ? staggerFromOffsets[i]
                     : lastTargetOffset;
 

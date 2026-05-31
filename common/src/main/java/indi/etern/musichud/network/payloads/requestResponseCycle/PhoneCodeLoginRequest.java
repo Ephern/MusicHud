@@ -29,8 +29,8 @@ public record PhoneCodeLoginRequest(int regionCode, long phone, int code) implem
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     PhoneCodeLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((request, serverPlayer) -> {
-                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithPhoneAndCode(request.regionCode, request.phone, request.code,serverPlayer);
+                    ServerDataPacketVThreadExecutor.execute((request, player) -> {
+                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithPhoneAndCode(request.regionCode, request.phone, request.code,player);
                     })
             );
         }

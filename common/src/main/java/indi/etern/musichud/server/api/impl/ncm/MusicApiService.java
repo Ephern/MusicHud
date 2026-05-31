@@ -17,7 +17,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;import org.jetbrains.annotations.Nullable;
 
@@ -48,6 +48,18 @@ public class MusicApiService implements IMusicApiService {
             .expireAfterAccess(10, TimeUnit.MINUTES)
             .maximumSize(50)
             .build();
+    private static final Cache<Long, List<Playlist>> userSubscribedPlaylistCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .maximumSize(50)
+            .build();
+    private static final Cache<Long, List<Artist>> userSubscribedArtistsCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .maximumSize(50)
+            .build();
+    private static final Cache<Long, List<Album>> userSubscribedAlbumsCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .maximumSize(50)
+            .build();
     private static volatile MusicApiService musicApiService;
     private final LoginApiService loginApiService = LoginApiService.getInstance();
     private final Gson gson = JsonUtil.gson;
@@ -63,8 +75,8 @@ public class MusicApiService implements IMusicApiService {
         return MusicApiService.musicApiService;
     }
 
-    private List<MusicDetail> appendArtistMusic(int offset, Artist artist, ServerPlayer serverPlayer) {
-        String rawCookie = loginApiService.getRawCookieOrElse(serverPlayer, loginApiService::getAnonymousCookie);
+    private List<MusicDetail> appendArtistMusic(int offset, Artist artist, Player player) {
+        String rawCookie = loginApiService.getRawCookieOrElse(player, loginApiService::getAnonymousCookie);
         GetArtistMusicResponse response = ApiClient.post(ServerApiMeta.Artist.ALL_SONGS, new ArtistAllMusicRequest(artist.getId(), 50, offset, "time"), rawCookie);
         List<Long> musicDetailIds = response.songs.stream().map(MusicDetail::getId).toList();
         artist.setTotalMusicCount(response.total);
@@ -74,22 +86,22 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
-    public Playlist getPlaylistDetail(long id, @Nullable ServerPlayer serverPlayer) {
+    public Playlist getPlaylistDetail(long id, @Nullable Player player) {
         Playlist cached = playlistCache.getIfPresent(id);
         Playlist playlist = Playlist.empty(id);
         if (cached != null) {
             playlist = cached;
         } else {
-            String rawCookie = loginApiService.getRawCookieOrElse(serverPlayer, loginApiService::getAnonymousCookie);
+            String rawCookie = loginApiService.getRawCookieOrElse(player, loginApiService::getAnonymousCookie);
             PlaylistResponse playlistResponse = ApiClient.post(ServerApiMeta.Playlist.DETAIL, new IdRequest(id), rawCookie);
             if (playlistResponse.getCode() == 200) {
                 playlist = playlistResponse.getPlaylist();
                 playlistCache.put(id, playlist);
             } else {
-                logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(serverPlayer).getName().getString(), playlistResponse.getCode());
+                logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(player).getName().getString(), playlistResponse.getCode());
             }
         }
-        LoginApiService.PlayerLoginInfo playerLoginInfo = loginApiService.playerInfoMap.get(serverPlayer);
+        LoginApiService.PlayerLoginInfo playerLoginInfo = loginApiService.playerInfoMap.get(player);
         Profile profile = playerLoginInfo != null ? playerLoginInfo.profile : null;
         if (playlist.getPrivacy() == Privacy.PRIVATE && !playlist.getCreator().equals(profile)) {
             return Playlist.privacyBlocked(id, playlist.getCreator());
@@ -168,7 +180,7 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
-    public List<MusicDetail> getMusicDetailByIds(List<Long> ids, ServerPlayer serverPlayer) {
+    public List<MusicDetail> getMusicDetailByIds(List<Long> ids, Player player) {
         List<Long> uncachedIds = new ArrayList<>();
         List<MusicDetail> result = new ArrayList<>(ids.size());
         for (long id : ids) {
@@ -189,7 +201,7 @@ public class MusicApiService implements IMusicApiService {
                 } else {
                     return List.of();
                 }
-                String userCookie = loginApiService.getRawCookieOrElse(serverPlayer,
+                String userCookie = loginApiService.getRawCookieOrElse(player,
                         () -> loginApiService.randomVipCookieOrElse(loginApiService::getAnonymousCookie)
                 );
                 MusicDetailsResponse response = ApiClient.post(ServerApiMeta.Music.DETAIL, requestBody, userCookie);
@@ -207,10 +219,10 @@ public class MusicApiService implements IMusicApiService {
 
     @SneakyThrows
     @Override
-    public Album getAlbumInfoDetail(long id, ServerPlayer serverPlayer) {
+    public Album getAlbumInfoDetail(long id, Player player) {
         return albumsCache.get(id,
                 () -> {
-                    String rawCookie = loginApiService.getRawCookieOrElse(serverPlayer, loginApiService::getAnonymousCookie);
+                    String rawCookie = loginApiService.getRawCookieOrElse(player, loginApiService::getAnonymousCookie);
                     GetAlbumDetailResult post = ApiClient.post(ServerApiMeta.Album.DETAIL, new IdRequest(id), rawCookie);
                     Album album = post.album();
                     post.songs.forEach(song -> {
@@ -224,12 +236,12 @@ public class MusicApiService implements IMusicApiService {
 
     @SneakyThrows
     @Override
-    public Artist getArtistDetail(long id, ServerPlayer serverPlayer) {
+    public Artist getArtistDetail(long id, Player player) {
         return artistsCache.get(id,
                 () -> {
-                    String rawCookie = loginApiService.getRawCookieOrElse(serverPlayer, loginApiService::getAnonymousCookie);
+                    String rawCookie = loginApiService.getRawCookieOrElse(player, loginApiService::getAnonymousCookie);
                     Artist artist = ApiClient.post(ServerApiMeta.Artist.DETAIL, new IdRequest(id), rawCookie).data.artist;
-                    appendArtistMusic(0, artist, serverPlayer);
+                    appendArtistMusic(0, artist, player);
                     return artist;
                 }
         );
@@ -237,17 +249,17 @@ public class MusicApiService implements IMusicApiService {
 
     @SneakyThrows
     @Override
-    public List<MusicDetail> getArtistMoreMusic(long id, int offset, ServerPlayer serverPlayer) {
-        Artist artist = getArtistDetail(id, serverPlayer);
-        return appendArtistMusic(offset, artist, serverPlayer);
+    public List<MusicDetail> getArtistMoreMusic(long id, int offset, Player player) {
+        Artist artist = getArtistDetail(id, player);
+        return appendArtistMusic(offset, artist, player);
     }
 
     @Override
-    public MusicResourceInfo getResourceInfo(MusicDetail musicDetail, Quality quality, ServerPlayer serverPlayer) {
+    public MusicResourceInfo getResourceInfo(MusicDetail musicDetail, Quality quality, Player player) {
         if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
             return MusicResourceInfo.NONE;
         } else {
-            var loginInfo = loginApiService.getLoginInfoByServerPlayer(serverPlayer);
+            var loginInfo = loginApiService.getLoginInfoByPlayer(player);
             AtomicBoolean vipAccessible = new AtomicBoolean(true);
             String cookie;
             boolean isVip = loginInfo != null && loginInfo.getVipType() == VipType.VIP;
@@ -318,59 +330,71 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
-    public List<Playlist> getPlayersUserSubscribedPlaylists(ServerPlayer player) {
+    @SneakyThrows
+    public List<Playlist> getPlayersUserSubscribedPlaylists(Player player) {
         if (player == null) {
             return Collections.emptyList();
         }
-        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
+        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {
             return List.of();
         } else {
-            PlaylistsResponse playlistData = ApiClient.post(
-                    ServerApiMeta.User.PLAYLIST,
-                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
-                    loginInfo.loginCookieInfo.rawCookie()
-            );
-            return playlistData.getPlaylists();
+            long userId = profile.getUserId();
+            return userSubscribedPlaylistCache.get(userId, () -> {
+                PlaylistsResponse playlistData = ApiClient.post(
+                        ServerApiMeta.User.PLAYLIST,
+                        new PagedRequestDataWithUID(userId, 50, 0),
+                        loginInfo.loginCookieInfo.rawCookie()
+                );
+                return playlistData.getPlaylists();
+            });
         }
     }
 
     @Override
-    public List<Album> getPlayersUserSubscribedAlbums(ServerPlayer player) {
+    @SneakyThrows
+    public List<Album> getPlayersUserSubscribedAlbums(Player player) {
         if (player == null) {
             return Collections.emptyList();
         }
-        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
+        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {
             return List.of();
         } else {
-            UserSubscribedAlbumResponse userSubscribedAlbumResponse = ApiClient.post(
-                    ServerApiMeta.User.SUBSCRIBED_ALBUMS,
-                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
-                    loginInfo.loginCookieInfo.rawCookie()
-            );
-            return userSubscribedAlbumResponse.data();
+            long userId = profile.getUserId();
+            return userSubscribedAlbumsCache.get(userId, () -> {
+                UserSubscribedAlbumResponse userSubscribedAlbumResponse = ApiClient.post(
+                        ServerApiMeta.User.SUBSCRIBED_ALBUMS,
+                        new PagedRequestDataWithUID(userId, 50, 0),
+                        loginInfo.loginCookieInfo.rawCookie()
+                );
+                return userSubscribedAlbumResponse.data();
+            });
         }
     }
 
     @Override
-    public List<Artist> getPlayersUserSubscribedArtists(ServerPlayer player) {
+    @SneakyThrows
+    public List<Artist> getPlayersUserSubscribedArtists(Player player) {
         if (player == null) {
             return Collections.emptyList();
         }
-        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByServerPlayer(player);
+        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayer(player);
         Profile profile = loginInfo.profile;
         if (profile == null) {
             return List.of();
         } else {
-            UserSubscribedArtistResponse userSubscribedArtistResponse = ApiClient.post(
-                    ServerApiMeta.User.SUBSCRIBED_ARTISTS,
-                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
-                    loginInfo.loginCookieInfo.rawCookie()
-            );
-            return userSubscribedArtistResponse.data();
+            long userId = profile.getUserId();
+            return userSubscribedArtistsCache.get(userId, () -> {
+                UserSubscribedArtistResponse userSubscribedArtistResponse = ApiClient.post(
+                        ServerApiMeta.User.SUBSCRIBED_ARTISTS,
+                        new PagedRequestDataWithUID(userId, 50, 0),
+                        loginInfo.loginCookieInfo.rawCookie()
+                );
+                return userSubscribedArtistResponse.data();
+            });
         }
     }
 

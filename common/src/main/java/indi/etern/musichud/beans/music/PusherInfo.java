@@ -7,7 +7,7 @@ import lombok.Setter;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.Objects;
 import java.util.UUID;
@@ -31,7 +31,7 @@ public final class PusherInfo {
     private final @NonNull String playerName;
     @Getter
     @Setter
-    private transient ServerPlayer serverPlayer;
+    private transient Player player;
 
     public PusherInfo(long uid, @NonNull UUID playerUUID, @NonNull String playerName) {
         this.uid = uid;

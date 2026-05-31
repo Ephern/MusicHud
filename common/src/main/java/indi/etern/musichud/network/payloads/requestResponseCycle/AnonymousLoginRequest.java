@@ -21,8 +21,8 @@ public class AnonymousLoginRequest implements C2SPayload {
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     AnonymousLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((anonymousLoginRequest, serverPlayer) -> {
-                        ILoginApiService.getInstance(ApiProvider.NCM).loginAsAnonymous(serverPlayer, true);
+                    ServerDataPacketVThreadExecutor.execute((anonymousLoginRequest, player) -> {
+                        ILoginApiService.getInstance(ApiProvider.NCM).loginAsAnonymous(player, true);
                     })
             );
         }
