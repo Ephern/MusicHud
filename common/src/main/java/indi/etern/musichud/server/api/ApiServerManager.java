@@ -81,13 +81,14 @@ public class ApiServerManager implements ServerRegister {
             } else {
                 IServerEventService.getInstance().registerServerLifecycleStopping(this::stopApiServer);
             }
+            Runtime.getRuntime().addShutdownHook(hook);
         }
-        Runtime.getRuntime().addShutdownHook(hook);
     }
 
     private void removeShutdownHook() {
         if (hook != null) {
             Runtime.getRuntime().removeShutdownHook(hook);
+            hook = null;
         }
     }
 
