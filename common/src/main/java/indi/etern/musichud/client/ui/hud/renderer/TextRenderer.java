@@ -29,7 +29,7 @@ public class TextRenderer implements HudRenderer{
         try {
             modernStringSplitter = TextLayoutEngine.getInstance().getStringSplitter();
         } catch (Throwable t) {
-            MusicHud.getLogger(ScrollingLyricLineRenderer.class).debug("ModernTextEngine is disabled", t);
+            MusicHud.getLogger(TextRenderer.class).debug("ModernTextEngine is disabled", t);
         }
     }
 

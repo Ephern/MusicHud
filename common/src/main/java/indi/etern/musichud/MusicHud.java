@@ -27,7 +27,7 @@ public final class MusicHud {
     public static final Logger LOGGER = LogManager.getLogger(LOGGER_BASE_NAME);
     public static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
     @Getter
-    private static ConnectStatus status = ConnectStatus.NOT_CONNECTED;
+    private static ConnectStatus connectStatus = ConnectStatus.NOT_CONNECTED;
     @Getter
     private static final Set<Consumer<ConnectStatus>> connectStatusListeners = new HashSet<>();
     @Getter
@@ -65,7 +65,7 @@ public final class MusicHud {
 
     public enum ConnectStatus {
         CONNECTED,
-        INCAPABLE,
+        INCOMPATIBLE,
         NOT_CONNECTED
     }
 
@@ -99,8 +99,8 @@ public final class MusicHud {
         void stop();
     }
 
-    public static void setStatus(ConnectStatus status) {
-        MusicHud.status = status;
+    public static void setConnectStatus(ConnectStatus status) {
+        MusicHud.connectStatus = status;
         connectStatusListeners.forEach(l -> l.accept(status));
     }
 }

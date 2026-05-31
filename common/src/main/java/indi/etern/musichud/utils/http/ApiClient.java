@@ -4,12 +4,15 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonSyntaxException;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.interfaces.ServerConfig;
+import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.throwable.ApiException;
 import indi.etern.musichud.utils.JsonUtil;
 import lombok.SneakyThrows;
+import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 
 import java.io.InputStream;
@@ -128,6 +131,9 @@ public class ApiClient {
                     throw e;
                 } catch (ConnectException e) {
                     LOGGER.error("Please check Api server status | 请检查 Api 服务器状态");
+                    if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".error.apiServer"));
+                    }
                     throw e;
                 }
             } catch (ConnectException e) {
@@ -176,6 +182,9 @@ public class ApiClient {
                     }
                 } catch (ConnectException e) {
                     LOGGER.error("Please check Api server status | 请检查 Api 服务器状态");
+                    if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".error.apiServer"));
+                    }
                     throw e;
                 }
             } catch (ConnectException e) {

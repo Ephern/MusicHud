@@ -9,9 +9,12 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
 
 public class PlayingStatusRenderer implements HudRenderer {
+    // From Lucide Icons
     public static final ResourceLocation LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
     public static final ResourceLocation RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
     public static final ResourceLocation ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
+    public static final ResourceLocation PLAYING_CONNECTED_ICON_LOCATION = MusicHud.location("textures/gui/icons/link.png");
+    public static final ResourceLocation PLAYING_ISOLATED_LOCATION = MusicHud.location("textures/gui/icons/unlink.png");
     private static volatile PlayingStatusRenderer instance;
     StreamAudioPlayer.Status status;
     @Getter
@@ -40,7 +43,15 @@ public class PlayingStatusRenderer implements HudRenderer {
             case BUFFERING -> LOADING_ICON_LOCATION;
             case RETRYING -> RETRYING_ICON_LOCATION;
             case ERROR -> ERROR_ICON_LOCATION;
-            default -> null;
+            default -> {
+                if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
+                    yield PLAYING_CONNECTED_ICON_LOCATION;
+                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED){
+                    yield PLAYING_ISOLATED_LOCATION;
+                } else {
+                    yield null;
+                }
+            }
         };
     }
 
@@ -49,10 +60,10 @@ public class PlayingStatusRenderer implements HudRenderer {
         ResourceLocation currentResourceLocation1 = currentResourceLocation;
         if (currentResourceLocation1 != null && visibility) {
             float rotationRadians;
-            if (currentResourceLocation1 == ERROR_ICON_LOCATION) {
-                rotationRadians = 0;
-            } else {
+            if (currentResourceLocation1 == RETRYING_ICON_LOCATION || currentResourceLocation1 == LOADING_ICON_LOCATION) {
                 rotationRadians = (float) ((Math.PI * 2) * ((float) (System.currentTimeMillis() % 1000) / 1000));
+            } else {
+                rotationRadians = 0;
             }
 
             Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(hudRenderContext);

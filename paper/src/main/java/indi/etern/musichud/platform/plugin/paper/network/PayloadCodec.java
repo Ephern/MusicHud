@@ -4,7 +4,7 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 final class PayloadCodec {
     private PayloadCodec() {
@@ -13,7 +13,7 @@ final class PayloadCodec {
     static <T> byte[] encode(
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             T payload,
-            ServerPlayer player
+            Player player
     ) {
         ByteBuf buffer = Unpooled.buffer();
         try {
@@ -32,7 +32,7 @@ final class PayloadCodec {
     static <T> T decode(
             StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
             byte[] bytes,
-            ServerPlayer player
+            Player player
     ) {
         ByteBuf buffer = Unpooled.wrappedBuffer(bytes);
         try {

@@ -21,9 +21,9 @@ public class StartQRLoginRequest implements C2SPayload {
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     StartQRLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((startQRLoginRequest, serverPlayer) -> {
-                        var qrLoginInfo = ILoginApiService.getInstance(ApiProvider.NCM).startQRLoginByPlayer(serverPlayer);
-                        IServerNetworkService.getInstance().sendToPlayer(serverPlayer,new StartQRLoginResponse(qrLoginInfo.data().qrimg()));
+                    ServerDataPacketVThreadExecutor.execute((startQRLoginRequest, player) -> {
+                        var qrLoginInfo = ILoginApiService.getInstance(ApiProvider.NCM).startQRLoginByPlayer(player);
+                        IServerNetworkService.getInstance().sendToPlayer(player,new StartQRLoginResponse(qrLoginInfo.data().qrimg()));
                     })
             );
         }

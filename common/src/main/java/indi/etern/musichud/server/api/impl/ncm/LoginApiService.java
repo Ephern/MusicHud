@@ -19,7 +19,7 @@ import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.*;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
@@ -34,13 +34,13 @@ public class LoginApiService implements ILoginApiService {
     private static final Logger logger = MusicHud.getLogger(LoginApiService.class);
     private static final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private static volatile LoginApiService loginApiService;
-    final Map<ServerPlayer, Runnable> pollingMap = new HashMap<>();
+    final Map<Player, Runnable> pollingMap = new HashMap<>();
     @Getter
-    Map<ServerPlayer, PlayerLoginInfo> playerInfoMap = new HashMap<>();
+    Map<Player, PlayerLoginInfo> playerInfoMap = new HashMap<>();
     @Getter
-    Set<Consumer<Map<ServerPlayer, PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
+    Set<Consumer<Map<Player, PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
     volatile String anonymousCookie;
-    final Cache<ServerPlayer, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
+    final Cache<Player, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
             .maximumSize(Long.MAX_VALUE)
             .softValues()
@@ -57,12 +57,12 @@ public class LoginApiService implements ILoginApiService {
         return LoginApiService.loginApiService;
     }
 
-    private static void sendSuccessLoginResultTo(ServerPlayer player, LoginCookieInfo loginCookieInfo, Profile profile) {
+    private static void sendSuccessLoginResultTo(Player player, LoginCookieInfo loginCookieInfo, Profile profile) {
         serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, profile));
         MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
     }
 
-    void sendLoginFailResult(ServerPlayer player, Exception e) {
+    void sendLoginFailResult(Player player, Exception e) {
         logger.error(e);
         String message;
         String eMessage = e.getMessage();
@@ -109,14 +109,14 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void joinUnlogged(ServerPlayer serverPlayer) {
-        playerInfoMap.put(serverPlayer, PlayerLoginInfo.UNLOGGED);
+    public void joinUnlogged(Player player) {
+        playerInfoMap.put(player, PlayerLoginInfo.UNLOGGED);
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(serverPlayer));
+        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
     }
 
     @Override
-    public void logout(ServerPlayer player) {
+    public void logout(Player player) {
         Runnable remove = pollingMap.remove(player);
         playerInfoMap.remove(player);
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap));
@@ -129,7 +129,7 @@ public class LoginApiService implements ILoginApiService {
 
     @SneakyThrows
     @Override
-    public void loginAsAnonymous(ServerPlayer player, boolean sendFail) {
+    public void loginAsAnonymous(Player player, boolean sendFail) {
         try {
             AnonymousLoginData response = ApiClient.post(
                     ServerApiMeta.Login.ANONYMOUS,
@@ -152,7 +152,7 @@ public class LoginApiService implements ILoginApiService {
 
     @SneakyThrows
     @Override
-    public void refreshAndSend(ServerPlayer player, LoginCookieInfo loginCookieInfo) {
+    public void refreshAndSend(Player player, LoginCookieInfo loginCookieInfo) {
         RefreshCookieResponse cookieResponse = ApiClient.post(ServerApiMeta.Login.REFRESH, null, loginCookieInfo.rawCookie());
         LoginCookieInfo refreshedLoginCookieInfo;
         if (cookieResponse.code == 200) {
@@ -168,7 +168,7 @@ public class LoginApiService implements ILoginApiService {
 
     @SneakyThrows
     @Override
-    public QRLoginData startQRLoginByPlayer(ServerPlayer player) {
+    public QRLoginData startQRLoginByPlayer(Player player) {
         try {
             logger.debug("Start QR login by player: {}", player.getName());
             QRLoginResponseInfo response1 = ApiClient.get(
@@ -192,7 +192,7 @@ public class LoginApiService implements ILoginApiService {
         }
     }
 
-    private void startQRPollingVThread(ServerPlayer player, String key) {
+    private void startQRPollingVThread(Player player, String key) {
         var params2 = new QRLoginCheckRequestInfo(key);
         var ref = new Object() {
             Runnable runnable = null;
@@ -247,13 +247,13 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public Profile loadUserProfile(ServerPlayer player, LoginCookieInfo loginCookieInfo) {
+    public Profile loadUserProfile(Player player, LoginCookieInfo loginCookieInfo) {
         AccountDetail accountDetail = ApiClient.get(ServerApiMeta.User.ACCOUNT, loginCookieInfo.rawCookie());
         Profile profile = accountDetail.profile();
         return postProcessProfile(player, loginCookieInfo, profile, accountDetail.account);
     }
 
-    private Profile postProcessProfile(ServerPlayer player, LoginCookieInfo loginCookieInfo, Profile profile, Account account) {
+    private Profile postProcessProfile(Player player, LoginCookieInfo loginCookieInfo, Profile profile, Account account) {
         if (profile == null) {
             if (account.anonymous) {
                 return Profile.ANONYMOUS;
@@ -270,12 +270,12 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void cancelQRLoginByPlayer(ServerPlayer player) {
+    public void cancelQRLoginByPlayer(Player player) {
         pollingMap.remove(player);
     }
 
     @Override
-    public PlayerLoginInfo getLoginInfoByServerPlayer(ServerPlayer player) {
+    public PlayerLoginInfo getLoginInfoByPlayer(Player player) {
         if (player == null) {
             return null;
         }
@@ -283,10 +283,10 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public String getRawCookieOrElse(ServerPlayer serverPlayer, Supplier<String> supplier) {
+    public String getRawCookieOrElse(Player player, Supplier<String> supplier) {
         String rawCookie;
-        if (serverPlayer != null) {
-            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(serverPlayer);
+        if (player != null) {
+            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(player);
             if (loginInfo != null) {
                 rawCookie = loginInfo.loginCookieInfo.rawCookie();
             } else {
@@ -299,9 +299,9 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void requestValidationCodeFor(int regionCode, long phone, ServerPlayer serverPlayer) {
+    public void requestValidationCodeFor(int regionCode, long phone, Player player) {
         SendValidationCodeResponse response = ApiClient.post(ServerApiMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null);
-        ZonedDateTime lastSentTime = lastSentTimes.getIfPresent(serverPlayer);
+        ZonedDateTime lastSentTime = lastSentTimes.getIfPresent(player);
         ZonedDateTime now = ZonedDateTime.now();
 
         Duration duration = null;
@@ -309,27 +309,27 @@ public class LoginApiService implements ILoginApiService {
             duration = Duration.between(lastSentTime, now);
         }
         if (lastSentTime == null || duration.compareTo(Duration.ofSeconds(30)) > 0) {
-            lastSentTimes.put(serverPlayer, now);
+            lastSentTimes.put(player, now);
             if (response.done) {
-                logger.info("Successfully send code to player: {}", serverPlayer.getName());
+                logger.info("Successfully send code to player: {}", player.getName());
             } else {
-                logger.error("Failed to send code to player: {}", serverPlayer.getName());
+                logger.error("Failed to send code to player: {}", player.getName());
             }
-            serverNetworkService.sendToPlayer(serverPlayer, new SendPhoneValidationCodeResponse(response.done, 30));
+            serverNetworkService.sendToPlayer(player, new SendPhoneValidationCodeResponse(response.done, 30));
         } else {
-            logger.warn("Refuse to send code to player: {}, as frequency limit", serverPlayer.getName());
-            serverNetworkService.sendToPlayer(serverPlayer, new SendPhoneValidationCodeResponse(response.done, 30 - (int) duration.getSeconds()));
+            logger.warn("Refuse to send code to player: {}, as frequency limit", player.getName());
+            serverNetworkService.sendToPlayer(player, new SendPhoneValidationCodeResponse(response.done, 30 - (int) duration.getSeconds()));
         }
     }
 
     @Override
-    public void loginWithPhoneAndCode(int regionCode, long phone, int code, ServerPlayer serverPlayer) {
+    public void loginWithPhoneAndCode(int regionCode, long phone, int code, Player player) {
         PhoneCodeLoginRequest requestBody = new PhoneCodeLoginRequest(regionCode, phone, code);
         PhoneLoginResponse loginResponse = ApiClient.post(ServerApiMeta.Login.PHONE, requestBody, null);
         if (loginResponse.code == 200) {
             LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.DEVICE_CODE, loginResponse.cookie, ZonedDateTime.now());
-            Profile profile = postProcessProfile(serverPlayer, loginCookieInfo, loginResponse.profile, loginResponse.account);
-            sendSuccessLoginResultTo(serverPlayer, loginCookieInfo, profile);
+            Profile profile = postProcessProfile(player, loginCookieInfo, loginResponse.profile, loginResponse.account);
+            sendSuccessLoginResultTo(player, loginCookieInfo, profile);
         } else {
             String i18nMessage = loginResponse.message;
             if (Objects.equals(i18nMessage, "验证码错误")) {
@@ -337,7 +337,7 @@ public class LoginApiService implements ILoginApiService {
             } else if (i18nMessage == null) {
                 i18nMessage = MusicHud.MOD_ID + ".text.unknownError";
             }
-            serverNetworkService.sendToPlayer(serverPlayer,
+            serverNetworkService.sendToPlayer(player,
                     new LoginResultMessage(
                             false,
                             i18nMessage,
@@ -348,12 +348,12 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void loginWithPhoneAndPassword(long phone, String md5password, ServerPlayer serverPlayer) {
+    public void loginWithPhoneAndPassword(long phone, String md5password, Player player) {
         throw new UnsupportedOperationException("Not supported yet due to api.");
     }
 
     @Override
-    public void loginWithEmailAndPassword(String email, String md5password, ServerPlayer serverPlayer) {
+    public void loginWithEmailAndPassword(String email, String md5password, Player player) {
         throw new UnsupportedOperationException("Not supported yet due to api.");
     }
 

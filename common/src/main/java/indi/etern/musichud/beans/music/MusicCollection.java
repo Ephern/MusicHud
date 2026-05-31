@@ -12,4 +12,6 @@ public interface MusicCollection {
     Collection<MusicDetail> getMusicDetails();
     CompletableFuture<Collection<MusicDetail>> loadMusicDetails(boolean ignoreCache);
     MusicCollection copyWithPusherInfo(PusherInfo pusherInfo);
+
+    boolean equalsLoose(Object obj);
 }
