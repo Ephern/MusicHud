@@ -1,5 +1,12 @@
-architectury {
-    common rootProject.architectury_enabled_platforms.split(',')
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+    id 'net.fabricmc.fabric-loom' version '1.17.0-alpha.13'
+    id 'com.gradleup.shadow'
+}
+
+base {
+    archivesName = "$rootProject.archives_name-$project.name"
 }
 
 repositories {
@@ -7,6 +14,74 @@ repositories {
         name = 'NeoForged'
         url = 'https://maven.neoforged.net/releases'
     }
+    maven {
+        name = "Fuzs Mod Resources"
+        url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/"
+    }
+    maven {
+        name = "Terraformers"
+        url = "https://maven.terraformersmc.com/"
+    }
+    maven {
+        name "IzzelAliz Maven"
+        url "https://maven.izzel.io/releases/"
+    }
+    maven {
+        name "ParchmentMC"
+        url "https://maven.parchmentmc.org/"
+    }
+    maven {
+        name "JitPack"
+        url 'https://jitpack.io'
+    }
+    flatDir {
+        dir rootProject.file('libs')
+    }
+}
+
+configurations {
+    common {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+    compileClasspath.extendsFrom common
+    runtimeClasspath.extendsFrom common
+}
+
+dependencies {
+    minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
+
+    implementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
+    implementation "net.neoforged:mergetool:2.0.0"
+
+    compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+    testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+
+    testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+    api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
+
+    api "icyllis.modernui:ModernUI-Core:$rootProject.modernui_version"
+    api "icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version"
+
+    implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
+    implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
+    // TODO: ModernUI-NeoForge not yet updated for 26.1
+    // compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+"
+    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.1.2-3.12.1.0"
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
 }
 
 processResources {
@@ -20,23 +95,6 @@ processResources {
     }
 }
 
-dependencies {
-    // We depend on Fabric Loader here to use the Fabric @Environment annotations,
-    // which get remapped to the correct annotations on each platform.
-    // Do NOT use other classes from Fabric Loader.
-    modImplementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
-    // Use Neoforge to avoid "Type net/neoforged/api/distmarker/Dist not present"
-    modImplementation "net.neoforged:mergetool:2.0.0"
-
-    testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
-    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
-    api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
-
-    implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
-    implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
-    compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+"
-}
-
 test {
     useJUnitPlatform()
     enabled = false
@@ -44,4 +102,13 @@ test {
 
 shadowJar {
     enabled = false
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = base.archivesName.get()
+            from components.java
+        }
+    }
 }

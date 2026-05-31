@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
 import com.mojang.blaze3d.pipeline.BlendFunction;
+import com.mojang.blaze3d.pipeline.ColorTargetState;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
@@ -12,7 +13,7 @@ public class HudRenderPipelines {
             RenderPipeline.builder()
                     .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
                     .withUniform("Projection", UniformType.UNIFORM_BUFFER)
-                    .withBlend(BlendFunction.TRANSLUCENT)
+                    .withColorTargetState(new ColorTargetState(BlendFunction.TRANSLUCENT))
                     .buildSnippet();
 
     public static final RenderPipeline BACKGROUND = RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)

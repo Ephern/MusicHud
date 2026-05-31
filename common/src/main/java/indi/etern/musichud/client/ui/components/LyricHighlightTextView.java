@@ -12,10 +12,10 @@ import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.Easings;
+import lombok.NonNull;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
-import javax.annotation.Nonnull;
 import java.time.Duration;
 import java.util.List;
 import java.util.function.Function;
@@ -59,7 +59,7 @@ public class LyricHighlightTextView extends TextView {
     }
 
     @Override
-    protected void onDraw(@Nonnull Canvas canvas) {
+    protected void onDraw(@NonNull Canvas canvas) {
         TextPaint textPaint = getPaint();
         if (status == HighlightStatus.WAITING) {
             super.setTextColor(Theme.FADE_LYRIC_COLOR);

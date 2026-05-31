@@ -3,9 +3,8 @@ package indi.etern.musichud.server.api;
 import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.server.level.ServerPlayer;import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;

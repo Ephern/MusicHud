@@ -14,8 +14,7 @@ import indi.etern.musichud.interfaces.IClientEventService;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.resources.language.I18n;
+import net.minecraft.client.gui.GuiGraphicsExtractor;import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -318,7 +317,7 @@ public class HudRendererManager {
         hudBaseData.getTransitionableBackground().startTransition(nextData);
     }
 
-    public void renderFrame(GuiGraphics graphics, DeltaTracker deltaTracker) {
+    public void renderFrame(GuiGraphicsExtractor graphics, DeltaTracker deltaTracker) {
         try {
             if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
                 return;

@@ -62,6 +62,7 @@ public final class PaperEventService implements IServerEventService, Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
+//        logger.info(event.getPlayer().getClass());
         ServerPlayer serverPlayer = ((CraftPlayer) event.getPlayer()).getHandle();
         disconnectListeners.forEach(d -> d.accept(serverPlayer));
     }

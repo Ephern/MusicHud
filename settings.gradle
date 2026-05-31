@@ -1,11 +1,9 @@
 pluginManagement {
     repositories {
         maven { url = 'https://maven.fabricmc.net/' }
-        maven { url = 'https://maven.architectury.dev/' }
-        maven { url = 'https://files.minecraftforge.net/maven/' }
-        maven { url = "https://maven.shedaniel.me/" }
-        maven { url = "https://maven.terraformersmc.com/releases/" }
+        maven { url = 'https://maven.neoforged.net/releases' }
         maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+        mavenCentral()
         gradlePluginPortal()
     }
 }
@@ -20,7 +18,17 @@ dependencyResolutionManagement {
 
 rootProject.name = 'music_hud'
 
+def active = providers.gradleProperty('activePlatform').getOrElse('all')
+def profiles = active.split(',').collect { it.trim().toLowerCase() } as Set
+
 include 'common'
-include 'fabric'
-include 'neoforge'
-include 'paper'
+
+if (profiles.contains('all') || profiles.contains('fabric')) {
+    include 'fabric'
+}
+if (profiles.contains('all') || profiles.contains('neoforge')) {
+    include 'neoforge'
+}
+if (profiles.contains('all') || profiles.contains('paper')) {
+    include 'paper'
+}

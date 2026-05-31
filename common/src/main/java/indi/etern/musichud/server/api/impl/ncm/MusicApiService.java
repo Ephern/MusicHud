@@ -19,9 +19,8 @@ import lombok.NoArgsConstructor;
 import lombok.SneakyThrows;
 import net.minecraft.server.level.ServerPlayer;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.NotNull;import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

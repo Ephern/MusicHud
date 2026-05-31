@@ -10,7 +10,7 @@ import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.DynamicUniformStorage;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2f;
@@ -33,7 +33,7 @@ public class HudRenderContext {
     private final Map<StorageKey, GpuBufferSlice> lastSlices = new HashMap<>();
 
     @Setter
-    private GuiGraphics graphics;
+    private GuiGraphicsExtractor graphics;
 
     public HudRenderContext() {
         current = this;
@@ -146,7 +146,7 @@ public class HudRenderContext {
     }
 
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
-        graphics.drawString(font, text, x, y, color, dropShadow);
+        graphics.text(font, text, x, y, color, dropShadow);
     }
 
     public void fill(int fromX, int fromY, int toX, int toY, int color) {
@@ -159,7 +159,7 @@ public class HudRenderContext {
     public static class Transforming {
         private final Matrix3x2fStack pose;
 
-        private Transforming(GuiGraphics guiGraphics) {
+        private Transforming(GuiGraphicsExtractor guiGraphics) {
             this.pose = guiGraphics.pose();
             pose.pushMatrix();
         }

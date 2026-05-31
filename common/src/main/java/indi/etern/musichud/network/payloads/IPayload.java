@@ -1,7 +1,7 @@
 package indi.etern.musichud.network.payloads;
 
-import icyllis.modernui.annotation.NonNull;
 import indi.etern.musichud.network.INetworkRegister;
+import lombok.NonNull;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
 public interface IPayload extends CustomPacketPayload {

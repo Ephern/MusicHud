@@ -2,7 +2,7 @@ package indi.etern.musichud.platform.mod.fabric.registry;
 
 import indi.etern.musichud.interfaces.IClientEventService;
 import indi.etern.musichud.interfaces.IKeyRegistryService;
-import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
+import net.fabricmc.fabric.api.client.keymapping.v1.KeyMappingHelper;
 import net.minecraft.client.KeyMapping;
 
 import java.util.LinkedHashMap;
@@ -25,7 +25,7 @@ public class FabricKeyRegistryService implements IKeyRegistryService {
     @Override
     public void register(KeyMapping keyMapping, Runnable action) {
         bindings.put(keyMapping, action);
-        KeyBindingHelper.registerKeyBinding(keyMapping);
+        KeyMappingHelper.registerKeyMapping(keyMapping);
     }
 
     public static FabricKeyRegistryService getInstance() {
