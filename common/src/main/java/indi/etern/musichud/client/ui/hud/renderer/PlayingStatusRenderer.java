@@ -56,6 +56,7 @@ public class PlayingStatusRenderer implements HudRenderer {
 
     @Override
     public void render(HudRenderContext hudRenderContext) {
+        ResourceLocation currentResourceLocation1 = currentResourceLocation;
         if (currentResourceLocation != null && visibility) {
             float rotationRadians;
             if (currentResourceLocation1 == RETRYING_ICON_LOCATION || currentResourceLocation1 == LOADING_ICON_LOCATION) {
