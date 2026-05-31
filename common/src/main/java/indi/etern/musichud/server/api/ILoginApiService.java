@@ -6,7 +6,7 @@ import indi.etern.musichud.interfaces.IServerEventService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerRegister;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 
 import java.util.Objects;
 import java.util.function.Supplier;
@@ -23,35 +23,35 @@ public interface ILoginApiService {
 
     String randomVipCookieOrElse(Supplier<String> defaultCookieSupplier);
 
-    void joinUnlogged(ServerPlayer serverPlayer);
+    void joinUnlogged(Player player);
 
-    void logout(ServerPlayer player);
+    void logout(Player player);
 
-    void loginAsAnonymous(ServerPlayer player, boolean sendFail);
+    void loginAsAnonymous(Player player, boolean sendFail);
 
-    void refreshAndSend(ServerPlayer player, LoginCookieInfo loginCookieInfo);
+    void refreshAndSend(Player player, LoginCookieInfo loginCookieInfo);
 
-    LoginApiService.QRLoginData startQRLoginByPlayer(ServerPlayer player);
+    LoginApiService.QRLoginData startQRLoginByPlayer(Player player);
 
-    Profile loadUserProfile(ServerPlayer player, LoginCookieInfo loginCookieInfo);
+    Profile loadUserProfile(Player player, LoginCookieInfo loginCookieInfo);
 
-    void cancelQRLoginByPlayer(ServerPlayer player);
+    void cancelQRLoginByPlayer(Player player);
 
-    LoginApiService.PlayerLoginInfo getLoginInfoByServerPlayer(ServerPlayer player);
+    LoginApiService.PlayerLoginInfo getLoginInfoByPlayer(Player player);
 
-    java.util.Map<ServerPlayer, LoginApiService.PlayerLoginInfo> getPlayerInfoMap();
+    java.util.Map<Player, LoginApiService.PlayerLoginInfo> getPlayerInfoMap();
 
-    java.util.Set<java.util.function.Consumer<java.util.Map<ServerPlayer, LoginApiService.PlayerLoginInfo>>> getLoginStateChangeListeners();
+    java.util.Set<java.util.function.Consumer<java.util.Map<Player, LoginApiService.PlayerLoginInfo>>> getLoginStateChangeListeners();
 
-    String getRawCookieOrElse(ServerPlayer serverPlayer, Supplier<String> supplier);
+    String getRawCookieOrElse(Player player, Supplier<String> supplier);
 
-    void requestValidationCodeFor(int regionCode, long phone, ServerPlayer serverPlayer);
+    void requestValidationCodeFor(int regionCode, long phone, Player player);
 
-    void loginWithPhoneAndCode(int regionCode, long phone, int code, ServerPlayer serverPlayer);
+    void loginWithPhoneAndCode(int regionCode, long phone, int code, Player player);
 
-    void loginWithPhoneAndPassword(long phone, String md5password, ServerPlayer serverPlayer);
+    void loginWithPhoneAndPassword(long phone, String md5password, Player player);
 
-    void loginWithEmailAndPassword(String email, String md5password, ServerPlayer serverPlayer);
+    void loginWithEmailAndPassword(String email, String md5password, Player player);
 
     void disconnectToAll();
 

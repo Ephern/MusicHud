@@ -40,7 +40,7 @@ public class ArtistDetailView extends LinearLayout {
         topBar.setLayoutParams(params);
 
         Button backButton = new Button(context);
-        backButton.setText(I18n.get("music_hud.button.back"));
+        backButton.setText(I18n.get(MusicHud.MOD_ID + ".button.back"));
         backButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
         backButton.setOnClickListener(view -> {
             RouterContainer.getInstance().popNavigate();
@@ -136,7 +136,7 @@ public class ArtistDetailView extends LinearLayout {
         }
         {
             noMoreResultText = new TextView(getContext());
-            noMoreResultText.setText(I18n.get("music_hud.text.searchNoMoreResult"));
+            noMoreResultText.setText(I18n.get(MusicHud.MOD_ID + ".text.searchNoMoreResult"));
             noMoreResultText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             noMoreResultText.setTextSize(Theme.TEXT_SIZE_NORMAL);
             noMoreResultText.setTextAlignment(TEXT_ALIGNMENT_CENTER);
@@ -159,8 +159,8 @@ public class ArtistDetailView extends LinearLayout {
                 ArtistDetailView.this.artist = artist1;
                 MuiModApi.postToUiThread(() -> {
                     briefInfo.setText(
-                            I18n.get("music_hud.text.artist.album").replace("{}", String.valueOf(artist1.getAlbumCount()))
-                                    + "  |  " + I18n.get("music_hud.text.artist.music").replace("{}", String.valueOf(artist1.getMusicCount())));
+                            I18n.get(MusicHud.MOD_ID + ".text.artist.album").replace("{}", String.valueOf(artist1.getAlbumCount()))
+                                    + "  |  " + I18n.get(MusicHud.MOD_ID + ".text.artist.music").replace("{}", String.valueOf(artist1.getMusicCount())));
                     description.setText(artist1.getDescription());
                     avatarImageView.loadUrl(artist1.getAvatarThumbnailUrl(dp(128)));
                     removeView(progressBar);
@@ -226,7 +226,7 @@ public class ArtistDetailView extends LinearLayout {
                 .map(Artist::getName).collect(Collectors.joining(" / "));
         musicLayout.setOnClickListener((view) -> {
             MusicService.getInstance().sendPushMusicToQueue(musicDetail);
-            ToastUtil.show(Toast.makeText(context, I18n.get("music_hud.text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
+            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
         musicList.addView(musicLayout);
     }

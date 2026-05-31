@@ -119,7 +119,7 @@ public class SearchResultTabPage extends FrameLayout {
             loadingMoreProgressBar.setIndeterminate(true);
 
             TextView noMoreResultText = new TextView(getContext());
-            noMoreResultText.setText(I18n.get("music_hud.text.searchNoMoreResult"));
+            noMoreResultText.setText(I18n.get(MusicHud.MOD_ID + ".text.searchNoMoreResult"));
             noMoreResultText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             noMoreResultText.setTextSize(Theme.TEXT_SIZE_NORMAL);
             noMoreResultText.setTextAlignment(TEXT_ALIGNMENT_CENTER);
@@ -258,10 +258,10 @@ public class SearchResultTabPage extends FrameLayout {
         @Override
         public CharSequence getPageTitle(int position) {
             return I18n.get(switch (position) {
-                case 0 -> "music_hud.text.page.search.music";
-                case 1 -> "music_hud.text.page.search.playlist";
-                case 2 -> "music_hud.text.page.search.album";
-                case 3 -> "music_hud.text.page.search.artist";
+                case 0 -> MusicHud.MOD_ID + ".text.page.search.music";
+                case 1 -> MusicHud.MOD_ID + ".text.page.search.playlist";
+                case 2 -> MusicHud.MOD_ID + ".text.page.search.album";
+                case 3 -> MusicHud.MOD_ID + ".text.page.search.artist";
                 default -> "";
             });
         }

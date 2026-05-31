@@ -5,6 +5,7 @@ import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
@@ -78,11 +79,11 @@ public class ArtistCard extends LinearLayout {
         artistName.setText(artist.getName());
         int musicCount = artist.getMusicCount();
         if (musicCount > 0) {
-            musicCounts.setText(I18n.get("music_hud.text.artist.music").replace("{}", String.valueOf(musicCount)));
+            musicCounts.setText(I18n.get(MusicHud.MOD_ID + ".text.artist.music").replace("{}", String.valueOf(musicCount)));
         } else {
             musicCounts.setText("");
         }
-        albumCounts.setText(I18n.get("music_hud.text.artist.album").replace("{}", String.valueOf(artist.getAlbumCount())));
+        albumCounts.setText(I18n.get(MusicHud.MOD_ID + ".text.artist.album").replace("{}", String.valueOf(artist.getAlbumCount())));
         this.artist = artist;
     }
 }

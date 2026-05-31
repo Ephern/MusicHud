@@ -1,6 +1,7 @@
 package indi.etern.musichud.platform.mod.forgeConfig.config;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.config.ProfileConfigData;
@@ -14,12 +15,18 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 public class ClientConfigDefinition implements ClientConfig {
     public static Pair<ClientConfigDefinition, ModConfigSpec> configure;
     @Getter
     private static ClientConfigDefinition instance;
+
+    static {
+        configure();
+    }
+
     private final ModConfigSpec.ConfigValue<Boolean> enable;
     private final ModConfigSpec.ConfigValue<Boolean> showTranslatedCnLyrics;
     private final ModConfigSpec.ConfigValue<Boolean> disableVanillaMusic;
@@ -35,15 +42,20 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Integer> hudCornerRadius;
     private final ModConfigSpec.ConfigValue<String> clientCookie;
     private final ModConfigSpec.ConfigValue<String> clientAccountConfig;
-    private final ModConfigSpec.ConfigValue<Boolean> enableEmbeddedServer;
+    private final ModConfigSpec.ConfigValue<Boolean> enabledInIntegratedServer;
+    private final ModConfigSpec.ConfigValue<Boolean> enableAutoConnect;
+    private final ModConfigSpec.ConfigValue<Boolean> enableIsolatedMode;
+    private final ModConfigSpec.ConfigValue<String> autoConnectServerFilterType;
+    private final ModConfigSpec.ConfigValue<String> autoConnectBlackList;
+    private final ModConfigSpec.ConfigValue<String> autoConnectWhiteList;
+    private final Set<Runnable> saveListener = new HashSet<>();
     @Setter
     @Getter
     private boolean configured;
-    private final Set<Runnable> saveListener = new HashSet<>();
 
     ClientConfigDefinition(ModConfigSpec.Builder builder) {
         enable = builder
-                .comment("Enable Music Hud Functions")
+                .comment("Enable Music HUD Functions")
                 .translation(MusicHud.MOD_ID + ".config.common.enable")
                 .define("enable", true);
         showTranslatedCnLyrics = builder
@@ -102,10 +114,30 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Client account config json")
                 .translation(MusicHud.MOD_ID + ".internal.clientAccountConfig")
                 .define("clientAccountConfig", "");
-        enableEmbeddedServer = builder
+        enabledInIntegratedServer = builder
                 .comment("Enable embedded server (To enable Music HUD in singleplayer or LAN multiplayer)")
-                .translation(MusicHud.MOD_ID + ".config.embeddedServer.enable")
-                .define("enableEmbeddedServer", true);
+                .translation(MusicHud.MOD_ID + ".config.integratedServer.enable")
+                .define("enabledInIntegratedServer", true);
+        enableAutoConnect = builder
+                .comment("Enable auto connect")
+                .translation(MusicHud.MOD_ID + ".config.autoConnect")
+                .define("enableAutoConnect", true);
+        enableIsolatedMode = builder
+                .comment("Enable client only mode")
+                .translation(MusicHud.MOD_ID + ".config.clientOnlyMode")
+                .define("enableClientOnlyMode", true);
+        autoConnectServerFilterType = builder
+                .comment("Auto connecting servers filter type (white list / black list)")
+                .translation(MusicHud.MOD_ID + ".config.autoConnectServerFilterType")
+                .define("autoConnectServerFilterType", AutoConnectServerFilterType.WHITE_LIST.name());
+        autoConnectBlackList = builder
+                .comment("Auto connecting servers black list")
+                .translation(MusicHud.MOD_ID + ".config.autoConnectBlackList")
+                .define("autoConnectBlackList", "[]");
+        autoConnectWhiteList = builder
+                .comment("Auto connecting servers white list")
+                .translation(MusicHud.MOD_ID + ".config.autoConnectWhiteList")
+                .define("autoConnectBlackList", "[]");
         instance = this;
     }
 
@@ -115,88 +147,56 @@ public class ClientConfigDefinition implements ClientConfig {
         }
     }
 
-    static {
-        configure();
+    @Override
+    public boolean getEnableAutoConnect() {
+        return this.enableAutoConnect.get();
     }
 
     @Override
-    public void setEnable(boolean enable) {
-        this.enable.set(enable);
+    public void setEnableAutoConnect(boolean autoConnect) {
+        this.enableAutoConnect.set(autoConnect);
     }
 
     @Override
-    public void setShowTranslatedCnLyrics(boolean showTranslatedCnLyrics) {
-        this.showTranslatedCnLyrics.set(showTranslatedCnLyrics);
+    public boolean getEnableIsolatedMode() {
+        return this.enableIsolatedMode.get();
     }
 
     @Override
-    public void setDisableVanillaMusic(boolean disableVanillaMusic) {
-        this.disableVanillaMusic.set(disableVanillaMusic);
+    public void setEnableIsolatedMode(boolean autoConnect) {
+        this.enableIsolatedMode.set(autoConnect);
     }
 
     @Override
-    public void setHideHudWhenNotPlaying(boolean hideHudWhenNotPlaying) {
-        this.hideHudWhenNotPlaying.set(hideHudWhenNotPlaying);
+    public AutoConnectServerFilterType getConnectServerFilterType() {
+        return AutoConnectServerFilterType.valueOf(autoConnectServerFilterType.get());
     }
 
     @Override
-    public void setEnableHud(boolean enableHud) {
-        this.enableHud.set(enableHud);
+    public void setConnectServerFilterType(AutoConnectServerFilterType type) {
+        autoConnectServerFilterType.set(type.name());
     }
 
     @Override
-    public void setPrimaryChosenQuality(Quality primaryChosenQuality) {
-        this.primaryChosenQuality.set(primaryChosenQuality.name());
+    public List<String> getBlackList() {
+        //noinspection unchecked
+        return JsonUtil.gson.fromJson(autoConnectBlackList.get(), List.class);
     }
 
     @Override
-    public void setHudVerticalPosition(VerticalAlign hudVerticalPosition) {
-        this.hudVerticalPosition.set(hudVerticalPosition.name());
+    public void setBlackList(List<String> blackList) {
+        autoConnectBlackList.set(JsonUtil.gson.toJson(blackList));
     }
 
     @Override
-    public void setHudHorizontalPosition(HorizontalAlign hudHorizontalPosition) {
-        this.hudHorizontalPosition.set(hudHorizontalPosition.name());
+    public List<String> getWhiteList() {
+        //noinspection unchecked
+        return JsonUtil.gson.fromJson(autoConnectWhiteList.get(), List.class);
     }
 
     @Override
-    public void setHudOffsetX(int hudOffsetX) {
-        this.hudOffsetX.set(hudOffsetX);
-    }
-
-    @Override
-    public void setHudOffsetY(int hudOffsetY) {
-        this.hudOffsetY.set(hudOffsetY);
-    }
-
-    @Override
-    public void setHudWidth(int hudWidth) {
-        this.hudWidth.set(hudWidth);
-    }
-
-    @Override
-    public void setHudHeight(int hudHeight) {
-        this.hudHeight.set(hudHeight);
-    }
-
-    @Override
-    public void setHudCornerRadius(int hudCornerRadius) {
-        this.hudCornerRadius.set(hudCornerRadius);
-    }
-
-    @Override
-    public void setClientCookie(LoginCookieInfo clientCookie) {
-        this.clientCookie.set(JsonUtil.gson.toJson(clientCookie));
-    }
-
-    @Override
-    public void setClientAccountConfig(ProfileConfigData clientAccountConfig) {
-        this.clientAccountConfig.set(JsonUtil.gson.toJson(clientAccountConfig));
-    }
-
-    @Override
-    public void setEnableEmbeddedServer(boolean enableEmbeddedServer) {
-        this.enableEmbeddedServer.set(enableEmbeddedServer);
+    public void setWhiteList(List<String> whiteList) {
+        autoConnectWhiteList.set(JsonUtil.gson.toJson(whiteList));
     }
 
     @Override
@@ -205,8 +205,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public void setEnable(boolean enable) {
+        this.enable.set(enable);
+    }
+
+    @Override
     public boolean getShowTranslatedCnLyrics() {
         return showTranslatedCnLyrics.get();
+    }
+
+    @Override
+    public void setShowTranslatedCnLyrics(boolean showTranslatedCnLyrics) {
+        this.showTranslatedCnLyrics.set(showTranslatedCnLyrics);
     }
 
     @Override
@@ -215,8 +225,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public void setDisableVanillaMusic(boolean disableVanillaMusic) {
+        this.disableVanillaMusic.set(disableVanillaMusic);
+    }
+
+    @Override
     public boolean getHideHudWhenNotPlaying() {
         return hideHudWhenNotPlaying.get();
+    }
+
+    @Override
+    public void setHideHudWhenNotPlaying(boolean hideHudWhenNotPlaying) {
+        this.hideHudWhenNotPlaying.set(hideHudWhenNotPlaying);
     }
 
     @Override
@@ -225,8 +245,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public void setEnableHud(boolean enableHud) {
+        this.enableHud.set(enableHud);
+    }
+
+    @Override
     public Quality getPrimaryChosenQuality() {
         return Quality.valueOf(primaryChosenQuality.get());
+    }
+
+    @Override
+    public void setPrimaryChosenQuality(Quality primaryChosenQuality) {
+        this.primaryChosenQuality.set(primaryChosenQuality.name());
     }
 
     @Override
@@ -235,8 +265,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public void setHudVerticalPosition(VerticalAlign hudVerticalPosition) {
+        this.hudVerticalPosition.set(hudVerticalPosition.name());
+    }
+
+    @Override
     public HorizontalAlign getHudHorizontalPosition() {
         return HorizontalAlign.valueOf(hudHorizontalPosition.get());
+    }
+
+    @Override
+    public void setHudHorizontalPosition(HorizontalAlign hudHorizontalPosition) {
+        this.hudHorizontalPosition.set(hudHorizontalPosition.name());
     }
 
     @Override
@@ -245,8 +285,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public void setHudOffsetX(int hudOffsetX) {
+        this.hudOffsetX.set(hudOffsetX);
+    }
+
+    @Override
     public int getHudOffsetY() {
         return hudOffsetY.get();
+    }
+
+    @Override
+    public void setHudOffsetY(int hudOffsetY) {
+        this.hudOffsetY.set(hudOffsetY);
     }
 
     @Override
@@ -255,8 +305,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public void setHudWidth(int hudWidth) {
+        this.hudWidth.set(hudWidth);
+    }
+
+    @Override
     public int getHudHeight() {
         return hudHeight.get();
+    }
+
+    @Override
+    public void setHudHeight(int hudHeight) {
+        this.hudHeight.set(hudHeight);
     }
 
     @Override
@@ -265,8 +325,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public void setHudCornerRadius(int hudCornerRadius) {
+        this.hudCornerRadius.set(hudCornerRadius);
+    }
+
+    @Override
     public LoginCookieInfo getClientCookie() {
         return JsonUtil.gson.fromJson(clientCookie.get(), LoginCookieInfo.class);
+    }
+
+    @Override
+    public void setClientCookie(LoginCookieInfo clientCookie) {
+        this.clientCookie.set(JsonUtil.gson.toJson(clientCookie));
     }
 
     @Override
@@ -275,8 +345,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public boolean getEnableEmbeddedServer() {
-        return enableEmbeddedServer.get();
+    public void setClientAccountConfig(ProfileConfigData clientAccountConfig) {
+        this.clientAccountConfig.set(JsonUtil.gson.toJson(clientAccountConfig));
+    }
+
+    @Override
+    public boolean getEnabledInIntegratedServer() {
+        return enabledInIntegratedServer.get();
+    }
+
+    @Override
+    public void setEnabledInIntegratedServer(boolean enabledInIntegratedServer) {
+        this.enabledInIntegratedServer.set(enabledInIntegratedServer);
     }
 
     @Override

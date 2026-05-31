@@ -24,23 +24,25 @@ public record ConnectRequest(Version clientVersion) implements C2SPayload {
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
+        private static final ClientConfig clientConfig = ClientConfig.getInstance();
+
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     ConnectRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((startQRLoginRequest, serverPlayer) -> {
+                    ServerDataPacketVThreadExecutor.execute((startQRLoginRequest, player) -> {
                         ILoginApiService instance = ILoginApiService.getInstance(ApiProvider.NCM);
                         boolean compatible = Version.capableWith(startQRLoginRequest.clientVersion());
-                        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && !ClientConfig.getInstance().getEnableEmbeddedServer()) {
+                        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && !clientConfig.getEnabledInIntegratedServer()) {
                             if (compatible) {
-                                instance.joinUnlogged(serverPlayer);
+                                instance.joinUnlogged(player);
                             }
                             return;
                         }
                         ConnectResponse response = new ConnectResponse(compatible, Version.current, List.of(ApiProvider.NCM));
-                        IServerNetworkService.getInstance().sendToPlayer(serverPlayer, response);
+                        IServerNetworkService.getInstance().sendToPlayer(player, response);
                         if (compatible) {
-                            instance.joinUnlogged(serverPlayer);
-                            MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(serverPlayer);
+                            instance.joinUnlogged(player);
+                            MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(player);
                         }
                     })
             );

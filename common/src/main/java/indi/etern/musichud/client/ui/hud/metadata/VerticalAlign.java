@@ -13,12 +13,12 @@ public enum VerticalAlign {
         float calcY(float y, HudRenderContext hudRenderContext, Layout hudLayout) {
             return y;
         }
-    }, CENTER("music_hud.config.layout.verticalAlign.CENTER", Gravity.CENTER) {
+    }, CENTER(MusicHud.MOD_ID + ".config.layout.verticalAlign.CENTER", Gravity.CENTER) {
         @Override
         float calcY(float y, HudRenderContext hudRenderContext, Layout hudLayout) {
             return (float) hudRenderContext.guiHeight() / 2 + y - hudLayout.getHeight() / 2;
         }
-    }, BOTTOM("music_hud.config.layout.verticalAlign.BOTTOM", Gravity.BOTTOM) {
+    }, BOTTOM(MusicHud.MOD_ID + ".config.layout.verticalAlign.BOTTOM", Gravity.BOTTOM) {
         @Override
         float calcY(float y, HudRenderContext hudRenderContext, Layout hudLayout) {
             return hudRenderContext.guiHeight() - hudLayout.getHeight() - y;

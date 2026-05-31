@@ -2,7 +2,7 @@ package indi.etern.musichud.platform.mod.neoforge.event;
 
 import indi.etern.musichud.interfaces.IServerEventService;
 import indi.etern.musichud.interfaces.Unregister;
-import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
@@ -14,7 +14,7 @@ import java.util.function.Consumer;
 
 public class NeoForgeServerEventService implements IServerEventService {
     private static volatile NeoForgeServerEventService instance;
-    private final Set<Consumer<ServerPlayer>> disconnectListeners = new HashSet<>();
+    private final Set<Consumer<Player>> disconnectListeners = new HashSet<>();
     private final Set<Runnable> stoppingListeners = new HashSet<>();
 
     private NeoForgeServerEventService() {
@@ -22,7 +22,7 @@ public class NeoForgeServerEventService implements IServerEventService {
     }
 
     @Override
-    public Unregister registerCommonPlayerQuit(Consumer<ServerPlayer> listener) {
+    public Unregister registerCommonPlayerQuit(Consumer<Player> listener) {
         disconnectListeners.add(listener);
         return () -> {
             disconnectListeners.remove(listener);
@@ -39,8 +39,8 @@ public class NeoForgeServerEventService implements IServerEventService {
 
     @SubscribeEvent
     public void onPlayerQuit(PlayerEvent.PlayerLoggedOutEvent event) {
-        if (event.getEntity() instanceof ServerPlayer serverPlayer) {
-            disconnectListeners.forEach(d -> d.accept(serverPlayer));
+        if (event.getEntity() instanceof Player player) {
+            disconnectListeners.forEach(d -> d.accept(player));
         }
     }
 

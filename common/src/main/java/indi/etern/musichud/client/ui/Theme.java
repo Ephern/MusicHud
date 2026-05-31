@@ -7,6 +7,7 @@ import icyllis.modernui.util.StateSet;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.interfaces.ClientConfig;
 import net.minecraft.client.resources.language.I18n;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -79,10 +80,10 @@ public class Theme {
         textView.setTextSize(TEXT_SIZE_NORMAL);
         textView.setTextColor(EMPHASIZE_TEXT_COLOR);
         if (enabled) {
-            if (MusicHud.getStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
+            if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode()) {
                 textView.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
-            } else if (MusicHud.getStatus() == MusicHud.ConnectStatus.INCAPABLE) {
-                textView.setText(I18n.get(MusicHud.MOD_ID + ".text.incapableWithServer"));
+            } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.INCOMPATIBLE) {
+                textView.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer"));
             }
         } else {
             textView.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));

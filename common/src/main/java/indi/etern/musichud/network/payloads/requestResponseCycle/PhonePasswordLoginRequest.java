@@ -25,8 +25,8 @@ public record PhonePasswordLoginRequest(long phone, String md5password) implemen
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     PhonePasswordLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((request, serverPlayer) -> {
-                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithPhoneAndPassword(request.phone,request.md5password,serverPlayer);
+                    ServerDataPacketVThreadExecutor.execute((request, player) -> {
+                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithPhoneAndPassword(request.phone,request.md5password,player);
                     })
             );
         }

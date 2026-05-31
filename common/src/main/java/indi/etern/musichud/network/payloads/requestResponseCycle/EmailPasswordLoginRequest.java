@@ -25,8 +25,8 @@ public record EmailPasswordLoginRequest(String email, String md5password) implem
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     EmailPasswordLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((request, serverPlayer) -> {
-                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithEmailAndPassword(request.email,request.md5password,serverPlayer);
+                    ServerDataPacketVThreadExecutor.execute((request, player) -> {
+                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithEmailAndPassword(request.email,request.md5password,player);
                     })
             );
         }

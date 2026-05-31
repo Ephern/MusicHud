@@ -20,8 +20,8 @@ public class CancelQRLoginRequest implements C2SPayload {
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     CancelQRLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((cancelQRLoginRequest, serverPlayer) -> {
-                        ILoginApiService.getInstance(ApiProvider.NCM).cancelQRLoginByPlayer(serverPlayer);
+                    ServerDataPacketVThreadExecutor.execute((cancelQRLoginRequest, player) -> {
+                        ILoginApiService.getInstance(ApiProvider.NCM).cancelQRLoginByPlayer(player);
                     })
             );
         }

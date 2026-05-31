@@ -20,12 +20,13 @@ import java.util.function.Consumer;
 
 @RegisterMark
 public class ApiServerManager implements ServerRegister {
-    private final Logger apiLogger = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/API");
-    private final ServerConfig serverConfig = ServerConfig.getInstance();
-    @Getter
-    private final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
+    private static final ServerConfig serverConfig = ServerConfig.getInstance();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     @Getter
     private static ApiServerManager instance;
+    private final Logger apiLogger = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/API");
+    @Getter
+    private final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
     private Process process;
     private boolean continueRestart = true;
     @Getter
@@ -49,7 +50,7 @@ public class ApiServerManager implements ServerRegister {
             return;
         }
         initialized = true;
-        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && !ClientConfig.getInstance().getEnableEmbeddedServer()) {
+        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && !clientConfig.getEnabledInIntegratedServer()) {
             return;
         }
         if (serverConfig.getStartupBinaryApiServerWhenLaunch()) {
