@@ -55,7 +55,7 @@ public class ClientConfigDefinition implements ClientConfig {
 
     ClientConfigDefinition(ModConfigSpec.Builder builder) {
         enable = builder
-                .comment("Enable Music Hud Functions")
+                .comment("Enable Music HUD Functions")
                 .translation(MusicHud.MOD_ID + ".config.common.enable")
                 .define("enable", true);
         showTranslatedCnLyrics = builder

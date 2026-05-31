@@ -6,7 +6,7 @@ license = "LGPL-3.0"
 [[mods]]
 modId = "music_hud"
 version = "${version}"
-displayName = "Music Hud"
+displayName = "Music HUD"
 authors = "Etern"
 description = "Request music in whole server powered by Netease Cloud Music (NCM) | 一个基于网易云的全服点歌模组"
 displayURL = "https://github.com/Etern-34520/MusicHud"

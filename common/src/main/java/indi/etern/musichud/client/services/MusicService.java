@@ -56,27 +56,27 @@ public class MusicService {
     @Getter
     private final Set<MusicCollection> localIdlePlaySources = new HashSet<>();
     @Getter
-    private final List<Consumer<MusicCollection>> localIdlePlaySourceAddListeners = new ArrayList<>();
+    private final Set<Consumer<MusicCollection>> localIdlePlaySourceAddListeners = new HashSet<>();
     @Getter
-    private final List<Consumer<MusicCollection>> localIdlePlaySourceRemoveListeners = new ArrayList<>();
+    private final Set<Consumer<MusicCollection>> localIdlePlaySourceRemoveListeners = new HashSet<>();
     @Getter
-    private final List<Consumer<MusicCollection>> localIdlePlaySourceChangeListeners = new ArrayList<>();
+    private final Set<Consumer<MusicCollection>> localIdlePlaySourceChangeListeners = new HashSet<>();
     @Getter
     private final Set<MusicCollection> serverIdlePlaySources = new HashSet<>();
     @Getter
-    private final List<Consumer<MusicCollection>> serverIdlePlaySourceAddListeners = new ArrayList<>();
+    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceAddListeners = new HashSet<>();
     @Getter
-    private final List<Consumer<MusicCollection>> serverIdlePlaySourceRemoveListeners = new ArrayList<>();
+    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceRemoveListeners = new HashSet<>();
     @Getter
-    private final List<Consumer<MusicCollection>> serverIdlePlaySourceChangeListeners = new ArrayList<>();
+    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceChangeListeners = new HashSet<>();
     @Getter
     private final Queue<MusicDetail> musicQueue = new ArrayDeque<>();
     @Getter
-    private final List<Consumer<Queue<MusicDetail>>> musicQueueRefreshListeners = new ArrayList<>();
+    private final Set<Consumer<Queue<MusicDetail>>> musicQueueRefreshListeners = new HashSet<>();
     @Getter
-    private final List<Consumer<MusicDetail>> musicQueuePushListeners = new ArrayList<>();
+    private final Set<Consumer<MusicDetail>> musicQueuePushListeners = new HashSet<>();
     @Getter
-    private final List<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = new ArrayList<>();
+    private final Set<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = new HashSet<>();
     long lastPressTime = 0;
     @Getter
     private boolean idlePlaySourceLoaded = false;
@@ -168,12 +168,14 @@ public class MusicService {
         } else {
             collection = idlePlaySourceCollection;
         }
-        localIdlePlaySources.add(collection);
-        localIdlePlaySourceAddListeners.forEach(l -> l.accept(collection));
-        localIdlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
         IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
-        profileConfigData.getIdlePlaySources().add(idlePlaySource);
-        profileConfigData.saveToConfig();
+        if (localIdlePlaySources.stream().noneMatch(s -> s.equals(collection))) {
+            localIdlePlaySources.add(collection);
+            localIdlePlaySourceAddListeners.forEach(l -> l.accept(collection));
+            localIdlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
+            profileConfigData.getIdlePlaySources().add(idlePlaySource);
+            profileConfigData.saveToConfig();
+        }
         clientNetworkService.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
     }
 
@@ -326,27 +328,29 @@ public class MusicService {
             //noinspection SuspiciousMethodCalls
             if (!playlistSources.contains(musicCollection) && !albumSources.contains(musicCollection)) {
                 toRemove.add(musicCollection);
-                serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
-                serverIdlePlaySourceRemoveListeners.forEach((listener) -> listener.accept(musicCollection));
             }
         }
         Player player = Minecraft.getInstance().player;
         for (MusicCollection musicCollection : playlistSources) {
             if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
                 toAdd.add(musicCollection);
-                serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
-                serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
             }
         }
         for (MusicCollection musicCollection : albumSources) {
             if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
                 toAdd.add(musicCollection);
-                serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
-                serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
             }
         }
         this.serverIdlePlaySources.removeAll(toRemove);
         this.serverIdlePlaySources.addAll(toAdd);
+        toRemove.forEach(musicCollection -> {
+            serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
+            serverIdlePlaySourceRemoveListeners.forEach((listener) -> listener.accept(musicCollection));
+        });
+        toAdd.forEach(musicCollection -> {
+            serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
+            serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
+        });
     }
 
     public CompletableFuture<List<Playlist>> loadUserPlaylists() {
@@ -415,23 +419,23 @@ public class MusicService {
         return completableFuture;
     }
 
-    public static void reset() {
+    public static void resetCurrentMusicStatus() {
         if (instance != null) {
             instance.switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
             instance.idlePlaySourceLoaded = false;
-            instance.localIdlePlaySourceRemoveListeners.forEach(l -> instance.localIdlePlaySources.forEach(l));
-            instance.localIdlePlaySourceChangeListeners.forEach(l -> instance.localIdlePlaySources.forEach(l));
-            instance.serverIdlePlaySourceRemoveListeners.forEach(l -> instance.serverIdlePlaySources.forEach(l));
-            instance.serverIdlePlaySourceChangeListeners.forEach(l -> instance.serverIdlePlaySources.forEach(l));
-            instance.localIdlePlaySources.clear();
-            instance.serverIdlePlaySources.clear();
+//            Set<MusicCollection> localCopy = Set.copyOf(instance.localIdlePlaySources);
+//            Set<MusicCollection> serverCopy = Set.copyOf(instance.serverIdlePlaySources);
+//            instance.localIdlePlaySources.clear();
+//            instance.serverIdlePlaySources.clear();
             instance.musicQueue.clear();
-//            instance.localIdlePlaySourceAddListeners.clear();
-//            instance.localIdlePlaySourceRemoveListeners.clear();
-//            instance.localIdlePlaySourceChangeListeners.clear();
-//            instance.musicQueueRefreshListeners.clear();
-//            instance.musicQueuePushListeners.clear();
-//            instance.musicQueueRemoveListeners.clear();
+//            localCopy.forEach(musicCollection -> {
+//                instance.localIdlePlaySourceRemoveListeners.forEach(l -> l.accept(musicCollection));
+//                instance.localIdlePlaySourceChangeListeners.forEach(l -> l.accept(musicCollection));
+//            });
+//            serverCopy.forEach(musicCollection -> {
+//                instance.serverIdlePlaySourceRemoveListeners.forEach(l -> l.accept(musicCollection));
+//                instance.serverIdlePlaySourceChangeListeners.forEach(l -> l.accept(musicCollection));
+//            });
         }
         if (HudRendererManager.isLoaded()) {
             HudRendererManager.getInstance().reset();
@@ -447,7 +451,7 @@ public class MusicService {
                 MusicService.getInstance().loadIdlePlaySourceFromConfig();
             });
             IClientEventService.getInstance().registerClientPlayerQuit((player) -> {
-                reset();
+                resetCurrentMusicStatus();
             });
         }
     }

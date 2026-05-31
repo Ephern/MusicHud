@@ -49,6 +49,7 @@ public class ConfigView extends LinearLayout {
     private static final ServerConfig serverConfig = ServerConfig.getInstance();
     @Getter
     static volatile ConfigView instance;
+    private final LoginService loginService = LoginService.getInstance();
 
     public ConfigView(Context context) {
         super(context);
@@ -81,9 +82,9 @@ public class ConfigView extends LinearLayout {
             booleanOption.setOnChanged(() -> {
                 MuiModApi.postToUiThread(MainFragment::refresh);
                 if (clientConfig.getEnable()) {
-                    LoginService.getInstance().connectToExternalServer();
+                    loginService.connectToExternalServer();
                 } else {
-                    LoginService.getInstance().disconnectToExternalOrIntegratedServer();
+                    loginService.disconnectToExternalOrIntegratedServer();
                 }
             });
             PreferencesFragment.BooleanOption translatedLyricOption = new PreferencesFragment.BooleanOption(context,
@@ -235,6 +236,15 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getEnableIsolatedMode,
                     clientConfig::setEnableIsolatedMode)
                     .setDefaultValue(true);
+            enableIsolatedMode.setOnChanged(() -> {
+                if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED) {
+                    if (clientConfig.getEnableIsolatedMode()) {
+                        loginService.switchToIsolate();
+                    } else {
+                        loginService.disconnectToExternalOrIntegratedServer();
+                    }
+                }
+            });
             enableIsolatedMode.create(multiplayerCategory);
 
             AutoConnectServerFilterType[] filterTypes = {AutoConnectServerFilterType.BLACK_LIST, AutoConnectServerFilterType.WHITE_LIST};

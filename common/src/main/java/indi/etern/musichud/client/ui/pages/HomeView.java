@@ -4,6 +4,7 @@ import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.Button;
@@ -33,6 +34,7 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -40,9 +42,10 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 @Slf4j
 public class HomeView extends LinearLayout {
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     @Getter
     private static HomeView instance;
+    private static final MusicService musicService = MusicService.getInstance();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private final Map<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new ConcurrentHashMap<>();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
@@ -62,9 +65,16 @@ public class HomeView extends LinearLayout {
         instance = this;
         Context context = getContext();
         removeAllViews();
-        MusicService musicService = MusicService.getInstance();
+        idlePlaySourceCardMap.clear();
 
-/*
+        boolean enabled = clientConfig.getEnable();
+        if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
+            setGravity(Gravity.CENTER);
+            TextView textView = Theme.getNotificationTextView(context, enabled);
+            addView(textView);
+            return;
+        }
+        /*
         boolean enabled = clientConfig.getEnable();
         if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED || !enabled) {
             setGravity(Gravity.CENTER);
@@ -207,43 +217,45 @@ public class HomeView extends LinearLayout {
             checkQueue(musicService.getMusicQueue());
 
             Queue<MusicDetail> queue = musicService.getMusicQueue();
-            musicService.getLocalIdlePlaySourceAddListeners().add(collection -> {
-                if (!idlePlaySourceCardMap.containsKey(collection)) {
-                    MuiModApi.postToUiThread(() -> {
+            Consumer<MusicCollection> localAddListener = collection -> {
+                MuiModApi.postToUiThread(() -> {
+                    if (!idlePlaySourceCardMap.containsKey(collection)) {
                         addIdlePlaySourceTo(collection, context, clientIdlePlaySourceCardsList);
                         checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
-                    });
-                }
-            });
-            musicService.getLocalIdlePlaySourceRemoveListeners().add(collection -> {
+                    }
+                });
+            };
+            Consumer<MusicCollection> localRemoveListener = collection -> {
                 MuiModApi.postToUiThread(() -> {
-                    MusicCollectionCard view = idlePlaySourceCardMap.get(collection);
+                    MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
                     if (view != null) {
                         clientIdlePlaySourceCardsList.removeView(view);
-                        idlePlaySourceCardMap.remove(collection);
+                        checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
                     }
-                    checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
                 });
-            });
-            musicService.getServerIdlePlaySourceAddListeners().add(collection -> {
-                if ((localPlayer != null && collection.getPusherInfo().getPlayerUUID() != localPlayer.getUUID())
-                        && !idlePlaySourceCardMap.containsKey(collection)) {
-                    MuiModApi.postToUiThread(() -> {
+            };
+            Consumer<MusicCollection> serverAddListener = collection -> {
+                MuiModApi.postToUiThread(() -> {
+                    if ((localPlayer != null && collection.getPusherInfo().getPlayerUUID() != localPlayer.getUUID())
+                            && !idlePlaySourceCardMap.containsKey(collection)) {
                         addIdlePlaySourceTo(collection, context, serverIdlePlaySourceCardsList);
                         checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
-                    });
-                }
-            });
-            musicService.getServerIdlePlaySourceRemoveListeners().add(collection -> {
+                    }
+                });
+            };
+            Consumer<MusicCollection> serverRemoveListener = collection -> {
                 MuiModApi.postToUiThread(() -> {
-                    MusicCollectionCard view = idlePlaySourceCardMap.get(collection);
+                    MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
                     if (view != null) {
                         serverIdlePlaySourceCardsList.removeView(view);
-                        idlePlaySourceCardMap.remove(collection);
+                        checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
                     }
-                    checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
                 });
-            });
+            };
+            musicService.getLocalIdlePlaySourceAddListeners().add(localAddListener);
+            musicService.getLocalIdlePlaySourceRemoveListeners().add(localRemoveListener);
+            musicService.getServerIdlePlaySourceAddListeners().add(serverAddListener);
+            musicService.getServerIdlePlaySourceRemoveListeners().add(serverRemoveListener);
 
             playQueueListView.removeAllViews();
 
@@ -251,20 +263,22 @@ public class HomeView extends LinearLayout {
                 addMusicQueueItem(musicDetail, playQueueListView);
             }
 
-            musicService.getMusicQueuePushListeners().add(musicDetail -> {
+            Consumer<MusicDetail> musicQueuePushListener = musicDetail -> {
                 MuiModApi.postToUiThread(() -> {
                     addMusicQueueItem(musicDetail, playQueueListView);
                     checkQueue(queue);
                 });
-            });
-            musicService.getMusicQueueRemoveListeners().add((removeIndex, musicDetail) -> {
+            };
+            BiConsumer<Integer, MusicDetail> musicQueueRemoveListener = (removeIndex, musicDetail) -> {
                 MuiModApi.postToUiThread(() -> {
                     if (removeIndex >= 0 && removeIndex < playQueueListView.getChildCount()) {
                         playQueueListView.removeViewAt(removeIndex);
                     }
                     checkQueue(queue);
                 });
-            });
+            };
+            musicService.getMusicQueuePushListeners().add(musicQueuePushListener);
+            musicService.getMusicQueueRemoveListeners().add(musicQueueRemoveListener);
 
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
                 @Override
@@ -273,24 +287,12 @@ public class HomeView extends LinearLayout {
 
                 @Override
                 public void onViewDetachedFromWindow(View v) {
-                    musicService.getLocalIdlePlaySourceRemoveListeners().remove((Consumer<MusicCollection>) collection1 -> {
-                        MuiModApi.postToUiThread(() -> {
-                            MusicCollectionCard view = idlePlaySourceCardMap.get(collection1);
-                            if (view != null) {
-                                clientIdlePlaySourceCardsList.removeView(view);
-                                idlePlaySourceCardMap.remove(collection1);
-                            }
-                            checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
-                        });
-                    });
-                    musicService.getLocalIdlePlaySourceAddListeners().remove((Consumer<MusicCollection>) collection -> {
-                        if (!idlePlaySourceCardMap.containsKey(collection)) {
-                            MuiModApi.postToUiThread(() -> {
-                                addIdlePlaySourceTo(collection, context, clientIdlePlaySourceCardsList);
-                                checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
-                            });
-                        }
-                    });
+                    musicService.getLocalIdlePlaySourceAddListeners().remove(localAddListener);
+                    musicService.getLocalIdlePlaySourceRemoveListeners().remove(localRemoveListener);
+                    musicService.getServerIdlePlaySourceAddListeners().remove(serverAddListener);
+                    musicService.getServerIdlePlaySourceRemoveListeners().remove(serverRemoveListener);
+                    musicService.getMusicQueuePushListeners().remove(musicQueuePushListener);
+                    musicService.getMusicQueueRemoveListeners().remove(musicQueueRemoveListener);
                     instance = null;
                 }
             });

@@ -30,6 +30,7 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.CookieLoginRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
+import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -140,7 +141,7 @@ public class LoginService {
 
     public void connectToExternalServer() {
         if (clientConfig.getEnable()) {
-            MusicService.reset();
+            MusicService.resetCurrentMusicStatus();
             NowPlayingInfo.getInstance().stop();
             StreamAudioPlayer.getInstance().stop();
             clientNetworkService.sendToServer(new ConnectRequest(Version.current));
@@ -174,7 +175,7 @@ public class LoginService {
 
     public void disconnectToExternalOrIntegratedServer() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
-        MusicService.reset();
+        MusicService.resetCurrentMusicStatus();
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();
 
@@ -189,7 +190,7 @@ public class LoginService {
 
     private void launchIsolated() {
         loginToServer();
-        MusicService.reset();
+        MusicService.resetCurrentMusicStatus();
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();
         MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(Minecraft.getInstance().player);
@@ -229,9 +230,9 @@ public class LoginService {
                         //noinspection UnstableApiUsage
                         Context context = UIManager.getInstance().getDecorView().getContext();
                         if (connected) {
-                            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.disconnected"), Toast.LENGTH_SHORT));
+                            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.disconnecting"), Toast.LENGTH_SHORT));
                         } else {
-                            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.connected"), Toast.LENGTH_SHORT));
+                            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.connecting"), Toast.LENGTH_SHORT));
                         }
                     });
                 }
@@ -271,6 +272,8 @@ public class LoginService {
                         } else {
                             getInstance().launchIsolated();
                         }
+                    } else {
+                        getInstance().launchIsolated();
                     }
                 } else {
                     // Single Player
@@ -278,7 +281,13 @@ public class LoginService {
                 }
             });
             eventService.registerClientPlayerQuit((player) -> {
-                MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
+                if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
+                    if (clientConfig.getEnableIsolatedMode()) {
+                        LoginApiService.getInstance().logout(player);
+                    }
+                } else {
+                    MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
+                }
             });
         }
     }

@@ -202,7 +202,7 @@ public class StreamAudioPlayer {
 //        boolean futureFinished = serverStartTimeUpdated;
         try {
             // 等待一些数据缓冲
-            while (!currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture && totalBufferedBytes.get() < BUFFER_SIZE * BUFFER_COUNT) {
+            while (currentPlayingFuture != null && !currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture && totalBufferedBytes.get() < BUFFER_SIZE * BUFFER_COUNT) {
                 Thread.sleep(50);
             }
 
@@ -364,9 +364,13 @@ public class StreamAudioPlayer {
         MusicResourceInfo musicResourceInfo = MusicResourceInfo.NONE;
         while (!currentDownloadFuture.isDone() && currentDownloadFuture == downloadFuture) {
             try {
-                if (musicResourceInfo.equals(MusicResourceInfo.NONE) || localRetryCount % 3 == 0) {
+                if (musicResourceInfo == null || musicResourceInfo.equals(MusicResourceInfo.NONE) || localRetryCount % 3 == 0) {
                     musicResourceInfo = getCurrentMusicResourceInfo(clientConfig.getPrimaryChosenQuality(), musicResourceInfo).get();
+                    if (musicResourceInfo == null) {
+                        continue;
+                    }
                 }
+
                 LOGGER.debug("Starting audio download (attempt {})", localRetryCount + 1);
 
                 AudioDecoder decoder = loadAudioDecoder(musicResourceInfo.getUrl(), musicResourceInfo.getType());
@@ -652,14 +656,14 @@ public class StreamAudioPlayer {
     public CompletableFuture<MusicResourceInfo> getCurrentMusicResourceInfo(Quality quality, MusicResourceInfo previous) {
         CompletableFuture<MusicResourceInfo> future = new CompletableFuture<>();
         GetMusicResourceResponse.setReceiver(currentMusicDetail.getId(), value -> {
-            if (value == null || value == MusicResourceInfo.NONE) {
+            if (value == MusicResourceInfo.NONE) {
                 MusicService.getInstance().switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                 setStatus(Status.ERROR);
             } else {
                 future.complete(value);
             }
         });
-        String url = previous.getUrl() == null ? "" : previous.getUrl();
+        String url = previous == null || previous.getUrl() == null ? "" : previous.getUrl();
         IClientNetworkService.getInstance().sendToServer(new GetMusicResourceRequest(currentMusicDetail.getId(), quality, url));
         return future;
     }

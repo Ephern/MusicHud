@@ -167,9 +167,12 @@ public class HudRendererManager {
 
             contentInterval = Math.min(contentUnit * 2.5f, 2f);
 
+            float maxTitleWidth = contentWidth - titleSize - contentInterval;
+
             float titleY = showProgress ? contentPadding + 1f : contentPadding + (contentHeight - titleSize) / 2;
-            float headX = Math.max(mainContentX + contentWidth - titleSize, imageHeightAndWidth + contentPadding - titleSize);
-            float statusX = headX - titleSize - contentPadding;
+            float statusX = Math.max(mainContentX + contentWidth - titleSize, imageHeightAndWidth + contentPadding - titleSize);
+            boolean statusVisible = !(maxTitleWidth - 1.25 * titleSize <= 0);
+            float headX = statusX - (statusVisible ? titleSize + contentPadding: 0);
 
             boolean showInfoLine = contentHeight - titleSize > 11f;
             float infoTextSize = showInfoLine ? contentUnit * 5.5f : 0;
@@ -183,16 +186,14 @@ public class HudRendererManager {
             float aboveProgressY = progressY - infoTextSize - contentInterval;
             float progressRightX = mainContentX + contentWidth;
 
-            Layout layout1 = new Layout("PlayerHead", headX, titleY, titleSize, titleSize, 0f);
-            layout1.setParent(baseLayout);
-            PLAYER_HEAD_RENDERER.configure(layout1);
-
-            float maxTitleWidth = contentWidth - titleSize - contentInterval;
-
             Layout statusLayout = new Layout("Status", statusX, titleY, titleSize, titleSize, 0f);
             statusLayout.setParent(baseLayout);
             PLAYING_STATUS_RENDERER.configure(statusLayout);
-            PLAYING_STATUS_RENDERER.setVisibility(!(maxTitleWidth - 1.25 * titleSize <= 0));
+            PLAYING_STATUS_RENDERER.setVisibility(statusVisible);
+
+            Layout layout1 = new Layout("PlayerHead", headX, titleY, titleSize, titleSize, 0f);
+            layout1.setParent(baseLayout);
+            PLAYER_HEAD_RENDERER.configure(layout1);
 
             Layout titleLayout = Layout.ofTextLayout("Title", mainContentX, titleY, maxTitleWidth, titleSize);
             titleLayout.setParent(baseLayout);

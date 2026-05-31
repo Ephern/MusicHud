@@ -418,7 +418,7 @@ public class MainFragment extends Fragment {
                 switchServerConnectButton.setFocusable(true);
                 switchServerConnectButton.setClickable(true);
                 switchServerConnectButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                switchServerConnectButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                switchServerConnectButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
                 switchServerConnectButton.setGravity(Gravity.CENTER);
                 Drawable background1 = ButtonInsetBackgroundFactory.builder()
@@ -430,9 +430,9 @@ public class MainFragment extends Fragment {
                 switchServerConnectButton.setOnClickListener(b -> {
                     MusicHud.EXECUTOR.execute(loginService::toggleConnection);
                 });
-                serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(52)));
+                serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(40)));
                 refreshServerConnectStatus();
-                LinearLayout.LayoutParams params4 = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+                LinearLayout.LayoutParams params4 = new LinearLayout.LayoutParams(widthDp, WRAP_CONTENT);
                 params4.setMargins(0, serverConnectPanel.dp(8), 0, serverConnectPanel.dp(48));
                 side.addView(serverConnectPanel, params4);
 
@@ -445,6 +445,8 @@ public class MainFragment extends Fragment {
                 sideContent.setLayoutTransition(transition2);
 
                 LayoutTransition transition3 = new LayoutTransition();
+                transition3.disableTransitionType(LayoutTransition.DISAPPEARING);
+                transition3.disableTransitionType(LayoutTransition.APPEARING);
                 transition3.enableTransitionType(LayoutTransition.CHANGING);
                 serverConnectPanel.setLayoutTransition(transition3);
 
@@ -466,40 +468,37 @@ public class MainFragment extends Fragment {
             boolean singlePlayer = Minecraft.getInstance().getCurrentServer() == null;
             switch (MusicHud.getConnectStatus()) {
                 case CONNECTED -> {
-                    serverConnectPanel.setVisibility(View.VISIBLE);//TODO
-                    serverConnectStatus.setText("Already connected to server-side Music HUD");
-                    switchServerConnectButton.setText("Disconnect");
                     if (singlePlayer) {
-                        switchServerConnectButton.setEnabled(false);
-                        switchServerConnectButton.setTooltipText("Cannot disconnect when playing single player");
+                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.connected.integrated"));
+                        switchServerConnectButton.setVisibility(View.GONE);
+                    } else {
+                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.connected"));
+                        switchServerConnectButton.setVisibility(View.VISIBLE);
+                        switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.disconnect"));
                     }
-                    switchServerConnectButton.setVisibility(View.VISIBLE);
                 }
                 case NOT_CONNECTED -> {
-                    serverConnectPanel.setVisibility(View.VISIBLE);
                     if (clientConfig.getEnableIsolatedMode()) {
-                        serverConnectStatus.setText("Not connected to server-side Music HUD, enabled isolated");
+                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected.isolated"));
                     } else {
-                        serverConnectStatus.setText("Not connected to server-side Music HUD, disabled");
+                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
                     }
-                    switchServerConnectButton.setText("Try to Connect");
                     switchServerConnectButton.setVisibility(View.VISIBLE);
+                    switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }
                 case INCOMPATIBLE -> {
-                    serverConnectPanel.setVisibility(View.VISIBLE);
                     if (clientConfig.getEnableIsolatedMode()) {
-                        serverConnectStatus.setText("Incompatible with server version, enabled isolated");
+                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatible"));
                     } else {
-                        serverConnectStatus.setText("Incompatible with server version, disabled");
+                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatible.isolated"));
                     }
-                    switchServerConnectButton.setVisibility(View.GONE);
-                }
-                default -> {
-                    serverConnectPanel.setVisibility(View.GONE);
+                    switchServerConnectButton.setVisibility(View.VISIBLE);
+                    switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }
             }
         } else {
-            serverConnectPanel.setVisibility(View.GONE);
+            serverConnectStatus.setText("");
+            switchServerConnectButton.setVisibility(View.GONE);
         }
     }
 

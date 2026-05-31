@@ -49,6 +49,18 @@ public class MusicApiService implements IMusicApiService {
             .expireAfterAccess(10, TimeUnit.MINUTES)
             .maximumSize(50)
             .build();
+    private static final Cache<Long, List<Playlist>> userSubscribedPlaylistCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .maximumSize(50)
+            .build();
+    private static final Cache<Long, List<Artist>> userSubscribedArtistsCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .maximumSize(50)
+            .build();
+    private static final Cache<Long, List<Album>> userSubscribedAlbumsCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .maximumSize(50)
+            .build();
     private static volatile MusicApiService musicApiService;
     private final LoginApiService loginApiService = LoginApiService.getInstance();
     private final Gson gson = JsonUtil.gson;
@@ -319,6 +331,7 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
+    @SneakyThrows
     public List<Playlist> getPlayersUserSubscribedPlaylists(Player player) {
         if (player == null) {
             return Collections.emptyList();
@@ -328,16 +341,20 @@ public class MusicApiService implements IMusicApiService {
         if (profile == null) {
             return List.of();
         } else {
-            PlaylistsResponse playlistData = ApiClient.post(
-                    ServerApiMeta.User.PLAYLIST,
-                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
-                    loginInfo.loginCookieInfo.rawCookie()
-            );
-            return playlistData.getPlaylists();
+            long userId = profile.getUserId();
+            return userSubscribedPlaylistCache.get(userId, () -> {
+                PlaylistsResponse playlistData = ApiClient.post(
+                        ServerApiMeta.User.PLAYLIST,
+                        new PagedRequestDataWithUID(userId, 50, 0),
+                        loginInfo.loginCookieInfo.rawCookie()
+                );
+                return playlistData.getPlaylists();
+            });
         }
     }
 
     @Override
+    @SneakyThrows
     public List<Album> getPlayersUserSubscribedAlbums(Player player) {
         if (player == null) {
             return Collections.emptyList();
@@ -347,16 +364,20 @@ public class MusicApiService implements IMusicApiService {
         if (profile == null) {
             return List.of();
         } else {
-            UserSubscribedAlbumResponse userSubscribedAlbumResponse = ApiClient.post(
-                    ServerApiMeta.User.SUBSCRIBED_ALBUMS,
-                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
-                    loginInfo.loginCookieInfo.rawCookie()
-            );
-            return userSubscribedAlbumResponse.data();
+            long userId = profile.getUserId();
+            return userSubscribedAlbumsCache.get(userId, () -> {
+                UserSubscribedAlbumResponse userSubscribedAlbumResponse = ApiClient.post(
+                        ServerApiMeta.User.SUBSCRIBED_ALBUMS,
+                        new PagedRequestDataWithUID(userId, 50, 0),
+                        loginInfo.loginCookieInfo.rawCookie()
+                );
+                return userSubscribedAlbumResponse.data();
+            });
         }
     }
 
     @Override
+    @SneakyThrows
     public List<Artist> getPlayersUserSubscribedArtists(Player player) {
         if (player == null) {
             return Collections.emptyList();
@@ -366,12 +387,15 @@ public class MusicApiService implements IMusicApiService {
         if (profile == null) {
             return List.of();
         } else {
-            UserSubscribedArtistResponse userSubscribedArtistResponse = ApiClient.post(
-                    ServerApiMeta.User.SUBSCRIBED_ARTISTS,
-                    new PagedRequestDataWithUID(profile.getUserId(), 50, 0),
-                    loginInfo.loginCookieInfo.rawCookie()
-            );
-            return userSubscribedArtistResponse.data();
+            long userId = profile.getUserId();
+            return userSubscribedArtistsCache.get(userId, () -> {
+                UserSubscribedArtistResponse userSubscribedArtistResponse = ApiClient.post(
+                        ServerApiMeta.User.SUBSCRIBED_ARTISTS,
+                        new PagedRequestDataWithUID(userId, 50, 0),
+                        loginInfo.loginCookieInfo.rawCookie()
+                );
+                return userSubscribedArtistResponse.data();
+            });
         }
     }
 

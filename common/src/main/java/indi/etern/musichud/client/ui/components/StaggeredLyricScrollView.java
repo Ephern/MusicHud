@@ -450,7 +450,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             float lastTargetOffset = line.getTargetOffset(lastHighlightedLyricLine);
             float targetOffset = line.getTargetOffset(justHighlightedLyricLine);
 
-            float fromOffset = staggerFromOffsets != null
+            float fromOffset = staggerFromOffsets != null && i < staggerFromOffsets.length
                     ? staggerFromOffsets[i]
                     : lastTargetOffset;
 
