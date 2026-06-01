@@ -141,9 +141,6 @@ public class LoginService {
 
     public void connectToExternalServer() {
         if (clientConfig.getEnable()) {
-            MusicService.resetCurrentMusicStatus();
-            NowPlayingInfo.getInstance().stop();
-            StreamAudioPlayer.getInstance().stop();
             clientNetworkService.sendToServer(new ConnectRequest(Version.current));
         }
     }
@@ -197,7 +194,6 @@ public class LoginService {
     }
 
     public void switchToServer() {
-        disconnectToExternalOrIntegratedServer();
         connectToExternalServer();
     }
 
@@ -248,7 +244,7 @@ public class LoginService {
             MuiModApi.postToUiThread(() -> {
                 //noinspection UnstableApiUsage
                 Context context = UIManager.getInstance().getDecorView().getContext();
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.IsolatedModeUnavailableInIntegratedServer"), Toast.LENGTH_SHORT));
+                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.switchConnectionUnavailableInIntegratedServer"), Toast.LENGTH_SHORT));
             });
         }
     }

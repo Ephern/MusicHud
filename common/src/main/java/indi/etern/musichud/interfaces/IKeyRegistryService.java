@@ -19,4 +19,5 @@ public interface IKeyRegistryService {
             }
         }
         throw new UnsupportedOperationException();
-    }}
+    }
+}
