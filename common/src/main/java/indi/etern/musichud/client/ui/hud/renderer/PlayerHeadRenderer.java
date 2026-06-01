@@ -4,7 +4,6 @@ import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.resources.ResourceLocation;
 
 public class PlayerHeadRenderer implements HudRenderer {
@@ -14,7 +13,7 @@ public class PlayerHeadRenderer implements HudRenderer {
     private Layout layout;
     @Getter
     @Setter
-    private PlayerInfo playerInfo;
+    private ResourceLocation skinResource;
 
     public static PlayerHeadRenderer getInstance() {
         if (instance == null) {
@@ -35,16 +34,14 @@ public class PlayerHeadRenderer implements HudRenderer {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null) return;
 
-        if (playerInfo == null) return;
-
-        ResourceLocation skinLocation = playerInfo.getSkin().texture();
+        if (skinResource == null) return;
 
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
         context.transform()
                 .translate(absolutePosition.x(), absolutePosition.y())
                 .then((transforming) -> {
                     context.blit(
-                            skinLocation,
+                            skinResource,
                             0, 0,
                             8, 8,
                             (int) layout.getWidth(), (int) layout.getHeight(),
@@ -57,7 +54,7 @@ public class PlayerHeadRenderer implements HudRenderer {
                 .scale(1.16f)
                 .then((transforming) -> {
                     context.blit(
-                            skinLocation,
+                            skinResource,
                             0, 0, 40, 8,
                             (int) layout.getWidth(), (int) layout.getHeight(), 8, 8,
                             SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE

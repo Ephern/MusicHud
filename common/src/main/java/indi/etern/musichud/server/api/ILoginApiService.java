@@ -8,7 +8,8 @@ import indi.etern.musichud.interfaces.ServerRegister;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import net.minecraft.world.entity.player.Player;
 
-import java.util.Objects;
+import java.util.*;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public interface ILoginApiService {
@@ -39,9 +40,9 @@ public interface ILoginApiService {
 
     LoginApiService.PlayerLoginInfo getLoginInfoByPlayer(Player player);
 
-    java.util.Map<Player, LoginApiService.PlayerLoginInfo> getPlayerInfoMap();
+    Map<UUID, LoginApiService.PlayerLoginInfo> getPlayerInfoMap();
 
-    java.util.Set<java.util.function.Consumer<java.util.Map<Player, LoginApiService.PlayerLoginInfo>>> getLoginStateChangeListeners();
+    Set<Consumer<Collection<LoginApiService.PlayerLoginInfo>>> getLoginStateChangeListeners();
 
     String getRawCookieOrElse(Player player, Supplier<String> supplier);
 

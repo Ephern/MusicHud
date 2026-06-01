@@ -10,6 +10,9 @@
 > Due to service scope provided by NetEase, this mod might not work well outside China
 
 ## Related Links
+[ModRinth](https://modrinth.com/mod/music-hud)
+
+[CurseForge](https://www.curseforge.com/minecraft/mc-mods/music-hud)
 
 [Third-party Bukkit plugin 1](https://github.com/Shiroiame-Kusu/MusicHud-Bukkit) (1.0.5 stable -)
 

@@ -36,16 +36,18 @@ public class PlayingStatusRenderer implements HudRenderer {
         this.layout = layout;
     }
 
-    public void setStatus(StreamAudioPlayer.Status status) {
-        this.status = status;
-        currentResourceLocation = switch (status) {
+    public void updateStatus(StreamAudioPlayer.Status status) {
+        if (status != null) {
+            this.status = status;
+        }
+        currentResourceLocation = switch (this.status) {
             case BUFFERING -> LOADING_ICON_LOCATION;
             case RETRYING -> RETRYING_ICON_LOCATION;
             case ERROR -> ERROR_ICON_LOCATION;
             default -> {
                 if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
                     yield PLAYING_CONNECTED_ICON_LOCATION;
-                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED){
+                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                     yield PLAYING_ISOLATED_LOCATION;
                 } else {
                     yield null;
