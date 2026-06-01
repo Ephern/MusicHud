@@ -36,9 +36,9 @@ public class LoginApiService implements ILoginApiService {
     private static volatile LoginApiService loginApiService;
     final Map<Player, Runnable> pollingMap = new HashMap<>();
     @Getter
-    Map<Player, PlayerLoginInfo> playerInfoMap = new HashMap<>();
+    Map<UUID, PlayerLoginInfo> playerInfoMap = new HashMap<>();
     @Getter
-    Set<Consumer<Map<Player, PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
+    Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
     volatile String anonymousCookie;
     final Cache<Player, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
@@ -59,7 +59,7 @@ public class LoginApiService implements ILoginApiService {
 
     private static void sendSuccessLoginResultTo(Player player, LoginCookieInfo loginCookieInfo, Profile profile) {
         serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, profile));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
+        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayer(player)));
     }
 
     void sendLoginFailResult(Player player, Exception e) {
@@ -110,16 +110,16 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public void joinUnlogged(Player player) {
-        playerInfoMap.put(player, PlayerLoginInfo.UNLOGGED);
-        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
+        playerInfoMap.put(player.getUUID(), PlayerLoginInfo.of(player, LoginCookieInfo.UNLOGGED));
+        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
+        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayer(player)));
     }
 
     @Override
     public void logout(Player player) {
         Runnable remove = pollingMap.remove(player);
         playerInfoMap.remove(player);
-        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap));
+        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
         if (remove != null) {
             logger.warn("Polling v-thread stopped as player {} quit", player.getName());
         }
@@ -262,10 +262,10 @@ public class LoginApiService implements ILoginApiService {
             }
         }
         profile.setVipType(account.vipType);
-        PlayerLoginInfo playerLoginInfo = PlayerLoginInfo.of(loginCookieInfo);
+        PlayerLoginInfo playerLoginInfo = PlayerLoginInfo.of(player, loginCookieInfo);
         playerLoginInfo.appendProfile(profile);
-        playerInfoMap.put(player, playerLoginInfo);
-        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap));
+        playerInfoMap.put(player.getUUID(), playerLoginInfo);
+        loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
         return profile;
     }
 
@@ -279,7 +279,7 @@ public class LoginApiService implements ILoginApiService {
         if (player == null) {
             return null;
         }
-        return playerInfoMap.get(player);
+        return playerInfoMap.get(player.getUUID());
     }
 
     @Override
@@ -359,12 +359,12 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public void disconnectToAll() {
-        serverNetworkService.sendToPlayers(playerInfoMap.keySet(), new ConnectResponse(false, Version.current, List.of(ApiProvider.NCM)));
+        serverNetworkService.sendToPlayerInfos(playerInfoMap.values(), new ConnectResponse(false, Version.current, List.of(ApiProvider.NCM)));
     }
 
     @Override
     public void reconnectAll() {
-        serverNetworkService.sendToPlayers(playerInfoMap.keySet(), new ConnectResponse(true, Version.current, List.of(ApiProvider.NCM)));
+        serverNetworkService.sendToPlayerInfos(playerInfoMap.values(), new ConnectResponse(true, Version.current, List.of(ApiProvider.NCM)));
     }
 
     record ValidationCodeRequest(int ctcode, long phone) {
@@ -373,13 +373,14 @@ public class LoginApiService implements ILoginApiService {
     @AllArgsConstructor
     @Getter
     public static class PlayerLoginInfo {
-        public static final PlayerLoginInfo UNLOGGED = of(LoginCookieInfo.UNLOGGED);
+//        public static final PlayerLoginInfo UNLOGGED = of(null, LoginCookieInfo.UNLOGGED);
         LoginCookieInfo loginCookieInfo;
+        Player player;
         VipType vipType;
         Profile profile;
 
-        public static PlayerLoginInfo of(LoginCookieInfo loginCookieInfo) {
-            return new PlayerLoginInfo(loginCookieInfo, null, null);
+        public static PlayerLoginInfo of(Player player, LoginCookieInfo loginCookieInfo) {
+            return new PlayerLoginInfo(loginCookieInfo, player, null, null);
         }
 
         public void appendProfile(Profile profile) {

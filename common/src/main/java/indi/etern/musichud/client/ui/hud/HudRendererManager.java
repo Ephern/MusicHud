@@ -14,10 +14,14 @@ import indi.etern.musichud.interfaces.IClientEventService;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -90,6 +94,7 @@ public class HudRendererManager {
 
                     updateStatus(StreamAudioPlayer.Status.IDLE);
                     StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
+                    MusicHud.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
                     loaded = true;
                 }
             }
@@ -97,9 +102,9 @@ public class HudRendererManager {
         return instance;
     }
 
-    private static void updateStatus(StreamAudioPlayer.Status status) {
+    private static void updateStatus(@Nullable StreamAudioPlayer.Status status) {
         if (instance != null) {
-            instance.PLAYING_STATUS_RENDERER.setStatus(status);
+            instance.PLAYING_STATUS_RENDERER.updateStatus(status);
         }
     }
 
@@ -275,7 +280,20 @@ public class HudRendererManager {
                         .orElse("");
                 ARTISTS_AND_ALBUM_RENDERER.setText(artists + " - " + musicDetail.getAlbum().getName());
                 LYRICS_LINE_RENDERER.clear();
-                PLAYER_HEAD_RENDERER.setPlayerInfo(nowPlayingInfo.getPusherPlayerInfo());
+                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
+                if (pusherPlayerInfo == null) {
+                    if (Minecraft.getInstance().getCurrentServer() == null || //single player
+                            MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
+                        LocalPlayer player = Minecraft.getInstance().player;
+                        if (player != null) {
+                            PLAYER_HEAD_RENDERER.setSkinResource(player.getSkin().body().texturePath());
+                        }
+                    } else {
+                        PLAYER_HEAD_RENDERER.setSkinResource(null);
+                    }
+                } else {
+                    PLAYER_HEAD_RENDERER.setSkinResource(pusherPlayerInfo.getSkin().body().texturePath());
+                }
                 ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
                         .thenAccept(imageTextureData -> {
 //                            imageTextureData.register().thenAcceptAsync((v) -> {
@@ -312,7 +330,7 @@ public class HudRendererManager {
         ARTISTS_AND_ALBUM_RENDERER.setText("");
         LYRICS_LINE_RENDERER.clear();
         PLAY_TIME_RENDERER.setText("");
-        PLAYER_HEAD_RENDERER.setPlayerInfo(null);
+        PLAYER_HEAD_RENDERER.setSkinResource(null);
         musicDurationString = "";
         var nextData = BackgroundData.NONE;
         hudBaseData.getTransitionableBackground().startTransition(nextData);
