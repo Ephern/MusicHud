@@ -286,13 +286,13 @@ public class HudRendererManager {
                             MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
                         LocalPlayer player = Minecraft.getInstance().player;
                         if (player != null) {
-                            PLAYER_HEAD_RENDERER.setSkinResource(player.getSkin().texture());
+                            PLAYER_HEAD_RENDERER.setSkinResource(player.getSkin().body().texturePath());
                         }
                     } else {
                         PLAYER_HEAD_RENDERER.setSkinResource(null);
                     }
                 } else {
-                    PLAYER_HEAD_RENDERER.setSkinResource(pusherPlayerInfo.getSkin().texture());
+                    PLAYER_HEAD_RENDERER.setSkinResource(pusherPlayerInfo.getSkin().body().texturePath());
                 }
                 ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
                         .thenAccept(imageTextureData -> {
