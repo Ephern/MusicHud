@@ -70,7 +70,7 @@ public record CookieLoginRequest(LoginCookieInfo loginCookieInfo, boolean tryRef
                                 );
                             }
                         }
-                        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(player));
+                        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayer(player)));
                     })
             );
         }
