@@ -141,9 +141,6 @@ public class LoginService {
 
     public void connectToExternalServer() {
         if (clientConfig.getEnable()) {
-            MusicService.resetCurrentMusicStatus();
-            NowPlayingInfo.getInstance().stop();
-            StreamAudioPlayer.getInstance().stop();
             clientNetworkService.sendToServer(new ConnectRequest(Version.current));
         }
     }
@@ -197,7 +194,6 @@ public class LoginService {
     }
 
     public void switchToServer() {
-        disconnectToExternalOrIntegratedServer();
         connectToExternalServer();
     }
 

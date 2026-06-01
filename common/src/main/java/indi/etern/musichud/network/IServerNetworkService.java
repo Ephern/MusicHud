@@ -3,6 +3,7 @@ package indi.etern.musichud.network;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.server.level.ServerPlayer;
@@ -47,6 +48,15 @@ public interface IServerNetworkService {
     default void sendToPlayers(Collection<Player> players, S2CPayload payload) {
         for (Player player : players) {
             sendToPlayer(player, payload);
+        }
+    }
+
+    default void sendToPlayerInfos(Collection<LoginApiService.PlayerLoginInfo> playerLoginInfos, S2CPayload payload) {
+        for (LoginApiService.PlayerLoginInfo playerLoginInfo : playerLoginInfos) {
+            Player player = playerLoginInfo.getPlayer();
+            if (player != null) {
+                sendToPlayer(player, payload);
+            }
         }
     }
 }
