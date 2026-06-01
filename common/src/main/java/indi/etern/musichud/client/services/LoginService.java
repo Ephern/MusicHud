@@ -248,7 +248,7 @@ public class LoginService {
             MuiModApi.postToUiThread(() -> {
                 //noinspection UnstableApiUsage
                 Context context = UIManager.getInstance().getDecorView().getContext();
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.IsolatedModeUnavailableInIntegratedServer"), Toast.LENGTH_SHORT));
+                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.switchConnectionUnavailableInIntegratedServer"), Toast.LENGTH_SHORT));
             });
         }
     }

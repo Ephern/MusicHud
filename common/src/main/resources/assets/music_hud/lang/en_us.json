@@ -23,6 +23,7 @@
   "music_hud.text.confirmSwitchConnection": "Press again in 3s to switch connection",
   "music_hud.text.connecting": "Connecting to server...",
   "music_hud.text.disconnecting": "Disconnecting to server",
+  "music_hud.text.switchConnectionUnavailableInIntegratedServer": "Switching connection is unavailable in integrated server",
   "music_hud.text.failedToLoadMusicResource": "Failed to load music resource",
   "music_hud.text.page.home": "Home",
   "music_hud.text.page.search": "Search",
