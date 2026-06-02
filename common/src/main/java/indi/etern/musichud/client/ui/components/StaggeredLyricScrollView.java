@@ -41,7 +41,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final int AUTO_RECENTER_DELAY_MILLIS = 1000;
     public static final float MAX_DELAY_MILLIS = 500;
-    public static final float LOG_DELAY_FACTOR = 9;
     public static final float STAGGERED_BASE_DURATION_MILLIS = 600;
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
     private static final SpringInterpolator STAGGER_INTERPOLATOR = new SpringInterpolator(STAGGERED_BASE_DURATION_MILLIS * 0.001f, 1);
@@ -140,9 +139,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     public void setLyrics(Collection<LyricLine> lyrics) {
         try {
-            if (!continueUpdate) {
-                startUpdateLoop();
-            }
+            stopUpdateLoop();
             if (container.getChildCount() > 0) {
                 ObjectAnimator slideOut = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0, -getWidth());
                 slideOut.setInterpolator(Easings.EASE_IN_OUT_QUINT);
@@ -161,10 +158,16 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                         slideIn.setInterpolator(Easings.EASE_IN_OUT_QUINT);
                         slideIn.setDuration(300);
                         slideIn.start();
+                        if (!continueUpdate) {
+                            startUpdateLoop();
+                        }
                     }
                 });
                 slideOut.start();
             } else {
+                if (!continueUpdate) {
+                    startUpdateLoop();
+                }
                 buildLyricRows(lyrics);
             }
         } catch (Exception e) {
@@ -414,11 +417,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int totalLines = lyricLineViewList.size();
         delayMillis = new float[totalLines];
 
+        double max = Math.max(5, Math.log(1 + totalLines));
         for (int i = 0; i < totalLines; i++) {
             int distance = Math.abs(i - targetIndex + 1);
-            float normalized = (float) distance / (float) totalLines;
-            float delayFactor = (float) Math.min(1.0, Math.log(1 + normalized * LOG_DELAY_FACTOR) / Math.log(1 + LOG_DELAY_FACTOR));
-            delayMillis[i] = delayFactor * MAX_DELAY_MILLIS * (i < targetIndex ? 0.3f : 1);
+            float delayFactor = (float) Math.clamp(Math.log(1 + distance) / max, 0, 1);
+            delayMillis[i] = delayFactor * MAX_DELAY_MILLIS * (i < targetIndex ? 0.5f : 1);
         }
     }
 
