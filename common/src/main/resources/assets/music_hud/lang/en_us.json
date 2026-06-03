@@ -98,6 +98,7 @@
   "music_hud.config.common.primaryChosenQuality.DOLBY": "Audio Vivid",
   "music_hud.config.common.primaryChosenQuality.JY_MASTER": "Master",
   "music_hud.config.common.primaryChosenQuality.SKY": "Surround Audio",
+  "music_hud.config.common.mainScreenAdditionalBackgroundDarken": "Additional background darken rate for main screen (0~1)",
   "music_hud.config.category.layout": "HUD Layout",
   "music_hud.config.layout.verticalAlign": "Vertical align",
   "music_hud.config.layout.verticalAlign.TOP": "Top",

@@ -33,6 +33,7 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
     private final ModConfigSpec.ConfigValue<Boolean> enableHud;
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
+    private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
     private final ModConfigSpec.ConfigValue<String> hudVerticalPosition;
     private final ModConfigSpec.ConfigValue<String> hudHorizontalPosition;
     private final ModConfigSpec.ConfigValue<Integer> hudOffsetX;
@@ -78,6 +79,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Primary chosen quality")
                 .translation(MusicHud.MOD_ID + ".config.common.primaryChosenQuality")
                 .define("primaryChosenQuality", Quality.LOSSLESS.name());
+        mainScreenAdditionalBackgroundDarken = builder
+                .comment("Main Screen Additional Background Darken Rate")
+                .translation(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken")
+                .defineInRange("mainScreenAdditionalBackgroundDarken", 0.5, 0, 1);
         hudVerticalPosition = builder
                 .comment("Vertical position (TOP|CENTER|BOTTOM)")
                 .translation(MusicHud.MOD_ID + ".config.layout.verticalAlign")
@@ -363,6 +368,16 @@ public class ClientConfigDefinition implements ClientConfig {
     public void save() {
         configure.getRight().save();
         saveListener.forEach(Runnable::run);
+    }
+
+    @Override
+    public double getMainScreenAdditionalBackgroundDarken() {
+        return mainScreenAdditionalBackgroundDarken.get();
+    }
+
+    @Override
+    public void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken) {
+        mainScreenAdditionalBackgroundDarken.set(additionalBackgroundDarken);
     }
 
 }

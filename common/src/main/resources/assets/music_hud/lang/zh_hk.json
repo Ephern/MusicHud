@@ -98,6 +98,7 @@
   "music_hud.config.common.primaryChosenQuality.DOLBY": "臻音全景聲 Audio Vivid",
   "music_hud.config.common.primaryChosenQuality.JY_MASTER": "超清母帶 Master",
   "music_hud.config.common.primaryChosenQuality.SKY": "沉浸環繞聲 Surround Audio",
+  "music_hud.config.common.mainScreenAdditionalBackgroundDarken": "額外的背景變暗比例 (0~1)",
   "music_hud.config.category.layout": "HUD 版面配置",
   "music_hud.config.layout.verticalAlign": "垂直對齊",
   "music_hud.config.layout.verticalAlign.TOP": "頂部",

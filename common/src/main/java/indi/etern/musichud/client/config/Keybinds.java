@@ -6,6 +6,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.IKeyRegistryService;
@@ -47,7 +48,7 @@ public class Keybinds implements ClientRegister {
         );
         IKeyRegistryService service = IKeyRegistryService.getInstance();
         service.register(mainMapping, () -> {
-            Minecraft.getInstance().setScreen(MuiModApi.get().createScreen(new MainFragment()));
+            Minecraft.getInstance().setScreen(MusicHudScreen.createScreen(new MainFragment(), null, null, "Music HUD"));
         });
         service.register(voteMapping, () -> {
             MusicService.getInstance().keyBindsVoteSkipCurrent();

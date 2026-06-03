@@ -21,6 +21,7 @@ import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
@@ -128,6 +129,17 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getPrimaryChosenQuality,
                     clientConfig::setPrimaryChosenQuality)
                     .setDefaultValue(Quality.LOSSLESS)
+                    .create(commonCategory);
+            new PreferencesFragment.FloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken"),
+                    clientConfig::getMainScreenAdditionalBackgroundDarken,
+                    clientConfig::setMainScreenAdditionalBackgroundDarken)
+                    .setRange(0, 1)
+                    .setOnChanged(() -> {
+                        MusicHudScreen.setDarken(clientConfig.getMainScreenAdditionalBackgroundDarken());
+                    })
+                    .setDefaultValue(0.5)
                     .create(commonCategory);
             view.addView(commonCategory);
             var positionCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.layout"));

@@ -114,4 +114,8 @@ public interface ClientConfig {
     boolean isConfigured();
 
     void setConfigured(boolean configured);
+
+    double getMainScreenAdditionalBackgroundDarken();
+
+    void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken);
 }
