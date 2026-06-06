@@ -87,6 +87,7 @@
   "music_hud.config.common.switch.showTranslatedCnLyrics": "显示中文歌词翻译",
   "music_hud.config.common.switch.disableVanillaMusicWhilePlaying": "播放时禁用原版音乐",
   "music_hud.config.common.switch.enableHud": "启用 HUD",
+  "music_hud.config.common.switch.enableMarqueeText": "启用 HUD 内文字溢出时的走马灯动画",
   "music_hud.config.common.switch.autoHide": "无音乐时隐藏 HUD",
   "music_hud.config.common.primaryChosenQuality": "首选音质，无法使用时可能会向下回退",
   "music_hud.config.common.primaryChosenQuality.STANDARD": "标准",

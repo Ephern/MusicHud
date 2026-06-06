@@ -118,4 +118,8 @@ public interface ClientConfig {
     double getMainScreenAdditionalBackgroundDarken();
 
     void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken);
+
+    boolean getEnableMarqueeText();
+
+    void setEnableMarqueeText(boolean aBoolean);
 }

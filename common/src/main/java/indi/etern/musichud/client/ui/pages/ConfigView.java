@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.pages;
 
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.ConfigItem;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.PreferencesFragment;
@@ -114,6 +113,11 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.enableHud"),
                     clientConfig::getEnableHud,
                     clientConfig::setEnableHud)
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.enableMarqueeText"),
+                    clientConfig::getEnableMarqueeText,
+                    clientConfig::setEnableMarqueeText)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.autoHide"),

@@ -87,6 +87,7 @@
   "music_hud.config.common.switch.showTranslatedCnLyrics": "Show translated Chinese lyrics",
   "music_hud.config.common.switch.disableVanillaMusicWhilePlaying": "Disable vanilla music while playing",
   "music_hud.config.common.switch.enableHud": "Enable HUD",
+  "music_hud.config.common.switch.enableMarqueeText": "Enable marquee animation when text overflows in HUD",
   "music_hud.config.common.switch.autoHide": "Auto hide when idle",
   "music_hud.config.common.primaryChosenQuality": "Primarily chosen quality, may fall back when unavailable",
   "music_hud.config.common.primaryChosenQuality.STANDARD": "Standard",

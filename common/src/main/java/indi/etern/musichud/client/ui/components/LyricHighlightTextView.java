@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.animation.ColorEvaluator;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.LinearGradient;
 import icyllis.modernui.graphics.Shader;
 import icyllis.modernui.text.Layout;
@@ -99,8 +100,8 @@ public class LyricHighlightTextView extends TextView {
         if (!lyricLine.isWordByWord()) {
             if (statusUpdateProcessing) {
                 float fraction = (float) (getMillisBetween(playedDuration, statusUpdateTime) - fullLineHighlightDelay) / animationDurationMillis;
-                if (0 <= fraction && fraction < 1 && getTextColors() != null) {
-                    setTextColor(ColorEvaluator.evaluate(fraction, Math.toIntExact(getTextColors().getDefaultColor()), Theme.EMPHASIZE_LYRIC_COLOR));
+                if (0 <= fraction && fraction < 1) {
+                    setTextColor(ColorEvaluator.evaluate(fraction, Color.toArgb(getCurrentTextColor()), Theme.EMPHASIZE_LYRIC_COLOR));
                 } else if (fraction >= 1) {
                     setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
                     statusUpdateProcessing = false;
