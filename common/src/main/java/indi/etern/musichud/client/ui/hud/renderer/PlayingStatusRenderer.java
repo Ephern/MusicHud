@@ -81,7 +81,7 @@ public class PlayingStatusRenderer implements HudRenderer {
                     .translate(centerX, centerY)
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
-                    .then(transforming -> {
+                    .end(transforming -> {
                         hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height);
                     });
         }

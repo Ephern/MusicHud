@@ -23,7 +23,7 @@ import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.utils.Easings;
+import indi.etern.musichud.client.ui.utils.Easing;
 import indi.etern.musichud.client.ui.utils.SpringInterpolator;
 import lombok.Getter;
 import lombok.NonNull;
@@ -147,7 +147,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             stopUpdateLoop();
             if (container.getChildCount() > 0) {
                 ObjectAnimator slideOut = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0, -getWidth());
-                slideOut.setInterpolator(Easings.EASE_IN_OUT_QUINT);
+                slideOut.setInterpolator(Easing.EASE_IN_OUT_QUINT);
                 slideOut.setDuration(300);
                 slideOut.addListener(new AnimatorListener() {
                     @Override
@@ -160,7 +160,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                         buildLyricRows(lyrics);
                         container.setTranslationX(getWidth());
                         ObjectAnimator slideIn = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0);
-                        slideIn.setInterpolator(Easings.EASE_IN_OUT_QUINT);
+                        slideIn.setInterpolator(Easing.EASE_IN_OUT_QUINT);
                         slideIn.setDuration(300);
                         slideIn.start();
                         if (!continueUpdate) {
@@ -227,7 +227,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
         ObjectAnimator alpha = ObjectAnimator.ofFloat(this, View.ALPHA, 0, 1f);
         alpha.setDuration(300);
-        alpha.setInterpolator(Easings.EASE_OUT_QUAD);
+        alpha.setInterpolator(Easing.EASE_OUT_QUAD);
         alpha.start();
     }
 

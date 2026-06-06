@@ -27,15 +27,15 @@ import icyllis.modernui.graphics.Color;
 import icyllis.modernui.mc.*;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.util.Objects;
 
 /**
@@ -76,7 +76,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         this.height = height;
     }*/
 
-    public static MusicHudScreen createScreen(@Nonnull Fragment fragment,
+    public static MusicHudScreen createScreen(@NonNull Fragment fragment,
                                               @Nullable ScreenCallback callback,
                                               @Nullable Screen previousScreen,
                                               @Nullable CharSequence title) {
@@ -91,12 +91,12 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public void resize(@Nonnull Minecraft minecraft, int width, int height) {
+    public void resize(@NonNull Minecraft minecraft, int width, int height) {
         super.resize(minecraft, width, height);
     }
 
     @Override
-    public void renderBackground(@Nonnull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
+    public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
         if (callback == null || callback.hasDefaultBackground()) {
             if (minecraft != null && minecraft.level == null) {
@@ -105,12 +105,12 @@ public class MusicHudScreen extends Screen implements MuiScreen {
                 BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
             }
             float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
-            gr.fill(0, 0, this.width, this.height, Color.argb((float) (progress * darken), 0, 0, 0));//additional darken
+            gr.fill(0, 0, this.width, this.height, Color.argb((int) (progress * darken * 255), 0, 0, 0));//additional darken
         }
     }
 
     @Override
-    public void render(@Nonnull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
+    public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         mHost.render(gr, mouseX, mouseY, deltaTick);
     }
 
@@ -126,13 +126,13 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         return callback == null || callback.isPauseScreen();
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Screen self() {
         return this;
     }
 
-    @Nonnull
+    @NonNull
     @Override
     public Fragment getFragment() {
         return mFragment;

@@ -7,9 +7,8 @@ import icyllis.modernui.text.*;
 import icyllis.modernui.text.style.ReplacementSpan;
 import lombok.*;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nonnull;
-import javax.annotation.Nullable;
 import java.time.Duration;
 import java.util.*;
 
@@ -187,7 +186,7 @@ public class LyricLine implements Comparable<LyricLine> {
         }
 
         @Override
-        public int getSize(@Nonnull TextPaint paint, CharSequence text,
+        public int getSize(@NonNull TextPaint paint, CharSequence text,
                            int start, int end, @Nullable FontMetricsInt fm) {
             if (cachedShapedText == null) {
                 String subText = text.subSequence(start, end).toString();
@@ -218,9 +217,9 @@ public class LyricLine implements Comparable<LyricLine> {
         }
 
         @Override
-        public void draw(@Nonnull Canvas canvas, CharSequence text,
+        public void draw(@NonNull Canvas canvas, CharSequence text,
                          int start, int end, float x, int top, int y, int bottom,
-                         @Nonnull TextPaint paint) {
+                         @NonNull TextPaint paint) {
             float pivotX = x + 0.5f * cachedWidth;
             canvas.save();
 //            canvas.translate(0, yOffset);

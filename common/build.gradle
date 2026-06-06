@@ -35,6 +35,15 @@ dependencies {
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
     compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+"
+
+//    runtimeOnly "dev.icyllis:arc3d-engine:2026.2.0"
+//    runtimeOnly "dev.icyllis:arc3d-compiler:2026.2.0"
+//    runtimeOnly "dev.icyllis:arc3d-core:2026.2.0"
+//    runtimeOnly "dev.icyllis:arc3d-sketch:2026.2.0"
+//    runtimeOnly "dev.icyllis:arc3d-engine:2026.2.0"
+//    runtimeOnly "dev.icyllis:arc3d-granite:2026.2.0"
+//    runtimeOnly "dev.icyllis:arc3d-opengl:2026.2.0"
+//    runtimeOnly "dev.icyllis:arc3d-vulkan:2026.2.0"
 }
 
 test {
