@@ -29,7 +29,6 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -97,15 +96,10 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public void resize(@NonNull Minecraft minecraft, int width, int height) {
-        super.resize(minecraft, width, height);
-    }
-
-    @Override
     public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
         if (callback == null || callback.hasDefaultBackground()) {
-            if (minecraft != null && minecraft.level == null) {
+            if (minecraft.level == null) {
                 super.renderBackground(gr, mouseX, mouseY, deltaTick);
             } else {
                 BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
