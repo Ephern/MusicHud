@@ -64,7 +64,7 @@ dependencies {
 
     api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
 
-    api "icyllis.modernui:ModernUI-Core:$rootProject.modernui_version"
+    api "dev.icyllis:modernui-core:$rootProject.modernui_version"
     api "icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version"
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
