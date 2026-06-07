@@ -32,8 +32,12 @@ import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -69,12 +73,14 @@ public class MusicHudScreen extends Screen implements MuiScreen {
                 fragment instanceof ScreenCallback cbk ? cbk : null;
     }
 
-    /*@Override
+/*
+    @Override
     public void init(@Nonnull Minecraft minecraft, int width, int height) {
         this.minecraft = minecraft;
         this.width = width;
         this.height = height;
-    }*/
+    }
+*/
 
     public static MusicHudScreen createScreen(@NonNull Fragment fragment,
                                               @Nullable ScreenCallback callback,
@@ -167,20 +173,20 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         mHost.onHoverMove(true);
     }
 
-//    @Override
-//    public boolean mouseClicked(double mouseX, double mouseY, int mouseButton) {
-//        return false;
-//    }
+    @Override
+    public boolean mouseClicked(@NotNull MouseButtonEvent event, boolean bl) {
+        return false;
+    }
 
-//    @Override
-//    public boolean mouseReleased(double mouseX, double mouseY, int mouseButton) {
-//        return false;
-//    }
+    @Override
+    public boolean mouseReleased(@NotNull MouseButtonEvent event) {
+        return false;
+    }
 
-//    @Override
-//    public boolean mouseDragged(double mouseX, double mouseY, int mouseButton, double deltaX, double deltaY) {
-//        return true;
-//    }
+    @Override
+    public boolean mouseDragged(@NotNull MouseButtonEvent event, double deltaX, double deltaY) {
+        return true;
+    }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
@@ -188,21 +194,21 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         return true;
     }
 
-//    @Override
-//    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-//        mHost.onKeyPress(keyCode, scanCode, modifiers);
-//        return false;
-//    }
+    @Override
+    public boolean keyPressed(KeyEvent event) {
+        mHost.onKeyPress(event.key(), event.scancode(), event.modifiers());
+        return false;
+    }
 
-//    @Override
-//    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-//        mHost.onKeyRelease(keyCode, scanCode, modifiers);
-//        return false;
-//    }
+    @Override
+    public boolean keyReleased(KeyEvent event) {
+        mHost.onKeyRelease(event.key(), event.scancode(), event.modifiers());
+        return false;
+    }
 
-//    @Override
-//    public boolean charTyped(char ch, int modifiers) {
-//        return mHost.onCharTyped(ch);
-//    }
+    @Override
+    public boolean charTyped(CharacterEvent event) {
+        return mHost.onCharTyped((char) event.codepoint());
+    }
 }
 
