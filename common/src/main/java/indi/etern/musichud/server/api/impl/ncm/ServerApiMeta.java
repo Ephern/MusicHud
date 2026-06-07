@@ -2,14 +2,26 @@ package indi.etern.musichud.server.api.impl.ncm;
 
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.PlaylistResponse;
+import indi.etern.musichud.server.api.ApiServerManager;
 import indi.etern.musichud.server.api.UrlMeta;
+import indi.etern.musichud.utils.http.ApiClient;
 
 import java.util.Set;
 
 @SuppressWarnings("SpellCheckingInspection")
 public class ServerApiMeta {
+    public static final UrlMeta<ApiClient.ApiVersionResponse> API_SERVER_VERSION = new UrlMeta<>(
+            "/inner/version",
+            null,
+            null,
+            false,
+            true,
+            false,
+            false,
+            null,
+            ApiClient.ApiVersionResponse.class);
     /**
-     * Currently only QR code login and anonymous login are proved to be functional (2025/11/06)
+     * Currently only QR code login, Phone sms code login and anonymous login are proved to be functional (2026/6/6)
      *
      */
     public static class Login {

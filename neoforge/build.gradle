@@ -53,7 +53,8 @@ dependencies {
 //        exclude group: "org.commonmark"
     }
 
-    modImplementation("icyllis.modernui:ModernUI-Markflow:${modernui_version}") {
+    modImplementation("icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version") {
+//        exclude group: "icyllis.modernui", module: "ModernUI-Core"
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "org.apache.logging.log4j", module: "log4j-core"
         exclude group: "org.apache.logging.log4j", module: "log4j-api"

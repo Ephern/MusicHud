@@ -106,7 +106,7 @@ public class ApiServerManager implements ServerRegister {
                     addShutdownHook();
                 }
             } else {
-                apiLogger.info("API Server has been launched externally");
+                apiLogger.info("API Server (version: {}) has been launched externally", ApiClient.getVersion());
             }
         });
     }
@@ -141,7 +141,14 @@ public class ApiServerManager implements ServerRegister {
                             while ((line = reader.readLine()) != null) {
                                 if (line.contains("Server started successfully") && binaryApiServerStatus == BinaryApiServerStatus.LAUNCHING) {
                                     setApiStatus(BinaryApiServerStatus.RUNNING);
-                                    apiLogger.info("Api server started");
+                                    boolean available = ApiClient.checkAvailable();
+                                    if (available) {
+                                        apiLogger.info("Api server started, version: {}", ApiClient.getVersion());
+                                    } else {
+                                        apiLogger.info("Api server started, but unavailable, restarting");
+                                        restartApiServer();
+                                        return;
+                                    }
                                 }
                                 log(line, false);
                             }

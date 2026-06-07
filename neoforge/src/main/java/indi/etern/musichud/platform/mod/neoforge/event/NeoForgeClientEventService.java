@@ -2,6 +2,8 @@ package indi.etern.musichud.platform.mod.neoforge.event;
 
 import indi.etern.musichud.interfaces.IClientEventService;
 import indi.etern.musichud.interfaces.Unregister;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
@@ -14,6 +16,7 @@ import java.util.Set;
 import java.util.function.Consumer;
 
 public class NeoForgeClientEventService implements IClientEventService {
+    private String serverIp;
     private static volatile NeoForgeClientEventService instance;
     private final Set<Consumer<Player>> joinListeners = new HashSet<>();
     private final Set<Consumer<Player>> quitListeners = new HashSet<>();
@@ -27,42 +30,39 @@ public class NeoForgeClientEventService implements IClientEventService {
     @Override
     public Unregister registerClientPlayerJoin(Consumer<Player> listener) {
         joinListeners.add(listener);
-        return () -> {
-            joinListeners.remove(listener);
-        };
+        return () -> joinListeners.remove(listener);
     }
 
     @Override
     public Unregister registerClientPlayerQuit(Consumer<Player> listener) {
         quitListeners.add(listener);
-        return () -> {
-            quitListeners.remove(listener);
-        };
+        return () -> quitListeners.remove(listener);
     }
 
     @Override
     public Unregister registerClientTickPost(Runnable listener) {
         tickPostListeners.add(listener);
-        return () -> {
-            tickPostListeners.remove(listener);
-        };
+        return () -> tickPostListeners.remove(listener);
     }
 
     @Override
     public Unregister registerClientLifecycleStopping(Runnable listener) {
         stoppingListeners.add(listener);
-        return () -> {
-            stoppingListeners.remove(listener);
-        };
+        return () -> stoppingListeners.remove(listener);
     }
 
     @SubscribeEvent
     public void onClientPlayerJoin(ClientPlayerNetworkEvent.LoggingIn event) {
-        joinListeners.forEach(j -> j.accept(event.getPlayer()));
+        ServerData currentServer = Minecraft.getInstance().getCurrentServer();
+        if (currentServer == null || !currentServer.ip.equals(serverIp)) {
+            serverIp = currentServer == null ? null : currentServer.ip;
+            joinListeners.forEach(l -> l.accept(event.getPlayer()));
+        }
     }
 
     @SubscribeEvent
     public void onClientPlayerQuit(ClientPlayerNetworkEvent.LoggingOut event) {
+        serverIp = null;
         quitListeners.forEach(q -> q.accept(event.getPlayer()));
     }
 

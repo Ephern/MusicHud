@@ -50,30 +50,11 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
         if (t <= 0.01f) return new ThemedColors(colors.primary, colors.secondary, colors.bright, colors.dark);
         if (t >= 0.99f) return new ThemedColors(next.primary, next.secondary, next.bright, next.dark);
 
-        int c1 = interpolateARGB(colors.primary, next.primary, t);
-        int c2 = interpolateARGB(colors.secondary, next.secondary, t);
-        int c3 = interpolateARGB(colors.bright, next.bright, t);
-        int c4 = interpolateARGB(colors.dark, next.dark, t);
+        int c1 = UniformDataUtils.interpolateARGB(colors.primary, next.primary, t);
+        int c2 = UniformDataUtils.interpolateARGB(colors.secondary, next.secondary, t);
+        int c3 = UniformDataUtils.interpolateARGB(colors.bright, next.bright, t);
+        int c4 = UniformDataUtils.interpolateARGB(colors.dark, next.dark, t);
         return new ThemedColors(c1, c2, c3, c4);
-    }
-
-    private int interpolateARGB(int a, int b, float t) {
-        int aA = (a >> 24) & 0xFF;
-        int aR = (a >> 16) & 0xFF;
-        int aG = (a >> 8) & 0xFF;
-        int aB = a & 0xFF;
-
-        int bA = (b >> 24) & 0xFF;
-        int bR = (b >> 16) & 0xFF;
-        int bG = (b >> 8) & 0xFF;
-        int bB = b & 0xFF;
-
-        int rA = (int) (aA + (bA - aA) * t);
-        int rR = (int) (aR + (bR - aR) * t);
-        int rG = (int) (aG + (bG - aG) * t);
-        int rB = (int) (aB + (bB - aB) * t);
-
-        return (rA << 24) | (rR << 16) | (rG << 8) | rB;
     }
 
     public static final int UBO_SIZE = new Std140SizeCalculator().putVec4().putVec4().putVec4().putVec4().align(16).get();

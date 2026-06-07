@@ -4,8 +4,8 @@ import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
 import net.minecraft.world.entity.player.Player;
+import org.jetbrains.annotations.Nullable;
 
-import javax.annotation.Nullable;
 import java.util.List;
 import java.util.Objects;
 import java.util.function.Function;

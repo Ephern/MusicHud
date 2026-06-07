@@ -2,7 +2,7 @@ package indi.etern.musichud.client.ui.utils;
 
 import icyllis.modernui.animation.TimeInterpolator;
 
-public enum Easings implements TimeInterpolator{
+public enum Easing implements TimeInterpolator{
     EASE_OUT_QUINT {
         @Override
         public float getInterpolation(float t) {

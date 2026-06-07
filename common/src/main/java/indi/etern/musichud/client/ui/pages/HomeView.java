@@ -373,7 +373,7 @@ public class HomeView extends LinearLayout {
     public void switchMusic(MusicDetail musicDetail, MusicDetail next, Queue<LyricLine> lyricLines) {
         MuiModApi.postToUiThread(() -> {
             if (staggeredLyricScrollView != null) {
-                staggeredLyricScrollView.setLyrics(lyricLines);
+                staggeredLyricScrollView.switchLyrics(musicDetail, lyricLines);
                 checkNextToPlay(next);
             }
         });

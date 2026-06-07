@@ -63,8 +63,8 @@ There are 2 methods to deploy.
 >
 > Due to some limitations, API Server may not be auto-closed when game exit abnormal (e.g., due to a crash)
 
-1. **Login to GitHub (Important, otherwise can NOT download artifacts)** and go to https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-and-pr.yml
-2. Click latest action runs in type "build-and-pr" and download platform binary artifacts matches to your pc/server platform
+1. **Login to GitHub (Important, otherwise can NOT download artifacts)** and go to https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-dev.yml
+2. Click latest action runs in type "Build Artifacts" and download platform binary artifacts matches to your pc/server platform
 3. Uncompress the binary executable file from ZIP file to ...
    - Mod edition: `{corepath}/music-hud/` and rename it to `api` (`api.exe` on Windows)
    - Plugin edition: `{corepath}/` and rename it to `api` (`api.exe` on Windows)
@@ -132,8 +132,8 @@ There are 2 methods to deploy.
 >
 > 由于一些限制，在游戏非正常退出时（如崩溃）无法自动结束进程
 
-1. **登录到 GitHub (重要，否则无法下载工件)** 并跳转到 https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-and-pr.yml
-2. 在 actions 类型中选择 "build-and-pr" 并进入最新的构建中根据你的平台下载对应的二进制构建产物
+1. **登录到 GitHub (重要，否则无法下载工件)** 并跳转到 https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-dev.yml
+2. 在 actions 类型中选择 "Build Artifacts" 并进入最新的构建中根据你的平台下载对应的二进制构建产物
 3. 解压下载得到的压缩包并将其中的二进制可执行文件放置到...
    - mod 版：{核心目录}/music-hud/ 并重命名为 `api` (对于 Windows 为 `api.exe`)
    - 插件版: {核心目录}/api(.exe)
