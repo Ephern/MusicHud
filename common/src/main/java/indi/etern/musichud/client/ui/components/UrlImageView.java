@@ -20,10 +20,10 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.resources.language.I18n;
 
-import javax.annotation.Nonnull;
 import java.util.concurrent.CompletableFuture;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -162,7 +162,7 @@ public class UrlImageView extends FrameLayout {
     }
 
     @Override
-    protected void onVisibilityChanged(@Nonnull View changedView, int visibility) {
+    protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
         if (visibility == VISIBLE) {
             checkVisibilityAndLoad();
@@ -362,7 +362,7 @@ public class UrlImageView extends FrameLayout {
         animatorSet.playTogether(fadeOut, fadeIn);
         animatorSet.addListener(new AnimatorListener() {
             @Override
-            public void onAnimationEnd(@Nonnull Animator animation) {
+            public void onAnimationEnd(@NonNull Animator animation) {
                 Drawable previousDrawable = imageView.getDrawable();
                 ImageView temp = imageView;
                 imageView = nextImageView;

@@ -4,9 +4,9 @@ import icyllis.modernui.animation.TimeInterpolator;
 import icyllis.modernui.annotation.NonNull;
 
 public class EasingInterpolator implements TimeInterpolator {
-    private final Easings easing;
+    private final Easing easing;
 
-    public EasingInterpolator(@NonNull Easings easing) {
+    public EasingInterpolator(@NonNull Easing easing) {
         this.easing = easing;
     }
 
@@ -16,7 +16,7 @@ public class EasingInterpolator implements TimeInterpolator {
     }
 
     // 便捷的静态工厂方法
-    public static TimeInterpolator of(Easings easing) {
+    public static TimeInterpolator of(Easing easing) {
         return new EasingInterpolator(easing);
     }
 }

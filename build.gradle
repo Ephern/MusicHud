@@ -69,8 +69,10 @@ configure(subprojects.findAll { it.name != 'paper' }) {
         testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
         testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
         testRuntimeOnly "org.junit.platform:junit-platform-launcher"
-        implementation "icyllis.modernui:ModernUI-Core:$rootProject.modernui_version"
-        implementation "icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version"
+        implementation "dev.icyllis:modernui-core:$rootProject.modernui_version"
+        implementation("icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version") {
+//            exclude group: "icyllis.modernui", module: "ModernUI-Core"
+        }
     }
 
     java {
