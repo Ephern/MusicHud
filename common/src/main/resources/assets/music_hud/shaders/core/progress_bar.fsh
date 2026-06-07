@@ -49,23 +49,18 @@ void main() {
     float fillMask = 1.0 - aastep(fillDis);
 
     float distFromFillRight = fillWidth - fillPos.x;
-    float t;
-    if (fillWidth < gradientLength) {
-        t = clamp(distFromFillRight / fillWidth, 0.0, 1.0);
-    } else {
-        t = clamp(distFromFillRight / gradientLength, 0.0, 1.0);
-    }
+    float narrow = step(fillWidth, gradientLength);
+    float denom = mix(gradientLength, fillWidth, narrow);
+    float t = clamp(distFromFillRight / denom, 0.0, 1.0);
 
     vec4 gradientColor = mix(u_CurrentColor, u_PlayedColor, t);
 
-    float indicatorAlpha;
-    if (progress < u_Gradient.z) {
-        indicatorAlpha = progress / u_Gradient.z;
-    } else if (progress > 1.0 - u_Gradient.z) {
-        indicatorAlpha = (1.0 - progress) / u_Gradient.z;
-    } else {
-        indicatorAlpha = 1.0;
-    }
+    float fadingIn = 1.0 - step(u_Gradient.z, progress);
+    float full = step(u_Gradient.z, progress) * step(progress, 1.0 - u_Gradient.z);
+    float fadingOut = 1.0 - step(progress, 1.0 - u_Gradient.z);
+    float indicatorAlpha = fadingIn * progress / u_Gradient.z
+                         + full * 1.0
+                         + fadingOut * (1.0 - progress) / u_Gradient.z;
 
     vec4 dstColor = u_BackgroundColor;
     float dstAlpha = dstColor.a * bgMask;
@@ -74,16 +69,7 @@ void main() {
     float srcAlpha = srcColor.a * fillMask * indicatorAlpha;
 
     float outAlpha = srcAlpha + dstAlpha * (1.0 - srcAlpha);
-    vec3 finalRGB;
-    if (outAlpha > 0.0) {
-        finalRGB = (srcColor.rgb * srcAlpha + dstColor.rgb * dstAlpha * (1.0 - srcAlpha)) / outAlpha;
-    } else {
-        finalRGB = vec3(0.0);
-    }
-
-    if (outAlpha < 0.002) {
-        discard;
-    }
+    vec3 finalRGB = (srcColor.rgb * srcAlpha + dstColor.rgb * dstAlpha * (1.0 - srcAlpha)) / max(outAlpha, 0.0001);
 
     fragColor = vec4(finalRGB, outAlpha);
 }

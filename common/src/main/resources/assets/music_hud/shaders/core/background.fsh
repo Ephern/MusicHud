@@ -99,27 +99,49 @@ void main() {
     float aspect = halfWidth / halfHeight;
     vec2 noiseUv = uv;
     noiseUv.x *= aspect;
-    float speed = 0.008;
+    float speed = 0.014;
     vec2 scrollVec = vec2(timestamp * speed, timestamp * speed * 0.7);
-    vec2 uv0 = noiseUv * 0.02 + scrollVec;
-    vec2 uv1 = noiseUv * 0.04 - scrollVec * 1.3;
 
-    float noise1 = fbm(uv0);
-    float noise2 = fbm(uv1);
-    float finalNoise = (noise1 * 0.7 + noise2 * 0.3);
+    float wx = snoise(noiseUv * 0.015 + scrollVec * 0.3);
+    float wy = snoise(noiseUv * 0.02 + scrollVec * 0.4 + vec2(2.7, 1.3));
+    vec2 warped = noiseUv + vec2(wx, wy) * 3.0;
 
-    vec4 primary   = u_Primary;
-    vec4 secondary = u_Secondary;
-    vec4 bright    = u_Bright;
-    vec4 dark      = u_Dark;
+    float a = 0.03;
+    float w0 = fbm(warped * (a) + scrollVec);
+    float w1 = fbm(warped * (a + 0.004) - scrollVec * 0.6 + vec2(3.7, 5.2));
+    float w2 = fbm(warped * (a + 0.002) + scrollVec * 0.5 + vec2(7.1, 2.9));
+    float w3 = fbm(warped * (a + 0.006) + scrollVec * 0.4 + vec2(1.8, 6.4));
 
-    float dir = snoise(uv0 * 0.8 + timestamp * 0.2);
-    vec4 color = mix4ColorsDirectional(dark, primary, secondary, bright, finalNoise, dir);
+    w0 = smoothstep(0.15, 0.85, w0);
+    w1 = smoothstep(0.15, 0.85, w1);
+    w2 = smoothstep(0.15, 0.85, w2);
+    w3 = smoothstep(0.15, 0.85, w3);
+
+    float total = w0 + w1 + w2 + w3 + 0.001;
+    w0 /= total; w1 /= total; w2 /= total; w3 /= total;
+
+    vec3 r0 = u_Dark.rgb;
+    vec3 r1 = u_Primary.rgb;
+    vec3 r2 = u_Secondary.rgb;
+    vec3 r3 = u_Bright.rgb;
+
+    float dir = snoise(noiseUv * 0.02 + noiseUv.yx * 0.01 + timestamp * 0.01);
+    float reverse = step(dir, 0.0);
+
+    vec3 c0 = mix(r0, r3, reverse); vec3 c3 = mix(r3, r0, reverse);
+    vec3 c1 = mix(r1, r2, reverse); vec3 c2 = mix(r2, r1, reverse);
+    float rw0 = mix(w0, w3, reverse);
+    float rw1 = mix(w1, w2, reverse);
+    float rw2 = mix(w2, w1, reverse);
+    float rw3 = mix(w3, w0, reverse);
+
+    vec3 rgb = c0 * rw0 + c1 * rw1 + c2 * rw2 + c3 * rw3;
+    float alpha = u_Dark.a * rw0 + u_Primary.a * rw1 + u_Secondary.a * rw2 + u_Bright.a * rw3;
 
     vec2 halfSize = vec2(halfWidth, halfHeight);
     vec2 d = abs(f_Position) - halfSize + radius;
     float dis = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
     float mask = 1.0 - aastep(dis);
 
-    fragColor = vec4(color.rgb, color.a * mask);
+    fragColor = vec4(rgb, alpha * mask);
 }

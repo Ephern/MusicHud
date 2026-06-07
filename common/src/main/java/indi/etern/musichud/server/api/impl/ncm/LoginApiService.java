@@ -286,7 +286,7 @@ public class LoginApiService implements ILoginApiService {
     public String getRawCookieOrElse(Player player, Supplier<String> supplier) {
         String rawCookie;
         if (player != null) {
-            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(player);
+            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(player.getUUID());
             if (loginInfo != null) {
                 rawCookie = loginInfo.loginCookieInfo.rawCookie();
             } else {

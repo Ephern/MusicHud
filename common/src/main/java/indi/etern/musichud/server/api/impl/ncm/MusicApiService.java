@@ -90,7 +90,7 @@ public class MusicApiService implements IMusicApiService {
     public Playlist getPlaylistDetail(long id, @Nullable Player player) {
         Playlist cached = playlistCache.getIfPresent(id);
         Playlist playlist = Playlist.empty(id);
-        if (cached != null) {
+        if (cached != null && !cached.getTracks().isEmpty()) {
             playlist = cached;
         } else {
             String rawCookie = loginApiService.getRawCookieOrElse(player, loginApiService::getAnonymousCookie);
@@ -102,7 +102,7 @@ public class MusicApiService implements IMusicApiService {
                 logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(player).getName().getString(), playlistResponse.getCode());
             }
         }
-        LoginApiService.PlayerLoginInfo playerLoginInfo = loginApiService.playerInfoMap.get(player);
+        LoginApiService.PlayerLoginInfo playerLoginInfo = player == null ? null : loginApiService.playerInfoMap.get(player.getUUID());
         Profile profile = playerLoginInfo != null ? playerLoginInfo.profile : null;
         if (playlist.getPrivacy() == Privacy.PRIVATE && !playlist.getCreator().equals(profile)) {
             return Playlist.privacyBlocked(id, playlist.getCreator());
