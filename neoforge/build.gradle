@@ -39,7 +39,7 @@ dependencies {
 
 
     implementation("icyllis.modernui:ModernUI-NeoForge:1.21.1-${rootProject.modernui_version}.+")
-    modImplementation("icyllis.modernui:ModernUI-Core:${modernui_version}") {
+    modImplementation("dev.icyllis:modernui-core:${modernui_version}") {
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "org.apache.logging.log4j", module: "log4j-core"
         exclude group: "org.apache.logging.log4j", module: "log4j-api"

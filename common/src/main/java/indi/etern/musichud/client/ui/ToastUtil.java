@@ -6,17 +6,16 @@ import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.widget.Toast;
 
 public class ToastUtil {
-//    static Toast lastToast = null;
+    static Toast lastToast = null;
 
     public static void show(Toast toast) {
-        // waiting for ModernUI to fix
-//        MuiModApi.postToUiThread(() -> {
-//            if (lastToast != null) {
-//                lastToast.cancel();
-//            }
+        MuiModApi.postToUiThread(() -> {
+            if (lastToast != null) {
+                lastToast.cancel();
+            }
             toast.show();
-//            lastToast = toast;
-//        });
+            lastToast = toast;
+        });
     }
 
     public static void show(String message) {

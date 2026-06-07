@@ -39,7 +39,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
         context.transform()
                 .translate(absolutePosition.x(), absolutePosition.y())
-                .then((transforming) -> {
+                .end((transforming) -> {
                     context.blit(
                             skinResource,
                             0, 0,
@@ -52,7 +52,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         context.transform()
                 .translate(absolutePosition.x() - layout.getWidth() * 0.08f, absolutePosition.y() - layout.getHeight() * 0.08f)
                 .scale(1.16f)
-                .then((transforming) -> {
+                .end((transforming) -> {
                     context.blit(
                             skinResource,
                             0, 0, 40, 8,

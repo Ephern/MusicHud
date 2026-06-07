@@ -84,7 +84,7 @@ public class LoginApiService implements ILoginApiService {
                     AnonymousLoginData response = ApiClient.post(
                             ServerApiMeta.Login.ANONYMOUS,
                             null,
-                            null);
+                            null, true);
                     if (response.code == 200) {
                         anonymousCookie = response.cookie;
                     } else {
@@ -134,7 +134,7 @@ public class LoginApiService implements ILoginApiService {
             AnonymousLoginData response = ApiClient.post(
                     ServerApiMeta.Login.ANONYMOUS,
                     null,
-                    null);
+                    null, true);
             LoginCookieInfo loginCookieInfo;
             if (response.code == 200) {
                 loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, response.cookie, ZonedDateTime.now());
@@ -153,7 +153,7 @@ public class LoginApiService implements ILoginApiService {
     @SneakyThrows
     @Override
     public void refreshAndSend(Player player, LoginCookieInfo loginCookieInfo) {
-        RefreshCookieResponse cookieResponse = ApiClient.post(ServerApiMeta.Login.REFRESH, null, loginCookieInfo.rawCookie());
+        RefreshCookieResponse cookieResponse = ApiClient.post(ServerApiMeta.Login.REFRESH, null, loginCookieInfo.rawCookie(), true);
         LoginCookieInfo refreshedLoginCookieInfo;
         if (cookieResponse.code == 200) {
             refreshedLoginCookieInfo = new LoginCookieInfo(loginCookieInfo.type(), cookieResponse.cookie, ZonedDateTime.now());
@@ -173,15 +173,15 @@ public class LoginApiService implements ILoginApiService {
             logger.debug("Start QR login by player: {}", player.getName());
             QRLoginResponseInfo response1 = ApiClient.get(
                     ServerApiMeta.Login.QrCode.KEY,
-                    null
-            );
+                    null,
+                    true);
             var requestBody = new QRLoginGenerateRequestInfo(response1.data.unikey, true);
             logger.debug("Got QR login key for player: {}", player.getName());
             QRLoginData response2 = ApiClient.post(
                     ServerApiMeta.Login.QrCode.GENERATE,
                     requestBody,
-                    null
-            );
+                    null,
+                    true);
             logger.debug("Got QR login code bitmap for player: {}", player.getName());
 
             startQRPollingVThread(player, response1.data.unikey);
@@ -214,8 +214,8 @@ public class LoginApiService implements ILoginApiService {
                         qrLoginStatus = ApiClient.post(
                                 ServerApiMeta.Login.QrCode.CHECK,
                                 params2,
-                                null
-                        );
+                                null,
+                                true);
                         logger.debug("QR login polling v-thread for {} got result: {}", player.getName(), qrLoginStatus.code);
                         if (qrLoginStatus.code == QRLoginStatus.Code.SUCCEED) {
                             logger.info("QR login polling v-thread pushing successful result to player: {}", player.getName());
@@ -248,7 +248,7 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public Profile loadUserProfile(Player player, LoginCookieInfo loginCookieInfo) {
-        AccountDetail accountDetail = ApiClient.get(ServerApiMeta.User.ACCOUNT, loginCookieInfo.rawCookie());
+        AccountDetail accountDetail = ApiClient.get(ServerApiMeta.User.ACCOUNT, loginCookieInfo.rawCookie(), true);
         Profile profile = accountDetail.profile();
         return postProcessProfile(player, loginCookieInfo, profile, accountDetail.account);
     }
@@ -286,7 +286,7 @@ public class LoginApiService implements ILoginApiService {
     public String getRawCookieOrElse(Player player, Supplier<String> supplier) {
         String rawCookie;
         if (player != null) {
-            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(player);
+            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(player.getUUID());
             if (loginInfo != null) {
                 rawCookie = loginInfo.loginCookieInfo.rawCookie();
             } else {
@@ -300,7 +300,7 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public void requestValidationCodeFor(int regionCode, long phone, Player player) {
-        SendValidationCodeResponse response = ApiClient.post(ServerApiMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null);
+        SendValidationCodeResponse response = ApiClient.post(ServerApiMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null, true);
         ZonedDateTime lastSentTime = lastSentTimes.getIfPresent(player);
         ZonedDateTime now = ZonedDateTime.now();
 
@@ -325,7 +325,7 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public void loginWithPhoneAndCode(int regionCode, long phone, int code, Player player) {
         PhoneCodeLoginRequest requestBody = new PhoneCodeLoginRequest(regionCode, phone, code);
-        PhoneLoginResponse loginResponse = ApiClient.post(ServerApiMeta.Login.PHONE, requestBody, null);
+        PhoneLoginResponse loginResponse = ApiClient.post(ServerApiMeta.Login.PHONE, requestBody, null, true);
         if (loginResponse.code == 200) {
             LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.DEVICE_CODE, loginResponse.cookie, ZonedDateTime.now());
             Profile profile = postProcessProfile(player, loginCookieInfo, loginResponse.profile, loginResponse.account);

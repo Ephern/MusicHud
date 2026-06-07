@@ -4,6 +4,8 @@ import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.utils.Easing;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -12,18 +14,22 @@ import net.minecraft.network.chat.Style;
 @Getter
 @Setter
 public class TextRenderer implements HudRenderer {
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private int vanillaLineHeight = -1;
     private ModernStringSplitter modernStringSplitter = null;
     private TextStyle currentTextData;
     private Layout layout;
     private int baseColor;
     private Position position;
-
-    // 淡入淡出相关字段
-    private TextStyle nextTextData; // 下一个要显示的文本
-    private float transitionProgress = 1.0f; // 过渡进度 (0.0f - 1.0f)
+    private int marqueeIntervalMillis = 5000;
+    private Easing marqueeStartAndEndUpSpeedEasing = Easing.EASE_IN_OUT_SINE;
+    private float marqueeSpaceWeight = 0.4f;
+    private TextStyle nextTextData;
+    private float transitionProgress = 1.0f;
     private boolean isTransitioning = false;
-    private float transitionSpeed = 4.0f; // 过渡速度，可以根据需要调整
+    private float transitionSpeed = 4.0f;
     private long lastUpdateTime = System.currentTimeMillis();
+    private float marqueeDuration = 10000;
 
     public TextRenderer() {
         try {
@@ -90,7 +96,7 @@ public class TextRenderer implements HudRenderer {
         if (!isTransitioning) return;
 
         long currentTime = System.currentTimeMillis();
-        float deltaTime = (currentTime - lastUpdateTime) / 1000.0f; // 转换为秒
+        float deltaTime = (currentTime - lastUpdateTime) / 1000.0f;
         lastUpdateTime = currentTime;
 
         transitionProgress += deltaTime * transitionSpeed;
@@ -113,23 +119,22 @@ public class TextRenderer implements HudRenderer {
             return;
         }
 
-        float scale = layout.getHeight() / 9;
+        if (vanillaLineHeight < 0) {
+            vanillaLineHeight = Minecraft.getInstance().font.lineHeight;
+        }
 
-        // 应用位置和缩放
+        float scale = layout.getHeight() / vanillaLineHeight;
+
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
 
-        // 如果没有在过渡，只渲染当前文本
         if (!isTransitioning || nextTextData == null) {
             renderText(context, currentTextData, absolutePosition, scale, 1.0f);
         } else {
-            // Use drawManaged to force flush between old and new text
-            // Render old text (fading out)
             float oldAlpha = 1.0f - transitionProgress;
             if (oldAlpha > 0) {
                 renderText(context, currentTextData, absolutePosition, scale, oldAlpha);
             }
 
-            // Render new text (fading in)
             float newAlpha = transitionProgress;
             if (newAlpha > 0) {
                 renderText(context, nextTextData, absolutePosition, scale, newAlpha);
@@ -142,20 +147,56 @@ public class TextRenderer implements HudRenderer {
         String text = textData.text;
         if (text == null || text.isEmpty()) return;
 
-        String trimmedText = trimToWidth(text, layout.getWidth() / scale);
-        if (trimmedText.isEmpty()) return;
-
         // 计算带透明度的颜色
-        int color = getColorWithAlpha(baseColor, alpha);
+        int color = getColorWithAlpha(textData.baseColor, alpha);
 
         // 计算位置
-        float x = position.computeX(absolutePosition.x(), scale, trimmedText, this::measureWidth);
-        context.transform()
-                .translate(x, absolutePosition.y())
-                .scale(scale)
-                .then(transforming -> {
-                    context.drawString(Minecraft.getInstance().font, trimmedText, 0, 0, color, false);
+        float measuredWidth = measureWidth(text);
+        float textRenderWidth = scale * measuredWidth;
+        float layoutWidth = layout.getWidth();
+        float x = position.computeX(absolutePosition.x(), scale, text, measuredWidth);
+        float y = absolutePosition.y();
+        boolean overflow = textRenderWidth > layoutWidth;
+
+        float x1 = x;
+        float marqueeWidth = 0;
+        float marqueeOffset = 0;
+        boolean enableMarqueeText = clientConfig.getEnableMarqueeText();
+        if (enableMarqueeText) {
+            marqueeWidth = textRenderWidth + layoutWidth * marqueeSpaceWeight;
+            long elapsedTime = System.currentTimeMillis() - lastUpdateTime;
+            float marqueeElapsedTime = Math.max(0, elapsedTime % (marqueeDuration + marqueeIntervalMillis) - marqueeIntervalMillis);
+            float marqueeProgress = marqueeStartAndEndUpSpeedEasing.getInterpolation(marqueeElapsedTime / marqueeDuration);
+            marqueeOffset = overflow ? marqueeProgress * marqueeWidth : 0;
+            x1 -= marqueeOffset;
+        } else {
+            float maxWidth = layout.getWidth() / scale;
+            text = trimToWidth(text, maxWidth);
+            if (text.isEmpty()) return;
+        }
+        context.pushScissor((int) x, (int) y, (int) (x + layoutWidth), (int) (y + layout.getHeight() + 1));
+        HudRenderContext.Transforming transform = context.transform();
+        String finalText = text;
+        transform.translate(x1, y)
+                .subTransform(transforming -> {
+                    transforming.scale(scale)
+                            .then(transforming1 -> {
+                                context.drawString(Minecraft.getInstance().font, finalText, 0, 0, color, false);
+                            });
                 });
+        if (overflow && enableMarqueeText) {
+            if (marqueeWidth - marqueeOffset < layoutWidth) {
+                transform.translate(marqueeWidth, 0)
+                        .subTransform(transforming -> {
+                            transforming.scale(scale)
+                                    .then(transforming1 -> {
+                                        context.drawString(Minecraft.getInstance().font, finalText, 0, 0, color, false);
+                                    });
+                        });
+            }
+        }
+        transform.end();
+        context.popScissor();
     }
 
     private int getColorWithAlpha(int baseColor, float alpha) {
@@ -171,7 +212,7 @@ public class TextRenderer implements HudRenderer {
         if (currentTextData == null || currentTextData.text == null || currentTextData.text.isEmpty()) {
             return 0f;
         } else {
-            return measureWidth(currentTextData.text) * (layout.getHeight() / Minecraft.getInstance().font.lineHeight);
+            return Math.min(layout.getWidth(), measureWidth(currentTextData.text) * (layout.getHeight() / vanillaLineHeight));
         }
     }
 
@@ -238,27 +279,22 @@ public class TextRenderer implements HudRenderer {
     public enum Position {
         LEFT {
             @Override
-            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
+            float computeX(float startX, float scale, String text, float measuredWidth) {
                 return startX;
             }
         }, CENTER {
             @Override
-            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
-                return startX - 0.5f * widthFn.measure(text) * scale;
+            float computeX(float startX, float scale, String text, float measuredWidth) {
+                return startX - 0.5f * measuredWidth * scale;
             }
         }, RIGHT {
             @Override
-            float computeX(float startX, float scale, String text, WidthFunction widthFn) {
-                return startX - widthFn.measure(text) * scale;
+            float computeX(float startX, float scale, String text, float measuredWidth) {
+                return startX - measuredWidth * scale;
             }
         };
 
-        abstract float computeX(float startX, float scale, String text, WidthFunction widthFn);
-    }
-
-    @FunctionalInterface
-    private interface WidthFunction {
-        float measure(String text);
+        abstract float computeX(float startX, float scale, String text, float measuredWidth);
     }
 
     public static class TextStyle {

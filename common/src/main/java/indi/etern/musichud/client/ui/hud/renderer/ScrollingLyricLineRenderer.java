@@ -7,7 +7,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
-import indi.etern.musichud.client.ui.utils.Easings;
+import indi.etern.musichud.client.ui.utils.Easing;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -147,7 +147,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             line.isScrolling = false;
             line.scrollOffset = line.scrollTarget;
         } else {
-            float progress = Easings.EASE_IN_OUT_SINE.getInterpolation((float) elapsed / line.line.scrollMs);
+            float progress = Easing.EASE_IN_OUT_SINE.getInterpolation((float) elapsed / line.line.scrollMs);
             line.scrollOffset = line.scrollTarget * progress;
         }
     }
@@ -219,7 +219,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         float y = absolutePosition.y();
         context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
         if (isTransitioning && nextLine1.line != null && nextLine2.line != null) {
-            float easedProgress = Easings.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
+            float easedProgress = Easing.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
             float oldYOffset = -easedProgress * layout.getHeight();
             if (currentLine1.line != null && currentLine1.line.lyricLine != null) {
                 if (currentLine1.line.lyricLine.isWordByWord()) {
@@ -319,7 +319,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         context.transform()
                 .translate(drawX, drawY)
                 .scale(scale)
-                .then(transforming -> {
+                .end(transforming -> {
                     context.drawString(Minecraft.getInstance().font, text, 0, 0, color, false);
                 });
     }
@@ -339,7 +339,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             context.transform()
                     .translate(drawX, drawY)
                     .scale(scale)
-                    .then(transforming -> {
+                    .end(transforming -> {
                         context.drawString(Minecraft.getInstance().font, text, 0, 0, line.line.emphasizeColor, false);
                     });
             context.popScissor();

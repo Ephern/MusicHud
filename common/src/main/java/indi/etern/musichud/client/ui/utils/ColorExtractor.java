@@ -4,8 +4,12 @@ import com.mojang.blaze3d.platform.NativeImage;
 import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 
+import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
+
+import static indi.etern.musichud.client.ui.utils.UniformDataUtils.interpolateARGB;
+import static indi.etern.musichud.client.ui.utils.UniformDataUtils.rgbToHsl;
 
 public class ColorExtractor {
     /**
@@ -68,9 +72,11 @@ public class ColorExtractor {
 
         if (colorWeight.isEmpty()) return getDefaultColors();
 
-        final float SAT_WEIGHT = 0.6f;
+        final float PRIMARY_SAT_WEIGHT = 0.3f;
+        final float SECONDARY_SAT_WEIGHT = 0.2f;
+        final float LUM_WEIGHT = 0.1f;
         final float FREQ_WEIGHT = 0.5f;
-        final float DIST_WEIGHT = 1.6f;
+        final float DIST_EPSILON = 0.001f;
 
         int bright = 0;
         float bestBrightScore = -1;
@@ -109,10 +115,10 @@ public class ColorExtractor {
             float lum = getLuminance(rgb);
             float dist1 = colorDistance(bright, rgb);
             float dist2 = colorDistance(dark, rgb);
-            float vivid = (float) (Math.pow(sat, SAT_WEIGHT) * lum);  // 鲜艳度
-            // log 压制极高频的优势
-            float freqFactor = (float) Math.log(weight + 1) / (float) Math.log(totalWeight + 1);
-            float score = (float) ((vivid + freqFactor * FREQ_WEIGHT) * (Math.log(dist1 * DIST_WEIGHT + 1) + Math.log(dist2 * DIST_WEIGHT + 1)));
+            float vivid = (float) (Math.pow(sat, PRIMARY_SAT_WEIGHT) * Math.pow(lum, LUM_WEIGHT));
+            // sqrt 压制部分高频优势
+            float freqFactor = (float) Math.sqrt(weight) / (float) Math.sqrt(totalWeight);
+            float score = (vivid + freqFactor * FREQ_WEIGHT) * (dist1 + DIST_EPSILON) * (dist2 + DIST_EPSILON);
             if (score > bestPrimaryScore) {
                 bestPrimaryScore = score;
                 primary = rgb;
@@ -129,12 +135,12 @@ public class ColorExtractor {
             if (rgb == primary) continue;
             float sat = getSaturation(rgb);
             float lum = getLuminance(rgb);
-            float vivid = (float) (Math.pow(sat, SAT_WEIGHT) * lum);
+            float vivid = (float) (Math.pow(sat, SECONDARY_SAT_WEIGHT) * Math.pow(lum, LUM_WEIGHT));
             float dist1 = colorDistance(primary, rgb);
             float dist2 = colorDistance(bright, rgb);
             float dist3 = colorDistance(dark, rgb);
-            float freqFactor = (float) Math.log(weight + 1) / (float) Math.log(totalWeight + 1);
-            float score = (float) ((vivid + freqFactor * FREQ_WEIGHT) * (Math.log(dist1 * DIST_WEIGHT + 1) + Math.log(dist2 * DIST_WEIGHT + 1) * Math.log(dist3 * DIST_WEIGHT + 1)));
+            float freqFactor = (float) Math.sqrt(weight) / (float) Math.sqrt(totalWeight);
+            float score = (vivid + freqFactor * FREQ_WEIGHT) * (dist1 + DIST_EPSILON) * (dist2 + DIST_EPSILON) * (dist3 + DIST_EPSILON);
             if (score > bestSecondaryScore && dist1 > 0.1f) {
                 bestSecondaryScore = score;
                 secondary = rgb;
@@ -160,13 +166,23 @@ public class ColorExtractor {
     }
 
     private static float colorDistance(int rgb1, int rgb2) {
-        float r1 = ((rgb1 >> 16) & 0xFF) / 255.0f;
-        float g1 = ((rgb1 >> 8) & 0xFF) / 255.0f;
-        float b1 = (rgb1 & 0xFF) / 255.0f;
-        float r2 = ((rgb2 >> 16) & 0xFF) / 255.0f;
-        float g2 = ((rgb2 >> 8) & 0xFF) / 255.0f;
-        float b2 = (rgb2 & 0xFF) / 255.0f;
-        return Math.abs(r1 - r2) + Math.abs(g1 - g2) + Math.abs(b1 - b2);
+        float[] hsl1 = rgbToHsl(rgb1);
+        float[] hsl2 = rgbToHsl(rgb2);
+
+        float hueDist = 0;
+        if (hsl1[1] > 0.1f && hsl2[1] > 0.1f) {
+            hueDist = Math.abs(hsl1[0] - hsl2[0]);
+            if (hueDist > 0.5f) hueDist = 1.0f - hueDist;
+        }
+        hueDist *= 2;
+
+        float satDist = Math.abs(hsl1[1] - hsl2[1]);
+        float lumDist = Math.abs(hsl1[2] - hsl2[2]);
+
+        float HUE_WEIGHT = 0.5f;
+        float SAT_WEIGHT = 0.2f;
+        float LUM_WEIGHT = 0.3f;
+        return hueDist * HUE_WEIGHT + satDist * SAT_WEIGHT + lumDist * LUM_WEIGHT;
     }
 
     private static float getLuminance(int rgb) {
@@ -260,24 +276,5 @@ public class ColorExtractor {
                 interpolateARGB(baseColor, colors.bright, alpha),
                 interpolateARGB(baseColor, colors.dark, alpha)
         );
-    }
-
-    private static int interpolateARGB(int a, int b, float t) {
-        int aA = (a >> 24) & 0xFF;
-        int aR = (a >> 16) & 0xFF;
-        int aG = (a >> 8) & 0xFF;
-        int aB = a & 0xFF;
-
-        int bA = (b >> 24) & 0xFF;
-        int bR = (b >> 16) & 0xFF;
-        int bG = (b >> 8) & 0xFF;
-        int bB = b & 0xFF;
-
-        int rA = (int) (aA + (bA - aA) * t);
-        int rR = (int) (aR + (bR - aR) * t);
-        int rG = (int) (aG + (bG - aG) * t);
-        int rB = (int) (aB + (bB - aB) * t);
-
-        return (rA << 24) | (rR << 16) | (rG << 8) | rB;
     }
 }

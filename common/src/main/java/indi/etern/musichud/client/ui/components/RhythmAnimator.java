@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.animation.PropertyValuesHolder;
 import icyllis.modernui.animation.ValueAnimator;
 import icyllis.modernui.view.View;
-import indi.etern.musichud.client.ui.utils.Easings;
+import indi.etern.musichud.client.ui.utils.Easing;
 
 /**
  * Unified RHYTHM lyric animation. The breathing scale uses a phase-shifted cosine
@@ -81,7 +81,7 @@ public class RhythmAnimator extends ValueAnimator {
         if (playTime >= FADE_IN_DELAY_MS) {
             float alphaFrac = Math.clamp(
                     (playTime - FADE_IN_DELAY_MS) / (float) FADE_IN_DURATION_MS, 0f, 1f);
-            mainText.setAlpha(Easings.EASE_OUT_QUAD.getInterpolation(alphaFrac));
+            mainText.setAlpha(Easing.EASE_OUT_QUAD.getInterpolation(alphaFrac));
         }
         float scale = computeBreathingScale(playTime);
         row.setScaleX(scale);
@@ -92,7 +92,7 @@ public class RhythmAnimator extends ValueAnimator {
         long fadeElapsed = playTime - fadeOutStartTime;
 
         if (fadeElapsed <= FADE_OUT_PEAK_MS) {
-            float frac = Easings.EASE_IN_OUT_QUAD.getInterpolation(
+            float frac = Easing.EASE_IN_OUT_QUAD.getInterpolation(
                     (float) fadeElapsed / FADE_OUT_PEAK_MS);
             float scale = MIN_SCALE + (FADE_PEAK_SCALE - MIN_SCALE) * frac;
             row.setScaleX(scale);
@@ -100,7 +100,7 @@ public class RhythmAnimator extends ValueAnimator {
         } else {
             float frac = (float) (fadeElapsed - FADE_OUT_PEAK_MS) / FADE_OUT_SHRINK_MS;
             frac = Math.clamp(frac, 0f, 1f);
-            float easedFrac = Easings.EASE_IN_QUINT.getInterpolation(frac);
+            float easedFrac = Easing.EASE_IN_QUINT.getInterpolation(frac);
             float scale = FADE_PEAK_SCALE + (FADE_END_SCALE - FADE_PEAK_SCALE) * easedFrac;
             row.setScaleX(scale);
             row.setScaleY(scale);

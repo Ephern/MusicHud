@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.pages;
 
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.ConfigItem;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.PreferencesFragment;
@@ -21,6 +20,7 @@ import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
@@ -28,6 +28,7 @@ import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ApiServerManager;
 import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
+import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import net.minecraft.Util;
@@ -114,6 +115,11 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setEnableHud)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.enableMarqueeText"),
+                    clientConfig::getEnableMarqueeText,
+                    clientConfig::setEnableMarqueeText)
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.switch.autoHide"),
                     clientConfig::getHideHudWhenNotPlaying,
                     clientConfig::setHideHudWhenNotPlaying)
@@ -128,6 +134,17 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getPrimaryChosenQuality,
                     clientConfig::setPrimaryChosenQuality)
                     .setDefaultValue(Quality.LOSSLESS)
+                    .create(commonCategory);
+            new PreferencesFragment.FloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken"),
+                    clientConfig::getMainScreenAdditionalBackgroundDarken,
+                    clientConfig::setMainScreenAdditionalBackgroundDarken)
+                    .setRange(0, 1)
+                    .setOnChanged(() -> {
+                        MusicHudScreen.setDarken(clientConfig.getMainScreenAdditionalBackgroundDarken());
+                    })
+                    .setDefaultValue(0.5)
                     .create(commonCategory);
             view.addView(commonCategory);
             var positionCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.layout"));
@@ -324,6 +341,9 @@ public class ConfigView extends LinearLayout {
             view.addView(multiplayerCategory);
 
             var integratedServerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.integratedServer"));
+            LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params1.setMargins(0, dp(6), 0, dp(128));
+            view.addView(integratedServerCategory, params1);
 
             PreferencesFragment.BooleanOption enableInIntegratedServerOption = new PreferencesFragment.BooleanOption(
                     context,
@@ -349,6 +369,31 @@ public class ConfigView extends LinearLayout {
                 }
             });
 
+            PreferencesFragment.BooleanOption startupBinaryApiServerOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.startupBinaryApiServerWhenLaunch"),
+                    serverConfig::getStartupBinaryApiServerWhenLaunch,
+                    serverConfig::setStartupBinaryApiServerWhenLaunch)
+                    .setDefaultValue(true);
+            startupBinaryApiServerOption.create(integratedServerCategory);
+
+            PreferencesFragment.BooleanOption useRandomCnIpOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.useRandomCnIp"),
+                    serverConfig::getUseRandomCnIp,
+                    serverConfig::setUseRandomCnIp)
+                    .setDefaultValue(true);
+            useRandomCnIpOption.create(integratedServerCategory);
+
+            PreferencesFragment.FloatOption pusherVoteAdditionalRateOption = new PreferencesFragment.FloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.pusherVoteAdditionalRate"),
+                    serverConfig::getPusherVoteAdditionalRate,
+                    serverConfig::setPusherVoteAdditionalRate)
+                    .setRange(0, 1)
+                    .setDefaultValue(0.5);
+            pusherVoteAdditionalRateOption.create(integratedServerCategory);
+
             {
                 LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.integratedServer.serverApiBaseUrl"));
                 EditText input = inputBox.findViewById(R.id.input);
@@ -371,14 +416,6 @@ public class ConfigView extends LinearLayout {
                 }
                 integratedServerCategory.addView(inputBox);
             }
-
-            PreferencesFragment.BooleanOption startupBinaryApiServerOption = new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.startupBinaryApiServerWhenLaunch"),
-                    serverConfig::getStartupBinaryApiServerWhenLaunch,
-                    serverConfig::setStartupBinaryApiServerWhenLaunch)
-                    .setDefaultValue(true);
-            startupBinaryApiServerOption.create(integratedServerCategory);
 
             {
                 LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.integratedServer.serverApiBinaryExecutablePath"));
@@ -403,34 +440,26 @@ public class ConfigView extends LinearLayout {
                 integratedServerCategory.addView(inputBox);
             }
 
-            LinearLayout layout = new LinearLayout(context);
-            layout.setOrientation(LinearLayout.HORIZONTAL);
-            layout.setGravity(Gravity.LEFT);
-            layout.setVerticalGravity(Gravity.CENTER);
-            LinearLayout.LayoutParams params2 = new LinearLayout.LayoutParams(MATCH_PARENT, dp(44));
-            params2.setMargins(dp(6), 0, dp(6), 0);
-            layout.setLayoutParams(params2);
+            LinearLayout apiServerStatusLayout = new LinearLayout(context);
+            apiServerStatusLayout.setOrientation(LinearLayout.HORIZONTAL);
+            apiServerStatusLayout.setGravity(Gravity.LEFT);
+            apiServerStatusLayout.setVerticalGravity(Gravity.CENTER);
+            LayoutParams params3 = new LayoutParams(MATCH_PARENT, dp(44));
+            params3.setMargins(dp(6), 0, dp(6), 0);
+            apiServerStatusLayout.setLayoutParams(params3);
 
             TextView apiStatusLabel = new TextView(context);
             apiStatusLabel.setTextSize(14);
-            String string = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
-            apiStatusLabel.setText(string.replace("{}", I18n.get(apiServerManager.getBinaryApiServerStatus().i18nKey())));
-
-            Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiStatusListener) -> {
-                MuiModApi.postToUiThread(() -> {
-                    apiStatusLabel.setText(string.replace("{}", I18n.get(apiStatusListener.i18nKey())));
-                });
-            };
-            List<Consumer<ApiServerManager.BinaryApiServerStatus>> apiStatusListeners = apiServerManager.getApiStatusListeners();
-            apiStatusListeners.add(listener);
+            String binaryApiStatusTemplate = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
+            apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerManager.getBinaryApiServerStatus().i18nKey())));
 
             Button stopApiServerButton = new Button(context);
             stopApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.stopApiServer"));
             stopApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             stopApiServerButton.setTextSize(14);
-            Drawable bg1 = ButtonInsetBackgroundFactory.builder().inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build().newBackgroundDrawable();
-            stopApiServerButton.setBackground(bg1);
-            stopApiServerButton.setOnClickListener((v) -> {
+            ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder().inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
+            stopApiServerButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            stopApiServerButton.setOnClickListener((v1) -> {
                 apiServerManager.stopApiServer();
             });
 
@@ -438,12 +467,51 @@ public class ConfigView extends LinearLayout {
             restartApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.restartApiServer"));
             restartApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             restartApiServerButton.setTextSize(14);
-            Drawable bg = ButtonInsetBackgroundFactory.builder().inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build().newBackgroundDrawable();
-            restartApiServerButton.setBackground(bg);
-            restartApiServerButton.setOnClickListener((v) -> {
+            restartApiServerButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            restartApiServerButton.setOnClickListener((v1) -> {
                 apiServerManager.restartApiServer();
             });
 
+            apiServerStatusLayout.addView(apiStatusLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+            apiServerStatusLayout.addView(stopApiServerButton);
+            apiServerStatusLayout.addView(restartApiServerButton);
+            integratedServerCategory.addView(apiServerStatusLayout);
+
+            LinearLayout apiVersionLinearLayout = new LinearLayout(context);
+            apiVersionLinearLayout.setOrientation(LinearLayout.HORIZONTAL);
+            apiVersionLinearLayout.setGravity(Gravity.LEFT);
+            apiVersionLinearLayout.setVerticalGravity(Gravity.CENTER);
+            LayoutParams params2 = new LayoutParams(MATCH_PARENT, dp(44));
+            params2.setMargins(dp(6), 0, dp(6), 0);
+            apiVersionLinearLayout.setLayoutParams(params2);
+
+            TextView apiVersionLabel = new TextView(context);
+            apiVersionLabel.setTextSize(14);
+            String apiServiceVersionTemplate = I18n.get(MusicHud.MOD_ID + ".text.apiServiceVersion");
+            apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
+
+            Button checkVersionButton = new Button(context);
+            checkVersionButton.setText(I18n.get(MusicHud.MOD_ID + ".button.checkApiServerVersion"));
+            checkVersionButton.setTextColor(Theme.PRIMARY_COLOR);
+            checkVersionButton.setTextSize(14);
+            checkVersionButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            checkVersionButton.setOnClickListener((v) -> {
+                ApiClient.checkAvailable();
+                apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
+            });
+
+            apiVersionLinearLayout.addView(apiVersionLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+            apiVersionLinearLayout.addView(checkVersionButton);
+            integratedServerCategory.addView(apiVersionLinearLayout);
+
+            Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiStatusListener) -> {
+                MuiModApi.postToUiThread(() -> {
+                    apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiStatusListener.i18nKey())));
+                    apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
+                });
+            };
+            List<Consumer<ApiServerManager.BinaryApiServerStatus>> apiStatusListeners = apiServerManager.getApiStatusListeners();
+            apiStatusListeners.add(listener);
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
                 @Override
                 public void onViewAttachedToWindow(View v) {
@@ -452,42 +520,6 @@ public class ConfigView extends LinearLayout {
                 @Override
                 public void onViewDetachedFromWindow(View v) {
                     apiStatusListeners.remove(listener);
-                }
-            });
-
-            layout.addView(apiStatusLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
-            layout.addView(stopApiServerButton);
-            layout.addView(restartApiServerButton);
-            integratedServerCategory.addView(layout);
-
-            PreferencesFragment.FloatOption pusherVoteAdditionalRateOption = new PreferencesFragment.FloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.pusherVoteAdditionalRate"),
-                    serverConfig::getPusherVoteAdditionalRate,
-                    serverConfig::setPusherVoteAdditionalRate)
-                    .setRange(0, 1)
-                    .setDefaultValue(0.5);
-            pusherVoteAdditionalRateOption.create(integratedServerCategory);
-
-            PreferencesFragment.BooleanOption useRandomCnIpOption = new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.useRandomCnIp"),
-                    serverConfig::getUseRandomCnIp,
-                    serverConfig::setUseRandomCnIp)
-                    .setDefaultValue(true);
-            useRandomCnIpOption.create(integratedServerCategory);
-            LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(0, dp(6), 0, dp(128));
-            view.addView(integratedServerCategory, params1);
-
-
-            addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-                @Override
-                public void onViewAttachedToWindow(View v) {
-                }
-
-                @Override
-                public void onViewDetachedFromWindow(View v) {
                     Util.ioPool().execute(() -> {
                         clientConfig.save();
                         serverConfig.save();
@@ -499,4 +531,5 @@ public class ConfigView extends LinearLayout {
             throw e;
         }
     }
+
 }

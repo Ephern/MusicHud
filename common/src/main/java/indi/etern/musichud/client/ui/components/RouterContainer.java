@@ -7,7 +7,7 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import indi.etern.musichud.client.ui.utils.EasingInterpolator;
-import indi.etern.musichud.client.ui.utils.Easings;
+import indi.etern.musichud.client.ui.utils.Easing;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -44,7 +44,7 @@ public class RouterContainer extends FrameLayout {
 
     private boolean isTransitioning = false;
     private String pendingNavigationKey = null;
-    private final Easings defaultEasing = Easings.EASE_IN_OUT_QUINT;
+    private final Easing defaultEasing = Easing.EASE_IN_OUT_QUINT;
 
     public enum TransitionType {
         FADE {
@@ -414,13 +414,13 @@ public class RouterContainer extends FrameLayout {
 
     private void performTransition(@Nullable View fromPage, @NonNull View toPage,
                                    String toKey, @Nullable TransitionType customType,
-                                   @Nullable Easings customEasing) {
+                                   @Nullable Easing customEasing) {
         isTransitioning = true;
 
         toPage.setVisibility(VISIBLE);
 
         TransitionType type = customType != null ? customType : transitionType;
-        Easings easing = customEasing != null ? customEasing : defaultEasing;
+        Easing easing = customEasing != null ? customEasing : defaultEasing;
         TimeInterpolator interpolator = EasingInterpolator.of(easing);
 
         // 使用枚举的方法创建动画
