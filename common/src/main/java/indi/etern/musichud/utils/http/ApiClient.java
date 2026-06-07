@@ -57,7 +57,7 @@ public class ApiClient {
 
     public static boolean checkAvailable() {
         try {
-            var response = post(ServerApiMeta.API_SERVER_VERSION, null, null, true);
+            var response = post(ServerApiMeta.API_SERVER_VERSION, null, null, false);
             version = response.data.version;
             return true;
         } catch (Exception e) {
