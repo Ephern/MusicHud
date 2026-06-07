@@ -167,20 +167,20 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         mHost.onHoverMove(true);
     }
 
-    @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int mouseButton) {
-        return false;
-    }
+//    @Override
+//    public boolean mouseClicked(double mouseX, double mouseY, int mouseButton) {
+//        return false;
+//    }
 
-    @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int mouseButton) {
-        return false;
-    }
+//    @Override
+//    public boolean mouseReleased(double mouseX, double mouseY, int mouseButton) {
+//        return false;
+//    }
 
-    @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int mouseButton, double deltaX, double deltaY) {
-        return true;
-    }
+//    @Override
+//    public boolean mouseDragged(double mouseX, double mouseY, int mouseButton, double deltaX, double deltaY) {
+//        return true;
+//    }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
@@ -188,21 +188,21 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         return true;
     }
 
-    @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        mHost.onKeyPress(keyCode, scanCode, modifiers);
-        return false;
-    }
+//    @Override
+//    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+//        mHost.onKeyPress(keyCode, scanCode, modifiers);
+//        return false;
+//    }
 
-    @Override
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        mHost.onKeyRelease(keyCode, scanCode, modifiers);
-        return false;
-    }
+//    @Override
+//    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+//        mHost.onKeyRelease(keyCode, scanCode, modifiers);
+//        return false;
+//    }
 
-    @Override
-    public boolean charTyped(char ch, int modifiers) {
-        return mHost.onCharTyped(ch);
-    }
+//    @Override
+//    public boolean charTyped(char ch, int modifiers) {
+//        return mHost.onCharTyped(ch);
+//    }
 }
 
