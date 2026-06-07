@@ -69,9 +69,8 @@ dependencies {
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
-    // TODO: ModernUI-NeoForge not yet updated for 26.1
-    // compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+"
-    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.1.2-3.12.1.0"
+
+    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.1.2-${rootProject.modernui_version}.+"
 }
 
 java {

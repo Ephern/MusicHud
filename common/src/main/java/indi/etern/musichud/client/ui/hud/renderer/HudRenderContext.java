@@ -179,12 +179,23 @@ public class HudRenderContext {
             return this;
         }
 
-        public void then(Consumer<Transforming> task) {
+        public Transforming then(Consumer<Transforming> task) {
+            task.accept(this);
+            return this;
+        }
+
+        public void end(Consumer<Transforming> task) {
             task.accept(this);
             pose.popMatrix();
         }
 
-        public Transforming restore() {
+        public void end() {
+            pose.popMatrix();
+        }
+
+        public Transforming subTransform(Consumer<Transforming> consumer) {
+            pose.pushMatrix();
+            consumer.accept(this);
             pose.popMatrix();
             return this;
         }

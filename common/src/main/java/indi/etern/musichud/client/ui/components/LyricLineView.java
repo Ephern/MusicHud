@@ -14,7 +14,7 @@ import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.utils.Easings;
+import indi.etern.musichud.client.ui.utils.Easing;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.Logger;
@@ -162,9 +162,9 @@ public class LyricLineView extends LinearLayout {
                 int height = row.getHeight();
                 row.setPivotY(Math.max(height, dp(24)));
                 ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, 1f, LYRIC_EMPHASIZE_SCALE);
-                scaleX.setInterpolator(Easings.EASE_IN_OUT_QUAD);
+                scaleX.setInterpolator(Easing.EASE_IN_OUT_QUAD);
                 ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, 1f, LYRIC_EMPHASIZE_SCALE);
-                scaleY.setInterpolator(Easings.EASE_IN_OUT_QUAD);
+                scaleY.setInterpolator(Easing.EASE_IN_OUT_QUAD);
 
                 AnimatorSet emphasizeAnimSet = new AnimatorSet();
                 emphasizeAnim = emphasizeAnimSet;
@@ -209,9 +209,9 @@ public class LyricLineView extends LinearLayout {
 
     private void fadeNormalLine() {
         ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, row.getScaleX(), 1f);
-        scaleX.setInterpolator(Easings.EASE_IN_OUT_QUAD);
+        scaleX.setInterpolator(Easing.EASE_IN_OUT_QUAD);
         ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, row.getScaleY(), 1f);
-        scaleY.setInterpolator(Easings.EASE_IN_OUT_QUAD);
+        scaleY.setInterpolator(Easing.EASE_IN_OUT_QUAD);
 
         AnimatorSet set = new AnimatorSet();
         set.playTogether(scaleX, scaleY);

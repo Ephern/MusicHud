@@ -32,7 +32,9 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> disableVanillaMusic;
     private final ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
     private final ModConfigSpec.ConfigValue<Boolean> enableHud;
+    private final ModConfigSpec.ConfigValue<Boolean> enableMarqueeText;
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
+    private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
     private final ModConfigSpec.ConfigValue<String> hudVerticalPosition;
     private final ModConfigSpec.ConfigValue<String> hudHorizontalPosition;
     private final ModConfigSpec.ConfigValue<Integer> hudOffsetX;
@@ -56,28 +58,36 @@ public class ClientConfigDefinition implements ClientConfig {
     ClientConfigDefinition(ModConfigSpec.Builder builder) {
         enable = builder
                 .comment("Enable Music HUD Functions")
-                .translation(MusicHud.MOD_ID + ".config.common.enable")
+                .translation(MusicHud.MOD_ID + ".config.common.switch.enable")
                 .define("enable", true);
         showTranslatedCnLyrics = builder
                 .comment("Show translated Chinese lyrics")
-                .translation(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics")
+                .translation(MusicHud.MOD_ID + ".config.common.switch.showTranslatedCnLyrics")
                 .define("showTranslatedCnLyrics", true);
         disableVanillaMusic = builder
                 .comment("Disable vanilla game music")
-                .translation(MusicHud.MOD_ID + ".config.commmon.disableVanillaMusic")
+                .translation(MusicHud.MOD_ID + ".config.common.switch.disableVanillaMusicWhilePlaying")
                 .define("disableVanillaMusic", true);
-        hideHudWhenNotPlaying = builder
-                .comment("Hide hud when not playing music")
-                .translation(MusicHud.MOD_ID + ".config.common.enableHud")
-                .define("hideHudWhenNotPlaying", true);
         enableHud = builder
                 .comment("Enable hud")
-                .translation(MusicHud.MOD_ID + ".config.common.hud.enable")
+                .translation(MusicHud.MOD_ID + ".config.common.switch.enableHud")
                 .define("enableHud", true);
+        enableMarqueeText = builder
+                .comment("Enable marquee animation on overflow text")
+                .translation(MusicHud.MOD_ID + ".config.common.switch.enableMarqueeText")
+                .define("enableMarqueeText", true);
+        hideHudWhenNotPlaying = builder
+                .comment("Hide hud when not playing music")
+                .translation(MusicHud.MOD_ID + ".config.common.switch.autoHide")
+                .define("hideHudWhenNotPlaying", true);
         primaryChosenQuality = builder
                 .comment("Primary chosen quality")
                 .translation(MusicHud.MOD_ID + ".config.common.primaryChosenQuality")
                 .define("primaryChosenQuality", Quality.LOSSLESS.name());
+        mainScreenAdditionalBackgroundDarken = builder
+                .comment("Main Screen Additional Background Darken Rate")
+                .translation(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken")
+                .defineInRange("mainScreenAdditionalBackgroundDarken", 0.5, 0, 1);
         hudVerticalPosition = builder
                 .comment("Vertical position (TOP|CENTER|BOTTOM)")
                 .translation(MusicHud.MOD_ID + ".config.layout.verticalAlign")
@@ -365,4 +375,23 @@ public class ClientConfigDefinition implements ClientConfig {
         saveListener.forEach(Runnable::run);
     }
 
+    @Override
+    public double getMainScreenAdditionalBackgroundDarken() {
+        return mainScreenAdditionalBackgroundDarken.get();
+    }
+
+    @Override
+    public void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken) {
+        mainScreenAdditionalBackgroundDarken.set(additionalBackgroundDarken);
+    }
+
+    @Override
+    public boolean getEnableMarqueeText() {
+        return enableMarqueeText.get();
+    }
+
+    @Override
+    public void setEnableMarqueeText(boolean enable) {
+        enableMarqueeText.set(enable);
+    }
 }

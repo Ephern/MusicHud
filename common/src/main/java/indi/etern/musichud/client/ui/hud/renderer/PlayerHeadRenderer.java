@@ -41,7 +41,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         context.nextStratum();
         context.transform()
                 .translate(absolutePosition.x(), absolutePosition.y())
-                .then((transforming) -> {
+                .end((transforming) -> {
                     context.blit(
                             RenderPipelines.GUI_TEXTURED,
                             skinResource,
@@ -55,7 +55,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         context.transform()
                 .translate(absolutePosition.x() - layout.getWidth() * 0.08f, absolutePosition.y() - layout.getHeight() * 0.08f)
                 .scale(1.16f)
-                .then((transforming) -> {
+                .end((transforming) -> {
                     context.blit(
                             RenderPipelines.GUI_TEXTURED,
                             skinResource,

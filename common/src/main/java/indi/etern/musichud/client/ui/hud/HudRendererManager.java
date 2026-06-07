@@ -383,7 +383,7 @@ public class HudRendererManager {
             TITLE_RENDERER.render(hudRenderContext);
             LYRICS_LINE_RENDERER.render(hudRenderContext);
 
-            ARTISTS_AND_ALBUM_RENDERER.getLayout().setWidth(progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - 1f);
+            ARTISTS_AND_ALBUM_RENDERER.getLayout().setWidth(progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - contentInterval);
             ARTISTS_AND_ALBUM_RENDERER.render(hudRenderContext);
             PLAY_TIME_RENDERER.render(hudRenderContext);
 

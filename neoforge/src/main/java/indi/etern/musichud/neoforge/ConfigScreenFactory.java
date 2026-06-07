@@ -1,7 +1,7 @@
 package indi.etern.musichud.neoforge;
 
-import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import net.minecraft.client.gui.screens.Screen;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
@@ -14,6 +14,6 @@ public class ConfigScreenFactory implements IConfigScreenFactory {
     public Screen createScreen(@NotNull ModContainer container, @NotNull Screen modListScreen) {
         var fragment = new MainFragment();
         fragment.setDefaultSelectedIndex(3); // Setting page
-        return MuiModApi.get().createScreen(fragment, null, modListScreen);
+        return MusicHudScreen.createScreen(fragment, null, modListScreen, "Music HUD");
     }
 }

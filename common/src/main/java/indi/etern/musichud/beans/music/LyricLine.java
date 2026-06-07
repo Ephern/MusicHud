@@ -6,7 +6,8 @@ import icyllis.modernui.graphics.text.ShapedText;
 import icyllis.modernui.text.*;
 import icyllis.modernui.text.style.ReplacementSpan;
 import lombok.*;
-import org.jetbrains.annotations.NotNull;import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.*;

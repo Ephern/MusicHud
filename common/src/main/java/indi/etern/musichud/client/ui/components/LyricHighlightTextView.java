@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.animation.ColorEvaluator;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.LinearGradient;
 import icyllis.modernui.graphics.Shader;
 import icyllis.modernui.text.Layout;
@@ -11,7 +12,7 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.Easings;
+import indi.etern.musichud.client.ui.utils.Easing;
 import lombok.NonNull;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -25,8 +26,8 @@ public class LyricHighlightTextView extends TextView {
     private static final int fullLineHighlightDelay = 300;
     private static final int fullLineFadeDelay = -200;
     private static final int animationDurationMillis = 300;
-    private final LyricLine lyricLine;
     private static final Duration animationDuration = Duration.ofMillis(animationDurationMillis);
+    private final LyricLine lyricLine;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private final Duration lineEndAnimationCallTime;
     private final float phraseRaiseY = dp(1) * 1.5f;
@@ -100,7 +101,7 @@ public class LyricHighlightTextView extends TextView {
             if (statusUpdateProcessing) {
                 float fraction = (float) (getMillisBetween(playedDuration, statusUpdateTime) - fullLineHighlightDelay) / animationDurationMillis;
                 if (0 <= fraction && fraction < 1) {
-                    setTextColor(ColorEvaluator.evaluate(fraction, getTextColors().getDefaultColor(), Theme.EMPHASIZE_LYRIC_COLOR));
+                    setTextColor(ColorEvaluator.evaluate(fraction, Color.toArgb(getCurrentTextColor()), Theme.EMPHASIZE_LYRIC_COLOR));
                 } else if (fraction >= 1) {
                     setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
                     statusUpdateProcessing = false;
@@ -233,7 +234,7 @@ public class LyricHighlightTextView extends TextView {
         if (spanCount == 1) {
             LyricLine.HighlightSpan span = phrase.spans().getFirst();
             float t = Math.clamp((float) progressMillis / totalDuration, 0, 1);
-            span.setYOffset(-phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t));
+            span.setYOffset(-phraseRaiseY * Easing.EASE_IN_OUT_QUAD.getInterpolation(t));
         } else {
             float staggerRate = 0.2f; // 错开比例，最后一个比第一个晚 totalDuration * staggerRate 毫秒
             long staggerDuration = (long) (totalDuration * staggerRate); // 错开总时长
@@ -253,7 +254,7 @@ public class LyricHighlightTextView extends TextView {
                     span.setScale(1);
                 } else {
                     float t = (float) (nowMillis - animStart) / animDuration;
-                    span.setYOffset(-phraseRaiseY * Easings.EASE_IN_OUT_QUAD.getInterpolation(t));
+                    span.setYOffset(-phraseRaiseY * Easing.EASE_IN_OUT_QUAD.getInterpolation(t));
                     span.setScale(1 + 0.35f * Math.min(phrase.durationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
                 }
             }
@@ -269,7 +270,7 @@ public class LyricHighlightTextView extends TextView {
         long endAtMillis = endAt.toMillis();
         long nowMillis = now.toMillis();
         float t = Math.clamp((float) (nowMillis - startAtMillis) / (endAtMillis - startAtMillis), 0, 1);
-        float yOffset = -phraseRaiseY * Easings.EASE_OUT_QUAD.getInterpolation(t);
+        float yOffset = -phraseRaiseY * Easing.EASE_OUT_QUAD.getInterpolation(t);
 
         phrase.spans().forEach(span -> span.setYOffset(yOffset));
     }
