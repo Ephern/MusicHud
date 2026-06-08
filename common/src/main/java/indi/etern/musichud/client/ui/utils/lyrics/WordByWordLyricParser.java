@@ -19,7 +19,6 @@ public class WordByWordLyricParser {
     private static final Pattern phrasePattern = Pattern.compile("\\((\\d+),(\\d+),(\\d+)\\)([\\s\\S]*?)(?=\\(\\d+,\\d+,(\\d+)\\)|$)");
     private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(5);
     private static final Logger logger = MusicHud.getLogger(FullLineLyricParser.class);
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     public static ArrayDeque<LyricLine> parse(MusicDetail musicDetail) {
         LyricInfo lyricInfo = musicDetail.getLyricInfo();

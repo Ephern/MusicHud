@@ -5,6 +5,7 @@ import icyllis.modernui.graphics.text.FontMetricsInt;
 import icyllis.modernui.graphics.text.ShapedText;
 import icyllis.modernui.text.*;
 import icyllis.modernui.text.style.ReplacementSpan;
+import indi.etern.musichud.MusicHud;
 import lombok.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -195,6 +196,8 @@ public class LyricLine implements Comparable<LyricLine> {
                         TextDirectionHeuristics.FIRSTSTRONG_LTR, paint
                 );
                 cachedWidth = Math.round(cachedShapedText.getAdvance());
+//                float advance = cachedShapedText.getAdvance();
+//                MusicHud.LOGGER.info("text = {}, start = {}, end = {}, cachedShapedText.getAdvance() = {}" , text, start, end, advance);
                 textHeight = cachedShapedText.getDescent() - cachedShapedText.getAscent();
 
                 // Enable SkFont subpixel anti-aliasing edging via VarHandle.

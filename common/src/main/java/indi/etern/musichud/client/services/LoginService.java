@@ -111,7 +111,12 @@ public class LoginService {
             loginResponseHandler.accept(qrLoginResponse);
     };
     private double lastPressTime;
+    @Getter
+    private ConnectionType connectionType;
 
+    public enum ConnectionType {
+        EXTERNAL, INTERNAL
+    }
     public static LoginService getInstance() {
         if (instance == null) {
             synchronized (LoginService.class) {
@@ -139,13 +144,24 @@ public class LoginService {
                 loginCookieInfo.type() != LoginType.ANONYMOUS;
     }
 
+    public void connectAsPrevious() {
+        if (connectionType == ConnectionType.EXTERNAL) {
+            connectToExternalServer();
+        } else {
+            launchIsolated();
+        }
+    }
+
     public void connectToExternalServer() {
         if (clientConfig.getEnable()) {
             clientNetworkService.sendToServer(new ConnectRequest(Version.current));
         }
     }
 
-    public void loginToServer() {
+    public void loginToServer(ConnectionType type) {
+        if (type != null) {
+            connectionType = type;
+        }
         if (isLogined()) {
             logger.info("Previous cookie found");
             loginToServerByCookieWithRefreshCheck();
@@ -186,7 +202,7 @@ public class LoginService {
     }
 
     private void launchIsolated() {
-        loginToServer();
+        loginToServer(ConnectionType.INTERNAL);
         MusicService.resetCurrentMusicStatus();
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();

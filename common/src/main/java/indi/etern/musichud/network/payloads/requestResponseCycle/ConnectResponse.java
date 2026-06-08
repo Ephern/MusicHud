@@ -61,7 +61,7 @@ public record ConnectResponse(boolean accepted, Version serverVersion,
                                 }
 
                                 MusicHud.setConnectStatus(MusicHud.ConnectStatus.CONNECTED);
-                                LoginService.getInstance().loginToServer();
+                                LoginService.getInstance().loginToServer(LoginService.ConnectionType.EXTERNAL);
                             } else {
                                 LoginService.getInstance().logout();
                                 MusicHud.setConnectStatus(MusicHud.ConnectStatus.INCOMPATIBLE);

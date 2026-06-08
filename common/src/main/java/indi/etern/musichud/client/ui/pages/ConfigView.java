@@ -83,7 +83,7 @@ public class ConfigView extends LinearLayout {
             booleanOption.setOnChanged(() -> {
                 MuiModApi.postToUiThread(MainFragment::refresh);
                 if (clientConfig.getEnable()) {
-                    loginService.connectToExternalServer();
+                    loginService.connectAsPrevious();
                 } else {
                     loginService.disconnectToExternalOrIntegratedServer();
                 }
