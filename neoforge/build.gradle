@@ -104,11 +104,9 @@ dependencies {
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"
-    jarJar "com.github.umjammer:jlayer:$rootProject.jlayer_version"
 
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
     shadowBundle "org.jflac:jflac-codec:$rootProject.jflac_version"
-    jarJar "org.jflac:jflac-codec:$rootProject.jflac_version"
 
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
