@@ -124,7 +124,7 @@ public class AccountView extends LinearLayout {
                     retryButton.setVisibility(GONE);
                     progressRing.setVisibility(VISIBLE);
                 });
-                loginService.loginToServer();
+                loginService.loginToServer(null);
             });
 
 

@@ -118,7 +118,7 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public void logout(Player player) {
         Runnable remove = pollingMap.remove(player);
-        playerInfoMap.remove(player);
+        playerInfoMap.remove(player.getUUID());
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
         if (remove != null) {
             logger.warn("Polling v-thread stopped as player {} quit", player.getName());
