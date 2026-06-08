@@ -7,6 +7,7 @@ import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.LinearGradient;
 import icyllis.modernui.graphics.Shader;
 import icyllis.modernui.text.Layout;
+import icyllis.modernui.text.MeasuredParagraph;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.LyricLine;
@@ -34,6 +35,7 @@ public class LyricHighlightTextView extends TextView {
     private HighlightStatus status = HighlightStatus.WAITING;
     private Duration statusUpdateTime = Duration.ZERO;
     private boolean statusUpdateProcessing = false;
+    private boolean debugDumped = false;
     @Setter
     private Runnable onFade;
 
@@ -91,6 +93,58 @@ public class LyricHighlightTextView extends TextView {
         // PERFORMING 状态
         Layout layout = getLayout();
         if (layout == null) return;
+
+        // DEBUG: print per-char advances and line widths (once per line)
+/*
+        if (lyricLine.isWordByWord() && !debugDumped) {
+            debugDumped = true;
+            CharSequence text = layout.getText();
+            int[] lineStarts = new int[layout.getLineCount() + 1];
+            float[] lineWidths = new float[layout.getLineCount()];
+            for (int i = 0; i < layout.getLineCount(); i++) {
+                lineStarts[i] = layout.getLineStart(i);
+                lineWidths[i] = layout.getLineWidth(i);
+            }
+            lineStarts[layout.getLineCount()] = text.length();
+            StringBuilder sb = new StringBuilder();
+            sb.append("[\"");
+            sb.append(text.toString().replace("\"", "\\\""));
+            sb.append("\", {");
+            sb.append("\"lineCount\":").append(layout.getLineCount()).append(",");
+            sb.append("\"viewWidth\":").append(getWidth() - getTotalPaddingLeft() - getTotalPaddingRight()).append(",");
+            sb.append("\"lineWidths\":[");
+            for (int i = 0; i < lineWidths.length; i++) {
+                if (i > 0) sb.append(",");
+                sb.append(lineWidths[i]);
+            }
+            sb.append("],\"lineTexts\":[");
+            for (int i = 0; i < layout.getLineCount(); i++) {
+                if (i > 0) sb.append(",");
+                String lineText = text.subSequence(lineStarts[i], lineStarts[i + 1]).toString().replace("\"", "\\\"");
+                sb.append("\"").append(lineText).append("\"");
+            }
+            // Advances per line (within each line only, no cross-line error)
+            sb.append("],\"advancesByLine\":[");
+            for (int i = 0; i < layout.getLineCount(); i++) {
+                if (i > 0) sb.append(",");
+                sb.append("[");
+                int lineStart = lineStarts[i];
+                int lineEnd = lineStarts[i + 1];
+                for (int j = lineStart; j < lineEnd; j++) {
+                    if (j > lineStart) sb.append(",");
+                    float right = layout.getPrimaryHorizontal(j + 1);
+                    float left = layout.getPrimaryHorizontal(j);
+                    if (j + 1 == lineEnd && layout.getLineForOffset(j + 1) != i) {
+                        right = layout.getLineRight(i);
+                    }
+                    sb.append(String.format("%.2f", right - left));
+                }
+                sb.append("]");
+            }
+            sb.append("]}");
+            log.info("Lyric Debug {}", sb);
+        }
+*/
 
         long range = layout.getLineRangeForDraw(canvas);
         if (range < 0) return;
