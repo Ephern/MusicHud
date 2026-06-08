@@ -35,7 +35,7 @@ public class LyricHighlightTextView extends TextView {
     private HighlightStatus status = HighlightStatus.WAITING;
     private Duration statusUpdateTime = Duration.ZERO;
     private boolean statusUpdateProcessing = false;
-    private boolean debugDumped = false;
+//    private boolean debugDumped = false;
     @Setter
     private Runnable onFade;
 
