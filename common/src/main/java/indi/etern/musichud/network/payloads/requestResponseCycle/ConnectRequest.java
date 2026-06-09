@@ -24,7 +24,17 @@ public record ConnectRequest(Version clientVersion) implements C2SPayload {
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
-        private static final ClientConfig clientConfig = ClientConfig.getInstance();
+        private static ClientConfig clientConfig;
+
+        static {
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                try {
+                    clientConfig = ClientConfig.getInstance();
+                } catch (UnsupportedOperationException e) {
+                    clientConfig = null;
+                }
+            }
+        }
 
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
@@ -32,7 +42,7 @@ public record ConnectRequest(Version clientVersion) implements C2SPayload {
                     ServerDataPacketVThreadExecutor.execute((startQRLoginRequest, player) -> {
                         ILoginApiService instance = ILoginApiService.getInstance(ApiProvider.NCM);
                         boolean compatible = Version.capableWith(startQRLoginRequest.clientVersion());
-                        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && !clientConfig.getEnabledInIntegratedServer()) {
+                        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && clientConfig != null && !clientConfig.getEnabledInIntegratedServer()) {
                             if (compatible) {
                                 instance.joinUnlogged(player);
                             }

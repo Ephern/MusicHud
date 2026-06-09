@@ -29,11 +29,23 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
             "",
             ZonedDateTime.of(114514, 1, 9, 1, 9, 8, 10, ZoneId.systemDefault())
     );
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static ClientConfig clientConfig;
+    static {
+        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+            try {
+                clientConfig = ClientConfig.getInstance();
+            } catch (UnsupportedOperationException e) {
+                clientConfig = null;
+            }
+        }
+    }
 
     public static LoginCookieInfo clientCurrentCookie() {
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
         if (side == Environment.Side.CLIENT) {
+            if (clientConfig == null) {
+                throw new IllegalStateException("\"clientConfig\" is null in client");
+            }
             try {
                 LoginCookieInfo loginCookieInfo = clientConfig.getClientCookie();
                 if (loginCookieInfo == null) {

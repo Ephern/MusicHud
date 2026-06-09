@@ -3,7 +3,7 @@ plugins {
     id 'maven-publish'
     id 'io.papermc.paperweight.userdev' version '2.0.0-beta.21'
     id 'com.gradleup.shadow'
-    id 'xyz.jpenilla.run-paper' version '2.3.1'
+    id 'xyz.jpenilla.run-paper' version '3.0.2'
 }
 
 base {
@@ -56,7 +56,7 @@ configurations {
 }
 
 dependencies {
-    paperweight.paperDevBundle("${rootProject.minecraft_version}.build.66-stable")
+    paperweight.paperDevBundle("${rootProject.minecraft_version}.build.+")
 
     // Fabric merged jar provides client+server classes not in Paper's server jar
     compileOnly("net.minecraft:minecraft-merged-deobf:${rootProject.minecraft_version}")

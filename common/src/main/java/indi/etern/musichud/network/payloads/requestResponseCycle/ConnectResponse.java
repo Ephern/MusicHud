@@ -41,7 +41,16 @@ public record ConnectResponse(boolean accepted, Version serverVersion,
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
-        private final ClientConfig clientConfig = ClientConfig.getInstance();
+        private static ClientConfig clientConfig;
+        static {
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                try {
+                    clientConfig = ClientConfig.getInstance();
+                } catch (UnsupportedOperationException e) {
+                    clientConfig = null;
+                }
+            }
+        }
 
         public void register() {
             NetworkReceiver<ConnectResponse> receiver = NetworkReceiver.noop();
@@ -56,7 +65,7 @@ public record ConnectResponse(boolean accepted, Version serverVersion,
                                 StreamAudioPlayer.getInstance().stop();
                                 if (Minecraft.getInstance().getCurrentServer() != null
                                         && MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED
-                                        && clientConfig.getEnableIsolatedMode()) {
+                                        && clientConfig != null && clientConfig.getEnableIsolatedMode()) {
                                     LoginService.getInstance().disconnectToExternalOrIntegratedServer();
                                 }
 
