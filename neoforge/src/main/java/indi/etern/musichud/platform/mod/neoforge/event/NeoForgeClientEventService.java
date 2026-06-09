@@ -62,8 +62,10 @@ public class NeoForgeClientEventService implements IClientEventService {
 
     @SubscribeEvent
     public void onClientPlayerQuit(ClientPlayerNetworkEvent.LoggingOut event) {
-        serverIp = null;
-        quitListeners.forEach(q -> q.accept(event.getPlayer()));
+        if (event.getPlayer() != null) {
+            serverIp = null;
+            quitListeners.forEach(q -> q.accept(event.getPlayer()));
+        }
     }
 
     @SubscribeEvent
