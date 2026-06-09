@@ -67,7 +67,7 @@ There are 2 methods to deploy.
 2. Click latest action runs in type "Build Artifacts" and download platform binary artifacts matches to your pc/server platform
 3. Uncompress the binary executable file from ZIP file to ...
    - Mod edition: `{corepath}/music-hud/` and rename it to `api` (`api.exe` on Windows)
-   - Plugin edition: `{corepath}/` and rename it to `api` (`api.exe` on Windows)
+   - Plugin edition: `{corepath}/plugins/MusicHud/` and rename it to `api` (`api.exe` on Windows)
    - Or place it anywhere and modify config in game or option `serverApiBinaryExecutablePath` (absolute or relative path) in config file `/config/music_hud-common.toml`.
 
 #### Deploy separately (recommend for server)
@@ -136,7 +136,7 @@ There are 2 methods to deploy.
 2. 在 actions 类型中选择 "Build Artifacts" 并进入最新的构建中根据你的平台下载对应的二进制构建产物
 3. 解压下载得到的压缩包并将其中的二进制可执行文件放置到...
    - mod 版：{核心目录}/music-hud/ 并重命名为 `api` (对于 Windows 为 `api.exe`)
-   - 插件版: {核心目录}/api(.exe)
+   - 插件版: {核心目录}/plugins/MusicHud/api(.exe)
    - 或者放在任意处并在游戏内或配置文件`/config/music_hud-common.toml`中修改选项 `serverApiBinaryExecutablePath` 对应(绝对/相对)目录
 
 #### 独立部署（推荐服务端使用）
