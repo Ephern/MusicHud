@@ -31,7 +31,18 @@ public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, 
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
-        private static final ClientConfig clientConfig = ClientConfig.getInstance();
+        private static ClientConfig clientConfig;
+        private static MusicService musicService;
+        static {
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                try {
+                    clientConfig = ClientConfig.getInstance();
+                } catch (UnsupportedOperationException e) {
+                    clientConfig = null;
+                }
+                musicService = MusicService.getInstance();
+            }
+        }
 
         public void register() {
             NetworkReceiver<SwitchMusicMessage> receiver = NetworkReceiver.noop();
@@ -41,7 +52,6 @@ public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, 
                         if (!clientConfig.getEnable()) {
                             return;
                         }
-                        MusicService musicService = MusicService.getInstance();
                         String message1 = message.message;
                         if (message1.startsWith(MusicHud.MOD_ID + ".")) {
                             message1 = I18n.get(message1);

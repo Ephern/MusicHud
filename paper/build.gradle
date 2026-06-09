@@ -3,6 +3,7 @@ plugins {
     id 'maven-publish'
     id 'com.gradleup.shadow'
     id 'io.papermc.paperweight.userdev'
+    id 'xyz.jpenilla.run-paper' version '3.0.2'
 }
 
 base {
@@ -90,6 +91,10 @@ tasks.reobfJar {
 
 tasks.assemble {
     dependsOn tasks.reobfJar
+}
+
+tasks.runServer {
+    minecraftVersion("${rootProject.minecraft_version}")
 }
 
 publishing {
