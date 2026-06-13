@@ -11,6 +11,7 @@ import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
+import indi.etern.musichud.client.compat.ReactiveMusicCompat;
 import indi.etern.musichud.client.config.ProfileConfigData;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
@@ -249,6 +250,7 @@ public class MusicService {
 
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         if (clientConfig.getEnable()) {
+            ReactiveMusicCompat.muteReactiveMusic(true);
             if (!message.isEmpty()) {
                 MuiModApi.postToUiThread(() -> {
                     //noinspection UnstableApiUsage
@@ -264,15 +266,19 @@ public class MusicService {
                 streamAudioPlayer.playAsync(musicDetail, serverStartTime)
                         .thenAccept(nowPlayingInfo::startAt)
                         .exceptionally(e -> {
-                            return null;//TODO display error in hud
+                            ReactiveMusicCompat.muteReactiveMusic(false);
+                            return null;
                         });
             } else {
+                ReactiveMusicCompat.muteReactiveMusic(false);
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 nowPlayingInfo.startAt(null);
 //                nowPlayingInfo.switchMusic(MusicDetail.NONE,MusicDetail.NONE,null);
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 streamAudioPlayer.stop();
             }
+        } else {
+            ReactiveMusicCompat.muteReactiveMusic(false);
         }
     }
 
