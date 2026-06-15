@@ -6,7 +6,7 @@ import indi.etern.musichud.interfaces.ClientConfig;
 public class ReactiveMusicCompat {
     private static Object reactiveMusicThread;
     private static boolean reactiveMusicAvailable;
-    private static ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     static {
         try {

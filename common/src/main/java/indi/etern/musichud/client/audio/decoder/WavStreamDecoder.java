@@ -9,40 +9,42 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * WAV 音频解码器，支持 PCM 格式（8位/16位，单声道/立体声）。
+ * WAV audio decoder, supporting PCM (8/16/24/32-bit signed, mono/stereo).
+ * Automatically resamples 24-bit and 32-bit to 16-bit.
  */
 public class WavStreamDecoder implements AudioDecoder {
     private final InputStream inputStream;
-    private int sampleRate;
-    private int format;          // OpenAL 格式常量
-    private long dataSize;       // 音频数据总字节数
-    private int frameSize;
-    private long bytesRead;            // 已读取的音频数据字节数
+    private final IResampler resampler;
+    private final int sampleRate;
+    private final int format;          // OpenAL format constant
+    private final long dataSize;       // total audio data bytes in file
+    private final int frameSize;
+    private long bytesRead;      // raw bytes read from stream
 
     /**
-     * 从输入流构造 WAV 解码器，解析文件头并定位到数据块开始。
+     * Construct WAV decoder from an input stream, parse header and seek to data chunk.
      *
-     * @param inputStream 输入流（通常为 BufferedInputStream）
+     * @param inputStream input stream (usually BufferedInputStream)
      */
     @SneakyThrows
     public WavStreamDecoder(InputStream inputStream) {
         this.inputStream = inputStream;
 
         try {
-            // 1. 读取 RIFF 头
+            // 1. read RIFF header
             byte[] riff = new byte[4];
             readFully(riff);
             if (!new String(riff).equals("RIFF")) {
                 throw new IOException("Not a WAV file: missing RIFF header");
             }
-            readIntLE(); // 文件总大小（跳过）
+            readIntLE(); // total file size (skip)
             byte[] wave = new byte[4];
             readFully(wave);
             if (!new String(wave).equals("WAVE")) {
                 throw new IOException("Not a WAV file: missing WAVE identifier");
             }
 
-            // 2. 查找 fmt 块
+            // 2. locate fmt chunk
             int audioFormat;
             int channels;
             int sampleRateTmp;
@@ -52,14 +54,14 @@ public class WavStreamDecoder implements AudioDecoder {
                 readFully(chunkId);
                 long chunkSize = readIntLE();
                 if (new String(chunkId).equals("fmt ")) {
-                    audioFormat = readShortLE();   // 格式标签，1 表示 PCM
+                    audioFormat = readShortLE();   // format tag, 1 = PCM
                     channels = readShortLE();
                     sampleRateTmp = readIntLE();
-                    readIntLE();      // 字节率（跳过）
-                    readShortLE();    // 块对齐（跳过）
+                    readIntLE();      // byte rate (skip)
+                    readShortLE();    // block align (skip)
                     bitsPerSample = readShortLE();
 
-                    // 跳过 fmt 块中可能存在的额外数据
+                    // skip possible extra data in fmt chunk
                     long extra = chunkSize - 16;
                     if (extra > 0) {
                         long skipped = inputStream.skip(extra);
@@ -69,7 +71,7 @@ public class WavStreamDecoder implements AudioDecoder {
                     }
                     break;
                 } else {
-                    // 忽略其他块
+                    // skip other chunks
                     long skipped = inputStream.skip(chunkSize);
                     if (skipped != chunkSize) {
                         throw new IOException("Failed to skip chunk");
@@ -80,7 +82,7 @@ public class WavStreamDecoder implements AudioDecoder {
                 throw new IOException("Unsupported audio format: " + audioFormat + " (only PCM supported)");
             }
 
-            // 3. 查找 data 块
+            // 3. locate data chunk
             long dataSizeTmp;
             while (true) {
                 byte[] chunkId = new byte[4];
@@ -99,32 +101,53 @@ public class WavStreamDecoder implements AudioDecoder {
 
             sampleRate = sampleRateTmp;
             dataSize = dataSizeTmp;
-            frameSize = sampleRate * channels * bitsPerSample / 8;
             bytesRead = 0;
 
-            // 确定 OpenAL 格式常量
-            if (channels == 1 && bitsPerSample == 8) {
-                this.format = AL10.AL_FORMAT_MONO8;
-            } else if (channels == 1 && bitsPerSample == 16) {
-                this.format = AL10.AL_FORMAT_MONO16;
-            } else if (channels == 2 && bitsPerSample == 8) {
-                this.format = AL10.AL_FORMAT_STEREO8;
-            } else if (channels == 2 && bitsPerSample == 16) {
-                this.format = AL10.AL_FORMAT_STEREO16;
+            int effectiveBitsPerSample = bitsPerSample;
+
+            // determine OpenAL format and resampler
+            if (channels == 1) {
+                switch (bitsPerSample) {
+                    case 8 -> this.format = AL10.AL_FORMAT_MONO8;
+                    case 16 -> this.format = AL10.AL_FORMAT_MONO16;
+                    case 24, 32 -> {
+                        this.format = AL10.AL_FORMAT_MONO16;
+                        effectiveBitsPerSample = 16;
+                    }
+                    default -> throw new IOException("Unsupported bits per sample: " + bitsPerSample);
+                }
+            } else if (channels == 2) {
+                switch (bitsPerSample) {
+                    case 8 -> this.format = AL10.AL_FORMAT_STEREO8;
+                    case 16 -> this.format = AL10.AL_FORMAT_STEREO16;
+                    case 24, 32 -> {
+                        this.format = AL10.AL_FORMAT_STEREO16;
+                        effectiveBitsPerSample = 16;
+                    }
+                    default -> throw new IOException("Unsupported bits per sample: " + bitsPerSample);
+                }
             } else {
-                throw new IOException("Unsupported channel count (" + channels +
-                        ") or bits per sample (" + bitsPerSample + ")");
+                throw new IOException("Unsupported channel count: " + channels);
             }
+
+            this.resampler = switch (bitsPerSample) {
+                case 24 -> new Bit24To16Resampler();
+                case 32 -> new Bit32To16Resampler();
+                default -> null;
+            };
+
+            frameSize = effectiveBitsPerSample * channels * sampleRate / 8;
         } catch (Exception e) {
             inputStream.close();
+            throw e;
         }
     }
 
     /**
-     * 读取一段音频数据。
+     * Read a chunk of audio data.
      *
-     * @param maxSize 最大字节数（实际返回可能小于该值）
-     * @return 音频数据字节数组，如果已到达数据末尾则返回 null
+     * @param maxSize max bytes to return (after resampling if applicable)
+     * @return audio data byte array, or null if end of data reached
      */
     @Override
     public byte[] readChunk(long maxSize) {
@@ -142,7 +165,6 @@ public class WavStreamDecoder implements AudioDecoder {
             while (read < toRead) {
                 int r = inputStream.read(buffer, read, (int) toRead - read);
                 if (r == -1) {
-                    // 流提前结束，但理论上有 dataSize 保证，不会发生
                     break;
                 }
                 read += r;
@@ -151,13 +173,11 @@ public class WavStreamDecoder implements AudioDecoder {
             if (read == 0) {
                 return null;
             }
-            // 如果读取不足，返回实际读取的部分
-            if (read < buffer.length) {
-                byte[] trimmed = new byte[read];
-                System.arraycopy(buffer, 0, trimmed, 0, read);
-                return trimmed;
+            byte[] result = read < buffer.length ? trim(buffer, read) : buffer;
+            if (resampler != null) {
+                result = resampler.resample(result);
             }
-            return buffer;
+            return result.length == 0 ? null : result;
         } catch (IOException e) {
             throw new RuntimeException("Error reading audio data", e);
         }
@@ -186,7 +206,7 @@ public class WavStreamDecoder implements AudioDecoder {
         } catch (Exception ignored) {}
     }
 
-    // ---------- 辅助方法 ----------
+    // ---------- helper methods ----------
     private void readFully(byte[] b) throws IOException {
         int read = 0;
         while (read < b.length) {
@@ -208,5 +228,11 @@ public class WavStreamDecoder implements AudioDecoder {
         byte[] b = new byte[2];
         readFully(b);
         return ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN).getShort();
+    }
+
+    private static byte[] trim(byte[] src, int len) {
+        byte[] dst = new byte[len];
+        System.arraycopy(src, 0, dst, 0, len);
+        return dst;
     }
 }
