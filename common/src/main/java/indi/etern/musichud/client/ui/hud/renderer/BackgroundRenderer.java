@@ -75,6 +75,5 @@ public class BackgroundRenderer implements HudRenderer {
         }
 
         hudRenderContext.submitHudRenderState(hudRenderState);
-        hudRenderContext.nextStratum();
     }
 }

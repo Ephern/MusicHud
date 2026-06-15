@@ -210,32 +210,6 @@ public class HudRenderContext {
         return new Transforming(graphics);
     }
 
-    public void nextStratum() {
-        // no-op in 1.21.1
-    }
-
-    // -- blit signatures matching 1.21.1 GuiGraphics (no RenderPipeline param) --
-
-    public void blit(ResourceLocation resourceLocation,
-                     int x, int y, int width, int height,
-                     int texWidth, int texHeight) {
-        graphics.blit(resourceLocation, x, y, width, height, 0, 0, width, height, texWidth, texHeight);
-    }
-
-    public void blit(ResourceLocation resourceLocation,
-                     int x, int y, int z,
-                     float u0, float v0, int width, int height,
-                     int texWidth, int texHeight) {
-        graphics.blit(resourceLocation, x, y, z, u0, v0, width, height, texWidth, texHeight);
-    }
-
-    public void blit(ResourceLocation resourceLocation,
-                     int x, int y, int width, int height,
-                     float u0, float v0, int uWidth, int vHeight,
-                     int texWidth, int texHeight) {
-        graphics.blit(resourceLocation, x, y, width, height, u0, v0, uWidth, vHeight, texWidth, texHeight);
-    }
-
     /** Legacy 12-int blit (texel coords) — passes raw texels, GuiGraphics does UV conversion internally */
     public void blit(ResourceLocation resourceLocation,
                      int targetX, int targetY,
@@ -280,14 +254,6 @@ public class HudRenderContext {
 
     public void fill(int fromX, int fromY, int toX, int toY, int color) {
         graphics.fill(fromX, fromY, toX, toY, color);
-    }
-
-    public void bindAllUniforms() {
-        // no-op in 1.21.1
-    }
-
-    public void prepareUniforms() {
-        // no-op in 1.21.1
     }
 
     public static class Transforming {
