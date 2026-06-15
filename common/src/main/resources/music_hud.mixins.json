@@ -6,7 +6,8 @@
   "client": [
     "MixinGuiRendererHud",
     "SoundEngineMixin",
-    "SpanSetMixin"
+    "SpanSetMixin",
+    "ReactiveMusicCompatMixin"
   ],
   "injectors": {
     "defaultRequire": 1
