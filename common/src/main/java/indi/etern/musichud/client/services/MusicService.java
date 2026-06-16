@@ -263,9 +263,7 @@ public class MusicService {
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 streamAudioPlayer.playAsync(musicDetail, serverStartTime)
                         .thenAccept(nowPlayingInfo::startAt)
-                        .exceptionally(e -> {
-                            return null;//TODO display error in hud
-                        });
+                        .exceptionally(e -> null);
             } else {
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 nowPlayingInfo.startAt(null);

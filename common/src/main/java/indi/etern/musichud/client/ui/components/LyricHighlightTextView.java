@@ -7,7 +7,6 @@ import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.LinearGradient;
 import icyllis.modernui.graphics.Shader;
 import icyllis.modernui.text.Layout;
-import icyllis.modernui.text.MeasuredParagraph;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.LyricLine;
@@ -19,23 +18,22 @@ import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.function.Function;
 
 @Slf4j
 public class LyricHighlightTextView extends TextView {
     private static final int fullLineHighlightDelay = 300;
-    private static final int fullLineFadeDelay = -200;
     private static final int animationDurationMillis = 300;
-    private static final Duration animationDuration = Duration.ofMillis(animationDurationMillis);
     private final LyricLine lyricLine;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    private final Duration lineEndAnimationCallTime;
     private final float phraseRaiseY = dp(1) * 1.5f;
+    private final Duration fadeAt;
+    private final List<LyricLine.Phrase> phrases;
     private HighlightStatus status = HighlightStatus.WAITING;
     private Duration statusUpdateTime = Duration.ZERO;
     private boolean statusUpdateProcessing = false;
-//    private boolean debugDumped = false;
     @Setter
     private Runnable onFade;
 
@@ -44,8 +42,17 @@ public class LyricHighlightTextView extends TextView {
         line.parsePhrases();
         lyricLine = line;
 
-        Duration lineDuration = line.getDuration();
-        lineEndAnimationCallTime = line.getStartTime().plus(lineDuration).minus(animationDuration);
+        List<LyricLine.Phrase> phrases1 = lyricLine.getPhrases();
+        phrases = phrases1;
+
+        Duration fadeAt1 = line.getStartTime().plus(line.getDuration()).minus(500, ChronoUnit.MILLIS);
+        if (line.isWordByWord() && phrases1 != null) {
+            Duration lastPhraseEndAt = phrases1.getLast().endTime();
+            if (lastPhraseEndAt.compareTo(fadeAt1) > 0) {
+                fadeAt1 = lastPhraseEndAt;
+            }
+        }
+        fadeAt = fadeAt1;
 
         setText(line.getSpannableString());
         getPaint().setLinearText(true);
@@ -86,6 +93,9 @@ public class LyricHighlightTextView extends TextView {
                 }
                 textPaint.setShader(null);
             }
+            if (phrases != null) {
+                phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));
+            }
             super.onDraw(canvas);
             return;
         }
@@ -94,63 +104,9 @@ public class LyricHighlightTextView extends TextView {
         Layout layout = getLayout();
         if (layout == null) return;
 
-        // DEBUG: print per-char advances and line widths (once per line)
-/*
-        if (lyricLine.isWordByWord() && !debugDumped) {
-            debugDumped = true;
-            CharSequence text = layout.getText();
-            int[] lineStarts = new int[layout.getLineCount() + 1];
-            float[] lineWidths = new float[layout.getLineCount()];
-            for (int i = 0; i < layout.getLineCount(); i++) {
-                lineStarts[i] = layout.getLineStart(i);
-                lineWidths[i] = layout.getLineWidth(i);
-            }
-            lineStarts[layout.getLineCount()] = text.length();
-            StringBuilder sb = new StringBuilder();
-            sb.append("[\"");
-            sb.append(text.toString().replace("\"", "\\\""));
-            sb.append("\", {");
-            sb.append("\"lineCount\":").append(layout.getLineCount()).append(",");
-            sb.append("\"viewWidth\":").append(getWidth() - getTotalPaddingLeft() - getTotalPaddingRight()).append(",");
-            sb.append("\"lineWidths\":[");
-            for (int i = 0; i < lineWidths.length; i++) {
-                if (i > 0) sb.append(",");
-                sb.append(lineWidths[i]);
-            }
-            sb.append("],\"lineTexts\":[");
-            for (int i = 0; i < layout.getLineCount(); i++) {
-                if (i > 0) sb.append(",");
-                String lineText = text.subSequence(lineStarts[i], lineStarts[i + 1]).toString().replace("\"", "\\\"");
-                sb.append("\"").append(lineText).append("\"");
-            }
-            // Advances per line (within each line only, no cross-line error)
-            sb.append("],\"advancesByLine\":[");
-            for (int i = 0; i < layout.getLineCount(); i++) {
-                if (i > 0) sb.append(",");
-                sb.append("[");
-                int lineStart = lineStarts[i];
-                int lineEnd = lineStarts[i + 1];
-                for (int j = lineStart; j < lineEnd; j++) {
-                    if (j > lineStart) sb.append(",");
-                    float right = layout.getPrimaryHorizontal(j + 1);
-                    float left = layout.getPrimaryHorizontal(j);
-                    if (j + 1 == lineEnd && layout.getLineForOffset(j + 1) != i) {
-                        right = layout.getLineRight(i);
-                    }
-                    sb.append(String.format("%.2f", right - left));
-                }
-                sb.append("]");
-            }
-            sb.append("]}");
-            log.info("Lyric Debug {}", sb);
-        }
-*/
-
         long range = layout.getLineRangeForDraw(canvas);
         if (range < 0) return;
 
-        Duration fadeAt = lineEndAnimationCallTime.plusMillis(fullLineFadeDelay);
-        List<LyricLine.Phrase> phrases = lyricLine.getPhrases();
         if (!lyricLine.isWordByWord()) {
             if (statusUpdateProcessing) {
                 float fraction = (float) (getMillisBetween(playedDuration, statusUpdateTime) - fullLineHighlightDelay) / animationDurationMillis;
@@ -171,7 +127,6 @@ public class LyricHighlightTextView extends TextView {
             return;
         }
 
-        // 非 fullLineMode，处理渐变高亮
         if (statusUpdateProcessing) {
             statusUpdateProcessing = false;
         }
@@ -183,22 +138,12 @@ public class LyricHighlightTextView extends TextView {
         if (phraseIndex == 0) {
             phraseStart = lyricLine.getStartTime();
             currentPhrase = phrases.getFirst();
-            phraseEnd = currentPhrase.endTime();
         } else if (phraseIndex >= phrases.size()) {
-            // 已经超过最后一个短语，整行显示强调色（已唱完）
-            super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
-            textPaint.setShader(null);
-            super.onDraw(canvas);
-            phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));
-            setStatus(HighlightStatus.DONE);
-            if (onFade != null) {
-                onFade.run();
-            }
-            return;
+            phraseStart = null;
+            currentPhrase = null;
         } else {
             phraseStart = phrases.get(phraseIndex - 1).endTime();
             currentPhrase = phrases.get(phraseIndex);
-            phraseEnd = currentPhrase.endTime();
         }
         for (int i = 0; i < phraseIndex; i++) {
             List<LyricLine.HighlightSpan> spans = phrases.get(i).spans();
@@ -206,25 +151,37 @@ public class LyricHighlightTextView extends TextView {
                 span.setYOffset(-phraseRaiseY);
             }
         }
-        raisePhrase(currentPhrase, phraseStart, phraseEnd, playedDuration);
+        if (playedDuration.compareTo(fadeAt) >= 0) {
+            super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
+            textPaint.setShader(null);
+            super.onDraw(canvas);
 
-        long phraseDurationMillis = phraseEnd.minus(phraseStart).toMillis();
+            phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));
+            setStatus(HighlightStatus.DONE);
+            if (onFade != null) {
+                onFade.run();
+            }
+            return;
+        }
+
+        phraseEnd = currentPhrase == null ? null : currentPhrase.endTime();
+        if (currentPhrase != null) {
+            raisePhrase(currentPhrase, phraseStart, phraseEnd, playedDuration);
+        }
+
+        long phraseDurationMillis = currentPhrase == null ? -1 : phraseEnd.minus(phraseStart).toMillis();
         if (phraseDurationMillis <= 0) {
-            // 无效短语，直接绘制强调色
-            textPaint.setColor(Theme.EMPHASIZE_LYRIC_COLOR);
+            super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
             textPaint.setShader(null);
             super.onDraw(canvas);
             return;
         }
 
-        long playedInPhrase = Math.min(playedDuration.minus(phraseStart).toMillis(), phraseDurationMillis);
+        long playedInPhrase = playedDuration.minus(phraseStart).toMillis();
         LyricLine.Phrase lastPhrase = lyricLine.getPhraseEndDurationMap().get(phraseStart);
-        int startOffset = lastPhrase == null ? 0 : lastPhrase.endOffset();
-        int endOffset = currentPhrase.endOffset();
-
         int textLength = layout.getText().length();
-        startOffset = Math.min(textLength, startOffset);
-        endOffset = Math.min(textLength, endOffset);
+        int startOffset = Math.min(textLength, lastPhrase == null ? 0 : lastPhrase.endOffset());
+        int endOffset = Math.min(textLength, currentPhrase.endOffset());
 
         int lineCount = layout.getLineCount();
         float[] lineLogicalStart = new float[lineCount];
@@ -243,9 +200,12 @@ public class LyricHighlightTextView extends TextView {
 
         float startLogicalX = getLogicalX.apply(startOffset);
         float endLogicalX = getLogicalX.apply(endOffset);
-        float gradientPointLogicalX = startLogicalX + (endLogicalX - startLogicalX) * playedInPhrase / phraseDurationMillis;
-        float gradientLeftLogical = gradientPointLogicalX - dp(16);
-        float gradientRightLogical = gradientPointLogicalX + dp(36);
+        int dp18 = dp(18);
+        int dp36 = dp18 * 2;
+        int additionalSpaceForLast = phraseIndex == phrases.size() - 1 ? dp36 : 0;
+        float gradientPointLogicalX = startLogicalX + (endLogicalX + additionalSpaceForLast - startLogicalX) * playedInPhrase / phraseDurationMillis - dp18;
+        float gradientLeftLogical = gradientPointLogicalX - dp18;
+        float gradientRightLogical = gradientPointLogicalX + dp36;
 
         int firstLine = (int) (range >>> 32);
         int lastLine = (int) (range & 0xFFFFFFFFL);
