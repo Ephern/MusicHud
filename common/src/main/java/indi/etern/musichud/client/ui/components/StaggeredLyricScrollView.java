@@ -39,6 +39,7 @@ import java.util.function.Supplier;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
+@SuppressWarnings("UnstableApiUsage")
 public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final int AUTO_RECENTER_DELAY_MILLIS = 1000;
     public static final float MAX_DELAY_MILLIS = 500;
@@ -349,7 +350,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     private void checkManualScrolling() {
-        if (scrollStatus == ScrollStatus.IDLE) {
+        if (scrollStatus == ScrollStatus.IDLE) {//TODO when following scroll
             scrollStatus = ScrollStatus.MANUAL;
             lastUserStartScrollTime = MuiModApi.getElapsedTime();
             lastUserScrollTime = MuiModApi.getElapsedTime();

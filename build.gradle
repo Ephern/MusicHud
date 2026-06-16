@@ -51,7 +51,7 @@ configure(subprojects.findAll { it.name != 'paper' }) {
             name "JitPack"
             url 'https://jitpack.io'
         }
-        flatDir{
+        flatDir{// You need to put ModernUI-mVus fork into this dir
             dir "$projectDir/libs"
         }
     }
