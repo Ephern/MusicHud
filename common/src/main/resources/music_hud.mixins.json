@@ -6,7 +6,9 @@
   "client": [
     "MixinGuiRendererHud",
     "SoundEngineMixin",
-    "SpanSetMixin"
+    "SpanSetMixin",
+    "ToastManagerMixin",
+    "ToastRecordAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
