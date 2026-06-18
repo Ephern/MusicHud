@@ -157,7 +157,12 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         float rawWidth;
         Font font = Minecraft.getInstance().font;
         if (modernStringSplitter != null) {
-            rawWidth = modernStringSplitter.stringWidth(text);
+            try {
+                rawWidth = modernStringSplitter.stringWidth(text);
+            } catch (Exception e) {
+                modernStringSplitter = null;//fallback
+                rawWidth = font.width(text);
+            }
         } else {
             rawWidth = font.width(text);
         }
