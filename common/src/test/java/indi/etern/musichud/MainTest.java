@@ -58,6 +58,6 @@ public class MainTest {
     @SneakyThrows
     @Test
     public void testVersion() {
-        assert Version.capableWith(new Version(1, 1, 0, Version.BuildType.Alpha));
+        assert Version.compatibleWith(new Version(1, 1, 0, Version.BuildType.Alpha));
     }
 }

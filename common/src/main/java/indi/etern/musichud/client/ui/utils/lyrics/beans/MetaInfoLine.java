@@ -22,7 +22,7 @@ public class MetaInfoLine {
     }
 
     public String getText() {
-        return metaInfoStrings.stream().map(metaInfoStringWrapper -> metaInfoStringWrapper.string).reduce((s1, s2) -> s1 + " " + s2).orElse(null);
+        return metaInfoStrings == null ? "" : metaInfoStrings.stream().map(metaInfoStringWrapper -> metaInfoStringWrapper.string).reduce((s1, s2) -> s1 + " " + s2).orElse(null);
     }
 
     public static class MetaInfoStringWrapper {

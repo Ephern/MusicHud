@@ -150,7 +150,7 @@ public class MusicApiService implements IMusicApiService {
         MusicDetailsResponse result = search(keywords, offset, 50, SearchType.MUSIC,
                 response -> gson.fromJson(response, SearchMusicResponseBody.class)
         ).result;
-        if (result != null) {
+        if (result != null && result.musicDetails() != null) {
             return result.musicDetails();
         } else {
             return new ArrayList<>();

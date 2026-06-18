@@ -106,7 +106,7 @@ public record Version(long mayor, long minor, long patch, BuildType build) imple
         }
     }
 
-    public static boolean capableWith(Version v) {
+    public static boolean compatibleWith(Version v) {
         int i = leastCapable.compareTo(v);
         return i <= 0;
     }
