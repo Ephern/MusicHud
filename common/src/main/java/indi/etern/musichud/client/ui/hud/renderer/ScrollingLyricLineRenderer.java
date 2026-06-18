@@ -159,7 +159,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         if (modernStringSplitter != null) {
             try {
                 rawWidth = modernStringSplitter.stringWidth(text);
-            } catch (Exception e) {
+            } catch (Throwable e) {
                 modernStringSplitter = null;//fallback
                 rawWidth = font.width(text);
             }
