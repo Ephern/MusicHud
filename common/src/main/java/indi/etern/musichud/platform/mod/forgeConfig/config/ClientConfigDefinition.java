@@ -99,7 +99,7 @@ public class ClientConfigDefinition implements ClientConfig {
         muted = builder
                 .comment("Record Muted Switch")
                 .translation(MusicHud.MOD_ID + ".config.common.muted")
-                .define("Muted", true);
+                .define("Muted", false);
         soundVolume = builder
                 .comment("Sound Volume for audio from Music HUD")
                 .translation(MusicHud.MOD_ID + ".config.common.soundVolume")
