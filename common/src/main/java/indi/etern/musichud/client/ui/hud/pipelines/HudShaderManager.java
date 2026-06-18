@@ -10,6 +10,7 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.regex.Matcher;
@@ -26,33 +27,42 @@ public class HudShaderManager {
         return vs + "|" + fs;
     }
     private static final Pattern MOJ_IMPORT = Pattern.compile("#moj_import\\s+<([^>]+)>");
+    private static int bindingPoint;
+    private static final Map<String, Integer> boundPoints = new HashMap<>();
+
+    public static synchronized int getOrCreateBindingPoint(String name) {
+        return boundPoints.computeIfAbsent(name, k -> bindingPoint++);
+    }
+
+    public static Integer getBindingPoint(String name) {
+        return boundPoints.get(name);
+    }
 
     public static HudShaderProgram getOrCreate(
             ResourceLocation vertexShaderLocation,
             ResourceLocation fragmentShaderLocation,
-            Map<String, Integer> uniformBlockBindingPoints) {
+            List<String> UBONames) {
         String key = cacheKey(vertexShaderLocation, fragmentShaderLocation);
         return programs.computeIfAbsent(key, k -> {
             try {
                 HudShaderProgram program = createProgram(vertexShaderLocation, fragmentShaderLocation);
 
-                for (Map.Entry<String, Integer> entry : uniformBlockBindingPoints.entrySet()) {
-                    int index = glGetUniformBlockIndex(program.getProgramId(), entry.getKey());
+                for (String uboName : UBONames) {
+                    int index = glGetUniformBlockIndex(program.getProgramId(), uboName);
                     if (index != GL_INVALID_INDEX) {
-                        glUniformBlockBinding(program.getProgramId(), index, entry.getValue());
-                        program.setUniformBlockBindingPoint(entry.getKey(), entry.getValue());
+                        int bindingPoint = getOrCreateBindingPoint(uboName);
+                        glUniformBlockBinding(program.getProgramId(), index, bindingPoint);
                     }
                 }
-                // Cache uniform locations for built-in matrices (plain uniforms)
-                program.cacheUniformLocation("ModelViewMat");
-                program.cacheUniformLocation("ProjMat");
-                MusicHud.LOGGER.debug("Program {}: ModelViewMat={} ProjMat={}",
-                        program.getProgramId(),
-                        program.getUniformLocation("ModelViewMat"),
-                        program.getUniformLocation("ProjMat"));
-                // Cache sampler uniform locations for manual texture binding
-                program.cacheSamplerLocation("Sampler0");
-                program.cacheSamplerLocation("Sampler1");
+                // Pre-cache uniform locations for built-in matrices (plain uniforms)
+                int modelViewMatLoc = program.getUniformOrSamplerLocation("ModelViewMat");
+                int projMatLoc = program.getUniformOrSamplerLocation("ProjMat");
+                if (MusicHud.LOGGER.isDebugEnabled()) {
+                    MusicHud.LOGGER.debug("Program {}: ModelViewMat={} ProjMat={}",
+                            program.getProgramId(),
+                            modelViewMatLoc,
+                            projMatLoc);
+                }
                 return program;
             } catch (Exception e) {
                 return new HudShaderProgram(0); // invalid program, fallback rendering will be used
@@ -66,6 +76,7 @@ public class HudShaderManager {
             throw new IllegalStateException("Failed to create program");
         }
 
+        //noinspection StatementWithEmptyBody
         while (glGetError() != GL_NO_ERROR);
 
         String vertexSource = readShaderSourceWithImports(vertexLocation);
@@ -118,7 +129,7 @@ public class HudShaderManager {
 
     private static String readShaderSourceWithImports(ResourceLocation location) {
         String source = readRawResource(location);
-        StringBuffer result = new StringBuffer();
+        StringBuilder result = new StringBuilder();
         Matcher matcher = MOJ_IMPORT.matcher(source);
         while (matcher.find()) {
             String importRef = matcher.group(1);

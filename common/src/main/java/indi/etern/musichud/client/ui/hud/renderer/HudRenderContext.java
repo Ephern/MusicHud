@@ -5,6 +5,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
+import indi.etern.musichud.client.ui.hud.pipelines.HudShaderManager;
 import indi.etern.musichud.client.ui.hud.pipelines.HudShaderProgram;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import lombok.Getter;
@@ -86,7 +87,7 @@ public class HudRenderContext {
                     if (textures[i] != null) {
                         glActiveTexture(GL_TEXTURE0 + i);
                         glBindTexture(GL_TEXTURE_2D, textures[i]);
-                        int samplerLoc = program.getUniformLocation("Sampler" + i);
+                        int samplerLoc = program.getUniformOrSamplerLocation("Sampler" + i);
                         if (samplerLoc >= 0) {
                             glUniform1i(samplerLoc, i);
                         }
@@ -123,13 +124,13 @@ public class HudRenderContext {
     private void setBuiltinUniforms(HudShaderProgram program) {
         Matrix4f proj = new Matrix4f(RenderSystem.getProjectionMatrix());
         Matrix4f mv = new Matrix4f().translate(0, 0, -1000);
-        int projLoc = program.getUniformLocation("ProjMat");
+        int projLoc = program.getUniformOrSamplerLocation("ProjMat");
         if (projLoc >= 0) {
             float[] buf = new float[16];
             proj.get(buf);
             glUniformMatrix4fv(projLoc, false, buf);
         }
-        int mvLoc = program.getUniformLocation("ModelViewMat");
+        int mvLoc = program.getUniformOrSamplerLocation("ModelViewMat");
         if (mvLoc >= 0) {
             float[] buf = new float[16];
             mv.get(buf);
@@ -139,7 +140,7 @@ public class HudRenderContext {
 
     private void uploadUniform(HudShaderProgram program, HudUniform uniform) {
         String uboName = uniform.getUBOName();
-        Integer bindingPoint = program.getUniformBlockBindingPoint(uboName);
+        Integer bindingPoint = HudShaderManager.getBindingPoint(uboName);
         if (bindingPoint == null) return;
 
         int uboSize = uniform.getUBOSize();

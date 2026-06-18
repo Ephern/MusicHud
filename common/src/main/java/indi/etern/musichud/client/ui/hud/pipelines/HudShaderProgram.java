@@ -14,38 +14,14 @@ import static org.lwjgl.opengl.GL31.glBindBufferRange;
 public class HudShaderProgram {
     @Getter
     private final int programId;
-    private final Map<String, Integer> uniformBlockBindingPoints = new HashMap<>();
     private final Map<String, Integer> uniformLocations = new HashMap<>();
 
     public HudShaderProgram(int programId) {
         this.programId = programId;
     }
 
-    public void cacheUniformLocation(String name) {
-        int loc = glGetUniformLocation(programId, name);
-        if (loc != -1) {
-            uniformLocations.put(name, loc);
-        }
-    }
-
-    public int getUniformLocation(String name) {
-        Integer loc = uniformLocations.get(name);
-        return loc != null ? loc : -1;
-    }
-
-    public void setUniformBlockBindingPoint(String blockName, int bindingPoint) {
-        uniformBlockBindingPoints.put(blockName, bindingPoint);
-    }
-
-    public Integer getUniformBlockBindingPoint(String blockName) {
-        return uniformBlockBindingPoints.get(blockName);
-    }
-
-    public void cacheSamplerLocation(String name) {
-        int loc = glGetUniformLocation(programId, name);
-        if (loc != -1) {
-            uniformLocations.put(name, loc);
-        }
+    public int getUniformOrSamplerLocation(String name) {
+        return uniformLocations.computeIfAbsent(name, n -> glGetUniformLocation(programId, n));
     }
 
     public static final class UniformBufferHandle {
