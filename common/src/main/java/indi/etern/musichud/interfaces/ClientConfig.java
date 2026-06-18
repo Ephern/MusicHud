@@ -65,6 +65,8 @@ public interface ClientConfig {
 
     void setSoundVolume(int soundVolume);
 
+    void forceSetSoundVolume(int soundVolume);
+
     int getSoundVolumeInterval();
 
     void setSoundVolumeInterval(int soundVolumeInterval);

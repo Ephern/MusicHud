@@ -440,6 +440,12 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public void forceSetSoundVolume(int soundVolume) {
+        this.muted.set(soundVolume == 0);
+        this.soundVolume.set(soundVolume);
+    }
+
+    @Override
     public int getSoundVolumeInterval() {
         return soundVolumeInterval.get();
     }

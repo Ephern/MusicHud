@@ -85,12 +85,12 @@ public class Keybinds implements ClientRegister {
             ToastUtil.show(getVolumeToastString());
         });
         service.register(increaseVolume, () -> {
-            clientConfig.setSoundVolume(Math.clamp(clientConfig.getSoundVolume() + clientConfig.getSoundVolumeInterval(), 0, 100));
+            clientConfig.forceSetSoundVolume(Math.clamp(clientConfig.getSoundVolume() + clientConfig.getSoundVolumeInterval(), 0, 100));
             clientConfig.save();
             ToastUtil.show(getVolumeToastString());
         });
         service.register(decreaseVolume, () -> {
-            clientConfig.setSoundVolume(Math.clamp(clientConfig.getSoundVolume() - clientConfig.getSoundVolumeInterval(), 0, 100));
+            clientConfig.forceSetSoundVolume(Math.clamp(clientConfig.getSoundVolume() - clientConfig.getSoundVolumeInterval(), 0, 100));
             clientConfig.save();
             ToastUtil.show(getVolumeToastString());
         });

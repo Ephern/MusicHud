@@ -59,6 +59,8 @@ public class StreamAudioPlayer {
     private long playedBytes = 0;
 //    private boolean isBuffering = false;
     private volatile ZonedDateTime serverStartTime;
+    private Future<?> downloadThreadFuture;
+    private Future<?> playThreadFuture;
 
     public static StreamAudioPlayer getInstance() {
         if (instance == null) {
@@ -160,10 +162,10 @@ public class StreamAudioPlayer {
         serverStartTime = startTime;
         downloadFuture = new CompletableFuture<>();
         playingFuture = new CompletableFuture<>();
-        MusicHud.EXECUTOR.submit(() -> {
+        downloadThreadFuture = MusicHud.EXECUTOR.submit(() -> {
             Thread.currentThread().setName("MHWorker-Downloader");
             try {
-                downloadAudioWithRetry(startTime != null ,downloadInitializedFuture);
+                downloadAudioWithRetry(startTime != null, downloadInitializedFuture);
             } catch (Exception e) {
                 LOGGER.error("Download thread error", e);
                 setStatus(Status.ERROR);
@@ -177,7 +179,7 @@ public class StreamAudioPlayer {
             }
         });
         downloadInitializedFuture.thenAccept(ignore -> {
-            MusicHud.EXECUTOR.submit(() -> {
+            playThreadFuture = MusicHud.EXECUTOR.submit(() -> {
                 Thread.currentThread().setName("MH-MusicPlayer");
                 try {
                     playAudioWithRetry(startPlayingFuture, startTime);
@@ -373,6 +375,7 @@ public class StreamAudioPlayer {
                 while (!currentDownloadFuture.isDone() && currentDownloadFuture == downloadFuture && initialBuffers < BUFFER_COUNT * 2) {
                     byte[] audioData = decoder.readChunk(BUFFER_SIZE);
                     if (audioData == null) break;
+                    if (currentDownloadFuture.isDone() || currentDownloadFuture != downloadFuture) break;
 
                     audioBuffer.put(audioData);
                     totalBufferedBytes.addAndGet(audioData.length);
@@ -515,6 +518,16 @@ public class StreamAudioPlayer {
     }
 
     private void stopInternal() {
+        if (downloadThreadFuture != null) {
+            downloadThreadFuture.cancel(true);
+            downloadThreadFuture = null;
+        }
+
+        if (playThreadFuture != null) {
+            playThreadFuture.cancel(true);
+            playThreadFuture = null;
+        }
+
         if (playingFuture != null) {
             playingFuture.cancel(true);
             playingFuture = null;
