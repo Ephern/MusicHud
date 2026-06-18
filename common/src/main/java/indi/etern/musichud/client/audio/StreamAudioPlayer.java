@@ -457,7 +457,8 @@ public class StreamAudioPlayer {
     }
 
     private void updateVolumeIfNecessary() {
-        float musicVolume = Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC);
+        float musicVolume = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
+                (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
         if (lastVolume != musicVolume && source != 0 && AL10.alIsSource(source)) {
             AL10.alSourcef(source, AL10.AL_GAIN, musicVolume);
             int error = AL10.alGetError();
