@@ -32,9 +32,9 @@ public class WordByWordLyricParser {
             String lyricString = metaData.lyric == null ? "" : metaData.lyric;
             lyricString = lyricString.replace('\n', ' ').trim();
             if (lyricLine == null) {
+                // Remove duration for smooth transition between lines
                 lyricLine = LyricLine.builder()
                         .startTime(startTime)
-                        .duration(metaData.lineDuration)
                         .text(lyricString)
                         .type(metaData.type).build();
                 if (startTime == null && lyricLine.getText() != null && !lyricLine.getText().startsWith("}")) {
