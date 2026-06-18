@@ -35,6 +35,11 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> enableMarqueeText;
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
     private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
+    private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
+    private final ModConfigSpec.ConfigValue<Boolean> muted;
+    private final ModConfigSpec.ConfigValue<Integer> soundVolume;
+    private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
+
     private final ModConfigSpec.ConfigValue<String> hudVerticalPosition;
     private final ModConfigSpec.ConfigValue<String> hudHorizontalPosition;
     private final ModConfigSpec.ConfigValue<Integer> hudOffsetX;
@@ -50,7 +55,6 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<String> autoConnectServerFilterType;
     private final ModConfigSpec.ConfigValue<String> autoConnectBlackList;
     private final ModConfigSpec.ConfigValue<String> autoConnectWhiteList;
-    private final Set<Runnable> saveListener = new HashSet<>();
     @Setter
     @Getter
     private boolean configured;
@@ -58,27 +62,27 @@ public class ClientConfigDefinition implements ClientConfig {
     ClientConfigDefinition(ModConfigSpec.Builder builder) {
         enable = builder
                 .comment("Enable Music HUD Functions")
-                .translation(MusicHud.MOD_ID + ".config.common.switch.enable")
+                .translation(MusicHud.MOD_ID + ".config.common.enable")
                 .define("enable", true);
         showTranslatedCnLyrics = builder
                 .comment("Show translated Chinese lyrics")
-                .translation(MusicHud.MOD_ID + ".config.common.switch.showTranslatedCnLyrics")
+                .translation(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics")
                 .define("showTranslatedCnLyrics", true);
         disableVanillaMusic = builder
                 .comment("Disable vanilla game music")
-                .translation(MusicHud.MOD_ID + ".config.common.switch.disableVanillaMusicWhilePlaying")
+                .translation(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying")
                 .define("disableVanillaMusic", true);
         enableHud = builder
                 .comment("Enable hud")
-                .translation(MusicHud.MOD_ID + ".config.common.switch.enableHud")
+                .translation(MusicHud.MOD_ID + ".config.common.enableHud")
                 .define("enableHud", true);
         enableMarqueeText = builder
                 .comment("Enable marquee animation on overflow text")
-                .translation(MusicHud.MOD_ID + ".config.common.switch.enableMarqueeText")
+                .translation(MusicHud.MOD_ID + ".config.common.enableMarqueeText")
                 .define("enableMarqueeText", true);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
-                .translation(MusicHud.MOD_ID + ".config.common.switch.autoHide")
+                .translation(MusicHud.MOD_ID + ".config.common.autoHide")
                 .define("hideHudWhenNotPlaying", true);
         primaryChosenQuality = builder
                 .comment("Primary chosen quality")
@@ -88,6 +92,22 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Main Screen Additional Background Darken Rate")
                 .translation(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken")
                 .defineInRange("mainScreenAdditionalBackgroundDarken", 0.5, 0, 1);
+        mixWithVanillaSoundVolume = builder
+                .comment("Mix Sound Volume with Vanilla Music Sound Volume")
+                .translation(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume")
+                .define("mixWithVanillaSoundVolume", true);
+        muted = builder
+                .comment("Record Muted Switch")
+                .translation(MusicHud.MOD_ID + ".config.common.muted")
+                .define("Muted", true);
+        soundVolume = builder
+                .comment("Sound Volume for audio from Music HUD")
+                .translation(MusicHud.MOD_ID + ".config.common.soundVolume")
+                .defineInRange("soundVolume", 100, 0, 100);
+        soundVolumeInterval = builder
+                .comment("Sound Volume Interval for Hot Key Adjust")
+                .translation(MusicHud.MOD_ID + ".config.common.soundVolumeInterval")
+                .defineInRange("soundVolumeInterval", 10, 1, 100);
         hudVerticalPosition = builder
                 .comment("Vertical position (TOP|CENTER|BOTTOM)")
                 .translation(MusicHud.MOD_ID + ".config.layout.verticalAlign")
@@ -372,7 +392,6 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void save() {
         configure.getRight().save();
-        saveListener.forEach(Runnable::run);
     }
 
     @Override
@@ -383,6 +402,57 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken) {
         mainScreenAdditionalBackgroundDarken.set(additionalBackgroundDarken);
+    }
+
+    @Override
+    public boolean getMixWithVanillaSoundVolume() {
+        return mixWithVanillaSoundVolume.get();
+    }
+
+    @Override
+    public void setMixWithVanillaSoundVolume(boolean mixWithVanillaSoundVolume) {
+        this.mixWithVanillaSoundVolume.set(mixWithVanillaSoundVolume);
+    }
+
+    @Override
+    public boolean getMuted() {
+        return muted.get();
+    }
+
+    @Override
+    public void setMuted(boolean muted) {
+        this.muted.set(muted);
+    }
+
+    @Override
+    public int getSoundVolume() {
+        return soundVolume.get();
+    }
+
+    @Override
+    public void setSoundVolume(int soundVolume) {
+        if (soundVolume == 0) {
+            this.muted.set(true);
+        } else {
+            this.muted.set(false);
+            this.soundVolume.set(soundVolume);
+        }
+    }
+
+    @Override
+    public void forceSetSoundVolume(int soundVolume) {
+        this.muted.set(soundVolume == 0);
+        this.soundVolume.set(soundVolume);
+    }
+
+    @Override
+    public int getSoundVolumeInterval() {
+        return soundVolumeInterval.get();
+    }
+
+    @Override
+    public void setSoundVolumeInterval(int soundVolume) {
+        this.soundVolumeInterval.set(soundVolume);
     }
 
     @Override
