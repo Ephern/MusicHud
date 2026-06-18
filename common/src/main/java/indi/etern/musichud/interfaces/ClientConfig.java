@@ -53,6 +53,24 @@ public interface ClientConfig {
 
     void setHudVerticalPosition(VerticalAlign hudVerticalPosition);
 
+    boolean getMixWithVanillaSoundVolume();
+
+    void setMixWithVanillaSoundVolume(boolean mixWithVanillaSoundVolume);
+
+    boolean getMuted();
+
+    void setMuted(boolean muted);
+
+    int getSoundVolume();
+
+    void setSoundVolume(int soundVolume);
+
+    void forceSetSoundVolume(int soundVolume);
+
+    int getSoundVolumeInterval();
+
+    void setSoundVolumeInterval(int soundVolumeInterval);
+
     HorizontalAlign getHudHorizontalPosition();
 
     void setHudHorizontalPosition(HorizontalAlign hudHorizontalPosition);
