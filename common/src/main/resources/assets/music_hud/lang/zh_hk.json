@@ -137,7 +137,7 @@
   "music_hud.config.integratedServer.enable": "在集成伺服器中啟用 Music HUD",
   "music_hud.config.integratedServer.serverApiBaseUrl": "API 伺服器的根 URL（以 http(s): 開頭）",
   "music_hud.config.integratedServer.startupBinaryApiServerWhenLaunch": "在遊戲啟動時啟動 API 伺服器",
-  "music_hud.config.integratedServer.serverApiBinaryExecutablePath": "API 伺服器的二進制可執行檔案路徑（相對/絕對路徑，在 API 伺服器的 GitHub Actions 中提供下載，重新啟動 API 伺服器後生效）",
+  "music_hud.config.integratedServer.serverApiBinaryExecutablePath": "API 伺服器的二進制可執行檔案路徑（相對/絕對路徑，重新啟動 API 伺服器後生效）",
   "music_hud.text.binaryApiStatus": "二進制 API 伺服器狀態: {}",
   "music_hud.button.stopApiServer": "停止",
   "music_hud.button.restartApiServer": "重新啟動 API 伺服器",
