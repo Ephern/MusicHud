@@ -137,7 +137,7 @@
   "music_hud.config.integratedServer.enable": "Enable Music HUD in Integrated Server",
   "music_hud.config.integratedServer.serverApiBaseUrl": "API server base url (starts with http(s):)",
   "music_hud.config.integratedServer.startupBinaryApiServerWhenLaunch": "Startup binary API server when game launches",
-  "music_hud.config.integratedServer.serverApiBinaryExecutablePath": "The location of binary executable file of api server (relative or absolute, can be downloaded in api-server's GitHub Actions, requires restart api server)",
+  "music_hud.config.integratedServer.serverApiBinaryExecutablePath": "The location of binary executable file of api server (relative or absolute, requires restart api server)",
   "music_hud.text.binaryApiStatus": "Binary API Server Status: {}",
   "music_hud.text.binaryApiServerStatus.STOPPED": "Stopped",
   "music_hud.text.binaryApiServerStatus.LAUNCHING": "Launching",

@@ -57,7 +57,7 @@ public class StreamAudioPlayer {
     private MusicDetail currentMusicDetail;
     private AudioDecoder currentDecoder;
     private long playedBytes = 0;
-//    private boolean isBuffering = false;
+    //    private boolean isBuffering = false;
     private volatile ZonedDateTime serverStartTime;
     private Future<?> downloadThreadFuture;
     private Future<?> playThreadFuture;
@@ -154,7 +154,11 @@ public class StreamAudioPlayer {
             initialized.set(true);
         } catch (Exception e) {
             stopInternal();
-            return CompletableFuture.failedFuture(e);
+            try {
+                Thread.sleep(500);
+            } catch (Exception ignored) {
+            }
+            return playAsyncInternal(musicDetail, startTime);
         }
 
         CompletableFuture<Void> downloadInitializedFuture = new CompletableFuture<>();
@@ -184,7 +188,7 @@ public class StreamAudioPlayer {
                 try {
                     playAudioWithRetry(startPlayingFuture, startTime);
                 } catch (Exception e) {
-                    LOGGER.error("Play thread error", e);
+                    LOGGER.error("Play thread error: {}", e.getMessage());
                     if (!startPlayingFuture.isDone()) {
                         startPlayingFuture.completeExceptionally(e);
                     }
@@ -228,9 +232,9 @@ public class StreamAudioPlayer {
                             int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
 
                             AL10.alBufferData(buffers[i], format, directBuffer, sampleRate);
-                            checkALError("alBufferData");
+                            checkALError("alBufferData-Pre");
                             AL10.alSourceQueueBuffers(source, buffers[i]);
-                            checkALError("alSourceQueueBuffers");
+                            checkALError("alSourceQueueBuffers-Pre");
 
                             totalBufferedBytes.addAndGet(-audioData.length);
                         }
@@ -238,7 +242,7 @@ public class StreamAudioPlayer {
                             Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC);
                         setStatus(Status.PLAYING);
                         AL10.alSourcePlay(source);
-                        checkALError("alSourcePlay");
+                        checkALError("alSourcePlay-Pre");
                     }
 
                 }
@@ -252,7 +256,7 @@ public class StreamAudioPlayer {
 
                                 int processed = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
                                 //noinspection SpellCheckingInspection
-                                checkALError("alGetSourcei");
+                                checkALError("alGetSourcei-Processed");
 
                                 startPlayingFuture.complete(serverStartTime == null ? ZonedDateTime.now() : serverStartTime);
 
@@ -260,7 +264,7 @@ public class StreamAudioPlayer {
                                     int[] buffer = new int[1];
                                     AL10.alSourceUnqueueBuffers(source, buffer);
                                     //noinspection SpellCheckingInspection
-                                    checkALError("alSourceUnqueueBuffers");
+                                    checkALError("alSourceUnqueueBuffers-Main");
 
                                     byte[] audioData = audioBuffer.poll(0, TimeUnit.MILLISECONDS);
 
@@ -291,9 +295,9 @@ public class StreamAudioPlayer {
                                     int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
 
                                     AL10.alBufferData(buffer[0], format, directBuffer, sampleRate);
-                                    checkALError("alBufferData");
+                                    checkALError("alBufferData-Main");
                                     AL10.alSourceQueueBuffers(source, buffer[0]);
-                                    checkALError("alSourceQueueBuffers");
+                                    checkALError("alSourceQueueBuffers-Main");
 
                                     if (audioData.length == BUFFER_SIZE) { // 不是静音数据
                                         totalBufferedBytes.addAndGet(-audioData.length);
@@ -302,10 +306,10 @@ public class StreamAudioPlayer {
 
                                 int state = AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE);
                                 //noinspection SpellCheckingInspection
-                                checkALError("alGetSourcei");
+                                checkALError("alGetSourcei-SourceState");
                                 if (state != AL10.AL_PLAYING && !currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture) {
                                     AL10.alSourcePlay(source);
-                                    checkALError("alSourcePlay");
+                                    checkALError("alSourcePlay-Main");
                                 }
                             }
                             Thread.sleep(40);
@@ -461,7 +465,7 @@ public class StreamAudioPlayer {
 
     private void updateVolumeIfNecessary() {
         float musicVolume = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
-                (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
+                                                          (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
         if (lastVolume != musicVolume && source != 0 && AL10.alIsSource(source)) {
             AL10.alSourcef(source, AL10.AL_GAIN, musicVolume);
             int error = AL10.alGetError();
@@ -621,7 +625,8 @@ public class StreamAudioPlayer {
                 if (currentDecoder != null) {
                     try {
                         currentDecoder.close();
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                     currentDecoder = null;
                 }
                 LOGGER.debug("Cleanup completed");
