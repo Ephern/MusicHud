@@ -232,7 +232,7 @@ public class HudRendererManager {
                 Theme.HUD_PROGRESS_LEFT,
                 Theme.HUD_PROGRESS_CURRENT,
                 Theme.HUD_PROGRESS_BACKGROUND,
-                12f,
+                layout.getHeight() * 6,
                 2f,
                 0.01f
         ));
