@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.CompletableFuture;
 
 public class HudRendererManager {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
@@ -294,28 +295,13 @@ public class HudRendererManager {
                 } else {
                     PLAYER_HEAD_RENDERER.setSkinResource(pusherPlayerInfo.getSkin().texture());
                 }
-                ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
-                        .thenAccept(imageTextureData -> {
-//                            imageTextureData.register().thenAcceptAsync((v) -> {
-//                                ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 16);
-//                                blurredImageTextureData.register().thenAccept((v1) -> Minecraft.getInstance().execute(() -> {
-                            if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
-                                BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
-                                var nextData = new BackgroundData(backgroundImages);
-                                hudBaseData.getTransitionableBackground().startTransition(nextData);
-                                Duration musicDuration = nowPlayingInfo.getMusicDuration();
-                                DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
-                                        LONG_DATE_TIME_FORMATTER :
-                                        SHORT_DATE_TIME_FORMATTER;
-                                musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
-                            }
-//                                }));
-//                            }, MusicHud.EXECUTOR);
-                        }).exceptionally(e -> {
-                            var nextData = BackgroundData.NONE;
-                            hudBaseData.getTransitionableBackground().startTransition(nextData);
-                            return null;
-                        });
+                loadAlbumImage(musicDetail).thenAccept((unused) -> {
+                    Duration musicDuration = nowPlayingInfo.getMusicDuration();
+                    DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
+                            LONG_DATE_TIME_FORMATTER :
+                            SHORT_DATE_TIME_FORMATTER;
+                    musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
+                });
             }
         } catch (Exception e) {
             if (logger == null) {
@@ -323,6 +309,25 @@ public class HudRendererManager {
             }
             logger.error("While switching music", e);
         }
+    }
+
+    private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail) {
+        return ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
+                .thenAccept(imageTextureData -> {
+                    if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
+                        BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
+                        var nextData = new BackgroundData(backgroundImages);
+                        hudBaseData.getTransitionableBackground().startTransition(nextData);
+                    }
+                }).exceptionallyAsync(e -> {
+                    var nextData = BackgroundData.NONE;
+                    hudBaseData.getTransitionableBackground().startTransition(nextData);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ignored) {}
+                    loadAlbumImage(musicDetail);
+                    return null;
+                }, MusicHud.EXECUTOR);
     }
 
     public void reset() {

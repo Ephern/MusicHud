@@ -167,6 +167,14 @@ public class ConfigView extends LinearLayout {
                     })
                     .setDefaultValue(0.5)
                     .create(commonCategory);
+            new PreferencesFragment.FloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha"),
+                    clientConfig::getHudBackgroundMixAlpha,
+                    clientConfig::setHudBackgroundMixAlpha)
+                    .setRange(0, 1)
+                    .setDefaultValue(0.5)
+                    .create(commonCategory);
             view.addView(commonCategory);
 
             var positionCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.layout"));

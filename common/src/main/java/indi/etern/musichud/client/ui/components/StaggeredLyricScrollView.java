@@ -15,6 +15,7 @@ import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ScrollController;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.view.MeasureSpec;
+import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
@@ -340,7 +341,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
 
         //Force reset due to manual scroll makes scrollController value different to actual value
-        if (Math.abs(scrollController.getCurrValue() - currentScrollPosition) > 2) {
+        if (Math.abs(scrollController.getCurrValue() - currentScrollPosition) > 1) {
             scrollController.scrollTo(currentScrollPosition, 0);
             scrollController.abortAnimation();
             prevScrollInitialized = false;
@@ -351,12 +352,14 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     private void checkManualScrolling() {
-        if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.FOLLOW_LYRICS && Math.abs(scrollController.getCurrValue() - currentScrollPosition) > 2) {
+        if (scrollStatus == ScrollStatus.IDLE) {
             markManual();
         } else if (scrollStatus == ScrollStatus.MANUAL) {
             lastUserScrollTime = MuiModApi.getElapsedTime();
         }
     }
+
+
 
     private void markManual() {
         scrollStatus = ScrollStatus.MANUAL;
@@ -368,6 +371,23 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (scrollController.isScrolling()) {
             scrollController.abortAnimation();
         }
+    }
+
+    @Override
+    public boolean onTouchEvent(MotionEvent ev) {
+        int action = ev.getActionMasked();
+        if (action == MotionEvent.ACTION_DOWN && scrollStatus == ScrollStatus.FOLLOW_LYRICS) {
+            markManual();
+        }
+        return super.onTouchEvent(ev);
+    }
+
+    @Override
+    public boolean onGenericMotionEvent(MotionEvent ev) {
+        if (ev.getAction() == MotionEvent.ACTION_SCROLL && scrollStatus == ScrollStatus.FOLLOW_LYRICS) {
+            markManual();
+        }
+        return super.onGenericMotionEvent(ev);
     }
 
     public int getRelativeTop(LyricLineView lyricLineView) {
