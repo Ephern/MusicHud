@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.utils.image;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
-import icyllis.arc3d.core.ColorSpaces;
+import icyllis.arc3d.core.ColorSpace;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
 import lombok.AccessLevel;
@@ -213,7 +213,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpaces.SRGB)
+                ColorSpace.get(ColorSpace.Named.SRGB))
         ) {
             wrap.setPixels(bitmap, 0, 0, 0, 0, width, height);
         }
@@ -231,7 +231,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpaces.SRGB);
+                ColorSpace.get(ColorSpace.Named.SRGB));
     }
 
     @SuppressWarnings("unused")
