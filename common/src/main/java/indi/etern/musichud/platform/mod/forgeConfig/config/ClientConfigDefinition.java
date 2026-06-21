@@ -30,15 +30,16 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> enable;
     private final ModConfigSpec.ConfigValue<Boolean> showTranslatedCnLyrics;
     private final ModConfigSpec.ConfigValue<Boolean> disableVanillaMusic;
-    private final ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
     private final ModConfigSpec.ConfigValue<Boolean> enableHud;
+    private final ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
     private final ModConfigSpec.ConfigValue<Boolean> enableMarqueeText;
-    private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
-    private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
-    private final ModConfigSpec.ConfigValue<Boolean> muted;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
+    private final ModConfigSpec.ConfigValue<Boolean> muted;
+    private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
+    private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
+    private final ModConfigSpec.ConfigValue<Double> hudBackgroundMixAlpha;
 
     private final ModConfigSpec.ConfigValue<String> hudVerticalPosition;
     private final ModConfigSpec.ConfigValue<String> hudHorizontalPosition;
@@ -92,6 +93,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Main Screen Additional Background Darken Rate")
                 .translation(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken")
                 .defineInRange("mainScreenAdditionalBackgroundDarken", 0.5, 0, 1);
+        hudBackgroundMixAlpha = builder
+                .comment("Hud Background Mix Alpha")
+                .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha")
+                .defineInRange("hudBackgroundMixAlpha", 0.5, 0, 1);
         mixWithVanillaSoundVolume = builder
                 .comment("Mix Sound Volume with Vanilla Music Sound Volume")
                 .translation(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume")
@@ -402,6 +407,16 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken) {
         mainScreenAdditionalBackgroundDarken.set(additionalBackgroundDarken);
+    }
+
+    @Override
+    public double getHudBackgroundMixAlpha() {
+        return hudBackgroundMixAlpha.get();
+    }
+
+    @Override
+    public void setHudBackgroundMixAlpha(double hudBackgroundMixAlpha) {
+        this.hudBackgroundMixAlpha.set(hudBackgroundMixAlpha);
     }
 
     @Override

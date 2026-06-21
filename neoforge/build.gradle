@@ -74,6 +74,17 @@ dependencies {
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
     shadowBundle "org.jflac:jflac-codec:$rootProject.jflac_version"
     forgeRuntimeLibrary "org.jflac:jflac-codec:$rootProject.jflac_version"
+
+//    implementation "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+//    shadowBundle "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+//    forgeRuntimeLibrary "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+    implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    shadowBundle "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    forgeRuntimeLibrary "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+
+    implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+    shadowBundle "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+    forgeRuntimeLibrary "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
 }
 processResources {
     inputs.property 'version', project.version

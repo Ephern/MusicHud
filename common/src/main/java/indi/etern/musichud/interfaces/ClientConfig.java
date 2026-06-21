@@ -137,6 +137,10 @@ public interface ClientConfig {
 
     void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken);
 
+    double getHudBackgroundMixAlpha();
+
+    void setHudBackgroundMixAlpha(double hudBackgroundMixAlpha);
+
     boolean getEnableMarqueeText();
 
     void setEnableMarqueeText(boolean aBoolean);

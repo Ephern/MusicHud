@@ -12,6 +12,7 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        mavenLocal()
         mavenCentral()
         maven { url 'https://jitpack.io' }
         maven { url = 'https://repo.papermc.io/repository/maven-public/' }

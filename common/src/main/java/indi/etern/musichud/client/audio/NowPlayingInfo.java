@@ -2,14 +2,18 @@ package indi.etern.musichud.client.audio;
 
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.lyrics.FullLineLyricParser;
 import indi.etern.musichud.client.ui.utils.lyrics.WordByWordLyricParser;
+import indi.etern.musichud.interfaces.ClientConfig;
+import io.github.selemba1000.*;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -17,10 +21,17 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import org.apache.logging.log4j.Logger;
 
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -30,11 +41,18 @@ public class NowPlayingInfo {
     private final Logger logger = MusicHud.getLogger(NowPlayingInfo.class);
     @Getter
     private final Set<Consumer<LyricLine>> lyricLineUpdateListener = new HashSet<>();
+    @Getter
+    private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
+    private final AtomicReference<ArrayDeque<LyricLine>> atomicLyricLines = new AtomicReference<>();
+    private final ClientConfig clientConfig = ClientConfig.getInstance();
+    private final AtomicInteger count = new AtomicInteger(0);
+    private volatile JMTC jmtc;
+    private JMTCCallbacks jmtcCallbacks;
+    private Thread smtcThread;
     @Setter
     @Getter
     private Duration updateInAdvanceDuration = Duration.of(500, ChronoUnit.MILLIS);
-    @Getter
-    private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
+    private MusicDetail smtcPlayingMusicDetail = null;
     @Getter
     private MusicDetail currentlyPlayingMusicDetail;
     private MusicDetail nextToPlayIdleMusicDetail;
@@ -44,11 +62,9 @@ public class NowPlayingInfo {
     private volatile ZonedDateTime musicStartTime = null;
     @Getter
     private ArrayDeque<LyricLine> lyricLines;
-    private final AtomicReference<ArrayDeque<LyricLine>> atomicLyricLines = new AtomicReference<>();
     @Getter
     private LyricLine currentLyricLine;
     private Thread lyricUpdaterVThread;
-
     final Runnable lyricUpdater = () -> {
         Thread thread = Thread.currentThread();
         lyricUpdaterVThread = thread;
@@ -87,8 +103,10 @@ public class NowPlayingInfo {
         lyricUpdaterVThread = null;
     };
 
-    private Duration getCallTime(LyricLine line) {
-        return line.getStartTime().minus(updateInAdvanceDuration);
+    private NowPlayingInfo() {
+        smtcThread = new Thread(this::jmtcLoop, "MH-SMTC");
+        smtcThread.setDaemon(true);
+        smtcThread.start();
     }
 
     public static NowPlayingInfo getInstance() {
@@ -100,6 +118,131 @@ public class NowPlayingInfo {
             }
         }
         return instance;
+    }
+
+    private void jmtcLoop() {
+        jmtc = JMTC.getInstance(new JMTCSettings("Minecraft-MusicHUD", "Minecraft-MusicHUD"));
+        jmtcCallbacks = new JMTCCallbacks();
+        jmtcCallbacks.onPlay = () -> {
+            MusicHud.EXECUTOR.execute(() -> {
+                clientConfig.setMuted(false);
+                clientConfig.save();
+            });
+            jmtc.setPlayingState(JMTCPlayingState.PLAYING);
+            jmtc.updateDisplay();
+        };
+        jmtcCallbacks.onPause = () -> {
+            MusicHud.EXECUTOR.execute(() -> {
+                clientConfig.setMuted(true);
+                clientConfig.save();
+            });
+            jmtc.setPlayingState(JMTCPlayingState.PAUSED);
+            jmtc.updateDisplay();
+        };
+        jmtcCallbacks.onNext = () -> {
+            MusicHud.EXECUTOR.execute(() -> {
+                MusicService.getInstance().voteForSkipCurrent();
+            });
+        };
+
+        jmtc.setEnabled(true);
+        jmtc.setEnabledButtons(new JMTCEnabledButtons(
+                true, true, false, true, false
+        ));
+        jmtc.setCallbacks(jmtcCallbacks);
+
+        // begin in STOPPED state with track info loaded
+        jmtc.setPlayingState(JMTCPlayingState.STOPPED);
+        jmtc.setMediaType(JMTCMediaType.Music);
+        jmtc.setParameters(new JMTCParameters(JMTCParameters.LoopStatus.Track, 1.0, 1.0, false));
+        jmtc.updateDisplay();
+
+        while (true) {
+            MusicDetail musicDetail = currentlyPlayingMusicDetail == null ? MusicDetail.NONE : currentlyPlayingMusicDetail;
+            boolean updateDisplay = false;
+            if (musicDetail != smtcPlayingMusicDetail) {
+                smtcPlayingMusicDetail = musicDetail;
+                String artists = musicDetail.getArtists().stream()
+                        .map(Artist::getName)
+                        .reduce((a, b) -> a + " / " + b)
+                        .orElse("");
+                List<MusicDetail> albumTracks = musicDetail.getAlbum().getMusicDetails();
+                long durationMillis = musicDetail.getDurationMillis();
+                jmtc.setTimelineProperties(new JMTCTimelineProperties(0L, durationMillis, 0L, durationMillis));
+                URI artUri = null;
+                String picUrl = musicDetail.getAlbum().getPicUrl();
+                if (picUrl.startsWith("http")) {
+                    try {
+                        String suffix = "png";
+                        String[] splits = picUrl.split("\\.");
+                        if (splits.length > 1) {
+                            suffix = splits[splits.length - 1];
+                        }
+                        Path tempFile = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
+                        tempFile.toFile().deleteOnExit();
+                        artUri = ImageUtils.downloadAsync(picUrl, inputStream -> {
+                            try {
+                                Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                                return tempFile.toUri();
+                            } catch (IOException e) {
+                                throw new RuntimeException(e);
+                            }
+                        }, false).join();
+                    } catch (Exception e) {
+                        logger.warn("Failed to download album art for SMTC", e);
+                    }
+                } else {
+                    try {
+                        Path tempFile = Files.createTempFile("MusicHUD-SMTC-Icon", ".png");
+                        tempFile.toFile().deleteOnExit();
+                        try (InputStream iconStream = getClass().getResourceAsStream("/assets/music_hud/icon.png")) {
+                            if (iconStream != null) {
+                                Files.copy(iconStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                                artUri = tempFile.toUri();
+                            }
+                        }
+                    } catch (Exception e) {
+                        logger.warn("Failed to set default SMTC icon", e);
+                    }
+                }
+                jmtc.setMediaProperties(new JMTCMusicProperties(
+                        smtcPlayingMusicDetail.getName(),
+                        artists,
+                        musicDetail.getAlbum().getName(),
+                        artists,
+                        new String[]{""},
+                        albumTracks.size(),
+                        albumTracks.indexOf(musicDetail),
+                        artUri
+                ));
+                updateDisplay = true;
+                jmtc.setPlayingState(JMTCPlayingState.PLAYING);
+            }
+            if (musicDetail != MusicDetail.NONE) {
+                Duration playedDuration = getPlayedDuration();
+                long position = playedDuration.toMillis();
+                jmtc.setPosition(position);
+//                System.out.println("position: " + position);
+                if (getPlayedDuration() == musicDuration) {
+                    jmtc.setPlayingState(JMTCPlayingState.STOPPED);
+                }
+                updateDisplay = true;
+            } else {
+                jmtc.setPlayingState(JMTCPlayingState.CLOSED);
+            }
+            if (updateDisplay) {
+                jmtc.updateDisplay();
+            }
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                return;
+            }
+        }
+    }
+
+    private Duration getCallTime(LyricLine line) {
+        return line.getStartTime().minus(updateInAdvanceDuration);
     }
 
     public float getProgressRate() {
@@ -140,7 +283,8 @@ public class NowPlayingInfo {
         }
         try {
             MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, idleNextToPlay, this.lyricLines));
-        } catch (IllegalStateException ignored) {}
+        } catch (IllegalStateException ignored) {
+        }
         HudRendererManager.getInstance().switchMusic(musicDetail);
         List.copyOf(musicSwitchListener).forEach(consumer -> {
             consumer.accept(previous, musicDetail);
@@ -150,6 +294,7 @@ public class NowPlayingInfo {
 
     public void startAt(ZonedDateTime zonedDateTime) {
         musicStartTime = Objects.requireNonNullElseGet(zonedDateTime, ZonedDateTime::now);
+        // SMTC state change picked up by jmtcLoop polling
         if (lyricLines != null && !lyricLines.isEmpty()) {
             if (lyricUpdaterVThread == null) {
                 MusicHud.EXECUTOR.execute(lyricUpdater);
@@ -160,7 +305,7 @@ public class NowPlayingInfo {
     }
 
     private void callLyricsUpdateListeners(LyricLine line) {
-         Set.copyOf(lyricLineUpdateListener).forEach(c -> {
+        Set.copyOf(lyricLineUpdateListener).forEach(c -> {
             try {
                 c.accept(line);
             } catch (Exception e) {
@@ -235,5 +380,4 @@ public class NowPlayingInfo {
         atomicLyricLines.set(null);
         currentLyricLine = null;
     }
-
 }
