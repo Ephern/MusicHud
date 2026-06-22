@@ -213,7 +213,7 @@ public class ConfigView extends LinearLayout {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                     })
-                    .setRange(0, 1920)
+                    .setRange(-1920, 1920)
                     .setDefaultValue(16)
                     .create(positionCategory);
             new PreferencesFragment.IntegerOption(
@@ -221,7 +221,7 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.layout.offsetY"),
                     clientConfig::getHudOffsetY,
                     clientConfig::setHudOffsetY)
-                    .setRange(0, 1920)
+                    .setRange(-1920, 1920)
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();

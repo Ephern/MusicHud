@@ -18,7 +18,7 @@ public class ToastUtil {
         });
     }
 
-    public static void show(String message) {
+    public static void show(CharSequence message) {
         MuiModApi.postToUiThread(() -> {
             //noinspection UnstableApiUsage
             Context context = UIManager.getInstance().getDecorView().getContext();

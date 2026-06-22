@@ -38,29 +38,38 @@ public class PlayerHeadRenderer implements HudRenderer {
         if (skinResource == null) return;
 
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
+        int w = (int) layout.getWidth();
+        int h = (int) layout.getHeight();
+
+        // Inner layer (face) - slightly smaller for 3D depth, rendered first as background
+        float scale = 0.87f;
+        float inset = (1 - scale) / 2;
         context.nextStratum();
+
         context.transform()
-                .translate(absolutePosition.x(), absolutePosition.y())
-                .end((transforming) -> {
+                .translate(absolutePosition.x() + w * inset, absolutePosition.y() + h * inset)
+                .scale(scale)
+                .end((t) -> {
                     context.blit(
                             RenderPipelines.GUI_TEXTURED,
                             skinResource,
                             0, 0,
                             8, 8,
-                            (int) layout.getWidth(), (int) layout.getHeight(),
+                            w, h,
                             8, 8,
                             SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE
                     );
                 });
+
+        // Outer layer (hat) - aligned to layout bounds, rendered second on top
         context.transform()
-                .translate(absolutePosition.x() - layout.getWidth() * 0.08f, absolutePosition.y() - layout.getHeight() * 0.08f)
-                .scale(1.16f)
-                .end((transforming) -> {
+                .translate(absolutePosition.x(), absolutePosition.y())
+                .end((t) -> {
                     context.blit(
                             RenderPipelines.GUI_TEXTURED,
                             skinResource,
                             0, 0, 40, 8,
-                            (int) layout.getWidth(), (int) layout.getHeight(), 8, 8,
+                            w, h, 8, 8,
                             SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE
                     );
                 });
