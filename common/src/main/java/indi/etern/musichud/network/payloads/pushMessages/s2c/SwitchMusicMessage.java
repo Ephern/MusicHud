@@ -59,10 +59,10 @@ public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, 
                         Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
                         if (musicQueue.isEmpty()) {
                             if (!message.nextIdle.equals(MusicDetail.NONE)) {
-                                ImageUtils.downloadAsync(message.nextIdle.getAlbum().getThumbnailPicUrl(200));
+                                ImageUtils.downloadAsync(message.nextIdle.getAlbum().getThumbnailPicUrl(240));
                             }
                         } else {
-                            ImageUtils.downloadAsync(musicQueue.peek().getAlbum().getThumbnailPicUrl(200));
+                            ImageUtils.downloadAsync(musicQueue.peek().getAlbum().getThumbnailPicUrl(240));
                         }
                     });
                 };

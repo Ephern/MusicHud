@@ -51,7 +51,6 @@ public class HudRendererManager {
     @Setter
     private volatile Layout baseLayout;
     private float contentInterval;
-    private float contentPadding;
     private String musicDurationString = "";
     private Logger logger;
 
@@ -147,7 +146,7 @@ public class HudRendererManager {
             configureBaseRenderer(baseLayout);
 
             Layout baseLayout = hudBaseData.getLayout();
-            contentPadding = Math.max(height / 10, 3);
+            float contentPadding = Math.max(height / 10, 3);
 
             float imageHeightAndWidth = height - 2 * contentPadding;
             float imageRadius = Math.clamp(baseLayout.getRadius() - contentPadding, 0, imageHeightAndWidth / 2f);
@@ -173,12 +172,12 @@ public class HudRendererManager {
 
             contentInterval = Math.min(contentUnit * 2.5f, 2f);
 
-            float maxTitleWidth = contentWidth - titleSize - contentInterval;
+            float maxTitleWidth = contentWidth - titleSize - Math.max(4, contentInterval);
 
             float titleY = showProgress ? contentPadding + 1f : contentPadding + (contentHeight - titleSize) / 2;
             float statusX = Math.max(mainContentX + contentWidth - titleSize, imageHeightAndWidth + contentPadding - titleSize);
             boolean statusVisible = !(maxTitleWidth - 1.25 * titleSize <= 0);
-            float headX = statusX - (statusVisible ? titleSize + contentPadding: 0);
+            float headX = statusX - (statusVisible ? titleSize + Math.max(4, contentInterval): 0);
 
             boolean showInfoLine = contentHeight - titleSize > 11f;
             float infoTextSize = showInfoLine ? contentUnit * 5.5f : 0;
@@ -312,7 +311,7 @@ public class HudRendererManager {
     }
 
     private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail) {
-        return ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
+        return ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240))
                 .thenAccept(imageTextureData -> {
                     if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
                         BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
@@ -378,11 +377,11 @@ public class HudRendererManager {
 
             float progressWidth = PROGRESS_RENDERER.getProgressData().getLayout().getWidth();
             Layout titleLayout = TITLE_RENDERER.getLayout();
-            float titleMaxWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().getWidth() - contentInterval;
+            float maxTitleWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().getWidth() - Math.max(4, contentInterval);
             if (PLAYING_STATUS_RENDERER.isVisible()) {
-                titleLayout.setWidth(titleMaxWidth - contentPadding - PLAYING_STATUS_RENDERER.getLayout().getWidth());
+                titleLayout.setWidth(maxTitleWidth - Math.max(4, contentInterval) - PLAYING_STATUS_RENDERER.getLayout().getWidth());
             } else {
-                titleLayout.setWidth(titleMaxWidth);
+                titleLayout.setWidth(maxTitleWidth);
             }
 
             TITLE_RENDERER.render(hudRenderContext);

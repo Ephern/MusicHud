@@ -14,9 +14,7 @@ import lombok.Setter;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 
 public class ClientConfigDefinition implements ClientConfig {
     public static Pair<ClientConfigDefinition, ModConfigSpec> configure;
@@ -395,7 +393,7 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public void save() {
+    public synchronized void save() {
         configure.getRight().save();
     }
 

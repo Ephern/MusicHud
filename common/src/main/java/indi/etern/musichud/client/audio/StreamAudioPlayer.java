@@ -8,6 +8,7 @@ import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.audio.decoder.AudioDecoder;
 import indi.etern.musichud.client.audio.decoder.AudioFormatDetector;
 import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceRequest;
@@ -467,6 +468,7 @@ public class StreamAudioPlayer {
         float musicVolume = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
                                                           (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
         if (lastVolume != musicVolume && source != 0 && AL10.alIsSource(source)) {
+            PlayingStatusRenderer.getInstance().updateStatus(null);
             AL10.alSourcef(source, AL10.AL_GAIN, musicVolume);
             int error = AL10.alGetError();
             if (error != AL10.AL_NO_ERROR) {

@@ -154,7 +154,7 @@ public class TextRenderer implements HudRenderer {
         float measuredWidth = measureWidth(text);
         float textRenderWidth = scale * measuredWidth;
         float layoutWidth = layout.getWidth();
-        float x = position.computeX(absolutePosition.x(), scale, text, measuredWidth);
+        float x = position.computeX(absolutePosition.x(), text, Math.min(textRenderWidth, layoutWidth));
         float y = absolutePosition.y();
         boolean overflow = textRenderWidth > layoutWidth;
 
@@ -162,7 +162,7 @@ public class TextRenderer implements HudRenderer {
         float marqueeWidth = 0;
         float marqueeOffset = 0;
         boolean enableMarqueeText = clientConfig.getEnableMarqueeText();
-        if (enableMarqueeText) {
+        if (enableMarqueeText && position == Position.LEFT) {
             marqueeWidth = textRenderWidth + layoutWidth * marqueeSpaceWeight;
             long elapsedTime = System.currentTimeMillis() - lastUpdateTime;
             float marqueeElapsedTime = Math.max(0, elapsedTime % (marqueeDuration + marqueeIntervalMillis) - marqueeIntervalMillis);
@@ -279,22 +279,22 @@ public class TextRenderer implements HudRenderer {
     public enum Position {
         LEFT {
             @Override
-            float computeX(float startX, float scale, String text, float measuredWidth) {
+            float computeX(float startX, String text, float scaledMeasuredWidth) {
                 return startX;
             }
         }, CENTER {
             @Override
-            float computeX(float startX, float scale, String text, float measuredWidth) {
-                return startX - 0.5f * measuredWidth * scale;
+            float computeX(float startX, String text, float scaledMeasuredWidth) {
+                return startX - 0.5f * scaledMeasuredWidth;
             }
         }, RIGHT {
             @Override
-            float computeX(float startX, float scale, String text, float measuredWidth) {
-                return startX - measuredWidth * scale;
+            float computeX(float startX, String text, float scaledMeasuredWidth) {
+                return startX - scaledMeasuredWidth;
             }
         };
 
-        abstract float computeX(float startX, float scale, String text, float measuredWidth);
+        abstract float computeX(float startX, String text, float scaledMeasuredWidth);
     }
 
     public static class TextStyle {
