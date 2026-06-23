@@ -1,6 +1,18 @@
 package indi.etern.musichud.client.config;
 
 import com.mojang.blaze3d.platform.InputConstants;
+import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.BitmapFactory;
+import icyllis.modernui.annotation.NonNull;
+import icyllis.modernui.annotation.Nullable;
+import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.graphics.text.FontMetricsInt;
+import icyllis.modernui.mc.UIManager;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.TextPaint;
+import icyllis.modernui.text.style.ImageSpan;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
@@ -11,15 +23,22 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.IKeyRegistryService;
 import indi.etern.musichud.interfaces.RegisterMark;
+import lombok.SneakyThrows;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
+import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
+
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 
 @RegisterMark
 public class Keybinds implements ClientRegister {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final LoginService loginService = LoginService.getInstance();
+    private static final Map<String, Image> cachedIconImageMap = new HashMap<>();
 
     public void register() {
         KeyMapping.Category category = KeyMapping.Category.register(MusicHud.location(MusicHud.MOD_ID));
@@ -70,45 +89,106 @@ public class Keybinds implements ClientRegister {
             Minecraft.getInstance().setScreen(MusicHudScreen.createScreen(new MainFragment(), null, null, "Music HUD"));
         });
         service.register(voteMapping, () -> {
-            MusicService.getInstance().keyBindsVoteSkipCurrent();
+            MusicHud.EXECUTOR.execute(() -> {
+                MusicService.getInstance().keyBindsVoteSkipCurrent();
+            });
         });
         service.register(toggleHudMapping, () -> {
-            clientConfig.setEnableHud(!clientConfig.getEnableHud());
-            clientConfig.save();
+            MusicHud.EXECUTOR.execute(() -> {
+                clientConfig.setEnableHud(!clientConfig.getEnableHud());
+                clientConfig.save();
+            });
         });
         service.register(toggleIsolatedMode, () -> {
             MusicHud.EXECUTOR.execute(loginService::keyBindsToggleConnection);
         });
         service.register(muteMapping, () -> {
-            clientConfig.setMuted(!clientConfig.getMuted());
-            clientConfig.save();
-            ToastUtil.show(getVolumeToastString());
+            MusicHud.EXECUTOR.execute(() -> {
+                clientConfig.setMuted(!clientConfig.getMuted());
+                clientConfig.save();
+                ToastUtil.show(getVolumeToastString());
+            });
         });
         service.register(increaseVolume, () -> {
-            clientConfig.forceSetSoundVolume(Math.clamp(clientConfig.getSoundVolume() + clientConfig.getSoundVolumeInterval(), 0, 100));
-            clientConfig.save();
-            ToastUtil.show(getVolumeToastString());
+            MusicHud.EXECUTOR.execute(() -> {
+                clientConfig.forceSetSoundVolume(Math.clamp(clientConfig.getSoundVolume() + clientConfig.getSoundVolumeInterval(), 0, 100));
+                clientConfig.save();
+                ToastUtil.show(getVolumeToastString());
+            });
         });
         service.register(decreaseVolume, () -> {
-            clientConfig.forceSetSoundVolume(Math.clamp(clientConfig.getSoundVolume() - clientConfig.getSoundVolumeInterval(), 0, 100));
-            clientConfig.save();
-            ToastUtil.show(getVolumeToastString());
+            MusicHud.EXECUTOR.execute(() -> {
+                clientConfig.forceSetSoundVolume(Math.clamp(clientConfig.getSoundVolume() - clientConfig.getSoundVolumeInterval(), 0, 100));
+                clientConfig.save();
+                ToastUtil.show(getVolumeToastString());
+            });
         });
     }
 
-    private String getVolumeToastString() {
+    @SneakyThrows
+    private CharSequence getVolumeToastString() {
         String emoji;
         boolean muted = clientConfig.getMuted();
         int volume = muted ? 0 : clientConfig.getSoundVolume();
+        String resourceName;
         if (muted) {
             emoji = I18n.get(MusicHud.MOD_ID + ".text.volumeTemplate.emoji.level0");
+            resourceName = "/assets/music_hud/textures/gui/icons/volume_x.png";
         } else if (volume <= 33) {
             emoji = I18n.get(MusicHud.MOD_ID + ".text.volumeTemplate.emoji.level1");
+            resourceName = "/assets/music_hud/textures/gui/icons/volume_0.png";
         } else if (volume <= 67) {
             emoji = I18n.get(MusicHud.MOD_ID + ".text.volumeTemplate.emoji.level2");
+            resourceName = "/assets/music_hud/textures/gui/icons/volume_1.png";
         } else {
             emoji = I18n.get(MusicHud.MOD_ID + ".text.volumeTemplate.emoji.level3");
+            resourceName = "/assets/music_hud/textures/gui/icons/volume_2.png";
         }
-        return I18n.get(MusicHud.MOD_ID + ".text.volumeTemplate").replace("{emoji}", emoji).replace("{volume}", String.valueOf(volume));
+        String template = I18n.get(MusicHud.MOD_ID + ".text.volumeTemplate").replace("{emoji}", emoji).replace("{volume}", String.valueOf(volume));
+        SpannableString message = new SpannableString(template);
+        Image image = cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
+            try (InputStream iconResourceStream = getClass().getResourceAsStream(s)){
+                if (iconResourceStream != null) {
+                    return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                } else {
+                    return null;
+                }
+            } catch (Exception ignored) {
+                return null;
+            }
+        });
+        if (image != null) {
+            ImageSpan span = getIconSpan(image);
+            message.setSpan(span, 0, emoji.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return message;
+    }
+
+    private static @NotNull ImageSpan getIconSpan(Image image) {
+        //noinspection UnstableApiUsage
+        Context context = UIManager.getInstance().getDecorView().getContext();
+        return new ImageSpan(context, image) {
+            @Override
+            public int getSize(@NonNull TextPaint paint, CharSequence text,
+                               int start, int end, @Nullable FontMetricsInt fm) {
+                Drawable d = getDrawable();
+                int origW = d.getIntrinsicWidth();
+                int origH = d.getIntrinsicHeight();
+                if (origW <= 0 || origH <= 0) return 0;
+
+                FontMetricsInt pFm = paint.getFontMetricsInt();
+                int textHeight = -pFm.ascent;
+
+                int newWidth = Math.round((float) textHeight * origW / origH);
+
+                d.setBounds(0, 0, newWidth, textHeight);
+
+                if (fm != null) {
+                    fm.ascent = -textHeight;
+                    fm.descent = 0;
+                }
+                return newWidth;
+            }
+        };
     }
 }
