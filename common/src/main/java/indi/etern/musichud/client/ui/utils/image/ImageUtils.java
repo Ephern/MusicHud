@@ -5,6 +5,7 @@ import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
 import icyllis.arc3d.core.ColorSpace;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.core.Core;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
 import icyllis.modernui.graphics.Image;
@@ -327,13 +328,17 @@ public class ImageUtils {
         return cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
             try (InputStream iconResourceStream = MusicHud.class.getResourceAsStream(s)) {
                 if (iconResourceStream != null) {
-                    CompletableFuture<Image> future = new CompletableFuture<>();
-                    MuiModApi.postToUiThread(() -> {
-                        try {
-                            future.complete(Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream)));
-                        } catch (Exception ignored) {}
-                    });
-                    return future.get();
+                    if (Core.isOnUiThread()) {
+                        return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                    } else {
+                        CompletableFuture<Image> future = new CompletableFuture<>();
+                        MuiModApi.postToUiThread(() -> {
+                            try {
+                                future.complete(Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream)));
+                            } catch (Exception ignored) {}
+                        });
+                        return future.get();
+                    }
                 } else {
                     return null;
                 }
