@@ -10,6 +10,7 @@ import icyllis.modernui.graphics.BitmapFactory;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.text.FontMetricsInt;
+import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.text.style.ImageSpan;
@@ -326,7 +327,13 @@ public class ImageUtils {
         return cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
             try (InputStream iconResourceStream = MusicHud.class.getResourceAsStream(s)) {
                 if (iconResourceStream != null) {
-                    return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                    CompletableFuture<Image> future = new CompletableFuture<>();
+                    MuiModApi.postToUiThread(() -> {
+                        try {
+                            future.complete(Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream)));
+                        } catch (Exception ignored) {}
+                    });
+                    return future.get();
                 } else {
                     return null;
                 }
