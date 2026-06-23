@@ -102,6 +102,7 @@ public class NowPlayingInfo {
         }
         lyricUpdaterVThread = null;
     };
+    private Path tempAlbumArt;
 
     private NowPlayingInfo() {
         smtcThread = new Thread(this::jmtcLoop, "MH-SMTC");
@@ -171,6 +172,11 @@ public class NowPlayingInfo {
                 jmtc.setTimelineProperties(new JMTCTimelineProperties(0L, durationMillis, 0L, durationMillis));
                 URI artUri = null;
                 String picUrl = musicDetail.getAlbum().getPicUrl();
+                if (tempAlbumArt != null) {
+                    try {
+                        Files.delete(tempAlbumArt);
+                    } catch (IOException ignored) {}
+                }
                 if (picUrl.startsWith("http")) {
                     try {
                         String suffix = "png";
@@ -178,12 +184,12 @@ public class NowPlayingInfo {
                         if (splits.length > 1) {
                             suffix = splits[splits.length - 1];
                         }
-                        Path tempFile = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
-                        tempFile.toFile().deleteOnExit();
+                        tempAlbumArt = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
+                        tempAlbumArt.toFile().deleteOnExit();
                         artUri = ImageUtils.downloadAsync(picUrl, inputStream -> {
                             try {
-                                Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                                return tempFile.toUri();
+                                Files.copy(inputStream, tempAlbumArt, StandardCopyOption.REPLACE_EXISTING);
+                                return tempAlbumArt.toUri();
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
@@ -193,12 +199,12 @@ public class NowPlayingInfo {
                     }
                 } else {
                     try {
-                        Path tempFile = Files.createTempFile("MusicHUD-SMTC-Icon", ".png");
-                        tempFile.toFile().deleteOnExit();
+                        tempAlbumArt = Files.createTempFile("MusicHUD-SMTC-Icon", ".png");
+                        tempAlbumArt.toFile().deleteOnExit();
                         try (InputStream iconStream = getClass().getResourceAsStream("/assets/music_hud/icon.png")) {
                             if (iconStream != null) {
-                                Files.copy(iconStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                                artUri = tempFile.toUri();
+                                Files.copy(iconStream, tempAlbumArt, StandardCopyOption.REPLACE_EXISTING);
+                                artUri = tempAlbumArt.toUri();
                             }
                         }
                     } catch (Exception e) {
