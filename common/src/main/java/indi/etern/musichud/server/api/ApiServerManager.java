@@ -27,7 +27,7 @@ public class ApiServerManager implements ServerRegister {
     private final Logger apiLogger = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/API");
     @Getter
     private final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
-    private Process process;
+    private volatile Process process;
     private boolean continueRestart = true;
     @Getter
     private BinaryApiServerStatus binaryApiServerStatus = BinaryApiServerStatus.STOPPED;
@@ -121,7 +121,7 @@ public class ApiServerManager implements ServerRegister {
         });
     }
 
-    private void startEmbeddedApiServer() {
+    private synchronized void startEmbeddedApiServer() {
         if (process != null) {
             return;
         }

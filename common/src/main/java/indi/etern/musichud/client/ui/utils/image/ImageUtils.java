@@ -4,15 +4,25 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
 import icyllis.arc3d.core.ColorSpace;
+import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
+import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.graphics.text.FontMetricsInt;
+import icyllis.modernui.mc.UIManager;
+import icyllis.modernui.text.TextPaint;
+import icyllis.modernui.text.style.ImageSpan;
+import indi.etern.musichud.MusicHud;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -20,6 +30,8 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -41,6 +53,7 @@ public class ImageUtils {
     private static ExecutorService downloadExecutor;
     private static Semaphore downloadSemaphore;
     private static int maxConcurrentDownloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS;
+    private static final Map<String, Image> cachedIconImageMap = new HashMap<>();
 
     static {
         initializeVirtualThreadExecutor();
@@ -279,6 +292,48 @@ public class ImageUtils {
             texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), convertBitmapToNativeImage(source)));
         }).join();
         return new ImageTextureData(data, texture.get());
+    }
+
+    public static @NotNull ImageSpan getIconSpan(Image image) {
+        //noinspection UnstableApiUsage
+        Context context = UIManager.getInstance().getDecorView().getContext();
+        return new ImageSpan(context, image) {
+            @Override
+            public int getSize(@NonNull TextPaint paint, CharSequence text,
+                               int start, int end, @Nullable FontMetricsInt fm) {
+                Drawable d = getDrawable();
+                int origW = d.getIntrinsicWidth();
+                int origH = d.getIntrinsicHeight();
+                if (origW <= 0 || origH <= 0) return 0;
+
+                FontMetricsInt pFm = paint.getFontMetricsInt();
+                int textHeight = -pFm.ascent;
+
+                int newWidth = Math.round((float) textHeight * origW / origH);
+
+                d.setBounds(0, 0, newWidth, textHeight);
+
+                if (fm != null) {
+                    fm.ascent = -textHeight;
+                    fm.descent = 0;
+                }
+                return newWidth;
+            }
+        };
+    }
+
+    public static @Nullable Image getImageFromResource(String resourceName) {
+        return cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
+            try (InputStream iconResourceStream = MusicHud.class.getResourceAsStream(s)) {
+                if (iconResourceStream != null) {
+                    return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                } else {
+                    return null;
+                }
+            } catch (Exception ignored) {
+                return null;
+            }
+        });
     }
 
     record PendingKey(String url, Function<InputStream, ?> consumer) {

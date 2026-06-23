@@ -1,8 +1,12 @@
 package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
@@ -14,6 +18,7 @@ import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.stream.Collectors;
@@ -40,7 +45,14 @@ public class ArtistDetailView extends LinearLayout {
         topBar.setLayoutParams(params);
 
         Button backButton = new Button(context);
-        backButton.setText(I18n.get(MusicHud.MOD_ID + ".button.back"));
+        String s = I18n.get(MusicHud.MOD_ID + ".button.back");
+        SpannableString spannableString = new SpannableString(s);
+        Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
+        if (image != null) {
+            ImageSpan span = ImageUtils.getIconSpan(image);
+            spannableString.setSpan(span, 0, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        backButton.setText(spannableString);
         backButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
         backButton.setOnClickListener(view -> {
             RouterContainer.getInstance().popNavigate();
