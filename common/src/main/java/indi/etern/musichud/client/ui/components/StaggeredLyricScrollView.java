@@ -642,6 +642,14 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
     }
 
+    @Override
+    public void requestLayout() {
+        super.requestLayout();
+        if (lyricLines != null) {
+            lyricLines.forEach((l, lv) -> lv.requestLayout());
+        }
+    }
+
     enum ScrollStatus {
         IDLE, MANUAL, RECENTER, FOLLOW_LYRICS
     }

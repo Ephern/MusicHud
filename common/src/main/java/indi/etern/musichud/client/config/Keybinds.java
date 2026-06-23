@@ -1,17 +1,9 @@
 package indi.etern.musichud.client.config;
 
 import com.mojang.blaze3d.platform.InputConstants;
-import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.BitmapFactory;
-import icyllis.modernui.annotation.NonNull;
-import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.Drawable;
-import icyllis.modernui.graphics.text.FontMetricsInt;
-import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
-import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.text.style.ImageSpan;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
@@ -19,6 +11,7 @@ import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;
+import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.IKeyRegistryService;
@@ -27,10 +20,8 @@ import lombok.SneakyThrows;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
-import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
 
-import java.io.InputStream;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -38,7 +29,6 @@ import java.util.Map;
 public class Keybinds implements ClientRegister {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final LoginService loginService = LoginService.getInstance();
-    private static final Map<String, Image> cachedIconImageMap = new HashMap<>();
 
     public void register() {
         String category = "key.category.music_hud.music_hud";
@@ -146,49 +136,11 @@ public class Keybinds implements ClientRegister {
         }
         String template = I18n.get(MusicHud.MOD_ID + ".text.volumeTemplate").replace("{emoji}", emoji).replace("{volume}", String.valueOf(volume));
         SpannableString message = new SpannableString(template);
-        Image image = cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
-            try (InputStream iconResourceStream = getClass().getResourceAsStream(s)){
-                if (iconResourceStream != null) {
-                    return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
-                } else {
-                    return null;
-                }
-            } catch (Exception ignored) {
-                return null;
-            }
-        });
+        Image image = ImageUtils.getImageFromResource(resourceName);
         if (image != null) {
-            ImageSpan span = getIconSpan(image);
+            ImageSpan span = ImageUtils.getIconSpan(image);
             message.setSpan(span, 0, emoji.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
         return message;
-    }
-
-    private static @NotNull ImageSpan getIconSpan(Image image) {
-        //noinspection UnstableApiUsage
-        Context context = UIManager.getInstance().getDecorView().getContext();
-        return new ImageSpan(context, image) {
-            @Override
-            public int getSize(@NonNull TextPaint paint, CharSequence text,
-                               int start, int end, @Nullable FontMetricsInt fm) {
-                Drawable d = getDrawable();
-                int origW = d.getIntrinsicWidth();
-                int origH = d.getIntrinsicHeight();
-                if (origW <= 0 || origH <= 0) return 0;
-
-                FontMetricsInt pFm = paint.getFontMetricsInt();
-                int textHeight = -pFm.ascent;
-
-                int newWidth = Math.round((float) textHeight * origW / origH);
-
-                d.setBounds(0, 0, newWidth, textHeight);
-
-                if (fm != null) {
-                    fm.ascent = -textHeight;
-                    fm.descent = 0;
-                }
-                return newWidth;
-            }
-        };
     }
 }
