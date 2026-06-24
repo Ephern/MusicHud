@@ -23,7 +23,6 @@ import java.time.ZonedDateTime;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-@Slf4j
 public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
     private final EditText phoneTextInput;
     private final EditText codeTextInput;
