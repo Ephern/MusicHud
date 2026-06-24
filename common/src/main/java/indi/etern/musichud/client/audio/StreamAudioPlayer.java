@@ -20,7 +20,9 @@ import net.minecraft.client.resources.language.I18n;
 import net.minecraft.sounds.SoundSource;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
+import org.lwjgl.openal.SOFTSourceResampler;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -43,6 +45,55 @@ public class StreamAudioPlayer {
     private static final int BUFFER_SIZE = 65536;
     private static final Logger LOGGER = MusicHud.getLogger(StreamAudioPlayer.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+
+    // OpenAL Soft per-source resampler quality.
+    // MC 1.21.1's LWJGL bundles an older OpenAL Soft that defaults to "Linear" (index 1),
+    // while 1.21.6+ defaults to "Cubic"/"Sinc4" (index 2+) — a clearly audible difference.
+    // explicitly select the highest-available quality resampler to match 1.21.6+ behavior.
+    private static int resamplerQualityIndex = Integer.MIN_VALUE;
+
+    private static int getBestResamplerIndex() {
+        if (resamplerQualityIndex != Integer.MIN_VALUE) return resamplerQualityIndex;
+        synchronized (StreamAudioPlayer.class) {
+            if (resamplerQualityIndex != Integer.MIN_VALUE) return resamplerQualityIndex;
+            resamplerQualityIndex = -1;
+            try {
+                if (AL.getCapabilities().AL_SOFT_source_resampler) {
+                    int numResamplers = AL10.alGetInteger(SOFTSourceResampler.AL_NUM_RESAMPLERS_SOFT);
+                    for (int i = numResamplers - 1; i >= 2; i--) {
+                        String name = SOFTSourceResampler.alGetStringiSOFT(
+                                SOFTSourceResampler.AL_RESAMPLER_NAME_SOFT, i);
+                        if (name != null) {
+                            String lower = name.toLowerCase();
+                            if (lower.contains("bsinc") || lower.contains("sinc") || lower.contains("cubic")) {
+                                resamplerQualityIndex = i;
+                                break;
+                            }
+                        }
+                    }
+                    if (resamplerQualityIndex < 0 && numResamplers > 2) {
+                        resamplerQualityIndex = numResamplers - 1;
+                    }
+                    LOGGER.info("OpenAL Soft resampler: numResamplers={}, selectedIndex={}",
+                            numResamplers, resamplerQualityIndex);
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Failed to query OpenAL Soft resamplers: {}", e.toString());
+            }
+            return resamplerQualityIndex;
+        }
+    }
+
+    private void applyHighQualityResampler(int source) {
+        int idx = getBestResamplerIndex();
+        if (idx >= 0) {
+            AL10.alSourcei(source, SOFTSourceResampler.AL_SOURCE_RESAMPLER_SOFT, idx);
+            int error = AL10.alGetError();
+            if (error != AL10.AL_NO_ERROR) {
+                LOGGER.warn("Failed to set source resampler to index {}: {}", idx, getALErrorString(error));
+            }
+        }
+    }
     private static volatile StreamAudioPlayer instance = null;
     private final int[] buffers = new int[BUFFER_COUNT];
     private final AtomicBoolean initialized = new AtomicBoolean(false);
@@ -150,6 +201,11 @@ public class StreamAudioPlayer {
             AL10.alSource3f(source, AL10.AL_POSITION, 0, 0, 0);
             AL10.alSourcef(source, AL10.AL_ROLLOFF_FACTOR, 0);
             checkALError("source configuration");
+            // OpenAL Soft resampler quality fix:
+            // In 1.21.1 the bundled OpenAL Soft defaults to "Linear" (index 1),
+            // while 1.21.6+ defaults to higher-quality "Cubic"/"Sinc4" (index 2+).
+            // Explicitly select best available to match 1.21.6+ audio quality.
+            applyHighQualityResampler(source);
             lastVolume = 1;
 
             initialized.set(true);
@@ -621,7 +677,7 @@ public class StreamAudioPlayer {
                 }
 
                 initialized.set(false);
-                lastVolume = 1;
+            lastVolume = 1;
                 audioBuffer = new LinkedBlockingQueue<>(30);
                 totalBufferedBytes.set(0);
                 playedBytes = 0;
