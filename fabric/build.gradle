@@ -71,6 +71,7 @@ processResources {
 shadowJar {
     configurations = [project.configurations.shadowBundle]
     archiveClassifier = 'dev-shadow'
+    exclude 'org/slf4j/**'
 }
 
 remapJar {

@@ -22,7 +22,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.function.Function;
 
-@Slf4j
 public class LyricHighlightTextView extends TextView {
     private static final int fullLineHighlightDelay = 300;
     private static final int animationDurationMillis = 300;
