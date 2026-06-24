@@ -49,9 +49,7 @@ void main() {
     float fillMask = 1.0 - aastep(fillDis);
 
     float distFromFillRight = fillWidth - fillPos.x;
-    float narrow = step(fillWidth, gradientLength);
-    float denom = mix(gradientLength, fillWidth, narrow);
-    float t = clamp(distFromFillRight / denom, 0.0, 1.0);
+    float t = clamp(distFromFillRight / gradientLength, 0.0, 1.0);
 
     vec4 gradientColor = mix(u_CurrentColor, u_PlayedColor, t);
 

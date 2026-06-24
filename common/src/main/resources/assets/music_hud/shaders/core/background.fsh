@@ -94,10 +94,7 @@ void main() {
     float radius     = u_Layout[2];
     float timestamp  = u_Dynamic1[0];
 
-    vec2 uv = f_Position / vec2(halfWidth, halfHeight);
-    float aspect = halfWidth / halfHeight;
-    vec2 noiseUv = uv;
-    noiseUv.x *= aspect;
+    vec2 noiseUv = f_Position / 40;
     float speed = 0.014;
     vec2 scrollVec = vec2(timestamp * speed, timestamp * speed * 0.7);
 

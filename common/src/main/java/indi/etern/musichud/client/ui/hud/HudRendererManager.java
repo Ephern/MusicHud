@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.concurrent.CompletableFuture;
 
 public class HudRendererManager {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
@@ -50,7 +51,6 @@ public class HudRendererManager {
     @Setter
     private volatile Layout baseLayout;
     private float contentInterval;
-    private float contentPadding;
     private String musicDurationString = "";
     private Logger logger;
 
@@ -146,7 +146,7 @@ public class HudRendererManager {
             configureBaseRenderer(baseLayout);
 
             Layout baseLayout = hudBaseData.getLayout();
-            contentPadding = Math.max(height / 10, 3);
+            float contentPadding = Math.max(height / 10, 3);
 
             float imageHeightAndWidth = height - 2 * contentPadding;
             float imageRadius = Math.clamp(baseLayout.getRadius() - contentPadding, 0, imageHeightAndWidth / 2f);
@@ -172,12 +172,12 @@ public class HudRendererManager {
 
             contentInterval = Math.min(contentUnit * 2.5f, 2f);
 
-            float maxTitleWidth = contentWidth - titleSize - contentInterval;
+            float maxTitleWidth = contentWidth - titleSize - Math.max(4, contentInterval);
 
             float titleY = showProgress ? contentPadding + 1f : contentPadding + (contentHeight - titleSize) / 2;
             float statusX = Math.max(mainContentX + contentWidth - titleSize, imageHeightAndWidth + contentPadding - titleSize);
             boolean statusVisible = !(maxTitleWidth - 1.25 * titleSize <= 0);
-            float headX = statusX - (statusVisible ? titleSize + contentPadding: 0);
+            float headX = statusX - (statusVisible ? titleSize + Math.max(4, contentInterval): 0);
 
             boolean showInfoLine = contentHeight - titleSize > 11f;
             float infoTextSize = showInfoLine ? contentUnit * 5.5f : 0;
@@ -232,7 +232,7 @@ public class HudRendererManager {
                 Theme.HUD_PROGRESS_LEFT,
                 Theme.HUD_PROGRESS_CURRENT,
                 Theme.HUD_PROGRESS_BACKGROUND,
-                12f,
+                layout.getHeight() * 6,
                 2f,
                 0.01f
         ));
@@ -294,28 +294,13 @@ public class HudRendererManager {
                 } else {
                     PLAYER_HEAD_RENDERER.setSkinResource(pusherPlayerInfo.getSkin().texture());
                 }
-                ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200))
-                        .thenAccept(imageTextureData -> {
-//                            imageTextureData.register().thenAcceptAsync((v) -> {
-//                                ImageTextureData blurredImageTextureData = ImageBlurPostProcessor.blur(imageTextureData, 16);
-//                                blurredImageTextureData.register().thenAccept((v1) -> Minecraft.getInstance().execute(() -> {
-                            if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
-                                BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
-                                var nextData = new BackgroundData(backgroundImages);
-                                hudBaseData.getTransitionableBackground().startTransition(nextData);
-                                Duration musicDuration = nowPlayingInfo.getMusicDuration();
-                                DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
-                                        LONG_DATE_TIME_FORMATTER :
-                                        SHORT_DATE_TIME_FORMATTER;
-                                musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
-                            }
-//                                }));
-//                            }, MusicHud.EXECUTOR);
-                        }).exceptionally(e -> {
-                            var nextData = BackgroundData.NONE;
-                            hudBaseData.getTransitionableBackground().startTransition(nextData);
-                            return null;
-                        });
+                loadAlbumImage(musicDetail).thenAccept((unused) -> {
+                    Duration musicDuration = nowPlayingInfo.getMusicDuration();
+                    DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
+                            LONG_DATE_TIME_FORMATTER :
+                            SHORT_DATE_TIME_FORMATTER;
+                    musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
+                });
             }
         } catch (Exception e) {
             if (logger == null) {
@@ -323,6 +308,25 @@ public class HudRendererManager {
             }
             logger.error("While switching music", e);
         }
+    }
+
+    private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail) {
+        return ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240))
+                .thenAccept(imageTextureData -> {
+                    if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
+                        BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
+                        var nextData = new BackgroundData(backgroundImages);
+                        hudBaseData.getTransitionableBackground().startTransition(nextData);
+                    }
+                }).exceptionallyAsync(e -> {
+                    var nextData = BackgroundData.NONE;
+                    hudBaseData.getTransitionableBackground().startTransition(nextData);
+                    try {
+                        Thread.sleep(1000);
+                    } catch (InterruptedException ignored) {}
+                    loadAlbumImage(musicDetail);
+                    return null;
+                }, MusicHud.EXECUTOR);
     }
 
     public void reset() {
@@ -373,11 +377,11 @@ public class HudRendererManager {
 
             float progressWidth = PROGRESS_RENDERER.getProgressData().getLayout().getWidth();
             Layout titleLayout = TITLE_RENDERER.getLayout();
-            float titleMaxWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().getWidth() - contentInterval;
+            float maxTitleWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().getWidth() - Math.max(4, contentInterval);
             if (PLAYING_STATUS_RENDERER.isVisible()) {
-                titleLayout.setWidth(titleMaxWidth - contentPadding - PLAYING_STATUS_RENDERER.getLayout().getWidth());
+                titleLayout.setWidth(maxTitleWidth - Math.max(4, contentInterval) - PLAYING_STATUS_RENDERER.getLayout().getWidth());
             } else {
-                titleLayout.setWidth(titleMaxWidth);
+                titleLayout.setWidth(maxTitleWidth);
             }
 
             TITLE_RENDERER.render(hudRenderContext);

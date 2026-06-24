@@ -77,6 +77,8 @@ public class ColorExtractor {
         final float LUM_WEIGHT = 0.1f;
         final float FREQ_WEIGHT = 0.5f;
         final float DIST_EPSILON = 0.001f;
+        final float BD_SAT_TARGET = 0.13f;
+        final float BD_SAT_SPREAD = 0.3f;
 
         int bright = 0;
         float bestBrightScore = -1;
@@ -84,9 +86,12 @@ public class ColorExtractor {
             if (entry.getValue() < minWeight) continue;
             int rgb = quantToRgb.get(entry.getKey());
             float lum = getLuminance(rgb);
-            // 亮度范围 [0,1]，直接使用
-            if (lum > bestBrightScore) {
-                bestBrightScore = lum;
+            float sat = getSaturation(rgb);
+            float satPenalty = (sat - BD_SAT_TARGET) * (sat - BD_SAT_TARGET) / (BD_SAT_SPREAD * BD_SAT_SPREAD);
+            float satScore = Math.max(0.1f, 1.0f - satPenalty);
+            float score = lum * satScore;
+            if (score > bestBrightScore) {
+                bestBrightScore = score;
                 bright = rgb;
             }
         }
@@ -97,9 +102,13 @@ public class ColorExtractor {
             if (entry.getValue() < minWeight) continue;
             int rgb = quantToRgb.get(entry.getKey());
             float lum = getLuminance(rgb);
-            float darkness = 1.0f - lum;  // 暗度，越高越暗
-            if (darkness > bestDarkScore) {
-                bestDarkScore = darkness;
+            float sat = getSaturation(rgb);
+            float darkness = 1.0f - lum;
+            float satPenalty = (sat - BD_SAT_TARGET) * (sat - BD_SAT_TARGET) / (BD_SAT_SPREAD * BD_SAT_SPREAD);
+            float satScore = Math.max(0.1f, 1.0f - satPenalty);
+            float score = darkness * satScore;
+            if (score > bestDarkScore) {
+                bestDarkScore = score;
                 dark = rgb;
             }
         }
@@ -170,7 +179,7 @@ public class ColorExtractor {
         float[] hsl2 = rgbToHsl(rgb2);
 
         float hueDist = 0;
-        if (hsl1[1] > 0.1f && hsl2[1] > 0.1f) {
+        if (hsl1[1] > 0.25f && hsl2[1] > 0.25f) {
             hueDist = Math.abs(hsl1[0] - hsl2[0]);
             if (hueDist > 0.5f) hueDist = 1.0f - hueDist;
         }
@@ -219,9 +228,6 @@ public class ColorExtractor {
         );
     }
 
-    /**
-     * 调整单个颜色（完整版）
-     */
     private static int adjustColorFull(int argb, float vibrance, float brightness, float contrast) {
         int r = (argb >> 16) & 0xFF;
         int g = (argb >> 8) & 0xFF;

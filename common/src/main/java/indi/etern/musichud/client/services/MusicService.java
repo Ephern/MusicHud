@@ -258,7 +258,7 @@ public class MusicService {
             }
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             if (!musicDetail.equals(MusicDetail.NONE)) {
-                ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(200));
+                ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 streamAudioPlayer.playAsync(musicDetail, serverStartTime)

@@ -37,7 +37,6 @@ dependencies {
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     shadowBundle project(path: ':common', configuration: 'transformProductionNeoForge')
 
-
     implementation("icyllis.modernui:ModernUI-NeoForge:1.21.1-${rootProject.modernui_version}.+")
     modImplementation("dev.icyllis:modernui-core:${modernui_version}") {
         exclude group: "org.slf4j", module: "slf4j-api"
@@ -50,7 +49,8 @@ dependencies {
 //        exclude group: "org.commonmark"
     }
 
-    modImplementation("icyllis.modernui:ModernUI-Markflow:${modernui_version}") {
+    modImplementation("icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version") {
+//        exclude group: "icyllis.modernui", module: "ModernUI-Core"
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "org.apache.logging.log4j", module: "log4j-core"
         exclude group: "org.apache.logging.log4j", module: "log4j-api"
@@ -69,6 +69,16 @@ dependencies {
     shadowBundle "org.jflac:jflac-codec:$rootProject.jflac_version"
     forgeRuntimeLibrary "org.jflac:jflac-codec:$rootProject.jflac_version"
 
+//    implementation "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+//    shadowBundle "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+//    forgeRuntimeLibrary "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+    implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    shadowBundle "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    forgeRuntimeLibrary "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+
+    implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+    shadowBundle "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+    forgeRuntimeLibrary "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
 }
 processResources {
     inputs.property 'version', project.version

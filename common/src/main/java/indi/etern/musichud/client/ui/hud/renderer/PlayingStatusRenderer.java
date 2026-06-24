@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.resources.ResourceLocation;
@@ -14,7 +15,9 @@ public class PlayingStatusRenderer implements HudRenderer {
     public static final ResourceLocation ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
     public static final ResourceLocation PLAYING_CONNECTED_ICON_LOCATION = MusicHud.location("textures/gui/icons/link.png");
     public static final ResourceLocation PLAYING_ISOLATED_LOCATION = MusicHud.location("textures/gui/icons/unlink.png");
+    public static final ResourceLocation MUTED_LOCATION = MusicHud.location("textures/gui/icons/volume_x.png");
     private static volatile PlayingStatusRenderer instance;
+    private final ClientConfig clientConfig = ClientConfig.getInstance();
     StreamAudioPlayer.Status status;
     @Getter
     private Layout layout;
@@ -45,7 +48,9 @@ public class PlayingStatusRenderer implements HudRenderer {
             case RETRYING -> RETRYING_ICON_LOCATION;
             case ERROR -> ERROR_ICON_LOCATION;
             default -> {
-                if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
+                if (clientConfig.getMuted()) {
+                    yield MUTED_LOCATION;
+                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
                     yield PLAYING_CONNECTED_ICON_LOCATION;
                 } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                     yield PLAYING_ISOLATED_LOCATION;

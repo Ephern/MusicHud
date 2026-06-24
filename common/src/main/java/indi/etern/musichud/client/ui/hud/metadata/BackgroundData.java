@@ -5,28 +5,38 @@ import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
 import indi.etern.musichud.client.ui.utils.ColorExtractor;
 import indi.etern.musichud.client.ui.utils.Mixable;
 import indi.etern.musichud.client.ui.utils.UniformDataUtils;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.EqualsAndHashCode;
+
+import java.util.Objects;
 
 @EqualsAndHashCode
 public final class BackgroundData implements Mixable<BackgroundData>, HudUniform {
     private final BackgroundImages image;
-    private final ThemedColors colors;
+    private final ThemedColors themedColors;
+    private ThemedColors mixedColors;
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private float mixAlpha = -1;
     public static final BackgroundData NONE = new BackgroundData(null, ColorExtractor.getDefaultColors());
 
     public BackgroundData(
             BackgroundImages image
     ) {
         this.image = image;
-        this.colors = ColorExtractor.mixBaseColorsWithAlpha(ColorExtractor.extractColors(image.current.getTexture()), 0xFF1A1A1A, 0.3f);
+        this.mixAlpha = (float) clientConfig.getHudBackgroundMixAlpha();
+        this.themedColors = ColorExtractor.extractColors(image.current.getTexture());
+        this.mixedColors = ColorExtractor.mixBaseColorsWithAlpha(themedColors, 0xFF1A1A1A, mixAlpha);
     }
 
-    BackgroundData(BackgroundImages image, ThemedColors colors) {
+    BackgroundData(BackgroundImages image, ThemedColors themedColors) {
         this.image = image;
-        this.colors = colors;
+        this.mixAlpha = (float) clientConfig.getHudBackgroundMixAlpha();
+        this.themedColors = themedColors;
+        this.mixedColors = ColorExtractor.mixBaseColorsWithAlpha(themedColors, 0xFF1A1A1A, mixAlpha);
     }
 
     public ThemedColors color() {
-        return colors;
+        return themedColors;
     }
 
     public BackgroundImages image() {
@@ -36,23 +46,23 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
     @Override
     public String toString() {
         return "BackgroundData[" +
-                "color=" + colors + ", " +
+                "themedColors=" + themedColors + ", " +
                 "image=" + image + ']';
     }
 
     @Override
     public BackgroundData mix(BackgroundData next, float transitionProgress) {
-        return new BackgroundData(image, next != null ? mixColor(next.colors, transitionProgress) : colors);
+        return new BackgroundData(image, next != null ? mixColor(next.themedColors, transitionProgress) : themedColors);
     }
 
     private ThemedColors mixColor(ThemedColors next, float t) {
-        if (t <= 0.01f) return new ThemedColors(colors.primary, colors.secondary, colors.bright, colors.dark);
+        if (t <= 0.01f) return new ThemedColors(themedColors.primary, themedColors.secondary, themedColors.bright, themedColors.dark);
         if (t >= 0.99f) return new ThemedColors(next.primary, next.secondary, next.bright, next.dark);
 
-        int c1 = UniformDataUtils.interpolateARGB(colors.primary, next.primary, t);
-        int c2 = UniformDataUtils.interpolateARGB(colors.secondary, next.secondary, t);
-        int c3 = UniformDataUtils.interpolateARGB(colors.bright, next.bright, t);
-        int c4 = UniformDataUtils.interpolateARGB(colors.dark, next.dark, t);
+        int c1 = UniformDataUtils.interpolateARGB(themedColors.primary, next.primary, t);
+        int c2 = UniformDataUtils.interpolateARGB(themedColors.secondary, next.secondary, t);
+        int c3 = UniformDataUtils.interpolateARGB(themedColors.bright, next.bright, t);
+        int c4 = UniformDataUtils.interpolateARGB(themedColors.dark, next.dark, t);
         return new ThemedColors(c1, c2, c3, c4);
     }
 
@@ -71,18 +81,29 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
     @Override
     public void write(Std140BufferWriter builder) {
         // Use float overload to avoid JOML Vector4f.get(ByteBuffer) being stripped by transformers
-        org.joml.Vector4f v = UniformDataUtils.colorToVector(colors.primary);
+        org.joml.Vector4f v = UniformDataUtils.colorToVector(mixedColors.primary);
         builder.putVec4(v.x, v.y, v.z, v.w);
-        v = UniformDataUtils.colorToVector(colors.secondary);
+        v = UniformDataUtils.colorToVector(mixedColors.secondary);
         builder.putVec4(v.x, v.y, v.z, v.w);
-        v = UniformDataUtils.colorToVector(colors.bright);
+        v = UniformDataUtils.colorToVector(mixedColors.bright);
         builder.putVec4(v.x, v.y, v.z, v.w);
-        v = UniformDataUtils.colorToVector(colors.dark);
+        v = UniformDataUtils.colorToVector(mixedColors.dark);
         builder.putVec4(v.x, v.y, v.z, v.w);
     }
 
     @Override
     public boolean shouldUseBuffer(HudUniform lastBuffered) {
-        return lastBuffered instanceof BackgroundData data && colors.equals(data.colors);
+        if (lastBuffered instanceof BackgroundData data) {
+            float mixAlpha = (float) clientConfig.getHudBackgroundMixAlpha();
+            if (mixAlpha != this.mixAlpha) {
+                this.mixAlpha = mixAlpha;
+                mixedColors = ColorExtractor.mixBaseColorsWithAlpha(themedColors, 0xFF1A1A1A, mixAlpha);
+                return false;
+            } else {
+                return Objects.equals(mixedColors, data.mixedColors);
+            }
+        } else {
+            return false;
+        }
     }
 }

@@ -65,7 +65,6 @@ public class MainFragment extends Fragment {
     private Button skipCurrentButton;
     private TextView serverConnectStatus;
     private Button switchServerConnectButton;
-    private LinearLayout serverConnectPanel;
 
     public MainFragment() {
     }
@@ -130,7 +129,7 @@ public class MainFragment extends Fragment {
                 instance.skipCurrentButton.setVisibility(View.GONE);
             } else {
                 instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(200));
+                instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(240));
                 instance.titleText.setText(musicDetail.getName());
                 PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
                 String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().getName() : null;
@@ -270,6 +269,7 @@ public class MainFragment extends Fragment {
                 side.setOrientation(LinearLayout.VERTICAL);
                 base.addView(side, new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT));
 
+                //noinspection UnstableApiUsage
                 var sideScrollView = new ClampingScrollView(context);
                 side.addView(sideScrollView, new LinearLayout.LayoutParams(WRAP_CONTENT, 0, 1));
 
@@ -406,7 +406,7 @@ public class MainFragment extends Fragment {
                 sideScrollView.addView(sideContent, sideParams);
 
 
-                serverConnectPanel = new LinearLayout(context);
+                LinearLayout serverConnectPanel = new LinearLayout(context);
                 serverConnectPanel.setOrientation(LinearLayout.VERTICAL);
 
                 serverConnectStatus = new TextView(context);

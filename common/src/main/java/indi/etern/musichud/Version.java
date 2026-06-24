@@ -7,7 +7,7 @@ import org.jetbrains.annotations.NotNull;
 
 public record Version(long mayor, long minor, long patch, BuildType build) implements Comparable<Version>{
     public static final StreamCodec<? super RegistryFriendlyByteBuf, Version> PACKET_CODEC;
-    public static final Version current = new Version(1,2,12, BuildType.Alpha);
+    public static final Version current = new Version(1,2,12, BuildType.Stable);
     public static final Version leastCapable = new Version(1,2,2,BuildType.Stable);
 
     static {
@@ -109,7 +109,7 @@ public record Version(long mayor, long minor, long patch, BuildType build) imple
         }
     }
 
-    public static boolean capableWith(Version v) {
+    public static boolean compatibleWith(Version v) {
         int i = leastCapable.compareTo(v);
         return i <= 0;
     }

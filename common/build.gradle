@@ -34,7 +34,12 @@ dependencies {
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
-    compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.1-${rootProject.modernui_version}.+"
+
+//    implementation "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+    implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+
+    compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.1-$rootProject.modernui_version.+"
 }
 
 test {

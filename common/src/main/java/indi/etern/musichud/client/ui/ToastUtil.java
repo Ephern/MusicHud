@@ -18,11 +18,16 @@ public class ToastUtil {
         });
     }
 
-    public static void show(String message) {
+    public static void show(CharSequence message) {
         MuiModApi.postToUiThread(() -> {
             //noinspection UnstableApiUsage
             Context context = UIManager.getInstance().getDecorView().getContext();
-            Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+            if (lastToast != null) {
+                lastToast.cancel();
+            }
+            Toast toast = Toast.makeText(context, message, Toast.LENGTH_SHORT);
+            toast.show();
+            lastToast = toast;
         });
     }
 }
