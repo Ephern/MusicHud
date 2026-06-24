@@ -16,7 +16,6 @@ import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.text.style.ImageSpan;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.config.Keybinds;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.SneakyThrows;
