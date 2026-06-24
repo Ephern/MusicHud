@@ -20,7 +20,6 @@ import net.minecraft.client.resources.language.I18n;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-@Slf4j
 public class QRLoginView extends LinearLayout implements ILoginView{
     private final Button loginButton;
     private final UrlImageView urlImageView;

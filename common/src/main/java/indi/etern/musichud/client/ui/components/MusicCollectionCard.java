@@ -30,7 +30,6 @@ import java.util.function.Consumer;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-@Slf4j
 public class MusicCollectionCard extends LinearLayout {
     private final MusicService musicService = MusicService.getInstance();
     @Getter

@@ -17,7 +17,6 @@ import lombok.extern.slf4j.Slf4j;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-@Slf4j
 public class AccountBaseView extends LinearLayout {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     @Getter

@@ -44,7 +44,6 @@ import java.util.function.Consumer;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-@Slf4j
 public class ConfigView extends LinearLayout {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final ServerConfig serverConfig = ServerConfig.getInstance();

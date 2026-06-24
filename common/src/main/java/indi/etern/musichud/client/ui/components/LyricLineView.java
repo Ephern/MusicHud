@@ -25,7 +25,6 @@ import java.time.temporal.ChronoUnit;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-@Slf4j
 public class LyricLineView extends LinearLayout {
     private static final float LYRIC_EMPHASIZE_SCALE = 1.02f;
     private static final float RHYTHM_EMPHASIZE_ANIMATION_SCALE = 0.85f;
