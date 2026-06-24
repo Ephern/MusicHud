@@ -47,7 +47,7 @@ public class StreamAudioPlayer {
     private final int[] buffers = new int[BUFFER_COUNT];
     private final AtomicBoolean initialized = new AtomicBoolean(false);
     private final AtomicReference<Status> status = new AtomicReference<>(Status.IDLE);
-    private final BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(30); // 最大30个数据块的缓冲区
+    private volatile BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(30); // 最大30个数据块的缓冲区
     @Getter
     private final Set<Consumer<Status>> statusChangeListener = new HashSet<>();
     private final AtomicLong totalBufferedBytes = new AtomicLong(0);
@@ -204,6 +204,7 @@ public class StreamAudioPlayer {
     private void playAudioWithRetry(CompletableFuture<ZonedDateTime> startPlayingFuture, ZonedDateTime serverStartTime) {
         CompletableFuture<?> currentPlayingFuture = playingFuture;
         CompletableFuture<?> currentDownloadFuture = downloadFuture;
+        BlockingQueue<byte[]> playBuffer = audioBuffer;
         boolean finished = false;
         try {
             // 等待一些数据缓冲
@@ -222,7 +223,7 @@ public class StreamAudioPlayer {
                         finished = true;
                     } else {// 从缓冲区填充初始数据
                         for (int i = 0; i < BUFFER_COUNT; i++) {
-                            byte[] audioData = audioBuffer.poll(0, TimeUnit.SECONDS);
+                            byte[] audioData = playBuffer.poll(0, TimeUnit.SECONDS);
                             if (audioData == null) break;
 
                             ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
@@ -267,10 +268,10 @@ public class StreamAudioPlayer {
                                     //noinspection SpellCheckingInspection
                                     checkALError("alSourceUnqueueBuffers-Main");
 
-                                    byte[] audioData = audioBuffer.poll(0, TimeUnit.MILLISECONDS);
+                                    byte[] audioData = playBuffer.poll(0, TimeUnit.MILLISECONDS);
 
                                     if (audioData == null) {
-                                        if (audioBuffer.isEmpty() && NowPlayingInfo.getInstance().isCompleted()) {
+                                        if (playBuffer.isEmpty() && NowPlayingInfo.getInstance().isCompleted()) {
                                             // 播放已完成且缓冲区为空，结束播放
                                             LOGGER.debug("No more audio data available");
                                             currentPlayingFuture.complete(null);
@@ -347,6 +348,7 @@ public class StreamAudioPlayer {
     private void downloadAudioWithRetry(boolean forceSync, CompletableFuture<Void> downloadInitializedFuture) {
         CompletableFuture<?> currentPlayingFuture = playingFuture;
         CompletableFuture<?> currentDownloadFuture = downloadFuture;
+        BlockingQueue<byte[]> localAudioBuffer = audioBuffer;
 
         int localRetryCount = 0;
         boolean forceSyncInternal = forceSync;
@@ -382,14 +384,14 @@ public class StreamAudioPlayer {
                     if (audioData == null) break;
                     if (currentDownloadFuture.isDone() || currentDownloadFuture != downloadFuture) break;
 
-                    audioBuffer.put(audioData);
+                    localAudioBuffer.put(audioData);
                     totalBufferedBytes.addAndGet(audioData.length);
                     initialBuffers++;
                 }
 
                 // 继续下载剩余数据
                 while (!currentDownloadFuture.isDone() && currentDownloadFuture == downloadFuture) {
-                    if (audioBuffer.size() <= 1) {
+                    if (localAudioBuffer.size() <= 1) {
                         syncPlaying(currentDownloadFuture);
                     }
 
@@ -398,7 +400,7 @@ public class StreamAudioPlayer {
 
                     if (currentPlayingFuture.isDone() || currentDownloadFuture != downloadFuture) break;
 
-                    audioBuffer.put(audioData);
+                    localAudioBuffer.put(audioData);
                     playedBytes += audioData.length;
                     totalBufferedBytes.addAndGet(audioData.length);
                 }
@@ -620,7 +622,7 @@ public class StreamAudioPlayer {
 
                 initialized.set(false);
                 lastVolume = 1;
-                audioBuffer.clear();
+                audioBuffer = new LinkedBlockingQueue<>(30);
                 totalBufferedBytes.set(0);
                 playedBytes = 0;
                 serverStartTime = null;

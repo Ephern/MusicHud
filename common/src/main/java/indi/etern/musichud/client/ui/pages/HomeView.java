@@ -40,7 +40,6 @@ import java.util.function.Consumer;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-@Slf4j
 public class HomeView extends LinearLayout {
     @Getter
     private static HomeView instance;

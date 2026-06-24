@@ -25,7 +25,6 @@ import java.util.concurrent.CompletableFuture;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-@Slf4j
 public class SearchResultTabPage extends FrameLayout {
     @Getter
     private final ViewPager pager;
