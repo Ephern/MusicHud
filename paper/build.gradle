@@ -79,6 +79,10 @@ dependencies {
     compileOnly "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     compileOnly "org.jflac:jflac-codec:$rootProject.jflac_version"
 
+//    compileOnly "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+    compileOnly "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    compileOnly "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+
     shadowBundle(project(':common')) { transitive = false }
 
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
