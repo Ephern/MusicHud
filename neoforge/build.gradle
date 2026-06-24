@@ -114,6 +114,14 @@ dependencies {
     testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+//    implementation "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+//    shadowBundle "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
+    implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    shadowBundle "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+
+    implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+    shadowBundle "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
 }
 
 java {

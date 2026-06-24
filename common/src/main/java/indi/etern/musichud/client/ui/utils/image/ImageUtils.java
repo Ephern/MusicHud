@@ -3,9 +3,19 @@ package indi.etern.musichud.client.ui.utils.image;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
-import icyllis.arc3d.core.ColorSpace;
+import icyllis.arc3d.core.ColorSpaces;
+import icyllis.modernui.annotation.NonNull;
+import icyllis.modernui.annotation.Nullable;
+import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
+import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.graphics.text.FontMetricsInt;
+import icyllis.modernui.mc.UIManager;
+import icyllis.modernui.text.TextPaint;
+import icyllis.modernui.text.style.ImageSpan;
+import indi.etern.musichud.MusicHud;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.SneakyThrows;
@@ -20,8 +30,11 @@ import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.Function;
 
 import static indi.etern.musichud.MusicHud.getLogger;
 
@@ -34,12 +47,13 @@ public class ImageUtils {
             .expireAfterAccess(20, TimeUnit.MINUTES)
             .maximumSize(64)
             .build();
-    private static final ConcurrentHashMap<String, CompletableFuture<ImageTextureData>> pendingDownloads =
+    private static final ConcurrentHashMap<PendingKey, CompletableFuture<?>> pendingDownloads =
             new ConcurrentHashMap<>();
     // 使用虚拟线程的 ExecutorService
     private static ExecutorService downloadExecutor;
     private static Semaphore downloadSemaphore;
     private static int maxConcurrentDownloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS;
+    private static final Map<String, Image> cachedIconImageMap = new HashMap<>();
 
     static {
         initializeVirtualThreadExecutor();
@@ -107,47 +121,72 @@ public class ImageUtils {
      * 异步下载图片
      */
     public static CompletableFuture<ImageTextureData> downloadAsync(String url) {
-        // 检查缓存
         ImageTextureData cached = cachedTexturesData.getIfPresent(url);
         if (cached != null) {
             LOGGER.debug("Cache hit for URL: {}", url);
             return CompletableFuture.completedFuture(cached);
         }
+        return downloadAsync(url, inputStream -> {
+            var opts = new BitmapFactory.Options();
+            opts.inPreferredFormat = Bitmap.Format.RGBA_8888;
 
-        // 检查是否已有正在进行的下载
-        return pendingDownloads.computeIfAbsent(url, k ->
-                CompletableFuture.supplyAsync(() -> {
-                    try {
-                        downloadSemaphore.acquire();
-                        try {
-                            LOGGER.debug("Starting download for URL: {} (active: {}, queued: {})",
-                                    url, getActiveDownloads(), getQueuedDownloads());
+            try (Bitmap source = BitmapFactory.decodeStream(inputStream, opts)) {
+                return getImageTextureData(url, source);
+            } catch (IOException e) {
+                throw new RuntimeException(e);
+            }
+        }, true);
+    }
 
-                            ImageTextureData imageTextureData = downloadImage(url);
-                            cachedTexturesData.put(url, imageTextureData);
-                            LOGGER.debug("Successfully downloaded and cached: {}", url);
-                            return imageTextureData;
-                        } finally {
-                            downloadSemaphore.release();
-                        }
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new CompletionException("Download interrupted", e);
-                    } catch (Exception e) {
-                        LOGGER.error("Failed to download image from {} : {}", url, e.getMessage());
-                        throw new CompletionException(e);
-                    }
-                }, downloadExecutor).whenComplete((result, ex) -> {
-                    // 下载完成后从 pending 中移除
-                    pendingDownloads.remove(url);
-                })
-        );
+    /**
+     * 异步下载图片
+     *
+     * @param url             图片URL
+     * @param streamProcessor 输入流处理器
+     */
+    public static <R> CompletableFuture<R> downloadAsync(String url, Function<InputStream, R> streamProcessor, boolean computable) {
+        if (computable) {
+            PendingKey key = new PendingKey(url, streamProcessor);
+            //noinspection unchecked
+            return (CompletableFuture<R>) pendingDownloads.computeIfAbsent(key, k ->
+                    downloadAsyncInternal(url, streamProcessor).whenComplete((result, ex) -> {
+                        // 下载完成后从 pending 中移除
+                        pendingDownloads.remove(key);
+                    })
+            );
+        } else {
+            return downloadAsyncInternal(url, streamProcessor);
+        }
+    }
+
+    private static <R> @NotNull CompletableFuture<R> downloadAsyncInternal(String url, Function<InputStream, R> streamProcessor) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                downloadSemaphore.acquire();
+                try {
+                    LOGGER.debug("Starting download for URL: {} (active: {}, queued: {})",
+                            url, getActiveDownloads(), getQueuedDownloads());
+
+                    R r = downloadImage(url, streamProcessor);
+                    LOGGER.debug("Successfully downloaded: {}", url);
+                    return r;
+                } finally {
+                    downloadSemaphore.release();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new CompletionException("Download interrupted", e);
+            } catch (Exception e) {
+                LOGGER.error("Failed to download image from {} : {}", url, e.getMessage());
+                throw new CompletionException(e);
+            }
+        }, downloadExecutor);
     }
 
     /**
      * 同步下载图片(阻塞当前线程)
      */
-    private static ImageTextureData downloadImage(String url) throws IOException {
+    private static <R> R downloadImage(String url, Function<InputStream, R> streamProcessor) throws IOException {
         HttpURLConnection connection = null;
         try {
             URL imageUrl = URI.create(url).toURL();
@@ -155,7 +194,6 @@ public class ImageUtils {
             connection.setRequestMethod("GET");
             connection.setConnectTimeout(10000);
             connection.setReadTimeout(10000);
-            connection.setRequestProperty("User-Agent", "ModernUI-MC/ImageUtils");
 
             int responseCode = connection.getResponseCode();
             if (responseCode != HttpURLConnection.HTTP_OK) {
@@ -166,12 +204,7 @@ public class ImageUtils {
             LOGGER.debug("Downloading bitmap from {}, Content-Type: {}", url, contentType);
 
             try (InputStream stream = connection.getInputStream()) {
-                var opts = new BitmapFactory.Options();
-                opts.inPreferredFormat = Bitmap.Format.RGBA_8888;
-
-                try (Bitmap source = BitmapFactory.decodeStream(stream, opts)){
-                    return getImageTextureData(url, source);
-                }
+                return streamProcessor.apply(stream);
             }
         } finally {
             if (connection != null) {
@@ -185,7 +218,6 @@ public class ImageUtils {
         int height = bitmap.getHeight();
         NativeImage nativeImage = new NativeImage(width, height, false);
 
-        //noinspection UnstableApiUsage
         try (Bitmap wrap = Bitmap.wrap(
                 nativeImage.getPointer(),
                 width * 4,
@@ -194,8 +226,8 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpace.get(ColorSpace.Named.SRGB)
-        )){
+                ColorSpaces.SRGB)
+        ) {
             wrap.setPixels(bitmap, 0, 0, 0, 0, width, height);
         }
         return nativeImage;
@@ -205,7 +237,6 @@ public class ImageUtils {
         int width = nativeImage.getWidth();
         int height = nativeImage.getHeight();
 
-        //noinspection UnstableApiUsage
         return Bitmap.wrap(nativeImage.getPointer(),
                 width * 4,
                 null,
@@ -213,7 +244,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpace.get(ColorSpace.Named.SRGB));
+                ColorSpaces.SRGB);
     }
 
     @SuppressWarnings("unused")
@@ -248,7 +279,7 @@ public class ImageUtils {
     public static ImageTextureData loadBase64(String data) {
         String base64Data = data.split(",")[1];
         byte[] imageBytes = Base64.getDecoder().decode(base64Data);
-        try (Bitmap source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length)){
+        try (Bitmap source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length)) {
             return getImageTextureData(data, source);
         }
     }
@@ -261,5 +292,50 @@ public class ImageUtils {
             texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), convertBitmapToNativeImage(source)));
         }).join();
         return new ImageTextureData(data, texture.get());
+    }
+
+    public static @NotNull ImageSpan getIconSpan(Image image) {
+        //noinspection UnstableApiUsage
+        Context context = UIManager.getInstance().getDecorView().getContext();
+        return new ImageSpan(context, image) {
+            @Override
+            public int getSize(@NonNull TextPaint paint, CharSequence text,
+                               int start, int end, @Nullable FontMetricsInt fm) {
+                Drawable d = getDrawable();
+                int origW = d.getIntrinsicWidth();
+                int origH = d.getIntrinsicHeight();
+                if (origW <= 0 || origH <= 0) return 0;
+
+                FontMetricsInt pFm = paint.getFontMetricsInt();
+                int textHeight = -pFm.ascent;
+
+                int newWidth = Math.round((float) textHeight * origW / origH);
+
+                d.setBounds(0, 0, newWidth, textHeight);
+
+                if (fm != null) {
+                    fm.ascent = -textHeight;
+                    fm.descent = 0;
+                }
+                return newWidth;
+            }
+        };
+    }
+
+    public static @Nullable Image getImageFromResource(String resourceName) {
+        return cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
+            try (InputStream iconResourceStream = MusicHud.class.getResourceAsStream(s)) {
+                if (iconResourceStream != null) {
+                    return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                } else {
+                    return null;
+                }
+            } catch (Exception ignored) {
+                return null;
+            }
+        });
+    }
+
+    record PendingKey(String url, Function<InputStream, ?> consumer) {
     }
 }

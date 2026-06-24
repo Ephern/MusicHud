@@ -12,8 +12,4 @@ public class ThemedColors {
         this.bright = bright;
         this.dark = dark;
     }
-
-    public static ThemedColors solid(int color) {
-        return new ThemedColors(color, color, color, color);
-    }
 }

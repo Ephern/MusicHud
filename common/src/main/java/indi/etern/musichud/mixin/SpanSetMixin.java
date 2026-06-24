@@ -3,11 +3,13 @@ package indi.etern.musichud.mixin;
 import icyllis.modernui.text.SpanSet;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Overwrite;
+import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Shadow;
 
 import java.util.Arrays;
 
 @SuppressWarnings("UnstableApiUsage")
+@Pseudo
 @Mixin(value = SpanSet.class, remap = false)
 public abstract class SpanSetMixin {
 

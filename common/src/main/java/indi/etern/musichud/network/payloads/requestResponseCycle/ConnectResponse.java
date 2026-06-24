@@ -59,7 +59,7 @@ public record ConnectResponse(boolean accepted, Version serverVersion,
                     if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                         LOGGER.info("Connecting {}", payload.accepted() ? "accepted" : "denied");
                         if (payload.accepted()) {
-                            if (Version.capableWith(payload.serverVersion)) {
+                            if (Version.compatibleWith(payload.serverVersion)) {
                                 MusicService.resetCurrentMusicStatus();
                                 NowPlayingInfo.getInstance().stop();
                                 StreamAudioPlayer.getInstance().stop();

@@ -41,8 +41,8 @@ public record ConnectRequest(Version clientVersion) implements C2SPayload {
                     ConnectRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((startQRLoginRequest, player) -> {
                         ILoginApiService instance = ILoginApiService.getInstance(ApiProvider.NCM);
-                        boolean compatible = Version.capableWith(startQRLoginRequest.clientVersion());
-                        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && clientConfig != null && !clientConfig.getEnabledInIntegratedServer()) {
+                        boolean compatible = Version.compatibleWith(startQRLoginRequest.clientVersion());
+                        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && !clientConfig.getEnabledInIntegratedServer()) {
                             if (compatible) {
                                 instance.joinUnlogged(player);
                             }

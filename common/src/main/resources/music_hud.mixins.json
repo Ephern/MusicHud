@@ -3,10 +3,12 @@
   "minVersion": "0.8",
   "package": "indi.etern.musichud.mixin",
   "compatibilityLevel": "JAVA_21",
+  "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
     "MixinGuiRendererHud",
     "SoundEngineMixin",
-    "SpanSetMixin"
+    "SpanSetMixin",
+    "ReactiveMusicCompatMixin"
   ],
   "injectors": {
     "defaultRequire": 1

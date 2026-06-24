@@ -76,7 +76,7 @@ public class ConfigView extends LinearLayout {
 
             var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
             PreferencesFragment.BooleanOption booleanOption = new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.enable"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enable"),
                     clientConfig::getEnable,
                     clientConfig::setEnable);
             booleanOption.create(commonCategory);
@@ -89,7 +89,7 @@ public class ConfigView extends LinearLayout {
                 }
             });
             PreferencesFragment.BooleanOption translatedLyricOption = new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.showTranslatedCnLyrics"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics"),
                     clientConfig::getShowTranslatedCnLyrics,
                     clientConfig::setShowTranslatedCnLyrics);
             translatedLyricOption.create(commonCategory);
@@ -105,24 +105,45 @@ public class ConfigView extends LinearLayout {
                 }
             });
             new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.disableVanillaMusicWhilePlaying"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying"),
                     clientConfig::getDisableVanillaMusic,
                     clientConfig::setDisableVanillaMusic)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.enableHud"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enableHud"),
                     clientConfig::getEnableHud,
                     clientConfig::setEnableHud)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.enableMarqueeText"),
+                    I18n.get(MusicHud.MOD_ID + ".config.common.autoHide"),
+                    clientConfig::getHideHudWhenNotPlaying,
+                    clientConfig::setHideHudWhenNotPlaying)
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enableMarqueeText"),
                     clientConfig::getEnableMarqueeText,
                     clientConfig::setEnableMarqueeText)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.switch.autoHide"),
-                    clientConfig::getHideHudWhenNotPlaying,
-                    clientConfig::setHideHudWhenNotPlaying)
+                    I18n.get(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume"),
+                    clientConfig::getMixWithVanillaSoundVolume,
+                    clientConfig::setMixWithVanillaSoundVolume)
+                    .create(commonCategory);
+            new PreferencesFragment.IntegerOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.soundVolume"),
+                    clientConfig::getSoundVolume,
+                    clientConfig::setSoundVolume)
+                    .setRange(0, 100)
+                    .setDefaultValue(100)
+                    .create(commonCategory);
+            new PreferencesFragment.IntegerOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.soundVolumeInterval"),
+                    clientConfig::getSoundVolumeInterval,
+                    clientConfig::setSoundVolumeInterval)
+                    .setRange(1, 100)
+                    .setDefaultValue(10)
                     .create(commonCategory);
             Quality[] qualities = {Quality.STANDARD, Quality.EX_HIGH, Quality.LOSSLESS, Quality.HIRES, Quality.JY_EFFECT, Quality.DOLBY, Quality.JY_MASTER, Quality.SKY};
             List<Quality> qualitiesList = Arrays.stream(qualities).toList();
@@ -146,7 +167,16 @@ public class ConfigView extends LinearLayout {
                     })
                     .setDefaultValue(0.5)
                     .create(commonCategory);
+            new PreferencesFragment.FloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha"),
+                    clientConfig::getHudBackgroundMixAlpha,
+                    clientConfig::setHudBackgroundMixAlpha)
+                    .setRange(0, 1)
+                    .setDefaultValue(0.5)
+                    .create(commonCategory);
             view.addView(commonCategory);
+
             var positionCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.layout"));
             new PreferencesFragment.DropDownOption<>(
                     context,
@@ -183,7 +213,7 @@ public class ConfigView extends LinearLayout {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                     })
-                    .setRange(0, 1920)
+                    .setRange(-1920, 1920)
                     .setDefaultValue(16)
                     .create(positionCategory);
             new PreferencesFragment.IntegerOption(
@@ -191,7 +221,7 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.layout.offsetY"),
                     clientConfig::getHudOffsetY,
                     clientConfig::setHudOffsetY)
-                    .setRange(0, 1920)
+                    .setRange(-1920, 1920)
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
