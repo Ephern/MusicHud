@@ -22,6 +22,7 @@ import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
+import org.lwjgl.openal.ALC10;
 import org.lwjgl.openal.SOFTSourceResampler;
 
 import java.io.BufferedInputStream;
@@ -94,6 +95,52 @@ public class StreamAudioPlayer {
             }
         }
     }
+
+    private static int getDeviceSampleRate() {
+        try {
+            long device = ALC10.alcGetContextsDevice(ALC10.alcGetCurrentContext());
+            if (device == 0) return 0;
+            return ALC10.alcGetInteger(device, ALC10.ALC_FREQUENCY);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to query OpenAL device sample rate: {}", e.toString());
+            return 0;
+        }
+    }
+
+    private static int getChannelCount(int alFormat) {
+        return switch (alFormat) {
+            case AL10.AL_FORMAT_MONO8, AL10.AL_FORMAT_MONO16 -> 1;
+            default -> 2; // STEREO8, STEREO16, or fallback
+        };
+    }
+
+    private void setupResampler(AudioDecoder decoder) {
+        int deviceRate = getDeviceSampleRate();
+        int sourceRate = decoder.getSampleRate();
+        currentEffectiveSampleRate = deviceRate > 0 ? deviceRate : sourceRate;
+        if (deviceRate > 0 && deviceRate != sourceRate) {
+            int channels = getChannelCount(decoder.getFormat());
+            currentResampler = new AudioResampler(sourceRate, deviceRate, channels);
+            LOGGER.debug("Software resampling enabled: {} Hz -> {} Hz ({}ch)",
+                    sourceRate, deviceRate, channels);
+        }
+    }
+
+    private byte[] resampleIfNeeded(byte[] rawData) {
+        if (currentResampler == null) return rawData;
+        return currentResampler.process(rawData);
+    }
+
+    private void flushResampler(BlockingQueue<byte[]> buffer) {
+        if (currentResampler == null) return;
+        byte[] tail = currentResampler.flush();
+        if (tail.length > 0) {
+            buffer.offer(tail);
+            totalBufferedBytes.addAndGet(tail.length);
+        }
+        currentResampler = null;
+    }
+
     private static volatile StreamAudioPlayer instance = null;
     private final int[] buffers = new int[BUFFER_COUNT];
     private final AtomicBoolean initialized = new AtomicBoolean(false);
@@ -108,6 +155,8 @@ public class StreamAudioPlayer {
     private volatile CompletableFuture<?> downloadFuture;
     private MusicDetail currentMusicDetail;
     private AudioDecoder currentDecoder;
+    private AudioResampler currentResampler;
+    private int currentEffectiveSampleRate;
     private long playedBytes = 0;
     //    private boolean isBuffering = false;
     private volatile ZonedDateTime serverStartTime;
@@ -287,7 +336,8 @@ public class StreamAudioPlayer {
                             directBuffer.flip();
 
                             int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-                            int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
+                            int sampleRate = currentEffectiveSampleRate > 0 ? currentEffectiveSampleRate :
+                                    (currentDecoder != null ? currentDecoder.getSampleRate() : 44100);
 
                             AL10.alBufferData(buffers[i], format, directBuffer, sampleRate);
                             checkALError("alBufferData-Pre");
@@ -350,7 +400,8 @@ public class StreamAudioPlayer {
                                     directBuffer.flip();
 
                                     int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-                                    int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
+                                    int sampleRate = currentEffectiveSampleRate > 0 ? currentEffectiveSampleRate :
+                                            (currentDecoder != null ? currentDecoder.getSampleRate() : 44100);
 
                                     AL10.alBufferData(buffer[0], format, directBuffer, sampleRate);
                                     checkALError("alBufferData-Main");
@@ -423,6 +474,7 @@ public class StreamAudioPlayer {
 
                 AudioDecoder decoder = loadAudioDecoder(musicResourceInfo.getUrl(), musicResourceInfo.getType());
                 currentDecoder = decoder;
+                setupResampler(decoder);
                 downloadInitializedFuture.complete(null);
 
                 if (status.get() != Status.ERROR && status.get() != Status.RETRYING) {
@@ -436,9 +488,12 @@ public class StreamAudioPlayer {
                 // 先填充一些数据到缓冲区
                 int initialBuffers = 0;
                 while (!currentDownloadFuture.isDone() && currentDownloadFuture == downloadFuture && initialBuffers < BUFFER_COUNT * 2) {
-                    byte[] audioData = decoder.readChunk(BUFFER_SIZE);
-                    if (audioData == null) break;
+                    byte[] rawData = decoder.readChunk(BUFFER_SIZE);
+                    if (rawData == null) break;
                     if (currentDownloadFuture.isDone() || currentDownloadFuture != downloadFuture) break;
+
+                    byte[] audioData = resampleIfNeeded(rawData);
+                    if (audioData.length == 0) continue;
 
                     localAudioBuffer.put(audioData);
                     totalBufferedBytes.addAndGet(audioData.length);
@@ -451,15 +506,21 @@ public class StreamAudioPlayer {
                         syncPlaying(currentDownloadFuture);
                     }
 
-                    byte[] audioData = decoder.readChunk(BUFFER_SIZE);
-                    if (audioData == null) break;
+                    byte[] rawData = decoder.readChunk(BUFFER_SIZE);
+                    if (rawData == null) break;
 
                     if (currentPlayingFuture.isDone() || currentDownloadFuture != downloadFuture) break;
 
+                    byte[] audioData = resampleIfNeeded(rawData);
+                    playedBytes += rawData.length;
+                    if (audioData.length == 0) continue;
+
                     localAudioBuffer.put(audioData);
-                    playedBytes += audioData.length;
                     totalBufferedBytes.addAndGet(audioData.length);
                 }
+
+                // flush remaining resampled data
+                flushResampler(localAudioBuffer);
 
                 // 下载完成
                 LOGGER.debug("Audio download completed");
@@ -688,6 +749,8 @@ public class StreamAudioPlayer {
                     } catch (Exception ignored) {
                     }
                     currentDecoder = null;
+                    currentResampler = null;
+                    currentEffectiveSampleRate = 0;
                 }
                 LOGGER.debug("Cleanup completed");
             } catch (Exception e) {
