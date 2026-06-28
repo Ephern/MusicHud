@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.utils;
 
-import icyllis.modernui.graphics.MathUtil;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import org.jetbrains.annotations.Nullable;
@@ -109,10 +108,10 @@ public class UniformDataUtils {
         float x4 = pose.m00 * right + pose.m10 * bottom + pose.m20;
         float y4 = pose.m01 * right + pose.m11 * bottom + pose.m21;
 
-        int L = (int) Math.floor(MathUtil.min(x1, x2, x3, x4));
-        int T = (int) Math.floor(MathUtil.min(y1, y2, y3, y4));
-        int R = (int) Math.ceil(MathUtil.max(x1, x2, x3, x4));
-        int B = (int) Math.ceil(MathUtil.max(y1, y2, y3, y4));
+        int L = (int) Math.floor(Math.min(Math.min(x1, x2), Math.min(x3, x4)));
+        int T = (int) Math.floor(Math.min(Math.min(y1, y2), Math.min(y3, y4)));
+        int R = (int) Math.ceil(Math.max(Math.max(x1, x2), Math.max(x3, x4)));
+        int B = (int) Math.ceil(Math.max(Math.max(y1, y2), Math.max(y3, y4)));
 
         if (L >= R || T >= B) return null;
         return new ScreenRectangle(L, T, R - L, B - T);

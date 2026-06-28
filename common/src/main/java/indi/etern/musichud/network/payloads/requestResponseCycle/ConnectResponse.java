@@ -1,13 +1,12 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
-import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
-import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -82,7 +81,7 @@ public record ConnectResponse(boolean accepted, Version serverVersion,
                         LOGGER.info("Disconnected");
                         LoginService.getInstance().disconnectToExternalOrIntegratedServer();
                     }
-                    MuiModApi.postToUiThread(MainFragment::refresh);
+                    MusicHudScreen.refresh();
                 };
             }
             INetworkRegister.getInstance().autoRegisterPayload(

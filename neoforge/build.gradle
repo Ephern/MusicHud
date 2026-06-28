@@ -81,27 +81,6 @@ dependencies {
 
     compileOnly "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
 
-    implementation("icyllis.modernui:ModernUI-NeoForge:26.1.2-${rootProject.modernui_version}.+")
-    implementation("dev.icyllis:modernui-core:$rootProject.modernui_version") {
-        exclude group: "org.slf4j", module: "slf4j-api"
-        exclude group: "org.apache.logging.log4j", module: "log4j-core"
-        exclude group: "org.apache.logging.log4j", module: "log4j-api"
-        exclude group: "com.google.code.findbugs", module: "jsr305"
-        exclude group: "org.jetbrains", module: "annotations"
-        exclude group: "com.ibm.icu", module: "icu4j"
-        exclude group: "it.unimi.dsi", module: "fastutil"
-    }
-    implementation("icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version") {
-        exclude group: "org.slf4j", module: "slf4j-api"
-        exclude group: "org.apache.logging.log4j", module: "log4j-core"
-        exclude group: "org.apache.logging.log4j", module: "log4j-api"
-        exclude group: "com.google.code.findbugs", module: "jsr305"
-        exclude group: "org.jetbrains", module: "annotations"
-        exclude group: "com.ibm.icu", module: "icu4j"
-        exclude group: "it.unimi.dsi", module: "fastutil"
-        exclude group: "org.commonmark"
-    }
-
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"
 

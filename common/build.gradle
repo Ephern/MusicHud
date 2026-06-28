@@ -64,17 +64,26 @@ dependencies {
 
     api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
 
-    api "dev.icyllis:modernui-core:$rootProject.modernui_version"
-    api "icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version"
-
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
 
 //    implementation "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
     implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
     implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+}
 
-    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.1.2-${rootProject.modernui_version}.+"
+sourceSets {
+    main {
+        java {
+            exclude 'indi/etern/musichud/client/ui/components/**'
+            exclude 'indi/etern/musichud/client/ui/pages/**'
+            exclude 'indi/etern/musichud/client/ui/screen/MainFragment.java'
+            exclude 'indi/etern/musichud/client/ui/utils/ButtonInsetBackgroundFactory.java'
+            exclude 'indi/etern/musichud/client/ui/utils/EasingInterpolator.java'
+            exclude 'indi/etern/musichud/client/ui/utils/SpringInterpolator.java'
+            exclude 'indi/etern/musichud/mixin/SpanSetMixin.java'
+        }
+    }
 }
 
 java {

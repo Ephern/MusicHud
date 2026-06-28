@@ -71,9 +71,6 @@ dependencies {
 
     compileOnly "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
 
-    compileOnly "icyllis.modernui:ModernUI-Fabric:26.1.2-${rootProject.modernui_version}.+"
-    compileOnly "dev.icyllis:modernui-core:$rootProject.modernui_version"
-
     compileOnly "javax.annotation:javax.annotation-api:1.3.2"
 
     compileOnly "com.github.umjammer:jlayer:$rootProject.jlayer_version"

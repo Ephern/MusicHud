@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.audio;
 
-import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.LyricInfo;
@@ -8,7 +7,6 @@ import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.lyrics.FullLineLyricParser;
 import indi.etern.musichud.client.ui.utils.lyrics.WordByWordLyricParser;
@@ -280,10 +278,6 @@ public class NowPlayingInfo {
         } else {
             this.lyricLines = null;
             this.atomicLyricLines.set(null);
-        }
-        try {
-            MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, idleNextToPlay, this.lyricLines));
-        } catch (IllegalStateException ignored) {
         }
         HudRendererManager.getInstance().switchMusic(musicDetail);
         List.copyOf(musicSwitchListener).forEach(consumer -> {

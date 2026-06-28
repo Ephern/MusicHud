@@ -1,221 +1,115 @@
 package indi.etern.musichud.client.ui.screen;
 
-/*
- * Modified from Modern UI
- */
-
-/*
- * Modern UI.
- * Copyright (C) 2019-2023 BloCamLimb. All rights reserved.
- *
- * Modern UI is free software; you can redistribute it and/or
- * modify it under the terms of the GNU Lesser General Public
- * License as published by the Free Software Foundation; either
- * version 3 of the License, or (at your option) any later version.
- *
- * Modern UI is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
- * GNU Lesser General Public License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public
- * License along with Modern UI. If not, see <https://www.gnu.org/licenses/>.
- */
-
-import icyllis.modernui.fragment.Fragment;
-import icyllis.modernui.graphics.Color;
-import icyllis.modernui.mc.*;
+import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.services.LoginService;
+import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.interfaces.ClientConfig;
-import lombok.Getter;
-import lombok.NonNull;
-import lombok.Setter;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.network.chat.CommonComponents;
+import net.minecraft.client.resources.language.I18n;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Objects;
-
-/**
- * Represents the GUI screen that receives events from Minecraft.
- * All vanilla methods are completely taken over by Modern UI.
- */
-@SuppressWarnings("UnstableApiUsage")
-public class MusicHudScreen extends Screen implements MuiScreen {
-    private final UIManager mHost;
+public class MusicHudScreen extends Screen {
+    private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
     @Nullable
-    private final Screen mPrevious;
-    private final Fragment mFragment;
-    @Nullable
-    private final ScreenCallback mCallback;
+    private final Screen previous;
 
-    private final static int FADE_IN_DURATION_MILLIS = 200;
-    @Getter
-    @Setter
-    private static double darken = ClientConfig.getInstance().getMainScreenAdditionalBackgroundDarken();
-
-    MusicHudScreen(UIManager host, Fragment fragment,
-                   @Nullable ScreenCallback callback, @Nullable Screen previous,
-                   @Nullable CharSequence title) {
-        super(title == null || title.isEmpty()
-                ? CommonComponents.EMPTY
-                : Component.literal(title.toString()));
-        mHost = host;
-        mPrevious = previous;
-        mFragment = Objects.requireNonNull(fragment);
-        mCallback = callback != null ? callback :
-                fragment instanceof ScreenCallback cbk ? cbk : null;
+    public MusicHudScreen(@Nullable Screen previous) {
+        super(Component.literal("Music HUD"));
+        this.previous = previous;
     }
 
-    /*@Override
-    public void init(@Nonnull Minecraft minecraft, int width, int height) {
-        this.minecraft = minecraft;
-        this.width = width;
-        this.height = height;
-    }*/
+    public static MusicHudScreen createScreen(@Nullable Screen previousScreen) {
+        return new MusicHudScreen(previousScreen);
+    }
 
-    public static MusicHudScreen createScreen(@NonNull Fragment fragment,
-                                              @Nullable ScreenCallback callback,
-                                              @Nullable Screen previousScreen,
-                                              @Nullable CharSequence title) {
-        return new MusicHudScreen(UIManager.getInstance(),
-                fragment, callback, previousScreen, title);
+    public static void refresh() {
+        Minecraft minecraft = Minecraft.getInstance();
+        minecraft.submit(() -> {
+            if (minecraft.screen instanceof MusicHudScreen screen) {
+                screen.rebuildWidgets();
+            }
+        });
     }
 
     @Override
     protected void init() {
-        super.init();
-        mHost.initScreen(this);
+        rebuildWidgets();
+    }
+
+    private void rebuildWidgets() {
+        clearWidgets();
+        int centerX = width / 2;
+        int y = height / 2 + 10;
+        addRenderableWidget(Button.builder(Component.translatable(MusicHud.MOD_ID + ".button.voteForSkip"), button ->
+                MusicHud.EXECUTOR.execute(() -> MusicService.getInstance().keyBindsVoteSkipCurrent())
+        ).bounds(centerX - 102, y, 100, 20).build());
+        addRenderableWidget(Button.builder(Component.literal(CLIENT_CONFIG.getEnableHud() ? "Hide HUD" : "Show HUD"), button -> {
+            MusicHud.EXECUTOR.execute(() -> {
+                CLIENT_CONFIG.setEnableHud(!CLIENT_CONFIG.getEnableHud());
+                CLIENT_CONFIG.save();
+                refresh();
+            });
+        }).bounds(centerX + 2, y, 100, 20).build());
+
+        y += 24;
+        addRenderableWidget(Button.builder(Component.literal(CLIENT_CONFIG.getMuted() ? "Unmute" : "Mute"), button -> {
+            MusicHud.EXECUTOR.execute(() -> {
+                CLIENT_CONFIG.setMuted(!CLIENT_CONFIG.getMuted());
+                CLIENT_CONFIG.save();
+                refresh();
+            });
+        }).bounds(centerX - 102, y, 100, 20).build());
+        addRenderableWidget(Button.builder(Component.literal("Toggle Connection"), button ->
+                MusicHud.EXECUTOR.execute(LoginService.getInstance()::keyBindsToggleConnection)
+        ).bounds(centerX + 2, y, 100, 20).build());
+
+        y += 24;
+        addRenderableWidget(Button.builder(Component.translatable("gui.done"), button -> onClose())
+                .bounds(centerX - 50, y, 100, 20).build());
     }
 
     @Override
-    public void extractBackground(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
-        ScreenCallback callback = getCallback();
-        if (callback == null || callback.hasDefaultBackground()) {
-            if (minecraft.level == null) {
-                super.extractBackground(gr, mouseX, mouseY, deltaTick);
-            } else {
-                BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
-            }
-            float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
-            gr.fill(0, 0, this.width, this.height, Color.argb((int) (progress * darken * 255), 0, 0, 0));//additional darken
-        }
+    public void extractBackground(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float deltaTick) {
+        super.extractBackground(graphics, mouseX, mouseY, deltaTick);
+        graphics.fill(0, 0, width, height, 0x99000000);
     }
 
     @Override
-    public void extractRenderState(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
-        mHost.render(gr, mouseX, mouseY, deltaTick);
-        super.extractRenderState(gr, mouseX, mouseY, deltaTick);
+    public void extractRenderState(GuiGraphicsExtractor graphics, int mouseX, int mouseY, float deltaTick) {
+        super.extractRenderState(graphics, mouseX, mouseY, deltaTick);
+        int centerX = width / 2;
+        int y = height / 2 - 70;
+        graphics.text(font, title, centerX - font.width(title) / 2, y, 0xFFFFFFFF, true);
+        y += 22;
+
+        MusicDetail music = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+        String musicName = music == null || music == MusicDetail.NONE
+                ? I18n.get(MusicHud.MOD_ID + ".text.idle")
+                : music.getName();
+        drawCentered(graphics, I18n.get(MusicHud.MOD_ID + ".text.currentMusic") + ": " + musicName, y);
+        y += 12;
+        drawCentered(graphics, "Status: " + MusicHud.getConnectStatus(), y);
+        y += 12;
+        drawCentered(graphics, "Volume: " + (CLIENT_CONFIG.getMuted() ? 0 : CLIENT_CONFIG.getSoundVolume()), y);
+    }
+
+    private void drawCentered(GuiGraphicsExtractor graphics, String text, int y) {
+        graphics.text(font, text, width / 2 - font.width(text) / 2, y, 0xFFE0E0E0, false);
     }
 
     @Override
-    public void removed() {
-        super.removed();
-        mHost.removed(this);
+    public void onClose() {
+        minecraft.setScreen(previous);
     }
 
     @Override
     public boolean isPauseScreen() {
-        ScreenCallback callback = getCallback();
-        return callback == null || callback.isPauseScreen();
-    }
-
-    @NonNull
-    @Override
-    public Screen self() {
-        return this;
-    }
-
-    @NonNull
-    @Override
-    public Fragment getFragment() {
-        return mFragment;
-    }
-
-    @Nullable
-    @Override
-    public ScreenCallback getCallback() {
-        return mCallback;
-    }
-
-    @Nullable
-    @Override
-    public Screen getPreviousScreen() {
-        return mPrevious;
-    }
-
-    @Override
-    public boolean isMenuScreen() {
         return false;
-    }
-
-    @Override
-    public void onBackPressed() {
-        mHost.getOnBackPressedDispatcher().onBackPressed();
-    }
-
-    // IMPL - GuiEventListener
-
-    @Override
-    public void mouseMoved(double mouseX, double mouseY) {
-        super.mouseMoved(mouseX, mouseY);
-        mHost.onHoverMove(true);
-    }
-
-    @Override
-    public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
-        super.mouseClicked(event, doubleClick);
-        return false;
-    }
-
-    @Override
-    public boolean mouseReleased(@NonNull MouseButtonEvent event) {
-        super.mouseReleased(event);
-        return false;
-    }
-
-    @Override
-    public boolean mouseDragged(@NonNull MouseButtonEvent event, double dx, double dy) {
-        super.mouseDragged(event, dx, dy);
-        return true;
-    }
-
-    @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
-        if (super.mouseScrolled(mouseX, mouseY, deltaX, deltaY)) {
-            return true;
-        }
-        mHost.onScroll(deltaX, deltaY);
-        return true;
-    }
-
-    @Override
-    public boolean keyPressed(@NonNull KeyEvent event) {
-        if (getFocused() != null && getFocused().keyPressed(event)) {
-            return true;
-        }
-        mHost.onKeyPress(event.key(), event.scancode(), event.modifiers());
-        return false;
-    }
-
-    @Override
-    public boolean keyReleased(@NonNull KeyEvent event) {
-        if (getFocused() != null && getFocused().keyReleased(event)) {
-            return true;
-        }
-        mHost.onKeyRelease(event.key(), event.scancode(), event.modifiers());
-        return false;
-    }
-
-    @Override
-    public boolean charTyped(@NonNull CharacterEvent event) {
-        if (getFocused() != null && getFocused().charTyped(event)) {
-            return true;
-        }
-        return mHost.onCharTyped(event.codepoint());
     }
 }

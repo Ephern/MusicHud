@@ -1,0 +1,48 @@
+name: Build
+
+on:
+  push:
+    branches:
+      - 26.1
+  pull_request:
+    branches:
+      - 26.1
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build ${{ matrix.loader }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        loader:
+          - fabric
+          - neoforge
+          - paper
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x ./gradlew
+
+      - name: Build ${{ matrix.loader }}
+        run: ./gradlew -PactivePlatform=${{ matrix.loader }} ${{ matrix.loader }}:build --stacktrace
+
+      - name: Upload ${{ matrix.loader }} artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: music-hud-${{ matrix.loader }}
+          path: ${{ matrix.loader }}/build/libs/*.jar
+          if-no-files-found: error

@@ -1,8 +1,31 @@
 pluginManagement {
     repositories {
-        maven { url = 'https://maven.fabricmc.net/' }
-        maven { url = 'https://maven.neoforged.net/releases' }
-        maven { url = 'https://repo.papermc.io/repository/maven-public/' }
+        // 1. 阿里云 Gradle 插件专用
+        maven {
+            url = 'https://maven.aliyun.com/repository/gradle-plugin'
+        }
+        // 2. 官方 BMCLAPI（Maven 风格，用于 Minecraft 生态库）
+        maven {
+            url = 'https://bmclapi2.bangbang93.com/maven'
+            content {
+                includeGroup 'net.neoforged'
+                includeGroup 'net.fabricmc'
+                includeGroup 'net.minecraftforge'
+            }
+        }
+        // 3. Fabric 官方（后备）
+        maven {
+            url = 'https://maven.fabricmc.net/'
+        }
+        // 4. NeoForge 官方（后备）
+        maven {
+            url = 'https://maven.neoforged.net/releases'
+        }
+        // 5. PaperMC 仓库
+        maven {
+            url = 'https://repo.papermc.io/repository/maven-public/'
+        }
+        // 6. Maven Central 和 Gradle Plugin Portal（最终后备）
         mavenCentral()
         gradlePluginPortal()
     }
@@ -10,10 +33,31 @@ pluginManagement {
 
 dependencyResolutionManagement {
     repositories {
+        // 1. 阿里云公共仓库（常规 Java 库主力）
+        maven {
+            url = 'https://maven.aliyun.com/repository/public'
+        }
+        // 2. 官方 BMCLAPI（专用于 Minecraft 相关库）
+        maven {
+            url = 'https://bmclapi2.bangbang93.com/maven'
+            content {
+                includeGroup 'net.neoforged'
+                includeGroup 'net.fabricmc'
+                includeGroup 'net.minecraftforge'
+            }
+        }
+        // 3. 本地 Maven
         mavenLocal()
+        // 4. JitPack
+        maven {
+            url = 'https://jitpack.io'
+        }
+        // 5. PaperMC 仓库
+        maven {
+            url = 'https://repo.papermc.io/repository/maven-public/'
+        }
+        // 6. Maven Central（后备）
         mavenCentral()
-        maven { url 'https://jitpack.io' }
-        maven { url = 'https://repo.papermc.io/repository/maven-public/' }
     }
 }
 

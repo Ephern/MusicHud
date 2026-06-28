@@ -41,7 +41,6 @@
     "forgeconfigapiport": "*"
   },
   "recommends": {
-    "modmenu": "*",
-    "modernui": "*"
+    "modmenu": "*"
   }
 }

@@ -1,7 +1,6 @@
 package indi.etern.musichud.client.ui.utils.image;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import icyllis.modernui.graphics.Bitmap;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import lombok.Getter;
@@ -57,13 +56,8 @@ public final class ImageTextureData implements Closeable {
         }
     }
 
-    public Bitmap convertToBitmap() {
-        NativeImage pixels = texture.getPixels();
-        if (pixels == null) {
-            return null;
-        } else {
-            return ImageUtils.convertNativeImageToBitmap(pixels);
-        }
+    public NativeImage getPixels() {
+        return texture.getPixels();
     }
 
     @Override

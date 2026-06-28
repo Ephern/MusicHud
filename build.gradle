@@ -1,5 +1,4 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.17.0-alpha.13' apply false
     id 'net.neoforged.moddev' version '2.0.141' apply false
     id 'com.gradleup.shadow' version '9.2.2' apply false
     id 'io.papermc.paperweight.userdev' version '2.0.0-beta.21' apply false
@@ -8,4 +7,29 @@ plugins {
 allprojects {
     group = rootProject.maven_group
     version = rootProject.mod_version + "+" + rootProject.minecraft_version_range
+
+    repositories {
+        // 1. 上海交大 BMCLAPI（代理 NeoForge 和 Minecraft 相关依赖，优先级最高）
+        maven {
+            url 'https://mirror.sjtu.edu.cn/bmclapi/'
+        }
+        // 2. 阿里云公共仓库（代理 Central、Google、JCenter 等）
+        maven {
+            url 'https://maven.aliyun.com/repository/public'
+        }
+        // 3. 阿里云 Gradle 插件专用（虽然一般用于插件，但保留无妨）
+        maven {
+            url 'https://maven.aliyun.com/repository/gradle-plugin'
+        }
+        // 4. NeoForge 官方仓库（作为后备，当镜像没有时回退）
+        maven {
+            url 'https://maven.neoforged.net/releases/'
+        }
+        // 5. 本地 Maven 和 Central（Central 已由阿里云代理，保留为 fallback）
+        mavenLocal()
+        mavenCentral()
+    }
 }
+
+// 如果子模块需要额外配置，可以在此添加
+// subprojects { ... }
