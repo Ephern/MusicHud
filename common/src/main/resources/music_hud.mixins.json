@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
+    "Blaze3DAudioLibraryInitMixin",
     "SoundEngineMixin",
     "SpanSetMixin",
     "ReactiveMusicCompatMixin"
