@@ -26,6 +26,7 @@ import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Arrays;
+import java.util.HashMap;
 import java.util.Locale;
 import java.util.Set;
 import java.util.concurrent.Executors;
@@ -50,17 +51,24 @@ public class ApiClient {
                 .build();
     }
 
-    public record ApiVersionResponse(ApiVersionResponseData data) {
-    }
-    private record ApiVersionResponseData(String version) {
-    }
-
     public static boolean checkAvailable() {
         try {
             var response = post(ServerApiMeta.API_SERVER_VERSION, null, null, false);
             version = response.data.version;
             return true;
         } catch (Exception e) {
+            try {
+                String response = get(ServerApiMeta.BASE, null, false);
+                if (response.contains("NCM API Rust Server")) {
+                    version = "ncm-rs-api";
+                    return true;
+                } else if (response.contains("<title>网易云音乐 API Enhanced</title>")) {
+                    version = "ncm-js-api-unknown";
+                    return true;
+                }
+            } catch (Exception ignored) {
+            }
+            version = "unknown";
             return false;
         }
     }
@@ -238,6 +246,12 @@ public class ApiClient {
                     return !COOKIE_ATTRIBUTE_NAMES.contains(name);
                 })
                 .collect(Collectors.joining("; "));
+    }
+
+    public record ApiVersionResponse(ApiVersionResponseData data) {
+    }
+
+    private record ApiVersionResponseData(String version) {
     }
 
     private record CodeOnlyResponse(int code) {
