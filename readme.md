@@ -2,7 +2,7 @@
 https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801fea44a7.png)
 ![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/b1ab5a9d276489d9f2ef4ecce3fd318e58290553.png)
 
-#### A GUI-based, server-wide song request mod/plugin designed with zero modifications to game mechanics
+#### A GUI-based, all situations (singleplayer/multiplayers) music mod/plugin designed with zero modifications to game mechanics
 
 > Due to service scope provided by NetEase, this mod might not work well outside China
 
@@ -16,7 +16,7 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 [Third-party Bukkit plugin 2](https://github.com/MOPELotus/MusicHud-Paper) (1.1.4 hotfix +, now partly merged into main repository)
 
 ## Prerequisites
-- ModernUI (only client)
+- ModernUI (only client) 
 - Forge Config API Port (only fabric)
 - ~~Architectury API~~ (Mod edition, 1.2.0 and below)
 
@@ -32,8 +32,9 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 ## Functions
 - Search for musics, playlists, albums and artists.
 - Log in to NetEase Cloud Music account via QR code or SMS code to explore subscribed playlists, albums and artists.
-- Synchronized server-wide play queue.
-- Configure idle playback sources for automatic random song switching when server is idle.
+- Connected mode: Synchronized server-wide play queue.
+- Isolated mode: Do all works on client, enjoy music yourself.
+- Configure idle playback sources for automatic random song switching when music player is idle.
 - Display lyrics, requesting player (or avatar) in the HUD and user interface.
 
 ## Compatibility
@@ -52,7 +53,11 @@ First of all, place the prerequisite mods and the MusicHud jar file into the mod
 All you need is to configure or deploy an API server.
 
 #### Multiplayer (join Server or LAN Multi-player)
+##### Connected mode
 You don't need to configure or deploy an API server, but the server or LAN multiplayer host needs to configure or deploy MusicHUD and API server.
+
+##### Isolated mode
+All you need is to configure or deploy an API server.
 
 ### Server
 All you need is to configure or deploy an API server.
@@ -78,7 +83,7 @@ There are 2 methods to deploy.
 ---
 ## CN version description
 
-#### 图形化的全服点歌模组/插件，设计上不修改任何游戏机制
+#### 图形化的全场景（单人/多人游戏）音乐模组/插件，设计上不修改任何游戏机制
 
 ## 相关链接
 
@@ -105,27 +110,34 @@ There are 2 methods to deploy.
 ## 功能
 - 搜索音乐、歌单、专辑和歌手
 - 通过二维码或短信验证码登录网易云账户，查看收藏的歌单、专辑和歌手
-- 全服同步播放队列
-- 配置空闲播放源，服务器空闲时随机切歌
+- 连接模式：全服同步播放队列
+- 隔离模式：在客户端上独立享受音乐
+- 配置空闲播放源，播放器空闲时随机切歌
 - 在 HUD 和用户界面中展示歌词，点歌玩家（或头像）
 
 ## 兼容
-- 目前特别地支持在 MusicHUD 播放时静音 Reactive Music
+- 目前特殊支持在 MusicHUD 播放时静音 Reactive Music
 
 ## ~~大饼~~ 待办清单
 - 可自定义的 HUD 布局 [目标 1.3.0/1.4.0]
 - 更多音乐平台支持(QQ音乐, 酷狗音乐) [目标 2.0.0]
 
 ## 使用
+
 ### 客户端
 首先在 mods 文件夹中放入前置 mod 和 MusicHUD 的 jar 文件
+
 #### 单人模式 或 局域网联机主机
 只需要配置/部署 API 服务器
 
 #### 加入服务器 或 加入局域网世界
+##### 连接模式
 不需要配置/部署 API 服务器
 
 但是需要服务器/局域网主机配置/部署 MusicHUD 和 API 服务器
+
+##### 隔离模式
+只需要配置/部署 API 服务器
 
 ### 服务端
 只需要部署 API 服务器
