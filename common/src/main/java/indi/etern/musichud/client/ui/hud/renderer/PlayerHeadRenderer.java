@@ -45,8 +45,8 @@ public class PlayerHeadRenderer implements HudRenderer {
         pose.translate(x + w * inset, y + h * inset, 0);
         pose.scale(scale, scale, 1);
         gr.blit(skin,
-                0, 0, 8, 8,
-                w, h, 8, 8,
+                0, 0, w, h,
+                8, 8, 8, 8,
                 SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE);
         pose.popPose();
 
@@ -54,8 +54,8 @@ public class PlayerHeadRenderer implements HudRenderer {
         pose.translate(x, y, 0);
         // Outer hat layer (40,8 to 48,16) - full size on top
         gr.blit(skin,
-                0, 0, 40, 8,
-                w, h, 8, 8,
+                0, 0, w, h,
+                40, 8, 8, 8,
                 SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE);
         pose.popPose();
     }

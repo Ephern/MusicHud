@@ -103,12 +103,6 @@ loom {
     runs {
         client {
             runDir = "run/client"
-            // Bootstraplauncher has a default ignoreList=asm,securejarhandler
-            // which excludes all jars with filenames starting with "asm" from the module path.
-            // Mixin requires ASM modules, so we must clear this.
-            vmArgs.addAll(
-                "-DignoreList="
-            )
         }
         server {
             runDir = "run/server"
