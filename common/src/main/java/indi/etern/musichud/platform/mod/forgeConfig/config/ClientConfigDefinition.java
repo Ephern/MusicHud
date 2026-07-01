@@ -162,7 +162,7 @@ public class ClientConfigDefinition implements ClientConfig {
         autoConnectServerFilterType = builder
                 .comment("Auto connecting servers filter type (white list / black list)")
                 .translation(MusicHud.MOD_ID + ".config.autoConnectServerFilterType")
-                .define("autoConnectServerFilterType", AutoConnectServerFilterType.WHITE_LIST.name());
+                .define("autoConnectServerFilterType", AutoConnectServerFilterType.BLACK_LIST.name());
         autoConnectBlackList = builder
                 .comment("Auto connecting servers black list")
                 .translation(MusicHud.MOD_ID + ".config.autoConnectBlackList")
