@@ -2,14 +2,25 @@ package indi.etern.musichud.server.api.impl.ncm;
 
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.PlaylistResponse;
-import indi.etern.musichud.server.api.ApiServerManager;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.utils.http.ApiClient;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Set;
 
 @SuppressWarnings("SpellCheckingInspection")
 public class ServerApiMeta {
+    public static final UrlMeta<String> BASE = new UrlMeta<>(
+            "",
+            null,
+            null,
+            true,
+            true,
+            true,
+            false,
+            null,
+            String.class);
     public static final UrlMeta<ApiClient.ApiVersionResponse> API_SERVER_VERSION = new UrlMeta<>(
             "/inner/version",
             null,

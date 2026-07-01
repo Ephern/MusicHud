@@ -30,6 +30,8 @@ import static org.lwjgl.opengl.GL20.*;
 public class HudRenderContext {
     @Getter
     private static HudRenderContext current;
+
+    @Getter
     @Setter
     private GuiGraphics graphics;
     private final Map<String, HudShaderProgram.UniformBufferHandle> uboHandles = new HashMap<>();

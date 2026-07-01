@@ -313,7 +313,6 @@ public class UrlImageView extends FrameLayout {
         float ratio = (float) image.getWidth() / image.getHeight();
         setAspectRatio(ratio);
 
-        //noinspection UnstableApiUsage
         RoundedImageDrawable drawable = new RoundedImageDrawable(
                 getContext().getResources(),
                 image
@@ -363,16 +362,9 @@ public class UrlImageView extends FrameLayout {
         animatorSet.addListener(new AnimatorListener() {
             @Override
             public void onAnimationEnd(@NonNull Animator animation) {
-                Drawable previousDrawable = imageView.getDrawable();
                 ImageView temp = imageView;
                 imageView = nextImageView;
                 nextImageView = temp;
-                if (previousDrawable instanceof RoundedImageDrawable imageDrawable) {
-                    Image image = imageDrawable.getImage();
-//                    if (image != null) {
-//                        image.close();
-//                    }
-                }
             }
         });
         animatorSet.start();

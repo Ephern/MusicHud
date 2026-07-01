@@ -4,8 +4,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
+import indi.etern.musichud.utils.ClientDistUtil;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
 
@@ -29,7 +28,7 @@ public interface IServerNetworkService {
 
     default <T extends S2CPayload> void sendToPlayer(Player player, T payload) {
         if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT
-                && (Minecraft.getInstance().getCurrentServer() == null || player instanceof LocalPlayer)) {
+                && ClientDistUtil.inIsolatedMode(player)) {
             //noinspection unchecked
             NetworkReceiver<T> receiver = (NetworkReceiver<T>) INetworkRegister.getInstance()
                     .getMetaDataOrNew(payload.getClass(), null).receiver();

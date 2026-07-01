@@ -36,6 +36,7 @@ import java.net.URL;
 import java.util.Base64;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
@@ -322,7 +323,6 @@ public class ImageUtils {
 
     @NotNull
     private static ImageTextureData getImageTextureData(String data, Bitmap source) {
-//        ResourceLocation imageLocation = MusicHud.location("image_" + source.hashCode());
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
         Minecraft.getInstance().submit(() -> {
             texture.set(new DynamicTexture(convertBitmapToNativeImage(source)));

@@ -2,7 +2,6 @@ package indi.etern.musichud.platform.mod.neoforge.network;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
-import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
@@ -24,7 +23,7 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings("unused")
-public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkService, IClientNetworkService {
+public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkService {
     private static volatile NeoForgeNetworkManager instance;
     private final Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
     private final Map<Class<? extends IPayload>, CustomPacketPayload.Type<?>> typeMap = new ConcurrentHashMap<>();
@@ -105,11 +104,6 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
             registerPayloadInternal(info);
         }
         pendingRegistrations.clear(); // 清空，避免重复注册
-    }
-
-    @Override
-    public void sendToNetworkServer(C2SPayload payload) {
-        PacketDistributor.sendToServer(payload);
     }
 
     @Override
