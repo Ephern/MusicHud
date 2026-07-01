@@ -34,7 +34,7 @@ public class PlayerHeadRenderer implements HudRenderer {
                 absolutePosition.x(), absolutePosition.y(), w, h);
     }
 
-    public static void renderHead(GuiGraphics gr, ResourceLocation skin,
+    public static void renderHead(GuiGraphics gr, Identifier skin,
                                    float x, float y, int w, int h) {
         float scale = 0.87f;
         float inset = (1 - scale) / 2;
