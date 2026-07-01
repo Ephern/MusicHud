@@ -67,13 +67,13 @@ tasks.processResources {
     inputs.property('apiVersion', rootProject.minecraft_version)
     filesMatching('paper-plugin.yml') {
         expand(
-                version: project.minecraft_api_version,
+                version: project.version,
                 apiVersion: rootProject.minecraft_api_version
         )
     }
     filesMatching('plugin.yml') {
         expand(
-                version: project.minecraft_api_version,
+                version: project.version,
                 apiVersion: rootProject.minecraft_api_version
         )
     }
