@@ -373,11 +373,11 @@ public class NowPlayingInfo {
                     MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
                 LocalPlayer player = Minecraft.getInstance().player;
                 if (player != null) {
-                    return player.getSkin().texture();
+                    return player.getSkin().body().texturePath();
                 }
             }
         } else {
-            return pusherPlayerInfo.getSkin().texture();
+            return pusherPlayerInfo.getSkin().body().texturePath();
         }
         return null;
     }
