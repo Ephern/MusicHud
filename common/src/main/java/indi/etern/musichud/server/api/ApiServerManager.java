@@ -46,7 +46,7 @@ public class ApiServerManager implements ServerRegister {
     }
 
     public void log(String s, boolean error) {
-        if (error || s.contains("[ERROR]")) {
+        if (error || s.contains("ERROR")) {
             apiLogger.error(s.replace("[ERROR]", ""));
         } else {
             apiLogger.debug(s.replace("[INFO]", ""));
@@ -149,7 +149,8 @@ public class ApiServerManager implements ServerRegister {
                         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                             String line;
                             while ((line = reader.readLine()) != null) {
-                                if (line.contains("Server started successfully") && binaryApiServerStatus == BinaryApiServerStatus.LAUNCHING) {
+                                if ((line.contains("Server started successfully") || line.contains("ncm_api_rs::server"))
+                                        && binaryApiServerStatus == BinaryApiServerStatus.LAUNCHING) {
                                     setApiStatus(BinaryApiServerStatus.RUNNING);
                                     boolean available = ApiClient.checkAvailable();
                                     if (available) {

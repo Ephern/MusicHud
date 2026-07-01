@@ -32,6 +32,7 @@ public class HudRenderContext {
     private final Map<StorageKey, HudUniform> lastWrittenUniforms = new HashMap<>();
     private final Map<StorageKey, GpuBufferSlice> lastSlices = new HashMap<>();
 
+    @Getter
     @Setter
     private GuiGraphicsExtractor graphics;
 

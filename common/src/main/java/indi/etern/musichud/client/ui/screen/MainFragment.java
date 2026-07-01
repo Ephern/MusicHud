@@ -7,6 +7,7 @@ import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.mc.MinecraftSurfaceView;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.util.DataSet;
@@ -25,6 +26,7 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.ui.hud.renderer.PlayerHeadRenderer;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
@@ -34,8 +36,11 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -65,6 +70,7 @@ public class MainFragment extends Fragment {
     private Button skipCurrentButton;
     private TextView serverConnectStatus;
     private Button switchServerConnectButton;
+    private MinecraftSurfaceView pusherHeadView;
 
     public MainFragment() {
     }
@@ -123,6 +129,7 @@ public class MainFragment extends Fragment {
                 instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                 instance.artists.removeAllViews();
                 instance.albumContainer.removeAllViews();
+                instance.pusherHeadView.setVisibility(View.GONE);
                 instance.pusherText.setText("");
                 instance.progressBar.setVisibility(View.GONE);
                 instance.progressText.setText("");
@@ -134,9 +141,11 @@ public class MainFragment extends Fragment {
                 PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
                 String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().name() : null;
                 if (name == null || name.isEmpty()) {
+                    instance.pusherHeadView.setVisibility(View.GONE);
                     instance.pusherText.setText("");
                 } else {
-                    instance.pusherText.setText(I18n.get(MusicHud.MOD_ID + ".text.pusherSource") + name);
+                    instance.pusherHeadView.setVisibility(View.VISIBLE);
+                    instance.pusherText.setText(name);
                 }
                 Context context = ModernUI.getInstance();
                 instance.artists.removeAllViews();
@@ -326,7 +335,41 @@ public class MainFragment extends Fragment {
                 pusherText = new TextView(context);
                 pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                 pusherText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                musicInfo.addView(pusherText);
+
+                LinearLayout pusherRow = new LinearLayout(context);
+                pusherRow.setOrientation(LinearLayout.HORIZONTAL);
+                pusherRow.setGravity(Gravity.CENTER_VERTICAL);
+
+                pusherHeadView = new MinecraftSurfaceView(context);
+                int rowHeight = pusherText.dp(Theme.TEXT_SIZE_LARGER);
+                //noinspection SuspiciousNameCombination
+                pusherHeadView.setLayoutParams(new LinearLayout.LayoutParams(rowHeight, rowHeight));
+                pusherHeadView.setVisibility(View.GONE);
+                pusherHeadView.setRenderer(new MinecraftSurfaceView.Renderer() {
+                    @Override
+                    public void onSurfaceChanged(int width, int height) {}
+
+                    @Override
+                    public void onDraw(@NotNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick,
+                                       double guiScale, float alpha) {
+                        ResourceLocation skin = null;
+                        try {
+                            skin = NowPlayingInfo.getInstance().getPusherSkinResource();
+                        } catch (Exception ignored) {}
+                        if (skin == null) return;
+
+                        int w = (int) Math.ceil(pusherHeadView.getWidth() / guiScale);
+                        int h = (int) Math.ceil(pusherHeadView.getHeight() / guiScale);
+                        PlayerHeadRenderer.renderHead(gr, skin, 0, 0, w, h);
+                    }
+                });
+
+                pusherRow.addView(pusherHeadView);
+                LinearLayout.LayoutParams params5 = new LinearLayout.LayoutParams(WRAP_CONTENT, rowHeight);
+                params5.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
+                params5.setMargins(pusherText.dp(4), 0, 0, 0);
+                pusherRow.addView(pusherText, params5);
+                musicInfo.addView(pusherRow);
 
                 progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
                 progressBar.setMin(0);

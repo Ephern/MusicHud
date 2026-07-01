@@ -337,11 +337,10 @@ public class MusicApiService implements IMusicApiService {
             return Collections.emptyList();
         }
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayer(player);
-        Profile profile = loginInfo.profile;
-        if (profile == null) {
+        if (loginInfo == null || loginInfo.profile == null) {
             return List.of();
         } else {
-            long userId = profile.getUserId();
+            long userId = loginInfo.profile.getUserId();
             return userSubscribedPlaylistCache.get(userId, () -> {
                 PlaylistsResponse playlistData = ApiClient.post(
                         ServerApiMeta.User.PLAYLIST,
@@ -360,11 +359,10 @@ public class MusicApiService implements IMusicApiService {
             return Collections.emptyList();
         }
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayer(player);
-        Profile profile = loginInfo.profile;
-        if (profile == null) {
+        if (loginInfo == null || loginInfo.profile == null) {
             return List.of();
         } else {
-            long userId = profile.getUserId();
+            long userId = loginInfo.profile.getUserId();
             return userSubscribedAlbumsCache.get(userId, () -> {
                 UserSubscribedAlbumResponse userSubscribedAlbumResponse = ApiClient.post(
                         ServerApiMeta.User.SUBSCRIBED_ALBUMS,
@@ -383,11 +381,10 @@ public class MusicApiService implements IMusicApiService {
             return Collections.emptyList();
         }
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayer(player);
-        Profile profile = loginInfo.profile;
-        if (profile == null) {
+        if (loginInfo == null || loginInfo.profile == null) {
             return List.of();
         } else {
-            long userId = profile.getUserId();
+            long userId = loginInfo.profile.getUserId();
             return userSubscribedArtistsCache.get(userId, () -> {
                 UserSubscribedArtistResponse userSubscribedArtistResponse = ApiClient.post(
                         ServerApiMeta.User.SUBSCRIBED_ARTISTS,
