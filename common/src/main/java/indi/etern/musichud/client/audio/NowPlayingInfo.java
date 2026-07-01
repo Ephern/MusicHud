@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.audio;
 
+import com.google.common.cache.Cache;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
@@ -19,6 +20,8 @@ import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
+import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
@@ -45,10 +48,7 @@ public class NowPlayingInfo {
     private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
     private final AtomicReference<ArrayDeque<LyricLine>> atomicLyricLines = new AtomicReference<>();
     private final ClientConfig clientConfig = ClientConfig.getInstance();
-    private final AtomicInteger count = new AtomicInteger(0);
     private volatile JMTC jmtc;
-    private JMTCCallbacks jmtcCallbacks;
-    private Thread smtcThread;
     @Setter
     @Getter
     private Duration updateInAdvanceDuration = Duration.of(500, ChronoUnit.MILLIS);
@@ -65,6 +65,7 @@ public class NowPlayingInfo {
     @Getter
     private LyricLine currentLyricLine;
     private Thread lyricUpdaterVThread;
+
     final Runnable lyricUpdater = () -> {
         Thread thread = Thread.currentThread();
         lyricUpdaterVThread = thread;
@@ -105,7 +106,7 @@ public class NowPlayingInfo {
     private Path tempAlbumArt;
 
     private NowPlayingInfo() {
-        smtcThread = new Thread(this::jmtcLoop, "MH-SMTC");
+        Thread smtcThread = new Thread(this::jmtcLoop, "MH-SMTC");
         smtcThread.setDaemon(true);
         smtcThread.start();
     }
@@ -123,7 +124,7 @@ public class NowPlayingInfo {
 
     private void jmtcLoop() {
         jmtc = JMTC.getInstance(new JMTCSettings("Minecraft-MusicHUD", "Minecraft-MusicHUD"));
-        jmtcCallbacks = new JMTCCallbacks();
+        JMTCCallbacks jmtcCallbacks = new JMTCCallbacks();
         jmtcCallbacks.onPlay = () -> {
             MusicHud.EXECUTOR.execute(() -> {
                 clientConfig.setMuted(false);
@@ -363,6 +364,22 @@ public class NowPlayingInfo {
         } else {
             return null;
         }
+    }
+
+    public ResourceLocation getPusherSkinResource() {
+        PlayerInfo pusherPlayerInfo = getPusherPlayerInfo();
+        if (pusherPlayerInfo == null) {
+            if (Minecraft.getInstance().getCurrentServer() == null || //single player
+                    MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
+                LocalPlayer player = Minecraft.getInstance().player;
+                if (player != null) {
+                    return player.getSkin().texture();
+                }
+            }
+        } else {
+            return pusherPlayerInfo.getSkin().texture();
+        }
+        return null;
     }
 
     public MusicDetail getNextToPlayIdleMusicDetail() {

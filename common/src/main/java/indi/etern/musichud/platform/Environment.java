@@ -42,7 +42,7 @@ public class Environment {
                 () -> load("indi.etern.musichud.platform.mod.forgeConfig.config.ClientConfigDefinition", ClientConfig.class),
                 () -> load("indi.etern.musichud.platform.mod.neoforge.network.NeoForgeNetworkManager", INetworkRegister.class),
                 () -> load("indi.etern.musichud.platform.mod.neoforge.network.NeoForgeNetworkManager", IServerNetworkService.class),
-                () -> load("indi.etern.musichud.platform.mod.neoforge.network.NeoForgeNetworkManager", IClientNetworkService.class),
+                () -> load("indi.etern.musichud.platform.mod.neoforge.network.NeoForgeClientNetworkService", IClientNetworkService.class),
                 () -> load("indi.etern.musichud.platform.mod.neoforge.event.NeoForgeServerEventService", IServerEventService.class),
                 () -> load("indi.etern.musichud.platform.mod.neoforge.event.NeoForgeClientEventService", IClientEventService.class),
                 () -> load("indi.etern.musichud.platform.mod.neoforge.registry.NeoForgeKeyRegistryService", IKeyRegistryService.class)),

@@ -19,6 +19,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -35,7 +36,7 @@ public class HudRendererManager {
     private static volatile boolean loaded = false;
     private final BackgroundRenderer BACKGROUND_RENDERER = BackgroundRenderer.getInstance();
     private final AlbumImageRenderer IMAGE_RENDERER = AlbumImageRenderer.getInstance();
-    private final PlayerHeadRenderer PLAYER_HEAD_RENDERER = PlayerHeadRenderer.getInstance();
+    private final PlayerHeadRenderer PLAYER_HEAD_RENDERER = new PlayerHeadRenderer();
     private final PlayingStatusRenderer PLAYING_STATUS_RENDERER = PlayingStatusRenderer.getInstance();
     private final ProgressRenderer PROGRESS_RENDERER = ProgressRenderer.getInstance();
     private final TextRenderer TITLE_RENDERER = new TextRenderer();
@@ -280,20 +281,7 @@ public class HudRendererManager {
                         .orElse("");
                 ARTISTS_AND_ALBUM_RENDERER.setText(artists + " - " + musicDetail.getAlbum().getName());
                 LYRICS_LINE_RENDERER.clear();
-                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-                if (pusherPlayerInfo == null) {
-                    if (Minecraft.getInstance().getCurrentServer() == null || //single player
-                            MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
-                        LocalPlayer player = Minecraft.getInstance().player;
-                        if (player != null) {
-                            PLAYER_HEAD_RENDERER.setSkinResource(player.getSkin().body().texturePath());
-                        }
-                    } else {
-                        PLAYER_HEAD_RENDERER.setSkinResource(null);
-                    }
-                } else {
-                    PLAYER_HEAD_RENDERER.setSkinResource(pusherPlayerInfo.getSkin().body().texturePath());
-                }
+                PLAYER_HEAD_RENDERER.setSkinResource(nowPlayingInfo.getPusherSkinResource());
                 loadAlbumImage(musicDetail).thenAccept((unused) -> {
                     Duration musicDuration = nowPlayingInfo.getMusicDuration();
                     DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
@@ -367,6 +355,8 @@ public class HudRendererManager {
 
             hudRenderContext.clearContext();
             hudRenderContext.setGraphics(graphics);
+
+            PLAYER_HEAD_RENDERER.setSkinResource(nowPlayingInfo.getPusherSkinResource());
 
             BACKGROUND_RENDERER.render(hudRenderContext);
 

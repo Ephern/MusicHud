@@ -50,6 +50,9 @@ public interface INetworkRegister {
     @SuppressWarnings("unchecked")
     default <T extends IPayload> PayloadMetadata<T> getMetaDataOrNew(Class<T> customPacketPayloadClass, @Nullable NetworkReceiver<T> networkReceiver) {
         return (PayloadMetadata<T>) metadataMap.computeIfAbsent(customPacketPayloadClass, clazz -> {
+            if (networkReceiver == null) {
+                throw new IllegalStateException("No pre-cached metadata, and networkReceiver is null");
+            }
             String name = String.join("_", StringUtils.splitByCharacterTypeCamelCase(clazz.getSimpleName())).toLowerCase();
             return new PayloadMetadata<T>(new CustomPacketPayload.Type<>(MusicHud.location(name)), networkReceiver);
         });
