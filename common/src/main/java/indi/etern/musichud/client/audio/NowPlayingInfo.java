@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.audio;
 
-import com.google.common.cache.Cache;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
@@ -21,7 +20,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
@@ -34,7 +33,6 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -360,18 +358,18 @@ public class NowPlayingInfo {
         }
     }
 
-    public ResourceLocation getPusherSkinResource() {
+    public Identifier getPusherSkinResource() {
         PlayerInfo pusherPlayerInfo = getPusherPlayerInfo();
         if (pusherPlayerInfo == null) {
             if (Minecraft.getInstance().getCurrentServer() == null || //single player
                     MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
                 LocalPlayer player = Minecraft.getInstance().player;
                 if (player != null) {
-                    return player.getSkin().texture();
+                    return player.getSkin().body().texturePath();
                 }
             }
         } else {
-            return pusherPlayerInfo.getSkin().texture();
+            return pusherPlayerInfo.getSkin().body().texturePath();
         }
         return null;
     }

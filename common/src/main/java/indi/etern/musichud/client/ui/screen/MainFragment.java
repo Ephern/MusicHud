@@ -36,10 +36,10 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
@@ -350,9 +350,9 @@ public class MainFragment extends Fragment {
                     public void onSurfaceChanged(int width, int height) {}
 
                     @Override
-                    public void onDraw(@NotNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick,
+                    public void onDraw(@NotNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick,
                                        double guiScale, float alpha) {
-                        ResourceLocation skin = null;
+                        Identifier skin = null;
                         try {
                             skin = NowPlayingInfo.getInstance().getPusherSkinResource();
                         } catch (Exception ignored) {}

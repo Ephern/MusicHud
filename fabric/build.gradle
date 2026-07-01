@@ -1,5 +1,5 @@
 plugins {
-    id 'net.fabricmc.fabric-loom' version '1.17.0-alpha.13'
+    id 'net.fabricmc.fabric-loom' version '1.17.12'
     id 'com.gradleup.shadow'
     id 'maven-publish'
 }

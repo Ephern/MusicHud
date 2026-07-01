@@ -4,7 +4,7 @@ import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
@@ -34,7 +34,7 @@ public class PlayerHeadRenderer implements HudRenderer {
                 absolutePosition.x(), absolutePosition.y(), w, h);
     }
 
-    public static void renderHead(GuiGraphics gr, ResourceLocation skin,
+    public static void renderHead(GuiGraphicsExtractor gr, Identifier skin,
                                    float x, float y, int w, int h) {
         float scale = 0.87f;
         float inset = (1 - scale) / 2;
