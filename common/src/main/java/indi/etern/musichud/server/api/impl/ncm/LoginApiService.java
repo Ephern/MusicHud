@@ -156,7 +156,7 @@ public class LoginApiService implements ILoginApiService {
         RefreshCookieResponse cookieResponse = ApiClient.post(ServerApiMeta.Login.REFRESH, null, loginCookieInfo.rawCookie(), true);
         LoginCookieInfo refreshedLoginCookieInfo;
         if (cookieResponse.code == 200) {
-            refreshedLoginCookieInfo = new LoginCookieInfo(loginCookieInfo.type(), cookieResponse.cookie, ZonedDateTime.now());
+            refreshedLoginCookieInfo = new LoginCookieInfo(loginCookieInfo.type(), cookieResponse.cookie != null ? cookieResponse.cookie : loginCookieInfo.rawCookie(), ZonedDateTime.now());
             Profile profile = loadUserProfile(player, refreshedLoginCookieInfo);
             serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", refreshedLoginCookieInfo, profile));
         } else {
