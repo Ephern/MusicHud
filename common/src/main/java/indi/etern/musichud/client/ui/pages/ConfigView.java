@@ -289,6 +289,7 @@ public class ConfigView extends LinearLayout {
                     } else {
                         loginService.disconnectToExternalOrIntegratedServer();
                     }
+                    MainFragment.refresh();
                 }
             });
             enableIsolatedMode.create(multiplayerCategory);

@@ -355,12 +355,12 @@ public class MusicService {
         CompletableFuture<List<Playlist>> completableFuture = new CompletableFuture<>();
         if (LoginService.getInstance().isLogined()) {
             MusicHud.EXECUTOR.execute(() -> {
-                clientNetworkService.sendToServer(GetUserPlaylistRequest.REQUEST);
                 Thread pendingThread = Thread.currentThread();
                 GetUserPlaylistResponse.setConsumer(value -> {
                     completableFuture.complete(value);
                     pendingThread.interrupt();
                 });
+                clientNetworkService.sendToServer(GetUserPlaylistRequest.REQUEST);
                 try {
                     Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
                     completableFuture.completeExceptionally(new ApiException());
@@ -377,12 +377,12 @@ public class MusicService {
         CompletableFuture<List<Album>> completableFuture = new CompletableFuture<>();
         if (LoginService.getInstance().isLogined()) {
             MusicHud.EXECUTOR.execute(() -> {
-                clientNetworkService.sendToServer(GetUserAlbumsRequest.REQUEST);
                 Thread pendingThread = Thread.currentThread();
                 GetUserAlbumsResponse.setConsumer(value -> {
                     completableFuture.complete(value);
                     pendingThread.interrupt();
                 });
+                clientNetworkService.sendToServer(GetUserAlbumsRequest.REQUEST);
                 try {
                     Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
                     completableFuture.completeExceptionally(new ApiException());
@@ -399,12 +399,12 @@ public class MusicService {
         CompletableFuture<List<Artist>> completableFuture = new CompletableFuture<>();
         if (LoginService.getInstance().isLogined()) {
             MusicHud.EXECUTOR.execute(() -> {
-                clientNetworkService.sendToServer(GetUserArtistsRequest.REQUEST);
                 Thread pendingThread = Thread.currentThread();
                 GetUserArtistsResponse.setConsumer(value -> {
                     completableFuture.complete(value);
                     pendingThread.interrupt();
                 });
+                clientNetworkService.sendToServer(GetUserArtistsRequest.REQUEST);
                 try {
                     Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
                     completableFuture.completeExceptionally(new ApiException());
