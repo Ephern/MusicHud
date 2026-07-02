@@ -15,7 +15,6 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.Easing;
 import lombok.NonNull;
 import lombok.Setter;
-import lombok.extern.slf4j.Slf4j;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
