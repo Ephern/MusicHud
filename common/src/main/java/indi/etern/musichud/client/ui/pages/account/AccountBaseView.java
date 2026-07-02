@@ -12,7 +12,6 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;

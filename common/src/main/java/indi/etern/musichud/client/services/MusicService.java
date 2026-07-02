@@ -421,19 +421,7 @@ public class MusicService {
         if (instance != null) {
             instance.switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
             instance.idlePlaySourceLoaded = false;
-//            Set<MusicCollection> localCopy = Set.copyOf(instance.localIdlePlaySources);
-//            Set<MusicCollection> serverCopy = Set.copyOf(instance.serverIdlePlaySources);
-//            instance.localIdlePlaySources.clear();
-//            instance.serverIdlePlaySources.clear();
             instance.musicQueue.clear();
-//            localCopy.forEach(musicCollection -> {
-//                instance.localIdlePlaySourceRemoveListeners.forEach(l -> l.accept(musicCollection));
-//                instance.localIdlePlaySourceChangeListeners.forEach(l -> l.accept(musicCollection));
-//            });
-//            serverCopy.forEach(musicCollection -> {
-//                instance.serverIdlePlaySourceRemoveListeners.forEach(l -> l.accept(musicCollection));
-//                instance.serverIdlePlaySourceChangeListeners.forEach(l -> l.accept(musicCollection));
-//            });
         }
         if (HudRendererManager.isLoaded()) {
             HudRendererManager.getInstance().reset();
@@ -449,7 +437,7 @@ public class MusicService {
                 MusicService.getInstance().loadIdlePlaySourceFromConfig();
             });
             IClientEventService.getInstance().registerClientPlayerQuit((player) -> {
-                resetCurrentMusicStatus();
+                MusicHud.EXECUTOR.execute(MusicService::resetCurrentMusicStatus);
             });
         }
     }

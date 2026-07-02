@@ -22,9 +22,6 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
 import org.lwjgl.glfw.GLFW;
 
-import java.util.HashMap;
-import java.util.Map;
-
 @RegisterMark
 public class Keybinds implements ClientRegister {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();

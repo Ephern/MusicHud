@@ -5,7 +5,6 @@ import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.beans.music.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.ui.utils.lyrics.beans.MetaInfoLine;
-import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;

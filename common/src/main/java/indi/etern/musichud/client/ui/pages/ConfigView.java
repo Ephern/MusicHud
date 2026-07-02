@@ -30,7 +30,6 @@ import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
-import lombok.extern.slf4j.Slf4j;
 import net.minecraft.Util;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.commons.lang3.Range;

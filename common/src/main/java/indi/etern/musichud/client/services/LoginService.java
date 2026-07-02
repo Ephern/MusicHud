@@ -53,6 +53,16 @@ public class LoginService {
     private static volatile LoginService instance = null;
     @Getter
     private final List<Consumer<LoginCookieInfo>> loginCompleteListeners = new ArrayList<>();
+    @Setter
+    private Consumer<StartQRLoginResponse> loginResponseHandler;
+    @Getter
+    NetworkReceiver<StartQRLoginResponse> qrLoginResponseReceiver = (qrLoginResponse, player) -> {
+        if (loginResponseHandler != null)
+            loginResponseHandler.accept(qrLoginResponse);
+    };
+    private double lastPressTime;
+    @Getter
+    private ConnectionType connectionType;
     @Getter
     NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, player) -> {
         MusicHud.EXECUTOR.submit(() -> {
@@ -103,20 +113,7 @@ public class LoginService {
             }
         });
     };
-    @Setter
-    private Consumer<StartQRLoginResponse> loginResponseHandler;
-    @Getter
-    NetworkReceiver<StartQRLoginResponse> qrLoginResponseReceiver = (qrLoginResponse, player) -> {
-        if (loginResponseHandler != null)
-            loginResponseHandler.accept(qrLoginResponse);
-    };
-    private double lastPressTime;
-    @Getter
-    private ConnectionType connectionType;
 
-    public enum ConnectionType {
-        EXTERNAL, INTERNAL
-    }
     public static LoginService getInstance() {
         if (instance == null) {
             synchronized (LoginService.class) {
@@ -265,41 +262,49 @@ public class LoginService {
         }
     }
 
+    public enum ConnectionType {
+        EXTERNAL, INTERNAL
+    }
+
     @RegisterMark
     public static final class RegisterImpl implements ClientRegister {
         @Override
         public void register() {
             IClientEventService eventService = IClientEventService.getInstance();
             eventService.registerClientPlayerJoin((player) -> {
-                ServerData currentServer = Minecraft.getInstance().getCurrentServer();
-                if (currentServer != null) {
-                    boolean autoConnectToServer = clientConfig.getEnableAutoConnect();
-                    if (autoConnectToServer) {
-                        AutoConnectServerFilterType connectServerFilterType = clientConfig.getConnectServerFilterType();
-                        if ((connectServerFilterType == AutoConnectServerFilterType.BLACK_LIST
-                                && clientConfig.getBlackList().stream().noneMatch(i -> Pattern.matches(i, currentServer.ip)))
-                                || (connectServerFilterType == AutoConnectServerFilterType.WHITE_LIST
-                                && clientConfig.getWhiteList().stream().anyMatch(i -> Pattern.matches(i, currentServer.ip)))) {
-                            getInstance().connectToExternalServer();
+                MusicHud.EXECUTOR.execute(() -> {
+                    ServerData currentServer = Minecraft.getInstance().getCurrentServer();
+                    if (currentServer != null) {
+                        boolean autoConnectToServer = clientConfig.getEnableAutoConnect();
+                        if (autoConnectToServer) {
+                            AutoConnectServerFilterType connectServerFilterType = clientConfig.getConnectServerFilterType();
+                            if ((connectServerFilterType == AutoConnectServerFilterType.BLACK_LIST
+                                    && clientConfig.getBlackList().stream().noneMatch(i -> Pattern.matches(i, currentServer.ip)))
+                                    || (connectServerFilterType == AutoConnectServerFilterType.WHITE_LIST
+                                    && clientConfig.getWhiteList().stream().anyMatch(i -> Pattern.matches(i, currentServer.ip)))) {
+                                getInstance().connectToExternalServer();
+                            } else {
+                                getInstance().launchIsolated();
+                            }
                         } else {
                             getInstance().launchIsolated();
                         }
                     } else {
-                        getInstance().launchIsolated();
+                        // Single Player
+                        getInstance().connectToExternalServer();
                     }
-                } else {
-                    // Single Player
-                    getInstance().connectToExternalServer();
-                }
+                });
             });
             eventService.registerClientPlayerQuit((player) -> {
-                if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
-                    if (clientConfig.getEnableIsolatedMode()) {
-                        LoginApiService.getInstance().logout(player);
+                MusicHud.EXECUTOR.execute(() -> {
+                    if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
+                        if (clientConfig.getEnableIsolatedMode()) {
+                            LoginApiService.getInstance().logout(player);
+                        }
+                    } else {
+                        MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
                     }
-                } else {
-                    MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
-                }
+                });
             });
         }
     }
