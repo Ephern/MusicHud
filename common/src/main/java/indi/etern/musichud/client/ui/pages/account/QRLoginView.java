@@ -15,7 +15,6 @@ import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.requestResponseCycle.CancelQRLoginRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginRequest;
-import lombok.extern.slf4j.Slf4j;
 import net.minecraft.client.resources.language.I18n;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;

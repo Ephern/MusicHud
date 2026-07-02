@@ -5,8 +5,6 @@ import indi.etern.musichud.beans.music.PlaylistResponse;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.utils.http.ApiClient;
 
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 
 @SuppressWarnings("SpellCheckingInspection")

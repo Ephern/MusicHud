@@ -27,13 +27,14 @@ public interface IServerNetworkService {
     void sendToNetworkPlayer(ServerPlayer player, S2CPayload payload);
 
     default <T extends S2CPayload> void sendToPlayer(Player player, T payload) {
-        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT
-                && ClientDistUtil.inIsolatedMode(player)) {
+        if (ClientDistUtil.shouldUseIntegratedServer(player)) {
             //noinspection unchecked
             NetworkReceiver<T> receiver = (NetworkReceiver<T>) INetworkRegister.getInstance()
                     .getMetaDataOrNew(payload.getClass(), null).receiver();
             if (receiver != null) {
-                receiver.receive(payload, player);
+                MusicHud.EXECUTOR.execute(() -> {
+                    receiver.receive(payload, player);
+                });
             } else {
                 throw new IllegalStateException();
             }
