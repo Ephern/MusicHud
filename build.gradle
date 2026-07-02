@@ -85,6 +85,10 @@ configure(subprojects.findAll { it.name != 'paper' }) {
         it.options.release = 21
     }
 
+    tasks.withType(JavaExec).configureEach {
+        jvmArgs("--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED")
+    }
+
     // Configure Maven publishing.
     publishing {
         publications {
