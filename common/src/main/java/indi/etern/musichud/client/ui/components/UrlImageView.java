@@ -7,7 +7,6 @@ import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.RoundedImageDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.util.ColorStateList;

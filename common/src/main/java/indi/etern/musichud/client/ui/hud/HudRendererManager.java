@@ -14,10 +14,7 @@ import indi.etern.musichud.interfaces.IClientEventService;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -122,10 +119,12 @@ public class HudRendererManager {
             );
             setBaseLayout(layout);
             IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
-                MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-                if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
-                    reset();
-                }
+                MusicHud.EXECUTOR.execute(() -> {
+                    MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+                    if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
+                        reset();
+                    }
+                });
             });
         } catch (Exception e) {
             if (logger == null) {

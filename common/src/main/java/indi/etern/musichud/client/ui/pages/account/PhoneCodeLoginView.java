@@ -14,7 +14,6 @@ import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.requestResponseCycle.PhoneCodeLoginRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeResponse;
-import lombok.extern.slf4j.Slf4j;
 import net.minecraft.client.resources.language.I18n;
 
 import java.time.Duration;
