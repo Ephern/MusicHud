@@ -4,7 +4,6 @@ import com.mojang.blaze3d.platform.NativeImage;
 import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 
-import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
 

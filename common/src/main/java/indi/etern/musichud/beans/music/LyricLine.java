@@ -5,7 +5,6 @@ import icyllis.modernui.graphics.text.FontMetricsInt;
 import icyllis.modernui.graphics.text.ShapedText;
 import icyllis.modernui.text.*;
 import icyllis.modernui.text.style.ReplacementSpan;
-import indi.etern.musichud.MusicHud;
 import lombok.*;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;

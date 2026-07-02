@@ -1,5 +1,6 @@
 package indi.etern.musichud.server.api;
 
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.interfaces.IServerEventService;
@@ -63,7 +64,9 @@ public interface ILoginApiService {
         @Override
         public void register() {
             IServerEventService.getInstance().registerCommonPlayerQuit(player -> {
-                getInstance(ApiProvider.NCM).logout(player);
+                MusicHud.EXECUTOR.execute(() -> {
+                    getInstance(ApiProvider.NCM).logout(player);
+                });
             });
         }
     }

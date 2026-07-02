@@ -119,10 +119,12 @@ public class HudRendererManager {
             );
             setBaseLayout(layout);
             IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
-                MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-                if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
-                    reset();
-                }
+                MusicHud.EXECUTOR.execute(() -> {
+                    MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+                    if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
+                        reset();
+                    }
+                });
             });
         } catch (Exception e) {
             if (logger == null) {
