@@ -6,7 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 import java.util.UUID;
 
@@ -22,17 +22,17 @@ public class PlayerInfoUtil {
         return connection.getPlayerInfo(uuid);
     }
 
-    public static ResourceLocation getPlayerSkin(PlayerInfo playerInfo) {
+    public static Identifier getPlayerSkin(PlayerInfo playerInfo) {
         if (playerInfo == null) {
             if (Minecraft.getInstance().getCurrentServer() == null || //single player
                     MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
                 LocalPlayer player = Minecraft.getInstance().player;
                 if (player != null) {
-                    return player.getSkin().texture();
+                    return player.getSkin().body().texturePath();
                 }
             }
         } else {
-            return playerInfo.getSkin().texture();
+            return playerInfo.getSkin().body().texturePath();
         }
         return null;
     }
