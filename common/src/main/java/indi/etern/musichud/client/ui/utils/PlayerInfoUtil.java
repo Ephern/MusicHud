@@ -28,11 +28,11 @@ public class PlayerInfoUtil {
                     MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
                 LocalPlayer player = Minecraft.getInstance().player;
                 if (player != null) {
-                    return player.getSkin().texture();
+                    return player.getSkin().body().texturePath();
                 }
             }
         } else {
-            return playerInfo.getSkin().texture();
+            return playerInfo.getSkin().body().texturePath();
         }
         return null;
     }
