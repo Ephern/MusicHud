@@ -26,8 +26,7 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class MusicPlayerServerService {
@@ -43,6 +42,8 @@ public class MusicPlayerServerService {
             .build();
     private final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private static final ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
+    private static final long DEBOUNCE_DELAY_MILLIS = 500;
+    private final AtomicInteger debounceToken = new AtomicInteger(0);
     @Getter
     ArrayDeque<MusicDetail> musicQueue = new ArrayDeque<>();
     boolean continuable;
@@ -186,10 +187,10 @@ public class MusicPlayerServerService {
                     if (musicDetail.getId() == randomTrack.getId()) {
                         randomTrack.setExtraInfo(musicDetail.getExtraInfo());
                     } else {
-                        throw new IllegalStateException();
+                        return Optional.empty();
                     }
                 } else {
-                    throw new IllegalStateException();
+                    return Optional.empty();
                 }
             }
 
@@ -315,6 +316,21 @@ public class MusicPlayerServerService {
         }
     }
 
+    private void debouncedUpdateAllIdlePlaySources() {
+        final int token = debounceToken.incrementAndGet();
+        MusicHud.EXECUTOR.execute(() -> {
+            try {
+                Thread.sleep(DEBOUNCE_DELAY_MILLIS);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            if (debounceToken.get() == token) {
+                sendUpdateAllIdlePlaySourcesMessageTo(loginApiService.getPlayerInfoMap().values());
+            }
+        });
+    }
+
     public void pushMusicToQueue(long musicDetailId, Player pusher) {
         List<MusicDetail> musicDetailByIds = musicApiService.getMusicDetailByIds(List.of(musicDetailId), pusher);
         if (musicDetailByIds.size() != 1) {
@@ -392,7 +408,7 @@ public class MusicPlayerServerService {
         musicCollections.add(idlePlaySource);
         idlePlaySources.put(player, musicCollections);
         updateContinuable(true);
-        sendUpdateAllIdlePlaySourcesMessageTo(loginApiService.getPlayerInfoMap().values());
+        debouncedUpdateAllIdlePlaySources();
     }
 
     public void removeIdlePlaySource(long id, Class<?> musicCollectionClass, Player player) {
@@ -404,7 +420,7 @@ public class MusicPlayerServerService {
             if (musicCollections.isEmpty()) {
                 idlePlaySources.remove(player);
             }
-            sendUpdateAllIdlePlaySourcesMessageTo(loginApiService.getPlayerInfoMap().values());
+            debouncedUpdateAllIdlePlaySources();
         }
     }
 
@@ -455,10 +471,11 @@ public class MusicPlayerServerService {
 
     public void removeAllIdlePlaySource(Player player) {
         idlePlaySources.remove(player);
-        sendUpdateAllIdlePlaySourcesMessageTo(loginApiService.getPlayerInfoMap().values());
+        debouncedUpdateAllIdlePlaySources();
     }
 
     public void reset() {
+        debounceToken.incrementAndGet();
         musicQueue.clear();
         idlePlaySources.clear();
         stopSendingMusic();
