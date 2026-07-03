@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
@@ -43,6 +44,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         float scale = 0.87f;
         float inset = (1 - scale) / 2;
 
+        float[] prevColor = RenderSystem.getShaderColor();
         // Inner face layer (8,8 to 16,16) - slightly smaller for depth
         gr.setColor(1, 1, 1, Math.min(alpha, 1));
         PoseStack pose = gr.pose();
@@ -63,6 +65,6 @@ public class PlayerHeadRenderer implements HudRenderer {
                 40, 8, 8, 8,
                 SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE);
         pose.popPose();
-        gr.setColor(255, 255, 255, 255);
+        gr.setColor(prevColor[0], prevColor[1], prevColor[2], prevColor[3]);
     }
 }
