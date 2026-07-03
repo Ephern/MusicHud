@@ -7,7 +7,7 @@ import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.ARGB;
+import net.minecraft.util.FastColor;
 
 public class PlayerHeadRenderer implements HudRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
@@ -36,15 +36,15 @@ public class PlayerHeadRenderer implements HudRenderer {
     }
 
     public static void renderHead(GuiGraphics gr, ResourceLocation skin,
-                                   float x, float y, int w, int h, float alpha) {
+                                  float x, float y, int w, int h, float alpha) {
         if (alpha <= 0.003) {
             return;
         }
         float scale = 0.87f;
         float inset = (1 - scale) / 2;
 
-        int alphaColor = ARGB.color(Math.min(alpha, 1), 0xFFFFFF);
         // Inner face layer (8,8 to 16,16) - slightly smaller for depth
+        gr.setColor(1, 1, 1, Math.min(alpha, 1));
         PoseStack pose = gr.pose();
         pose.pushPose();
         pose.translate(x + w * inset, y + h * inset, 0);
@@ -63,5 +63,6 @@ public class PlayerHeadRenderer implements HudRenderer {
                 40, 8, 8, 8,
                 SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE);
         pose.popPose();
+        gr.setColor(255, 255, 255, 255);
     }
 }
