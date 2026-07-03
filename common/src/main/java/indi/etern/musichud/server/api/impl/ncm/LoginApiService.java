@@ -367,6 +367,45 @@ public class LoginApiService implements ILoginApiService {
         serverNetworkService.sendToPlayerInfos(playerInfoMap.values(), new ConnectResponse(true, Version.current, List.of(ApiProvider.NCM)));
     }
 
+    @Override
+    public void loginWithCookie(LoginCookieInfo loginCookieInfo, boolean tryToRefresh, Player player) {
+        IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
+        if (tryToRefresh) {
+            try {
+                refreshAndSend(player, loginCookieInfo);
+            } catch (Exception e) {
+                serverNetworkService.sendToPlayer(player,
+                        new LoginResultMessage(false,
+                                "",
+                                loginCookieInfo,
+                                Profile.ANONYMOUS
+                        )
+                );
+            }
+        } else if (loginCookieInfo.type() != LoginType.ANONYMOUS) {
+            try {
+                Profile profile =
+                        loadUserProfile(player, loginCookieInfo);
+                serverNetworkService.sendToPlayer(player,
+                        new LoginResultMessage(true,
+                                "",
+                                loginCookieInfo,
+                                profile
+                        )
+                );
+            } catch (Exception e) {
+                serverNetworkService.sendToPlayer(player,
+                        new LoginResultMessage(false,
+                                "",
+                                loginCookieInfo,
+                                Profile.ANONYMOUS
+                        )
+                );
+            }
+        }
+        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(getLoginInfoByPlayer(player)));//FIXME
+    }
+
     record ValidationCodeRequest(int ctcode, long phone) {
     }
 

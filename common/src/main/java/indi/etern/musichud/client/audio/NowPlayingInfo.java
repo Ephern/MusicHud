@@ -9,6 +9,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.lyrics.FullLineLyricParser;
 import indi.etern.musichud.client.ui.utils.lyrics.WordByWordLyricParser;
@@ -16,11 +17,7 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import io.github.selemba1000.*;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
@@ -346,32 +343,11 @@ public class NowPlayingInfo {
     }
 
     public PlayerInfo getPusherPlayerInfo() {
-        Minecraft minecraft = Minecraft.getInstance();
-        ClientPacketListener connection = minecraft.getConnection();
-        if (connection == null) {
-            throw new IllegalStateException();
-        }
         if (currentlyPlayingMusicDetail != null) {
-            return connection.getPlayerInfo(currentlyPlayingMusicDetail.getPusherInfo().getPlayerUUID());
+            return PlayerInfoUtil.getPlayerInfoByUUID(currentlyPlayingMusicDetail.getPusherInfo().getPlayerUUID());
         } else {
             return null;
         }
-    }
-
-    public ResourceLocation getPusherSkinResource() {
-        PlayerInfo pusherPlayerInfo = getPusherPlayerInfo();
-        if (pusherPlayerInfo == null) {
-            if (Minecraft.getInstance().getCurrentServer() == null || //single player
-                    MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
-                LocalPlayer player = Minecraft.getInstance().player;
-                if (player != null) {
-                    return player.getSkin().texture();
-                }
-            }
-        } else {
-            return pusherPlayerInfo.getSkin().texture();
-        }
-        return null;
     }
 
     public MusicDetail getNextToPlayIdleMusicDetail() {

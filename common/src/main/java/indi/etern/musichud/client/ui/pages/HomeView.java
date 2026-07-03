@@ -40,10 +40,12 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class HomeView extends LinearLayout {
-    @Getter
-    private static HomeView instance;
     private static final MusicService musicService = MusicService.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    @Getter
+    private static HomeView instance;
+    private final Set<MusicCollection> serverIdlePlaySources = musicService.getServerIdlePlaySources();
+    private final Set<MusicCollection> clientIdlePlaySources = musicService.getLocalIdlePlaySources();
     private final Map<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new ConcurrentHashMap<>();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
@@ -53,6 +55,44 @@ public class HomeView extends LinearLayout {
     private LinearLayout playQueueListView;
     private LinearLayout clientIdlePlaySourceView;
     private LinearLayout serverIdlePlaySourceView;
+    private AutoFlowGridLayout clientIdlePlaySourceCardsList;
+    private final Consumer<MusicCollection> localAddListener = collection -> {
+        MuiModApi.postToUiThread(() -> {
+            if (!idlePlaySourceCardMap.containsKey(collection)) {
+                addIdlePlaySourceTo(collection, getContext(), clientIdlePlaySourceCardsList);
+                checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
+            }
+        });
+    };
+    private final Consumer<MusicCollection> localRemoveListener = collection -> {
+        MuiModApi.postToUiThread(() -> {
+            MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
+            if (view != null) {
+                clientIdlePlaySourceCardsList.removeView(view);
+                checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
+            }
+        });
+    };
+    private AutoFlowGridLayout serverIdlePlaySourceCardsList;
+    private final Consumer<MusicCollection> serverRemoveListener = collection -> {
+        MuiModApi.postToUiThread(() -> {
+            MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
+            if (view != null) {
+                serverIdlePlaySourceCardsList.removeView(view);
+                checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
+            }
+        });
+    };
+    private LocalPlayer localPlayer = Minecraft.getInstance().player;
+    private final Consumer<MusicCollection> serverAddListener = collection -> {
+        MuiModApi.postToUiThread(() -> {
+            if ((localPlayer != null && collection.getPusherInfo().getPlayerUUID() != localPlayer.getUUID())
+                    && !idlePlaySourceCardMap.containsKey(collection)) {
+                addIdlePlaySourceTo(collection, getContext(), serverIdlePlaySourceCardsList);
+                checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
+            }
+        });
+    };
 
     public HomeView(Context context) {
         super(context);
@@ -72,15 +112,6 @@ public class HomeView extends LinearLayout {
             addView(textView);
             return;
         }
-        /*
-        boolean enabled = clientConfig.getEnable();
-        if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED || !enabled) {
-            setGravity(Gravity.CENTER);
-            TextView textView = Theme.getNotificationTextView(context, enabled);
-            addView(textView);
-            return;
-        }
-*/
 
         setOrientation(HORIZONTAL);
         {
@@ -158,7 +189,7 @@ public class HomeView extends LinearLayout {
             idlePlaySourceViewDescription.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
             clientIdlePlaySourceView.addView(idlePlaySourceViewDescription, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-            AutoFlowGridLayout clientIdlePlaySourceCardsList = new AutoFlowGridLayout(context);
+            clientIdlePlaySourceCardsList = new AutoFlowGridLayout(context);
             clientIdlePlaySourceCardsList.setRowMinWidth(dp(143));
             LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params4.setMargins(0, dp(16), 0, 0);
@@ -185,17 +216,15 @@ public class HomeView extends LinearLayout {
             idlePlaySourceViewDescription1.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
             serverIdlePlaySourceView.addView(idlePlaySourceViewDescription1, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-            AutoFlowGridLayout serverIdlePlaySourceCardsList = new AutoFlowGridLayout(context);
+            serverIdlePlaySourceCardsList = new AutoFlowGridLayout(context);
             serverIdlePlaySourceCardsList.setRowMinWidth(dp(143));
             LayoutParams params6 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params6.setMargins(0, dp(16), 0, 0);
             serverIdlePlaySourceView.addView(serverIdlePlaySourceCardsList, params6);
             scrollViewContainer.addView(serverIdlePlaySourceView, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-            LocalPlayer localPlayer = Minecraft.getInstance().player;
+            localPlayer = Minecraft.getInstance().player;
 
-            Set<MusicCollection> clientIdlePlaySources = musicService.getLocalIdlePlaySources();
-            Set<MusicCollection> serverIdlePlaySources = musicService.getServerIdlePlaySources();
             clientIdlePlaySources.forEach(collection -> {
                 if (!idlePlaySourceCardMap.containsKey(collection)) {
                     MusicCollectionCard child = new MusicCollectionCard(context, collection);
@@ -215,41 +244,7 @@ public class HomeView extends LinearLayout {
             checkQueue(musicService.getMusicQueue());
 
             Queue<MusicDetail> queue = musicService.getMusicQueue();
-            Consumer<MusicCollection> localAddListener = collection -> {
-                MuiModApi.postToUiThread(() -> {
-                    if (!idlePlaySourceCardMap.containsKey(collection)) {
-                        addIdlePlaySourceTo(collection, context, clientIdlePlaySourceCardsList);
-                        checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
-                    }
-                });
-            };
-            Consumer<MusicCollection> localRemoveListener = collection -> {
-                MuiModApi.postToUiThread(() -> {
-                    MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
-                    if (view != null) {
-                        clientIdlePlaySourceCardsList.removeView(view);
-                        checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
-                    }
-                });
-            };
-            Consumer<MusicCollection> serverAddListener = collection -> {
-                MuiModApi.postToUiThread(() -> {
-                    if ((localPlayer != null && collection.getPusherInfo().getPlayerUUID() != localPlayer.getUUID())
-                            && !idlePlaySourceCardMap.containsKey(collection)) {
-                        addIdlePlaySourceTo(collection, context, serverIdlePlaySourceCardsList);
-                        checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
-                    }
-                });
-            };
-            Consumer<MusicCollection> serverRemoveListener = collection -> {
-                MuiModApi.postToUiThread(() -> {
-                    MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
-                    if (view != null) {
-                        serverIdlePlaySourceCardsList.removeView(view);
-                        checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
-                    }
-                });
-            };
+
             musicService.getLocalIdlePlaySourceAddListeners().add(localAddListener);
             musicService.getLocalIdlePlaySourceRemoveListeners().add(localRemoveListener);
             musicService.getServerIdlePlaySourceAddListeners().add(serverAddListener);
