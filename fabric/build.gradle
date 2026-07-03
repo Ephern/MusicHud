@@ -126,10 +126,10 @@ jar {
 loom {
     runs {
         client {
-            runDir = "run/client"
+            setRunDirectory file("run/server")
         }
         server {
-            runDir = "run/server"
+            setRunDirectory file("run/server")
         }
     }
 }

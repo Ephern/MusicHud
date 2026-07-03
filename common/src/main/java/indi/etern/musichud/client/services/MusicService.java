@@ -34,6 +34,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
@@ -54,29 +55,29 @@ public class MusicService {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static volatile MusicService instance;
     @Getter
-    private final Set<MusicCollection> localIdlePlaySources = new HashSet<>();
+    private final Set<MusicCollection> localIdlePlaySources = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<Consumer<MusicCollection>> localIdlePlaySourceAddListeners = new HashSet<>();
+    private final Set<Consumer<MusicCollection>> localIdlePlaySourceAddListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<Consumer<MusicCollection>> localIdlePlaySourceRemoveListeners = new HashSet<>();
+    private final Set<Consumer<MusicCollection>> localIdlePlaySourceRemoveListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<Consumer<MusicCollection>> localIdlePlaySourceChangeListeners = new HashSet<>();
+    private final Set<Consumer<MusicCollection>> localIdlePlaySourceChangeListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<MusicCollection> serverIdlePlaySources = new HashSet<>();
+    private final Set<MusicCollection> serverIdlePlaySources = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceAddListeners = new HashSet<>();
+    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceAddListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceRemoveListeners = new HashSet<>();
+    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceRemoveListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceChangeListeners = new HashSet<>();
+    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceChangeListeners = ConcurrentHashMap.newKeySet();
     @Getter
     private final Queue<MusicDetail> musicQueue = new ArrayDeque<>();
     @Getter
-    private final Set<Consumer<Queue<MusicDetail>>> musicQueueRefreshListeners = new HashSet<>();
+    private final Set<Consumer<Queue<MusicDetail>>> musicQueueRefreshListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<Consumer<MusicDetail>> musicQueuePushListeners = new HashSet<>();
+    private final Set<Consumer<MusicDetail>> musicQueuePushListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = new HashSet<>();
+    private final Set<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = ConcurrentHashMap.newKeySet();
     long lastPressTime = 0;
     @Getter
     private boolean idlePlaySourceLoaded = false;
@@ -169,7 +170,7 @@ public class MusicService {
             collection = idlePlaySourceCollection;
         }
         IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
-        if (localIdlePlaySources.stream().noneMatch(s -> s.equals(collection))) {
+        if (localIdlePlaySources.stream().noneMatch(s -> s.equalsLoose(collection))) {
             localIdlePlaySources.add(collection);
             localIdlePlaySourceAddListeners.forEach(l -> l.accept(collection));
             localIdlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
@@ -318,7 +319,7 @@ public class MusicService {
         }
     }
 
-    public void updateAllIdlePlaySources(List<Playlist> playlistSources, List<Album> albumSources) {
+    public synchronized void updateAllIdlePlaySources(List<Playlist> playlistSources, List<Album> albumSources) {
         Set<MusicCollection> toRemove = new HashSet<>();
         Set<MusicCollection> toAdd = new HashSet<>();
         Set<MusicCollection> serverIdlePlaySources = Set.copyOf(this.serverIdlePlaySources);

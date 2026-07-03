@@ -8,6 +8,7 @@ import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
+import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientEventService;
@@ -15,6 +16,7 @@ import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
@@ -279,7 +281,8 @@ public class HudRendererManager {
                         .orElse("");
                 ARTISTS_AND_ALBUM_RENDERER.setText(artists + " - " + musicDetail.getAlbum().getName());
                 LYRICS_LINE_RENDERER.clear();
-                PLAYER_HEAD_RENDERER.setSkinResource(nowPlayingInfo.getPusherSkinResource());
+                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
+                PLAYER_HEAD_RENDERER.setSkinResource(PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo));
                 loadAlbumImage(musicDetail).thenAccept((unused) -> {
                     Duration musicDuration = nowPlayingInfo.getMusicDuration();
                     DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
@@ -354,7 +357,8 @@ public class HudRendererManager {
             hudRenderContext.clearContext();
             hudRenderContext.setGraphics(graphics);
 
-            PLAYER_HEAD_RENDERER.setSkinResource(nowPlayingInfo.getPusherSkinResource());
+            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
+            PLAYER_HEAD_RENDERER.setSkinResource(PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo));
 
             BACKGROUND_RENDERER.render(hudRenderContext);
 

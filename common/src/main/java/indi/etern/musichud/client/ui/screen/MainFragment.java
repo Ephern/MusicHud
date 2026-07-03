@@ -7,7 +7,6 @@ import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.drawable.Drawable;
-import icyllis.modernui.mc.MinecraftSurfaceView;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.util.DataSet;
@@ -26,21 +25,18 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
-import indi.etern.musichud.client.ui.hud.renderer.PlayerHeadRenderer;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.resources.Identifier;
-import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -57,6 +53,17 @@ public class MainFragment extends Fragment {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final LoginService loginService = LoginService.getInstance();
     private static volatile MainFragment instance = null;
+
+    static {
+        MusicHud.getConnectStatusListeners().add(status -> {
+            if (instance != null) {
+                MuiModApi.postToUiThread(() -> {
+                    instance.refreshServerConnectStatus();
+                });
+            }
+        });
+    }
+
     private final NowPlayingInfo playingInfo = NowPlayingInfo.getInstance();
     private UrlImageView albumImage;
     private TextView titleText;
@@ -70,19 +77,9 @@ public class MainFragment extends Fragment {
     private Button skipCurrentButton;
     private TextView serverConnectStatus;
     private Button switchServerConnectButton;
-    private MinecraftSurfaceView pusherHeadView;
+    private PlayerHeadView pusherHeadView;
 
     public MainFragment() {
-    }
-
-    static {
-        MusicHud.getConnectStatusListeners().add(status -> {
-            if (instance != null) {
-                MuiModApi.postToUiThread(() -> {
-                    instance.refreshServerConnectStatus();
-                });
-            }
-        });
     }
 
     public static void refresh() {
@@ -100,15 +97,7 @@ public class MainFragment extends Fragment {
             accountBaseView.refresh();
         }
         if (instance != null && instance.titleText != null) {
-//            if (!clientConfig.getEnable()) {
-//                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
-//            } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED && !clientConfig.getEnableIsolatedClient()) {
-//                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
-//            } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.INCOMPATIBLE && !clientConfig.getEnableIsolatedClient()) {
-//                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer"));
-//            } else {
-                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
-//            }
+            instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
             instance.refreshServerConnectStatus();
         }
     }
@@ -117,15 +106,7 @@ public class MainFragment extends Fragment {
         if (instance != null) {
             if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
                 instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
-//                if (!clientConfig.getEnable()) {
-//                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
-//                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
-//                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
-//                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.INCOMPATIBLE) {
-//                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer"));
-//                } else {
-                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
-//                }
+                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
                 instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                 instance.artists.removeAllViews();
                 instance.albumContainer.removeAllViews();
@@ -313,15 +294,7 @@ public class MainFragment extends Fragment {
                 titleText = new TextView(context);
                 titleText.setTextSize(Theme.TEXT_SIZE_LARGE);
                 titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
-//                if (!clientConfig.getEnable()) {
-//                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.disabled"));
-//                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
-//                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
-//                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.INCOMPATIBLE) {
-//                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer"));
-//                } else {
-                    instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
-//                }
+                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
                 musicInfo.addView(titleText);
 
                 artists = new FlexWrapLayout(context);
@@ -340,28 +313,18 @@ public class MainFragment extends Fragment {
                 pusherRow.setOrientation(LinearLayout.HORIZONTAL);
                 pusherRow.setGravity(Gravity.CENTER_VERTICAL);
 
-                pusherHeadView = new MinecraftSurfaceView(context);
+                pusherHeadView = new PlayerHeadView(context);
                 int rowHeight = pusherText.dp(Theme.TEXT_SIZE_LARGER);
                 //noinspection SuspiciousNameCombination
                 pusherHeadView.setLayoutParams(new LinearLayout.LayoutParams(rowHeight, rowHeight));
                 pusherHeadView.setVisibility(View.GONE);
-                pusherHeadView.setRenderer(new MinecraftSurfaceView.Renderer() {
-                    @Override
-                    public void onSurfaceChanged(int width, int height) {}
-
-                    @Override
-                    public void onDraw(@NotNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick,
-                                       double guiScale, float alpha) {
-                        Identifier skin = null;
-                        try {
-                            skin = NowPlayingInfo.getInstance().getPusherSkinResource();
-                        } catch (Exception ignored) {}
-                        if (skin == null) return;
-
-                        int w = (int) Math.ceil(pusherHeadView.getWidth() / guiScale);
-                        int h = (int) Math.ceil(pusherHeadView.getHeight() / guiScale);
-                        PlayerHeadRenderer.renderHead(gr, skin, 0, 0, w, h);
+                pusherHeadView.setPlayerSkinSupplier(() -> {
+                    try {
+                        PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
+                        return PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo);
+                    } catch (Exception ignored) {
                     }
+                    return null;
                 });
 
                 pusherRow.addView(pusherHeadView);
@@ -369,7 +332,10 @@ public class MainFragment extends Fragment {
                 params5.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
                 params5.setMargins(pusherText.dp(4), 0, 0, 0);
                 pusherRow.addView(pusherText, params5);
-                musicInfo.addView(pusherRow);
+                LinearLayout.LayoutParams params6 = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+                int dp2 = musicInfo.dp(2);
+                params6.setMargins(0, dp2, 0, dp2);
+                musicInfo.addView(pusherRow, params6);
 
                 progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
                 progressBar.setMin(0);
@@ -384,7 +350,8 @@ public class MainFragment extends Fragment {
                 streamAudioPlayer.getStatusChangeListener().add(statusListener);
                 base.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
                     @Override
-                    public void onViewAttachedToWindow(View v) {}
+                    public void onViewAttachedToWindow(View v) {
+                    }
 
                     @Override
                     public void onViewDetachedFromWindow(View v) {
@@ -435,7 +402,7 @@ public class MainFragment extends Fragment {
                 params1.setMargins(sideContent.dp(8), sideContent.dp(4), sideContent.dp(8), sideContent.dp(24));
 
                 musicInfo.addView(skipCurrentButton, buttonParams);
-                musicInfo.setMinimumHeight(sideContent.dp(128));
+                musicInfo.setMinimumHeight(sideContent.dp(132));
 
                 sideContent.addView(musicInfo, params1);
                 sideContent.addView(sideMenu, params);
