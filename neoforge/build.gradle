@@ -108,10 +108,16 @@ remapJar {
 loom {
     runs {
         client {
-            runDir = "run/client"
+            setRunDirectory file("run/client")
+            jvmArguments.addAll(
+                "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED"
+            )
         }
         server {
-            runDir = "run/server"
+            setRunDirectory file("run/server")
+            jvmArguments.addAll(
+                "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED"
+            )
         }
     }
 }

@@ -7,6 +7,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
+import net.minecraft.util.ARGB;
 
 public class PlayerHeadRenderer implements HudRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
@@ -31,11 +32,14 @@ public class PlayerHeadRenderer implements HudRenderer {
         int h = (int) layout.getHeight();
 
         renderHead(context.getGraphics(), skinResource,
-                absolutePosition.x(), absolutePosition.y(), w, h);
+                absolutePosition.x(), absolutePosition.y(), w, h, 1);
     }
 
     public static void renderHead(GuiGraphics gr, Identifier skin,
-                                   float x, float y, int w, int h) {
+                                   float x, float y, int w, int h, float alpha) {
+        if (alpha <= 0.003) {
+            return;
+        }
         float scale = 0.87f;
         float inset = (1 - scale) / 2;
         gr.nextStratum();
@@ -44,15 +48,16 @@ public class PlayerHeadRenderer implements HudRenderer {
         gr.pose().pushMatrix();
         gr.pose().translate(x + w * inset, y + h * inset);
         gr.pose().scale(scale);
+        int alphaColor = ARGB.color(Math.min(alpha, 1), 0xFFFFFF);
         gr.blit(RenderPipelines.GUI_TEXTURED, skin,
-                0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE);
+                0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
         gr.pose().popMatrix();
 
         gr.pose().pushMatrix();
         gr.pose().translate(x, y);
         // Outer hat layer (40,8 to 48,16) - full size on top
         gr.blit(RenderPipelines.GUI_TEXTURED, skin,
-                0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE);
+                0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
         gr.pose().popMatrix();
     }
 }

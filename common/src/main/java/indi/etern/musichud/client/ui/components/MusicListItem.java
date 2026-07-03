@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.view.Gravity;
+import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
@@ -12,6 +13,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -23,8 +25,11 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Objects;
 
+import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
+import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+
 public class MusicListItem extends LinearLayout {
-    public static final int imageSize = 54;
+    public static final int imageSize = 56;
     private final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("mm:ss");
     private UrlImageView albumImage;
@@ -37,6 +42,7 @@ public class MusicListItem extends LinearLayout {
     private boolean showPusherInfo = true;
     @Getter
     private MusicDetail musicDetail;
+    private PlayerHeadView pusherHeadView;
 
     public MusicListItem(Context context) {
         super(context);
@@ -72,6 +78,7 @@ public class MusicListItem extends LinearLayout {
 
         LinearLayout linearLayout = new LinearLayout(context);
         linearLayout.setOrientation(HORIZONTAL);
+        linearLayout.setGravity(Gravity.CENTER_VERTICAL);
         musicTexts.addView(linearLayout);
 
         durationText = new TextView(context);
@@ -80,13 +87,31 @@ public class MusicListItem extends LinearLayout {
         durationText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
 
         LayoutParams params = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        params.setMargins(0, 0, dp(16), 0);
+        params.setMargins(0, 0, dp(12), 0);
         linearLayout.addView(durationText, params);
 
-        pusherText = new TextView(getContext());
+        LinearLayout pusherRow = new LinearLayout(context);
+        pusherRow.setOrientation(LinearLayout.HORIZONTAL);
+        pusherRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        pusherText = new TextView(context);
         pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         pusherText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        linearLayout.addView(pusherText);
+        pusherText.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+
+        pusherHeadView = new PlayerHeadView(context);
+        int rowHeight = pusherText.dp(Theme.TEXT_SIZE_LARGER);
+        //noinspection SuspiciousNameCombination
+        pusherHeadView.setLayoutParams(new LinearLayout.LayoutParams(rowHeight, rowHeight));
+        pusherHeadView.setVisibility(View.GONE);
+
+        pusherRow.addView(pusherHeadView);
+        LinearLayout.LayoutParams params5 = new LinearLayout.LayoutParams(WRAP_CONTENT, rowHeight);
+        params5.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
+        params5.setMargins(pusherText.dp(4), 0, 0, 0);
+        pusherRow.addView(pusherText, params5);
+
+        linearLayout.addView(pusherRow, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
     }
 
     public void bindData(MusicDetail musicDetail) {
@@ -175,7 +200,17 @@ public class MusicListItem extends LinearLayout {
                 ClientPacketListener connection = Minecraft.getInstance().getConnection();
                 if (connection == null) throw new IllegalStateException();
                 pusherText.setText(pusherInfo.getPlayerName());
+                pusherHeadView.setVisibility(VISIBLE);
+                pusherHeadView.setPlayerSkinSupplier(() -> {
+                    try {
+                        return PlayerInfoUtil.getPlayerSkin(PlayerInfoUtil.getPlayerInfoByUUID(pusherInfo.getPlayerUUID()));
+                    } catch (Exception ignored) {}
+                    return null;
+                });
             }
+        } else {
+            pusherHeadView.setVisibility(View.GONE);
+            pusherHeadView.setPlayerSkinSupplier(null);
         }
     }
 }

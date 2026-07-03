@@ -27,7 +27,7 @@ public interface IServerNetworkService {
     void sendToNetworkPlayer(ServerPlayer player, S2CPayload payload);
 
     default <T extends S2CPayload> void sendToPlayer(Player player, T payload) {
-        if (ClientDistUtil.shouldUseIntegratedServer(player)) {
+        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && ClientDistUtil.isLocalPlayer(player)) {
             //noinspection unchecked
             NetworkReceiver<T> receiver = (NetworkReceiver<T>) INetworkRegister.getInstance()
                     .getMetaDataOrNew(payload.getClass(), null).receiver();

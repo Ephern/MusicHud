@@ -9,6 +9,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.lyrics.FullLineLyricParser;
 import indi.etern.musichud.client.ui.utils.lyrics.WordByWordLyricParser;
@@ -16,11 +17,7 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import io.github.selemba1000.*;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.resources.Identifier;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
@@ -101,7 +98,6 @@ public class NowPlayingInfo {
         }
         lyricUpdaterVThread = null;
     };
-    private Path tempAlbumArt;
 
     private NowPlayingInfo() {
         Thread smtcThread = new Thread(this::jmtcLoop, "MH-SMTC");
@@ -171,11 +167,6 @@ public class NowPlayingInfo {
                 jmtc.setTimelineProperties(new JMTCTimelineProperties(0L, durationMillis, 0L, durationMillis));
                 URI artUri = null;
                 String picUrl = musicDetail.getAlbum().getPicUrl();
-                if (tempAlbumArt != null) {
-                    try {
-                        Files.delete(tempAlbumArt);
-                    } catch (IOException ignored) {}
-                }
                 if (picUrl.startsWith("http")) {
                     try {
                         String suffix = "png";
@@ -183,12 +174,12 @@ public class NowPlayingInfo {
                         if (splits.length > 1) {
                             suffix = splits[splits.length - 1];
                         }
-                        tempAlbumArt = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
-                        tempAlbumArt.toFile().deleteOnExit();
+                        Path tempFile = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
+                        tempFile.toFile().deleteOnExit();
                         artUri = ImageUtils.downloadAsync(picUrl, inputStream -> {
                             try {
-                                Files.copy(inputStream, tempAlbumArt, StandardCopyOption.REPLACE_EXISTING);
-                                return tempAlbumArt.toUri();
+                                Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                                return tempFile.toUri();
                             } catch (IOException e) {
                                 throw new RuntimeException(e);
                             }
@@ -198,12 +189,12 @@ public class NowPlayingInfo {
                     }
                 } else {
                     try {
-                        tempAlbumArt = Files.createTempFile("MusicHUD-SMTC-Icon", ".png");
-                        tempAlbumArt.toFile().deleteOnExit();
+                        Path tempFile = Files.createTempFile("MusicHUD-SMTC-Icon", ".png");
+                        tempFile.toFile().deleteOnExit();
                         try (InputStream iconStream = getClass().getResourceAsStream("/assets/music_hud/icon.png")) {
                             if (iconStream != null) {
-                                Files.copy(iconStream, tempAlbumArt, StandardCopyOption.REPLACE_EXISTING);
-                                artUri = tempAlbumArt.toUri();
+                                Files.copy(iconStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                                artUri = tempFile.toUri();
                             }
                         }
                     } catch (Exception e) {
@@ -352,32 +343,11 @@ public class NowPlayingInfo {
     }
 
     public PlayerInfo getPusherPlayerInfo() {
-        Minecraft minecraft = Minecraft.getInstance();
-        ClientPacketListener connection = minecraft.getConnection();
-        if (connection == null) {
-            throw new IllegalStateException();
-        }
         if (currentlyPlayingMusicDetail != null) {
-            return connection.getPlayerInfo(currentlyPlayingMusicDetail.getPusherInfo().getPlayerUUID());
+            return PlayerInfoUtil.getPlayerInfoByUUID(currentlyPlayingMusicDetail.getPusherInfo().getPlayerUUID());
         } else {
             return null;
         }
-    }
-
-    public Identifier getPusherSkinResource() {
-        PlayerInfo pusherPlayerInfo = getPusherPlayerInfo();
-        if (pusherPlayerInfo == null) {
-            if (Minecraft.getInstance().getCurrentServer() == null || //single player
-                    MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
-                LocalPlayer player = Minecraft.getInstance().player;
-                if (player != null) {
-                    return player.getSkin().body().texturePath();
-                }
-            }
-        } else {
-            return pusherPlayerInfo.getSkin().body().texturePath();
-        }
-        return null;
     }
 
     public MusicDetail getNextToPlayIdleMusicDetail() {

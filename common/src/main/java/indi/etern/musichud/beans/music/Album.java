@@ -103,7 +103,11 @@ public class Album implements MusicCollection{
 
     @Override
     public boolean equals(Object obj) {
-        return obj instanceof Album album && id == album.id && pusherInfo.equals(album.pusherInfo);
+        return obj instanceof Album album
+                && album.id == id
+                && album.name.equals(name)
+                && album.picUrl.equals(picUrl)
+                && album.pusherInfo.equals(pusherInfo);
     }
 
     @Override
@@ -113,6 +117,6 @@ public class Album implements MusicCollection{
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, pusherInfo.getPlayerUUID());
+        return Objects.hash(id, name, picUrl, pusherInfo.getPlayerUUID());
     }
 }
