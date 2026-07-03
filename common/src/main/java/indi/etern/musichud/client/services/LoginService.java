@@ -42,6 +42,7 @@ import java.time.Period;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -61,6 +62,8 @@ public class LoginService {
             loginResponseHandler.accept(qrLoginResponse);
     };
     private double lastPressTime;
+    private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 300;
+    private final AtomicInteger toggleVersion = new AtomicInteger(0);
     @Getter
     private ConnectionType connectionType;
     @Getter
@@ -213,14 +216,34 @@ public class LoginService {
     public Boolean toggleConnection() {
         MusicHud.ConnectStatus connectStatus = MusicHud.getConnectStatus();
         if (connectStatus == MusicHud.ConnectStatus.CONNECTED) {
-            if (clientConfig.getEnableIsolatedMode()) {
-                switchToIsolate();
-            } else {
-                disconnectToExternalOrIntegratedServer();
-            }
+            final int version = toggleVersion.incrementAndGet();
+            MusicHud.EXECUTOR.execute(() -> {
+                try {
+                    Thread.sleep(TOGGLE_DEBOUNCE_DELAY_MILLIS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (toggleVersion.get() != version) return;
+                if (clientConfig.getEnableIsolatedMode()) {
+                    switchToIsolate();
+                } else {
+                    disconnectToExternalOrIntegratedServer();
+                }
+            });
             return true;
         } else if (connectStatus == MusicHud.ConnectStatus.NOT_CONNECTED) {
-            switchToServer();
+            final int version = toggleVersion.incrementAndGet();
+            MusicHud.EXECUTOR.execute(() -> {
+                try {
+                    Thread.sleep(TOGGLE_DEBOUNCE_DELAY_MILLIS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (toggleVersion.get() != version) return;
+                switchToServer();
+            });
             return false;
         } else {
             return null;

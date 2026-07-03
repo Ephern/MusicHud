@@ -156,19 +156,20 @@ public class Playlist implements MusicCollection {
     public boolean equals(Object obj) {
         return obj instanceof Playlist playlist
                 && playlist.id == id
-                && playlist.getPusherInfo().equals(pusherInfo);
+                && playlist.name.equals(name)
+                && playlist.coverImgUrl.equals(coverImgUrl)
+                && playlist.pusherInfo.equals(pusherInfo);
     }
 
     @Override
     public boolean equalsLoose(Object obj) {
         return obj instanceof Playlist playlist
-                && playlist.id == id
-                && playlist.getPusherInfo().equals(pusherInfo);
+                && playlist.id == id;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, pusherInfo.getPlayerUUID(), name, coverImgUrl);
+        return Objects.hash(id, name, coverImgUrl, pusherInfo.getPlayerUUID());
     }
 
     @Override

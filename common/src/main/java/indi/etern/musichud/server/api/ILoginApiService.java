@@ -55,6 +55,8 @@ public interface ILoginApiService {
 
     void loginWithEmailAndPassword(String email, String md5password, Player player);
 
+    void loginWithCookie(LoginCookieInfo loginCookieInfo, boolean tryToRefresh, Player player);
+
     void disconnectToAll();
 
     void reconnectAll();
