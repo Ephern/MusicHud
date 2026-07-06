@@ -2,11 +2,15 @@ package indi.etern.musichud.server.api;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
+import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.beans.user.Profile;
+import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.IServerEventService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerRegister;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.*;
@@ -33,19 +37,21 @@ public interface ILoginApiService {
 
     void refreshAndSend(Player player, LoginCookieInfo loginCookieInfo);
 
-    LoginApiService.QRLoginData startQRLoginByPlayer(Player player);
+    PusherInfo getPusherInfo(Player player);
+
+    QRLoginData startQRLoginByPlayer(Player player);
 
     Profile loadUserProfile(Player player, LoginCookieInfo loginCookieInfo);
 
     void cancelQRLoginByPlayer(Player player);
 
-    LoginApiService.PlayerLoginInfo getLoginInfoByPlayer(Player player);
+    PlayerLoginInfo getLoginInfoByPlayerUUID(UUID playerUUID);
 
-    Map<UUID, LoginApiService.PlayerLoginInfo> getPlayerInfoMap();
+    Map<UUID, PlayerLoginInfo> getPlayerInfoMap();
 
-    Set<Consumer<Collection<LoginApiService.PlayerLoginInfo>>> getLoginStateChangeListeners();
+    Set<Consumer<Collection<PlayerLoginInfo>>> getLoginStateChangeListeners();
 
-    String getRawCookieOrElse(Player player, Supplier<String> supplier);
+    String getRawCookieOrElse(UUID playerUUID, Supplier<String> supplier);
 
     void requestValidationCodeFor(int regionCode, long phone, Player player);
 
@@ -70,6 +76,30 @@ public interface ILoginApiService {
                     getInstance(ApiProvider.NCM).logout(player);
                 });
             });
+        }
+    }
+
+    record QRLoginData(int code, Data data) {
+        public record Data(String qrurl, String qrimg) {
+        }
+    }
+
+    @AllArgsConstructor
+    @Getter
+    class PlayerLoginInfo {
+        LoginCookieInfo loginCookieInfo;
+        Player player;
+        VipType vipType;
+        Profile profile;
+        PusherInfo pusherInfo;
+
+        public static PlayerLoginInfo of(Player player, LoginCookieInfo loginCookieInfo) {
+            return new PlayerLoginInfo(loginCookieInfo, player, null, null, PusherInfo.ofPlayer(player));
+        }
+
+        public void appendProfile(Profile profile) {
+            this.profile = profile;
+            vipType = profile.getVipType();
         }
     }
 }

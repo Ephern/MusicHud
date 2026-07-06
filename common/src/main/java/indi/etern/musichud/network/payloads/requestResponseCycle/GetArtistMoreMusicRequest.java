@@ -29,7 +29,7 @@ public record GetArtistMoreMusicRequest(long id, int offset) implements C2SPaylo
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetArtistMoreMusicRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((playlistDetailRequest, player) -> {
-                        List<MusicDetail> musicDetails = IMusicApiService.getInstance(ApiProvider.NCM).getArtistMoreMusic(playlistDetailRequest.id, playlistDetailRequest.offset, player);
+                        List<MusicDetail> musicDetails = IMusicApiService.getInstance(ApiProvider.NCM).getArtistMoreMusic(playlistDetailRequest.id, playlistDetailRequest.offset, player.getUUID());
                         if (musicDetails != null) {
                             IServerNetworkService.getInstance().sendToPlayer(player,new GetArtistMoreMusicResponse(playlistDetailRequest.id, playlistDetailRequest.offset, musicDetails));
                         }

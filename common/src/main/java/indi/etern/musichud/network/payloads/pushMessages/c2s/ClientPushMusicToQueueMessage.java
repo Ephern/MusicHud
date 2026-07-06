@@ -1,5 +1,6 @@
 package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
+import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -22,7 +23,7 @@ public record ClientPushMusicToQueueMessage(long id) implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     ClientPushMusicToQueueMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
-                        MusicPlayerServerService.getInstance().pushMusicToQueue(message.id, player);
+                        MusicPlayerServerService.getInstance().pushMusicToQueue(message.id, PusherInfo.ofPlayer(player));
                     })
             );
         }

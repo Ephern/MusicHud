@@ -2,9 +2,11 @@ package indi.etern.musichud.beans.music;
 
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.ILoginApiService;
+import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.Setter;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.Objects;
@@ -13,28 +15,34 @@ import java.util.UUID;
 public final class PusherInfo {
     public static final ByteBufCodec<PusherInfo> CODEC = ByteBufCodec.composite(
             Codecs.LONG,
-            PusherInfo::getUid,
+            (pusherInfo) -> -1L,// for compatibility with older versions. TODO: remove when bump to 1.3.0
             Codecs.UUID,
             PusherInfo::getPlayerUUID,
             Codecs.STRING_UTF8,
             PusherInfo::getPlayerName,
-            PusherInfo::new
+            (uid, uuid, name) -> new PusherInfo(uuid, name)
     );
-    public static final PusherInfo EMPTY = new PusherInfo(0L, new UUID(0L, 0L), "");
-    @Getter
-    private final long uid;
+    public static final PusherInfo EMPTY = new PusherInfo(new UUID(0L, 0L), "");
     @Getter
     private final @NonNull UUID playerUUID;
     @Getter
     private final @NonNull String playerName;
-    @Getter
-    @Setter
-    private transient Player player;
 
-    public PusherInfo(long uid, @NonNull UUID playerUUID, @NonNull String playerName) {
-        this.uid = uid;
+    public PusherInfo(@NonNull UUID playerUUID, @NonNull String playerName) {
         this.playerUUID = playerUUID;
         this.playerName = playerName;
+    }
+
+    public static PusherInfo ofPlayer(Player player) {
+        LoginApiService.PlayerLoginInfo loginInfo = ILoginApiService.getInstance(ApiProvider.NCM).getPlayerInfoMap().get(player.getUUID());
+        PusherInfo pusherInfo = PusherInfo.EMPTY;
+        if (loginInfo != null) {
+            pusherInfo = new PusherInfo(
+                    player.getUUID(),
+                    player.getName().getString()
+            );
+        }
+        return pusherInfo;
     }
 
     @Override
@@ -50,7 +58,6 @@ public final class PusherInfo {
     @Override
     public String toString() {
         return "PusherInfo[" +
-                "uid=" + uid + ", " +
                 "playerUUID=" + playerUUID + ", " +
                 "playerName=" + playerName + ']';
     }

@@ -25,7 +25,7 @@ public record GetAlbumDetailRequest(long id) implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetAlbumDetailRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((playlistDetailRequest, player) -> {
-                        Album album = IMusicApiService.getInstance(ApiProvider.NCM).getAlbumInfoDetail(playlistDetailRequest.id, player);
+                        Album album = IMusicApiService.getInstance(ApiProvider.NCM).getAlbumInfoDetail(playlistDetailRequest.id, player.getUUID());
                         if (album != null) {
                             IServerNetworkService.getInstance().sendToPlayer(player,new GetAlbumDetailResponse(album));
                         }

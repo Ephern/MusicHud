@@ -29,7 +29,7 @@ public record GetMusicResourceRequest(long id,Quality quality,String retryForUrl
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetMusicResourceRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((request, player) -> {
-                        var currentMusicResourceInfo = MusicPlayerServerService.getInstance().getMusicResourceInfo(request.id, request.quality, request.retryForUrl, player);
+                        var currentMusicResourceInfo = MusicPlayerServerService.getInstance().getMusicResourceInfo(request.id, request.quality, request.retryForUrl, player.getUUID());
                         IServerNetworkService.getInstance().sendToPlayer(player, new GetMusicResourceResponse(currentMusicResourceInfo));
                     })
             );

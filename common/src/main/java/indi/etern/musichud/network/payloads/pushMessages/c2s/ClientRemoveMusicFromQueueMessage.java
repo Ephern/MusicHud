@@ -25,7 +25,7 @@ public record ClientRemoveMusicFromQueueMessage(int index, long id) implements C
                     ClientRemoveMusicFromQueueMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
                             MusicPlayerServerService.getInstance().removeMusicDetailFromQueue(
-                                    message.index, message.id, player
+                                    message.index, message.id, player.getUUID()
                             );
                     })
             );

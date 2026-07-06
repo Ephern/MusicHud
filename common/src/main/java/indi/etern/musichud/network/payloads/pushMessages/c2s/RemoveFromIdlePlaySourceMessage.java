@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.beans.api.IdlePlaySource;
+import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -23,7 +24,7 @@ public record RemoveFromIdlePlaySourceMessage(IdlePlaySource idlePlaySource) imp
                     RemoveFromIdlePlaySourceMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
                         IdlePlaySource idlePlaySource = message.idlePlaySource;
-                        MusicPlayerServerService.getInstance().removeIdlePlaySource(idlePlaySource.getId(), idlePlaySource.getType(), player);
+                        MusicPlayerServerService.getInstance().removeIdlePlaySource(idlePlaySource.getId(), idlePlaySource.getType(), PusherInfo.ofPlayer(player));
                     })
             );
         }
