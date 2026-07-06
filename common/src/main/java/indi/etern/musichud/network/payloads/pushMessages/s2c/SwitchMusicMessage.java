@@ -7,24 +7,23 @@ import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.Queue;
 
 public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, String message) implements S2CPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, SwitchMusicMessage> CODEC = StreamCodec.composite(
+    public static final ByteBufCodec<SwitchMusicMessage> CODEC = ByteBufCodec.composite(
             MusicDetail.CODEC,
             SwitchMusicMessage::musicDetail,
             MusicDetail.CODEC,
             SwitchMusicMessage::nextIdle,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             SwitchMusicMessage::message,
             SwitchMusicMessage::new
     );

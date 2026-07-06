@@ -229,7 +229,6 @@ public class MusicPlayerServerService {
                     pusher.getUUID(),
                     pusher.getName().getString()
             );
-            pusherInfo.setPlayer(pusher);
         }
         return pusherInfo;
     }

@@ -3,15 +3,13 @@ package indi.etern.musichud.beans.api;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.Playlist;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.IMusicApiService;
-import io.netty.buffer.ByteBuf;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.Objects;
@@ -19,8 +17,8 @@ import java.util.Objects;
 @Getter
 @ToString
 public final class IdlePlaySource {
-    public static final StreamCodec<ByteBuf, IdlePlaySource> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+    public static final ByteBufCodec<IdlePlaySource> CODEC = ByteBufCodec.composite(
+            Codecs.LONG,
             IdlePlaySource::getId,
             Codecs.CLASS,
             IdlePlaySource::getType,

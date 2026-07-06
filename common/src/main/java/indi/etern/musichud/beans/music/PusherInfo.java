@@ -1,24 +1,22 @@
 package indi.etern.musichud.beans.music;
 
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.entity.player.Player;
 
 import java.util.Objects;
 import java.util.UUID;
 
 public final class PusherInfo {
-    public static final StreamCodec<RegistryFriendlyByteBuf, PusherInfo> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+    public static final ByteBufCodec<PusherInfo> CODEC = ByteBufCodec.composite(
+            Codecs.LONG,
             PusherInfo::getUid,
             Codecs.UUID,
             PusherInfo::getPlayerUUID,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             PusherInfo::getPlayerName,
             PusherInfo::new
     );

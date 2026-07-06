@@ -1,34 +1,32 @@
 package indi.etern.musichud.beans.music;
 
 import com.google.gson.annotations.SerializedName;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.List;
 import java.util.Objects;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MusicDetail {
-    public static final StreamCodec<RegistryFriendlyByteBuf, MusicDetail> CODEC = StreamCodec.composite(
-            ByteBufCodecs.STRING_UTF8,
+    public static final ByteBufCodec<MusicDetail> CODEC = ByteBufCodec.composite(
+            Codecs.STRING_UTF8,
             MusicDetail::getName,
-            ByteBufCodecs.LONG,
+            Codecs.LONG,
             MusicDetail::getId,
             Codecs.ofList(() -> Artist.CODEC),
             MusicDetail::getArtists,
-            Codecs.ofList(() -> ByteBufCodecs.STRING_UTF8),
+            Codecs.ofList(() -> Codecs.STRING_UTF8),
             MusicDetail::getAlias,
             Album.CODEC,
             MusicDetail::getAlbum,
-            ByteBufCodecs.INT,
+            Codecs.INT,
             MusicDetail::getDurationMillis,
-            Codecs.ofList(() -> ByteBufCodecs.STRING_UTF8),
+            Codecs.ofList(() -> Codecs.STRING_UTF8),
             MusicDetail::getTranslations,
             PusherInfo.CODEC,
             MusicDetail::getPusherInfo,

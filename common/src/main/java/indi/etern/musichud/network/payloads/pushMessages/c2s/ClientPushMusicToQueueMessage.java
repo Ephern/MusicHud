@@ -2,17 +2,16 @@ package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.payloads.C2SPayload;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 public record ClientPushMusicToQueueMessage(long id) implements C2SPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, ClientPushMusicToQueueMessage> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+    public static final ByteBufCodec<ClientPushMusicToQueueMessage> CODEC = ByteBufCodec.composite(
+            Codecs.LONG,
             ClientPushMusicToQueueMessage::id,
             ClientPushMusicToQueueMessage::new
     );

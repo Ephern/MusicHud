@@ -1,14 +1,16 @@
 package indi.etern.musichud.platform.plugin.paper.network;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
+import io.netty.buffer.ByteBuf;
+import io.netty.buffer.Unpooled;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.player.Player;
@@ -29,7 +31,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
 
     private final Logger logger = MusicHud.getLogger(PaperNetworkManager.class);
     private final Map<String, RegisteredReceiver<?>> c2sReceivers = new ConcurrentHashMap<>();
-    private final Map<CustomPacketPayload.Type<?>, StreamCodec<? super RegistryFriendlyByteBuf, ? extends IPayload>> s2cCodecs =
+    private final Map<CustomPacketPayload.Type<?>, ByteBufCodec<? extends IPayload>> s2cCodecs =
             new ConcurrentHashMap<>();
     private final Set<String> incomingChannels = ConcurrentHashMap.newKeySet();
     private final Set<String> outgoingChannels = ConcurrentHashMap.newKeySet();
@@ -59,7 +61,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
     @Override
     public <T extends IPayload> void registerC2SPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> serverReceiver
     ) {
         String channel = getMetaDataOrNew(clazz, serverReceiver).type().id().toString();
@@ -70,7 +72,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
     @Override
     public <T extends IPayload> void registerS2CPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> clientReceiver
     ) {
         CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, clientReceiver).type();
@@ -81,7 +83,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
     @Override
     public <T extends IPayload> void autoRegisterPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> clientOrServerReceiver
     ) {
         if (S2CPayload.class.isAssignableFrom(clazz)) {
@@ -97,7 +99,8 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
 
     @Override
     public void sendToNetworkPlayer(ServerPlayer serverPlayer, S2CPayload payload) {
-        StreamCodec<? super RegistryFriendlyByteBuf, ? extends IPayload> codec = s2cCodecs.get(payload.type());
+        @SuppressWarnings("unchecked")
+        ByteBufCodec<S2CPayload> codec = (ByteBufCodec<S2CPayload>) s2cCodecs.get(payload.type());
         if (codec == null) {
             logger.warn("Skipping unregistered S2C payload {}", payload.type().id());
             return;
@@ -107,7 +110,18 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
             logger.warn("Skipping {} because player {} is no longer online", payload.type().id(), serverPlayer.getScoreboardName());
             return;
         }
-        byte[] networkPayload = encodePayload(codec, payload, serverPlayer);
+        byte[] result;
+        ByteBuf buffer = Unpooled.buffer();
+        try {
+            FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buffer);
+            codec.encode(friendlyByteBuf, payload);
+            byte[] bytes = new byte[friendlyByteBuf.readableBytes()];
+            friendlyByteBuf.readBytes(bytes);
+            result = bytes;
+        } finally {
+            buffer.release();
+        }
+        byte[] networkPayload = result;
         String channel = payload.type().id().toString();
         ensureOutgoingChannelRegistered(channel);
         MusicHud.EXECUTOR.execute(() -> sendPluginMessageWhenReady(bukkitPlayer, channel, networkPayload, 0));
@@ -178,25 +192,20 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
         Bukkit.getScheduler().runTaskLater(plugin, () -> sendPluginMessageWhenReady(player, channel, payload, attempt + 1), 1L);
     }
 
-    @SuppressWarnings("unchecked")
-    private <T extends IPayload> byte[] encodePayload(
-            StreamCodec<? super RegistryFriendlyByteBuf, ? extends IPayload> codec,
-            T payload,
-            Player player
-    ) {
-        return PayloadCodec.encode(
-                (StreamCodec<? super RegistryFriendlyByteBuf, T>) codec,
-                payload,
-                player
-        );
-    }
-
     private record RegisteredReceiver<T extends IPayload>(
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> receiver
     ) {
         private void receive(byte[] bytes, Player player) {
-            T payload = PayloadCodec.decode(codec, bytes, player);
+            T result;
+            ByteBuf buffer = Unpooled.wrappedBuffer(bytes);
+            try {
+                FriendlyByteBuf friendlyByteBuf = new FriendlyByteBuf(buffer);
+                result = codec.decode(friendlyByteBuf);
+            } finally {
+                buffer.release();
+            }
+            T payload = result;
             receiver.receive(payload, player);
         }
     }
