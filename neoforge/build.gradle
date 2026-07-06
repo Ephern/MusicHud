@@ -108,13 +108,15 @@ loom {
         client {
             setRunDirectory file("run/client")
             jvmArguments.addAll(
-                "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED"
+                "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED",
+                    "-Dmusichud.log.level=DEBUG"
             )
         }
         server {
             setRunDirectory file("run/server")
             jvmArguments.addAll(
-                "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED"
+                "--add-opens", "java.base/java.lang.invoke=ALL-UNNAMED",
+                    "-Dmusichud.log.level=DEBUG"
             )
         }
     }
