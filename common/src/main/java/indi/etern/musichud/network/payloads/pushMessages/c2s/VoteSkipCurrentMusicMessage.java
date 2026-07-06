@@ -22,7 +22,7 @@ public record VoteSkipCurrentMusicMessage(long id) implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     VoteSkipCurrentMusicMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
-                        MusicPlayerServerService.getInstance().voteSkipCurrent(message.id, player);
+                        MusicPlayerServerService.getInstance().voteSkipCurrent(message.id, player.getUUID());
                     })
             );
         }
