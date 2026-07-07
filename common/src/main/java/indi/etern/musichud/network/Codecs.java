@@ -2,6 +2,7 @@ package indi.etern.musichud.network;
 
 import indi.etern.musichud.network.vanillaUtils.VanillaUtf8String;
 import indi.etern.musichud.network.vanillaUtils.VanillaVarInt;
+import indi.etern.musichud.network.vanillaUtils.VanillaVarLong;
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
 import org.jetbrains.annotations.NotNull;
@@ -76,7 +77,17 @@ public class Codecs {
             byteBuf.writeLong(long_);
         }
     };
+    public static final ByteBufCodec<Long> VAR_LONG = new ByteBufCodec<Long>() {
+        @Override
+        public void encode(ByteBuf byteBuf, Long value) {
+            VanillaVarLong.write(byteBuf, value);
+        }
 
+        @Override
+        public Long decode(ByteBuf byteBuf) {
+            return VanillaVarLong.read(byteBuf);
+        }
+    };
     public static final ByteBufCodec<Long[]> LONG_ARRAY = new ByteBufCodec<>() {
         @Override
         public void encode(ByteBuf byteBuf, Long[] value) {
