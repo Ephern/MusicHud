@@ -81,7 +81,7 @@ remapJar {
 loom {
     runs {
         client {
-            setRunDirectory file("run/server")
+            setRunDirectory file("run/client")
             jvmArguments.addAll(
                     "-Dmusichud.log.level=DEBUG"
             )
