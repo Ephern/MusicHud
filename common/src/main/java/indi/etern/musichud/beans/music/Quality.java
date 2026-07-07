@@ -1,12 +1,11 @@
 package indi.etern.musichud.beans.music;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.interfaces.AliasEnum;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.utils.ClientDistUtil;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 
 public enum Quality implements AliasEnum {
     /**
@@ -24,7 +23,7 @@ public enum Quality implements AliasEnum {
      */
     STANDARD, HIGHER, EX_HIGH, LOSSLESS, HIRES, JY_EFFECT, SKY, DOLBY, JY_MASTER, NONE;
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, Quality> CODEC = Codecs.ofEnum(Quality.class);
+    public static final ByteBufCodec<Quality> CODEC = Codecs.ofEnum(Quality.class);
 
     @Override
     public String toString() {

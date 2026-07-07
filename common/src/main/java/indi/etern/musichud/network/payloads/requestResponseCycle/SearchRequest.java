@@ -9,17 +9,14 @@ import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 public record SearchRequest(String query, SearchType searchType, int offset) implements C2SPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, SearchRequest> CODEC = StreamCodec.composite(
-            ByteBufCodecs.STRING_UTF8,
+    public static final ByteBufCodec<SearchRequest> CODEC = ByteBufCodec.composite(
+            Codecs.STRING_UTF8,
             SearchRequest::query,
             Codecs.ofEnum(SearchType.class),
             SearchRequest::searchType,
-            ByteBufCodecs.INT,
+            Codecs.INT,
             SearchRequest::offset,
             SearchRequest::new
     );

@@ -3,11 +3,9 @@ package indi.etern.musichud.beans.music;
 import com.google.gson.annotations.SerializedName;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import lombok.*;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -18,12 +16,12 @@ import java.util.concurrent.CompletableFuture;
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Album implements MusicCollection{
-    public static final StreamCodec<RegistryFriendlyByteBuf, Album> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+    public static final ByteBufCodec<Album> CODEC = ByteBufCodec.composite(
+            Codecs.LONG,
             Album::getId,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             Album::getName,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             Album::getPicUrl,
             Codecs.ofList(() -> MusicDetail.CODEC),
             Album::getMusicDetails,

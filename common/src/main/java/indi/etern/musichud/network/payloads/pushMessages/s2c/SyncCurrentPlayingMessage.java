@@ -5,18 +5,17 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.time.ZonedDateTime;
 
 public record SyncCurrentPlayingMessage(MusicDetail currentPlaying, MusicDetail nextIdle, ZonedDateTime startTime) implements S2CPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, SyncCurrentPlayingMessage> CODEC = StreamCodec.composite(
+    public static final ByteBufCodec<SyncCurrentPlayingMessage> CODEC = ByteBufCodec.composite(
             MusicDetail.CODEC,
             SyncCurrentPlayingMessage::currentPlaying,
             MusicDetail.CODEC,

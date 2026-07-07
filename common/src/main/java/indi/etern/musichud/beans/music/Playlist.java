@@ -3,14 +3,12 @@ package indi.etern.musichud.beans.music;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.Collection;
 import java.util.List;
@@ -19,18 +17,18 @@ import java.util.concurrent.CompletableFuture;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Playlist implements MusicCollection {
-    public static final StreamCodec<RegistryFriendlyByteBuf, Playlist> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+    public static final ByteBufCodec<Playlist> CODEC = ByteBufCodec.composite(
+            Codecs.LONG,
             Playlist::getId,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             Playlist::getName,
-            ByteBufCodecs.LONG,
+            Codecs.LONG,
             Playlist::getCoverImgId,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             Playlist::getCoverImgId_str,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             Playlist::getCoverImgUrl,
-            Profile.STREAM_CODEC,
+            Profile.CODEC,
             Playlist::getCreator,
             Codecs.ofEnum(Privacy.class),
             Playlist::getPrivacy,

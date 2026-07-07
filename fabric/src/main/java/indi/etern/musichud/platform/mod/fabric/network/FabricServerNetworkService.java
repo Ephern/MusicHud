@@ -1,8 +1,10 @@
 package indi.etern.musichud.platform.mod.fabric.network;
 
+import indi.etern.musichud.network.IPlayerClient;
 import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -27,7 +29,9 @@ public class FabricServerNetworkService implements IServerNetworkService {
     }
 
     @Override
-    public void sendToNetworkPlayer(ServerPlayer serverPlayer, S2CPayload payload) {
-        ServerPlayNetworking.send(serverPlayer, payload);
+    public void sendToNetworkPlayer(IPlayerClient playerClient, S2CPayload payload) {
+        if (playerClient instanceof VanillaPlayerProxy player && player.getPlayer() instanceof ServerPlayer serverPlayer) {
+            ServerPlayNetworking.send(serverPlayer, payload);
+        }
     }
 }

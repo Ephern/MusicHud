@@ -2,15 +2,13 @@ package indi.etern.musichud.platform.mod.neoforge.network;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
-import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.network.NetworkReceiver;
+import indi.etern.musichud.network.*;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.network.vanillaUtils.StreamCodecWrapper;
+import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
 import indi.etern.musichud.platform.Environment;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -42,20 +40,28 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     }
 
     @SuppressWarnings({"rawtypes", "unchecked"})
-    private void registerPayloadInternal(RegistrationInfo<?> info) {
+    private <T extends IPayload> void registerPayloadInternal(RegistrationInfo<T> info) {
         if (C2SPayload.class.isAssignableFrom(info.clazz)) { // C2S
-            registrar.playToServer(info.type(), (StreamCodec) info.codec(), (payload, context) -> {
-                NetworkReceiver receiver = info.serverReceiver();
-                receiver.receive(payload, context.player());
+            registrar.playToServer(info.type(), StreamCodecWrapper.of(info.codec()), (payload, context) -> {
+                if (payload instanceof IPayload payload1) {
+                    NetworkReceiver receiver = info.serverReceiver();
+                    receiver.receive(payload1, VanillaPlayerProxy.ofPlayer(context.player()));
+                } else {
+                    MusicHud.LOGGER.error("Client payload not implements IPayload");
+                }
             });
         } else if (S2CPayload.class.isAssignableFrom(info.clazz)) { // S2C
             if (side == Environment.Side.CLIENT) {
-                registrar.playToClient(info.type(), (StreamCodec) info.codec(), (payload, context) -> {
-                    NetworkReceiver receiver = info.clientReceiver();
-                    receiver.receive(payload, context.player());
+                registrar.playToClient(info.type(), StreamCodecWrapper.of(info.codec()), (payload, context) -> {
+                    if (payload instanceof IPayload payload1) {
+                        NetworkReceiver receiver = info.clientReceiver();
+                        receiver.receive(payload1, VanillaPlayerProxy.ofPlayer(context.player()));
+                    } else {
+                        MusicHud.LOGGER.error("Server payload not implements IPayload");
+                    }
                 });
             } else {
-                registrar.playToClient(info.type(), (StreamCodec) info.codec(), (payload, context) -> {
+                registrar.playToClient(info.type(), StreamCodecWrapper.of(info.codec()), (payload, context) -> {
                 });
             }
         }
@@ -64,7 +70,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     @Override
     public <T extends IPayload> void registerC2SPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> serverReceiver
     ) {
         CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, serverReceiver).type();
@@ -75,7 +81,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     @Override
     public <T extends IPayload> void registerS2CPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> clientReceiver
     ) {
         CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, clientReceiver).type();
@@ -86,7 +92,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     @Override
     public <T extends IPayload> void autoRegisterPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> clientOrServerReceiver
     ) {
         if (S2CPayload.class.isAssignableFrom(clazz)) {
@@ -107,14 +113,16 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     }
 
     @Override
-    public void sendToNetworkPlayer(ServerPlayer serverPlayer, S2CPayload payload) {
-        PacketDistributor.sendToPlayer(serverPlayer, payload);
+    public void sendToNetworkPlayer(IPlayerClient playerClient, S2CPayload payload) {
+        if (playerClient instanceof VanillaPlayerProxy player && player.getPlayer() instanceof ServerPlayer serverPlayer) {
+            PacketDistributor.sendToPlayer(serverPlayer, payload);
+        }
     }
 
     private record RegistrationInfo<T extends IPayload>(
             Class<T> clazz,
             CustomPacketPayload.Type<T> type,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> clientReceiver,
             NetworkReceiver<T> serverReceiver
     ) {

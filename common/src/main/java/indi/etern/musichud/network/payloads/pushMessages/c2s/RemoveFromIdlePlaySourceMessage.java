@@ -1,17 +1,17 @@
 package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.beans.api.IdlePlaySource;
+import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.payloads.C2SPayload;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 
 public record RemoveFromIdlePlaySourceMessage(IdlePlaySource idlePlaySource) implements C2SPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, RemoveFromIdlePlaySourceMessage> CODEC = StreamCodec.composite(
+    public static final ByteBufCodec<RemoveFromIdlePlaySourceMessage> CODEC = ByteBufCodec.composite(
             IdlePlaySource.CODEC,
             RemoveFromIdlePlaySourceMessage::idlePlaySource,
             RemoveFromIdlePlaySourceMessage::new
@@ -24,7 +24,7 @@ public record RemoveFromIdlePlaySourceMessage(IdlePlaySource idlePlaySource) imp
                     RemoveFromIdlePlaySourceMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
                         IdlePlaySource idlePlaySource = message.idlePlaySource;
-                        MusicPlayerServerService.getInstance().removeIdlePlaySource(idlePlaySource.getId(), idlePlaySource.getType(), player);
+                        MusicPlayerServerService.getInstance().removeIdlePlaySource(idlePlaySource.getId(), idlePlaySource.getType(), PusherInfo.ofPlayer(player));
                     })
             );
         }

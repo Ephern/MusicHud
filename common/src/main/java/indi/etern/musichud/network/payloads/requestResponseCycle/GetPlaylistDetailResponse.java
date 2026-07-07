@@ -3,17 +3,16 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.payloads.S2CPayload;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
 public record GetPlaylistDetailResponse(Playlist playlist) implements S2CPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, GetPlaylistDetailResponse> CODEC = StreamCodec.composite(
+    public static final ByteBufCodec<GetPlaylistDetailResponse> CODEC = ByteBufCodec.composite(
             Playlist.CODEC,
             GetPlaylistDetailResponse::playlist,
             GetPlaylistDetailResponse::new

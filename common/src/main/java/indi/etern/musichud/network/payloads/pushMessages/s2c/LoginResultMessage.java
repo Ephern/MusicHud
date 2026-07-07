@@ -6,24 +6,23 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 public record LoginResultMessage(boolean success, String message, LoginCookieInfo loginCookieInfo, Profile profile) implements S2CPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, LoginResultMessage> CODEC =
-            StreamCodec.composite(
-                    ByteBufCodecs.BOOL,
+    public static final ByteBufCodec<LoginResultMessage> CODEC =
+            ByteBufCodec.composite(
+                    Codecs.BOOL,
                     LoginResultMessage::success,
-                    ByteBufCodecs.STRING_UTF8,
+                    Codecs.STRING_UTF8,
                     LoginResultMessage::message,
                     LoginCookieInfo.STREAM_CODEC,
                     LoginResultMessage::loginCookieInfo,
-                    Profile.STREAM_CODEC,
+                    Profile.CODEC,
                     LoginResultMessage::profile,
                     LoginResultMessage::new
             );

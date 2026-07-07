@@ -1,9 +1,8 @@
 package indi.etern.musichud.beans.user;
 
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
 import lombok.*;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.Objects;
 
@@ -11,13 +10,13 @@ import java.util.Objects;
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Profile {
-    public static final StreamCodec<RegistryFriendlyByteBuf, Profile> STREAM_CODEC =
-            StreamCodec.composite(
-                    ByteBufCodecs.STRING_UTF8,
+    public static final ByteBufCodec<Profile> CODEC =
+            ByteBufCodec.composite(
+                    Codecs.STRING_UTF8,
                     Profile::getNickname,
-                    ByteBufCodecs.STRING_UTF8,
+                    Codecs.STRING_UTF8,
                     Profile::getAvatarUrl,
-                    ByteBufCodecs.LONG,
+                    Codecs.LONG,
                     Profile::getUserId,
                     Profile::new
             );

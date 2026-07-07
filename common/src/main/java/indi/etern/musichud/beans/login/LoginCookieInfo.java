@@ -2,11 +2,9 @@ package indi.etern.musichud.beans.login;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.platform.Environment;
-import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 import org.apache.logging.log4j.Logger;
 
 import java.time.ZoneId;
@@ -14,11 +12,11 @@ import java.time.ZonedDateTime;
 
 public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime generateTime) {
     private static final Logger logger = MusicHud.getLogger(LoginCookieInfo.class);
-    public static final StreamCodec<ByteBuf, LoginCookieInfo> STREAM_CODEC =
-            StreamCodec.composite(
+    public static final ByteBufCodec<LoginCookieInfo> STREAM_CODEC =
+            ByteBufCodec.composite(
                     LoginType.PACKET_CODEC,
                     LoginCookieInfo::type,
-                    ByteBufCodecs.STRING_UTF8,
+                    Codecs.STRING_UTF8,
                     LoginCookieInfo::rawCookie,
                     Codecs.ZONED_DATE_TIME,
                     LoginCookieInfo::generateTime,
