@@ -8,7 +8,7 @@ import indi.etern.musichud.client.ui.hud.renderer.PlayerHeadRenderer;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -16,11 +16,11 @@ import java.util.function.Supplier;
 
 public class PlayerHeadView extends MinecraftSurfaceView {
     @Getter
-    private Supplier<ResourceLocation> playerSkinSupplier;
+    private Supplier<Identifier> playerSkinSupplier;
 
     @Setter
     @Getter
-    private ResourceLocation skin;
+    private Identifier skin;
 
     public PlayerHeadView(Context context) {
         super(context);
@@ -42,7 +42,7 @@ public class PlayerHeadView extends MinecraftSurfaceView {
         });
     }
 
-    public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
+    public void setPlayerSkinSupplier(@Nullable Supplier<Identifier> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
         skin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
     }
