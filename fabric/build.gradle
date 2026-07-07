@@ -126,13 +126,13 @@ jar {
 loom {
     runs {
         client {
-            setRunDirectory file("run/client")
+            setRunDirectory file("../fabric/run/client")
             jvmArguments.addAll(
                     "-Dmusichud.log.level=DEBUG"
             )
         }
         server {
-            setRunDirectory file("run/server")
+            setRunDirectory file("../fabric/run/server")
             jvmArguments.addAll(
                     "-Dmusichud.log.level=DEBUG"
             )
