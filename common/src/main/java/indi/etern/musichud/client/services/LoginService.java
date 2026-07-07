@@ -29,6 +29,7 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.AnonymousLoginR
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.CookieLoginRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse;
+import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.Getter;
@@ -206,7 +207,7 @@ public class LoginService {
         MusicService.resetCurrentMusicStatus();
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();
-        MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(Minecraft.getInstance().player);
+        MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(VanillaPlayerProxy.ofPlayer(Minecraft.getInstance().player));
     }
 
     public void switchToServer() {
@@ -322,7 +323,7 @@ public class LoginService {
                 MusicHud.EXECUTOR.execute(() -> {
                     if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                         if (clientConfig.getEnableIsolatedMode()) {
-                            LoginApiService.getInstance().logout(player);
+                            LoginApiService.getInstance().logout(VanillaPlayerProxy.ofPlayer(player));
                         }
                     } else {
                         MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);

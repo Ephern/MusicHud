@@ -8,6 +8,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Level;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
+import org.apache.logging.log4j.core.config.Configurator;
 
 import java.time.Duration;
 import java.util.HashSet;
@@ -34,10 +35,11 @@ public final class MusicHud {
     @Setter
     private static Environment currentEnvironment;
     private static long initAtMillis;
+    private static Level logLevel = Level.INFO;
 
     public static Logger getLogger(Class<?> clazz) {
         Logger logger = LogManager.getLogger(LOGGER_BASE_NAME + "/" + clazz.getSimpleName());
-        logger.atLevel(Level.ALL);
+        Configurator.setLevel(logger, logLevel);
         return logger;
     }
 
@@ -45,7 +47,11 @@ public final class MusicHud {
         if (currentEnvironment == null) {
             throw new IllegalStateException("Current environment is not set");
         }
-        LOGGER.atLevel(Level.ALL);
+        String sysLogLevel = System.getProperty("musichud.log.level");
+        if (sysLogLevel != null && !sysLogLevel.isEmpty()) {
+            logLevel = Level.valueOf(sysLogLevel.toUpperCase());
+        }
+        Configurator.setLevel(LOGGER, logLevel);
         LOGGER.debug("Initialized in environment: {}", currentEnvironment);
         RegistrationManager.performCommonAutoRegistration();
         initAtMillis = System.currentTimeMillis();
