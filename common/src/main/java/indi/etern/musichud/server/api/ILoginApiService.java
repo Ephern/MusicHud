@@ -2,12 +2,16 @@ package indi.etern.musichud.server.api;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
+import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.beans.user.Profile;
+import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.IServerEventService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerRegister;
+import indi.etern.musichud.network.IPlayerClient;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
-import net.minecraft.world.entity.player.Player;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -25,37 +29,39 @@ public interface ILoginApiService {
 
     String randomVipCookieOrElse(Supplier<String> defaultCookieSupplier);
 
-    void joinUnlogged(Player player);
+    void joinUnlogged(IPlayerClient player);
 
-    void logout(Player player);
+    void logout(IPlayerClient player);
 
-    void loginAsAnonymous(Player player, boolean sendFail);
+    void loginAsAnonymous(IPlayerClient player, boolean sendFail);
 
-    void refreshAndSend(Player player, LoginCookieInfo loginCookieInfo);
+    void refreshAndSend(IPlayerClient player, LoginCookieInfo loginCookieInfo);
 
-    LoginApiService.QRLoginData startQRLoginByPlayer(Player player);
+    PusherInfo getPusherInfo(IPlayerClient player);
 
-    Profile loadUserProfile(Player player, LoginCookieInfo loginCookieInfo);
+    QRLoginData startQRLoginByPlayer(IPlayerClient player);
 
-    void cancelQRLoginByPlayer(Player player);
+    Profile loadUserProfile(IPlayerClient player, LoginCookieInfo loginCookieInfo);
 
-    LoginApiService.PlayerLoginInfo getLoginInfoByPlayer(Player player);
+    void cancelQRLoginByPlayer(IPlayerClient player);
 
-    Map<UUID, LoginApiService.PlayerLoginInfo> getPlayerInfoMap();
+    PlayerLoginInfo getLoginInfoByPlayerUUID(UUID playerUUID);
 
-    Set<Consumer<Collection<LoginApiService.PlayerLoginInfo>>> getLoginStateChangeListeners();
+    Map<UUID, PlayerLoginInfo> getPlayerInfoMap();
 
-    String getRawCookieOrElse(Player player, Supplier<String> supplier);
+    Set<Consumer<Collection<PlayerLoginInfo>>> getLoginStateChangeListeners();
 
-    void requestValidationCodeFor(int regionCode, long phone, Player player);
+    String getRawCookieOrElse(UUID playerUUID, Supplier<String> supplier);
 
-    void loginWithPhoneAndCode(int regionCode, long phone, int code, Player player);
+    void requestValidationCodeFor(int regionCode, long phone, IPlayerClient player);
 
-    void loginWithPhoneAndPassword(long phone, String md5password, Player player);
+    void loginWithPhoneAndCode(int regionCode, long phone, int code, IPlayerClient player);
 
-    void loginWithEmailAndPassword(String email, String md5password, Player player);
+    void loginWithPhoneAndPassword(long phone, String md5password, IPlayerClient player);
 
-    void loginWithCookie(LoginCookieInfo loginCookieInfo, boolean tryToRefresh, Player player);
+    void loginWithEmailAndPassword(String email, String md5password, IPlayerClient player);
+
+    void loginWithCookie(LoginCookieInfo loginCookieInfo, boolean tryToRefresh, IPlayerClient player);
 
     void disconnectToAll();
 
@@ -70,6 +76,30 @@ public interface ILoginApiService {
                     getInstance(ApiProvider.NCM).logout(player);
                 });
             });
+        }
+    }
+
+    record QRLoginData(int code, Data data) {
+        public record Data(String qrurl, String qrimg) {
+        }
+    }
+
+    @AllArgsConstructor
+    @Getter
+    class PlayerLoginInfo {
+        LoginCookieInfo loginCookieInfo;
+        IPlayerClient player;
+        VipType vipType;
+        Profile profile;
+        PusherInfo pusherInfo;
+
+        public static PlayerLoginInfo of(IPlayerClient player, LoginCookieInfo loginCookieInfo) {
+            return new PlayerLoginInfo(loginCookieInfo, player, null, null, PusherInfo.ofPlayer(player));
+        }
+
+        public void appendProfile(Profile profile) {
+            this.profile = profile;
+            vipType = profile.getVipType();
         }
     }
 }

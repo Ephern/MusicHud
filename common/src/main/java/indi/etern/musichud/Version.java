@@ -1,17 +1,16 @@
 package indi.etern.musichud;
 
+import indi.etern.musichud.network.ByteBufCodec;
 import io.netty.buffer.ByteBuf;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 import org.jetbrains.annotations.NotNull;
 
 public record Version(long mayor, long minor, long patch, BuildType build) implements Comparable<Version>{
-    public static final StreamCodec<? super RegistryFriendlyByteBuf, Version> PACKET_CODEC;
-    public static final Version current = new Version(1,2,14, BuildType.Stable);
+    public static final ByteBufCodec<Version> PACKET_CODEC;
+    public static final Version current = new Version(1,2,15, BuildType.Alpha);
     public static final Version leastCapable = new Version(1,2,2,BuildType.Stable);
 
     static {
-        PACKET_CODEC = new StreamCodec<ByteBuf, Version>() {
+        PACKET_CODEC = new ByteBufCodec<Version>() {
             public @NotNull Version decode(@NotNull ByteBuf byteBuf) {
                 return new Version(byteBuf.readLong(), byteBuf.readLong(), byteBuf.readLong(), BuildType.ofOrdinal(byteBuf.readInt()));
             }

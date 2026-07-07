@@ -7,9 +7,11 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
+import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.IntegerCodeEnum;
+import indi.etern.musichud.network.IPlayerClient;
 import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectResponse;
@@ -19,7 +21,6 @@ import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.*;
-import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
@@ -34,13 +35,13 @@ public class LoginApiService implements ILoginApiService {
     private static final Logger logger = MusicHud.getLogger(LoginApiService.class);
     private static final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private static volatile LoginApiService loginApiService;
-    final Map<Player, Runnable> pollingMap = new HashMap<>();
+    final Map<IPlayerClient, Runnable> pollingMap = new HashMap<>();
     @Getter
     Map<UUID, PlayerLoginInfo> playerInfoMap = new HashMap<>();
     @Getter
     Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
     volatile String anonymousCookie;
-    final Cache<Player, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
+    final Cache<IPlayerClient, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
             .maximumSize(Long.MAX_VALUE)
             .softValues()
@@ -57,12 +58,12 @@ public class LoginApiService implements ILoginApiService {
         return LoginApiService.loginApiService;
     }
 
-    private static void sendSuccessLoginResultTo(Player player, LoginCookieInfo loginCookieInfo, Profile profile) {
+    private static void sendSuccessLoginResultTo(IPlayerClient player, LoginCookieInfo loginCookieInfo, Profile profile) {
         serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, profile));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayer(player)));
+        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
     }
 
-    void sendLoginFailResult(Player player, Exception e) {
+    void sendLoginFailResult(IPlayerClient player, Exception e) {
         logger.error(e);
         String message;
         String eMessage = e.getMessage();
@@ -109,14 +110,14 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void joinUnlogged(Player player) {
-        playerInfoMap.put(player.getUUID(), PlayerLoginInfo.of(player, LoginCookieInfo.UNLOGGED));
+    public void joinUnlogged(IPlayerClient player) {
+        playerInfoMap.put(player.getUUID(), ILoginApiService.PlayerLoginInfo.of(player, LoginCookieInfo.UNLOGGED));
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayer(player)));
+        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
     }
 
     @Override
-    public void logout(Player player) {
+    public void logout(IPlayerClient player) {
         Runnable remove = pollingMap.remove(player);
         playerInfoMap.remove(player.getUUID());
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
@@ -124,12 +125,12 @@ public class LoginApiService implements ILoginApiService {
             logger.warn("Polling v-thread stopped as player {} quit", player.getName());
         }
         MusicPlayerServerService playerServerService = MusicPlayerServerService.getInstance();
-        playerServerService.removeAllIdlePlaySource(player);
+        playerServerService.removeAllIdlePlaySource(getPusherInfo(player));
     }
 
     @SneakyThrows
     @Override
-    public void loginAsAnonymous(Player player, boolean sendFail) {
+    public void loginAsAnonymous(IPlayerClient player, boolean sendFail) {
         try {
             AnonymousLoginData response = ApiClient.post(
                     ServerApiMeta.Login.ANONYMOUS,
@@ -152,7 +153,7 @@ public class LoginApiService implements ILoginApiService {
 
     @SneakyThrows
     @Override
-    public void refreshAndSend(Player player, LoginCookieInfo loginCookieInfo) {
+    public void refreshAndSend(IPlayerClient player, LoginCookieInfo loginCookieInfo) {
         RefreshCookieResponse cookieResponse = ApiClient.post(ServerApiMeta.Login.REFRESH, null, loginCookieInfo.rawCookie(), true);
         LoginCookieInfo refreshedLoginCookieInfo;
         if (cookieResponse.code == 200) {
@@ -166,9 +167,23 @@ public class LoginApiService implements ILoginApiService {
         }
     }
 
+    @Override
+    public PusherInfo getPusherInfo(IPlayerClient player) {
+
+        PlayerLoginInfo loginInfo = playerInfoMap.get(player.getUUID());
+        PusherInfo pusherInfo = PusherInfo.EMPTY;
+        if (loginInfo != null) {
+            pusherInfo = new PusherInfo(
+                    player.getUUID(),
+                    player.getName()
+            );
+        }
+        return pusherInfo;
+    }
+
     @SneakyThrows
     @Override
-    public QRLoginData startQRLoginByPlayer(Player player) {
+    public QRLoginData startQRLoginByPlayer(IPlayerClient player) {
         try {
             logger.debug("Start QR login by player: {}", player.getName());
             QRLoginResponseInfo response1 = ApiClient.get(
@@ -192,7 +207,7 @@ public class LoginApiService implements ILoginApiService {
         }
     }
 
-    private void startQRPollingVThread(Player player, String key) {
+    private void startQRPollingVThread(IPlayerClient player, String key) {
         var params2 = new QRLoginCheckRequestInfo(key);
         var ref = new Object() {
             Runnable runnable = null;
@@ -247,13 +262,13 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public Profile loadUserProfile(Player player, LoginCookieInfo loginCookieInfo) {
+    public Profile loadUserProfile(IPlayerClient player, LoginCookieInfo loginCookieInfo) {
         AccountDetail accountDetail = ApiClient.get(ServerApiMeta.User.ACCOUNT, loginCookieInfo.rawCookie(), true);
         Profile profile = accountDetail.profile();
         return postProcessProfile(player, loginCookieInfo, profile, accountDetail.account);
     }
 
-    private Profile postProcessProfile(Player player, LoginCookieInfo loginCookieInfo, Profile profile, Account account) {
+    private Profile postProcessProfile(IPlayerClient player, LoginCookieInfo loginCookieInfo, Profile profile, Account account) {
         if (profile == null) {
             if (account.anonymous) {
                 return Profile.ANONYMOUS;
@@ -262,7 +277,7 @@ public class LoginApiService implements ILoginApiService {
             }
         }
         profile.setVipType(account.vipType);
-        PlayerLoginInfo playerLoginInfo = PlayerLoginInfo.of(player, loginCookieInfo);
+        PlayerLoginInfo playerLoginInfo = ILoginApiService.PlayerLoginInfo.of(player, loginCookieInfo);
         playerLoginInfo.appendProfile(profile);
         playerInfoMap.put(player.getUUID(), playerLoginInfo);
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
@@ -270,25 +285,25 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void cancelQRLoginByPlayer(Player player) {
+    public void cancelQRLoginByPlayer(IPlayerClient player) {
         pollingMap.remove(player);
     }
 
     @Override
-    public PlayerLoginInfo getLoginInfoByPlayer(Player player) {
-        if (player == null) {
+    public PlayerLoginInfo getLoginInfoByPlayerUUID(UUID playerUUID) {
+        if (playerUUID == null) {
             return null;
         }
-        return playerInfoMap.get(player.getUUID());
+        return playerInfoMap.get(playerUUID);
     }
 
     @Override
-    public String getRawCookieOrElse(Player player, Supplier<String> supplier) {
+    public String getRawCookieOrElse(UUID playerUUID, Supplier<String> supplier) {
         String rawCookie;
-        if (player != null) {
-            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(player.getUUID());
+        if (playerUUID != null) {
+            PlayerLoginInfo loginInfo = this.getPlayerInfoMap().get(playerUUID);
             if (loginInfo != null) {
-                rawCookie = loginInfo.loginCookieInfo.rawCookie();
+                rawCookie = loginInfo.getLoginCookieInfo().rawCookie();
             } else {
                 rawCookie = supplier != null ? supplier.get() : null;
             }
@@ -299,7 +314,7 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void requestValidationCodeFor(int regionCode, long phone, Player player) {
+    public void requestValidationCodeFor(int regionCode, long phone, IPlayerClient player) {
         SendValidationCodeResponse response = ApiClient.post(ServerApiMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null, true);
         ZonedDateTime lastSentTime = lastSentTimes.getIfPresent(player);
         ZonedDateTime now = ZonedDateTime.now();
@@ -323,7 +338,7 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void loginWithPhoneAndCode(int regionCode, long phone, int code, Player player) {
+    public void loginWithPhoneAndCode(int regionCode, long phone, int code, IPlayerClient player) {
         PhoneCodeLoginRequest requestBody = new PhoneCodeLoginRequest(regionCode, phone, code);
         PhoneLoginResponse loginResponse = ApiClient.post(ServerApiMeta.Login.PHONE, requestBody, null, true);
         if (loginResponse.code == 200) {
@@ -348,12 +363,12 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void loginWithPhoneAndPassword(long phone, String md5password, Player player) {
+    public void loginWithPhoneAndPassword(long phone, String md5password, IPlayerClient player) {
         throw new UnsupportedOperationException("Not supported yet due to api.");
     }
 
     @Override
-    public void loginWithEmailAndPassword(String email, String md5password, Player player) {
+    public void loginWithEmailAndPassword(String email, String md5password, IPlayerClient player) {
         throw new UnsupportedOperationException("Not supported yet due to api.");
     }
 
@@ -368,7 +383,7 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void loginWithCookie(LoginCookieInfo loginCookieInfo, boolean tryToRefresh, Player player) {
+    public void loginWithCookie(LoginCookieInfo loginCookieInfo, boolean tryToRefresh, IPlayerClient player) {
         IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
         if (tryToRefresh) {
             try {
@@ -403,29 +418,10 @@ public class LoginApiService implements ILoginApiService {
                 );
             }
         }
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(getLoginInfoByPlayer(player)));//FIXME
+        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(getLoginInfoByPlayerUUID(player.getUUID())));
     }
 
     record ValidationCodeRequest(int ctcode, long phone) {
-    }
-
-    @AllArgsConstructor
-    @Getter
-    public static class PlayerLoginInfo {
-//        public static final PlayerLoginInfo UNLOGGED = of(null, LoginCookieInfo.UNLOGGED);
-        LoginCookieInfo loginCookieInfo;
-        Player player;
-        VipType vipType;
-        Profile profile;
-
-        public static PlayerLoginInfo of(Player player, LoginCookieInfo loginCookieInfo) {
-            return new PlayerLoginInfo(loginCookieInfo, player, null, null);
-        }
-
-        public void appendProfile(Profile profile) {
-            this.profile = profile;
-            vipType = profile.getVipType();
-        }
     }
 
     public record AnonymousLoginData(int code, long userId, long createTime, String cookie) {
@@ -436,11 +432,6 @@ public class LoginApiService implements ILoginApiService {
             int code,
             String cookie
     ) {
-    }
-
-    public record QRLoginData(int code, Data data) {
-        public record Data(String qrurl, String qrimg) {
-        }
     }
 
     public record QRLoginResponseInfo(int code, Data data) {

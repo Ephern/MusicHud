@@ -2,11 +2,9 @@ package indi.etern.musichud.beans.music;
 
 import com.google.gson.annotations.SerializedName;
 import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import lombok.*;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,22 +15,22 @@ import java.util.concurrent.CompletableFuture;
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Artist {
-    public static final StreamCodec<RegistryFriendlyByteBuf,Artist> CODEC = Codecs.composite(
-            ByteBufCodecs.VAR_LONG,
+    public static final ByteBufCodec<Artist> CODEC = ByteBufCodec.composite(
+            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
             Artist::getId,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             Artist::getName,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             Artist::getAvatarUrl,
-            ByteBufCodecs.INT,
+            Codecs.INT,
             Artist::getAlbumCount,
-            ByteBufCodecs.INT,
+            Codecs.INT,
             Artist::getMusicCount,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             Artist::getDescription,
             Codecs.ofList(() -> MusicDetail.CODEC),// Attention! may cause loop if abuse (MusicDetails <=> Artists)
             Artist::getMusicDetails,
-            ByteBufCodecs.INT,
+            Codecs.INT,
             Artist::getTotalMusicCount,
             Artist::new
     );

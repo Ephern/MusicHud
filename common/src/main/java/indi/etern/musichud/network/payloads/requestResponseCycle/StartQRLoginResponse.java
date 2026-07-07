@@ -3,19 +3,18 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.interfaces.CommonRegister;
-import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
-import io.netty.buffer.ByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
+import indi.etern.musichud.platform.Environment;
 
 public record StartQRLoginResponse(String base64QRImg) implements S2CPayload {
-    public static final StreamCodec<ByteBuf, StartQRLoginResponse> CODEC =
-            StreamCodec.composite(
-                    ByteBufCodecs.STRING_UTF8,
+    public static final ByteBufCodec<StartQRLoginResponse> CODEC =
+            ByteBufCodec.composite(
+                    Codecs.STRING_UTF8,
                     StartQRLoginResponse::base64QRImg,
                     StartQRLoginResponse::new
             );

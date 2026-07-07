@@ -4,19 +4,31 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
-import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FastColor;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.function.Supplier;
 
 public class PlayerHeadRenderer implements HudRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
     @Getter
     private Layout layout;
-    @Getter
-    @Setter
+    private ResourceLocation previousSkinResource;
     private ResourceLocation skinResource;
+    @Getter
+    private Supplier<ResourceLocation> playerSkinSupplier;
+    private long lastUpdateTime = -1;
+    private static final int TRANSITION_DURATION = 400;
+
+    public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
+        this.playerSkinSupplier = playerSkinSupplier;
+        lastUpdateTime = System.currentTimeMillis();
+        previousSkinResource = skinResource;
+        skinResource = playerSkinSupplier == null ? null : playerSkinSupplier.get();
+    }
 
     public void configure(Layout layout) {
         this.layout = layout;
@@ -26,18 +38,37 @@ public class PlayerHeadRenderer implements HudRenderer {
     public void render(HudRenderContext context) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null) return;
+        long currentTimeMillis = System.currentTimeMillis();
+        if (playerSkinSupplier != null) {
+            ResourceLocation skin = playerSkinSupplier.get();
+            if (skinResource != skin) {
+                lastUpdateTime = currentTimeMillis;
+                previousSkinResource = skinResource;
+                skinResource = skin;
+            }
+        }
         if (skinResource == null) return;
 
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
         int w = (int) layout.getWidth();
         int h = (int) layout.getHeight();
 
-        renderHead(context.getGraphics(), skinResource,
-                absolutePosition.x(), absolutePosition.y(), w, h, 1);
+        if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
+            renderHead(context.getGraphics(), skinResource,
+                    absolutePosition.x(), absolutePosition.y(), w, h, 1);
+        } else {
+            float transitionProgress = Math.clamp((float) (currentTimeMillis - lastUpdateTime) / TRANSITION_DURATION, 0, 1);
+            if (previousSkinResource != null) {
+                renderHead(context.getGraphics(), previousSkinResource,
+                        absolutePosition.x(), absolutePosition.y(), w, h, 1 - transitionProgress);
+            }
+            renderHead(context.getGraphics(), skinResource,
+                    absolutePosition.x(), absolutePosition.y(), w, h, transitionProgress);
+        }
     }
 
     public static void renderHead(GuiGraphics gr, ResourceLocation skin,
-                                  float x, float y, int w, int h, float alpha) {
+                                   float x, float y, int w, int h, float alpha) {
         if (alpha <= 0.003) {
             return;
         }

@@ -2,17 +2,16 @@ package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.payloads.C2SPayload;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 public record VoteSkipCurrentMusicMessage(long id) implements C2SPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, VoteSkipCurrentMusicMessage> CODEC = StreamCodec.composite(
-            ByteBufCodecs.VAR_LONG,
+    public static final ByteBufCodec<VoteSkipCurrentMusicMessage> CODEC = ByteBufCodec.composite(
+            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
             VoteSkipCurrentMusicMessage::id,
             VoteSkipCurrentMusicMessage::new
     );
@@ -23,7 +22,7 @@ public record VoteSkipCurrentMusicMessage(long id) implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     VoteSkipCurrentMusicMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
-                        MusicPlayerServerService.getInstance().voteSkipCurrent(message.id, player);
+                        MusicPlayerServerService.getInstance().voteSkipCurrent(message.id, player.getUUID());
                     })
             );
         }

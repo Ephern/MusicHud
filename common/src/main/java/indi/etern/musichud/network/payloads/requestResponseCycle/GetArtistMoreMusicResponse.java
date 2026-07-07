@@ -3,12 +3,10 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.payloads.S2CPayload;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.HashMap;
 import java.util.List;
@@ -16,11 +14,11 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 public record GetArtistMoreMusicResponse(long artistId, int offset, List<MusicDetail> musicDetails) implements S2CPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, GetArtistMoreMusicResponse> CODEC =
-            StreamCodec.composite(
-                    ByteBufCodecs.VAR_LONG,
+    public static final ByteBufCodec<GetArtistMoreMusicResponse> CODEC =
+            ByteBufCodec.composite(
+                    Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
                     GetArtistMoreMusicResponse::artistId,
-                    ByteBufCodecs.INT,
+                    Codecs.INT,
                     GetArtistMoreMusicResponse::offset,
                     Codecs.ofList(() -> MusicDetail.CODEC),
                     GetArtistMoreMusicResponse::musicDetails,
