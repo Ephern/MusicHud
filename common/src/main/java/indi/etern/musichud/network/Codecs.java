@@ -3,6 +3,7 @@ package indi.etern.musichud.network;
 import indi.etern.musichud.network.vanillaUtils.VanillaUtf8String;
 import indi.etern.musichud.network.vanillaUtils.VanillaVarInt;
 import io.netty.buffer.ByteBuf;
+import io.netty.handler.codec.DecoderException;
 import org.jetbrains.annotations.NotNull;
 
 import java.nio.charset.StandardCharsets;
@@ -73,6 +74,31 @@ public class Codecs {
 
         public void encode(ByteBuf byteBuf, Long long_) {
             byteBuf.writeLong(long_);
+        }
+    };
+
+    public static final ByteBufCodec<Long[]> LONG_ARRAY = new ByteBufCodec<>() {
+        @Override
+        public void encode(ByteBuf byteBuf, Long[] value) {
+            VanillaVarInt.write(byteBuf, value.length);
+            for (long l : value) {
+                byteBuf.writeLong(l);
+            }
+        }
+
+        @Override
+        public Long[] decode(ByteBuf byteBuf) {
+            int i = VanillaVarInt.read(byteBuf);
+            int j = byteBuf.readableBytes() / 8;
+            if (i > j) {
+                throw new DecoderException("LongArray with size " + i + " is bigger than allowed " + j);
+            } else {
+                Long[] ls = new Long[i];
+                for (int i1 = 0; i1 < ls.length; ++i1) {
+                    ls[i1] = byteBuf.readLong();
+                }
+                return ls;
+            }
         }
     };
     public static final ByteBufCodec<Float> FLOAT = new ByteBufCodec<>() {

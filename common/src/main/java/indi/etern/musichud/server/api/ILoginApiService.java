@@ -8,10 +8,10 @@ import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.IServerEventService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerRegister;
+import indi.etern.musichud.network.IPlayerClient;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import net.minecraft.world.entity.player.Player;
 
 import java.util.*;
 import java.util.function.Consumer;
@@ -29,21 +29,21 @@ public interface ILoginApiService {
 
     String randomVipCookieOrElse(Supplier<String> defaultCookieSupplier);
 
-    void joinUnlogged(Player player);
+    void joinUnlogged(IPlayerClient player);
 
-    void logout(Player player);
+    void logout(IPlayerClient player);
 
-    void loginAsAnonymous(Player player, boolean sendFail);
+    void loginAsAnonymous(IPlayerClient player, boolean sendFail);
 
-    void refreshAndSend(Player player, LoginCookieInfo loginCookieInfo);
+    void refreshAndSend(IPlayerClient player, LoginCookieInfo loginCookieInfo);
 
-    PusherInfo getPusherInfo(Player player);
+    PusherInfo getPusherInfo(IPlayerClient player);
 
-    QRLoginData startQRLoginByPlayer(Player player);
+    QRLoginData startQRLoginByPlayer(IPlayerClient player);
 
-    Profile loadUserProfile(Player player, LoginCookieInfo loginCookieInfo);
+    Profile loadUserProfile(IPlayerClient player, LoginCookieInfo loginCookieInfo);
 
-    void cancelQRLoginByPlayer(Player player);
+    void cancelQRLoginByPlayer(IPlayerClient player);
 
     PlayerLoginInfo getLoginInfoByPlayerUUID(UUID playerUUID);
 
@@ -53,15 +53,15 @@ public interface ILoginApiService {
 
     String getRawCookieOrElse(UUID playerUUID, Supplier<String> supplier);
 
-    void requestValidationCodeFor(int regionCode, long phone, Player player);
+    void requestValidationCodeFor(int regionCode, long phone, IPlayerClient player);
 
-    void loginWithPhoneAndCode(int regionCode, long phone, int code, Player player);
+    void loginWithPhoneAndCode(int regionCode, long phone, int code, IPlayerClient player);
 
-    void loginWithPhoneAndPassword(long phone, String md5password, Player player);
+    void loginWithPhoneAndPassword(long phone, String md5password, IPlayerClient player);
 
-    void loginWithEmailAndPassword(String email, String md5password, Player player);
+    void loginWithEmailAndPassword(String email, String md5password, IPlayerClient player);
 
-    void loginWithCookie(LoginCookieInfo loginCookieInfo, boolean tryToRefresh, Player player);
+    void loginWithCookie(LoginCookieInfo loginCookieInfo, boolean tryToRefresh, IPlayerClient player);
 
     void disconnectToAll();
 
@@ -88,12 +88,12 @@ public interface ILoginApiService {
     @Getter
     class PlayerLoginInfo {
         LoginCookieInfo loginCookieInfo;
-        Player player;
+        IPlayerClient player;
         VipType vipType;
         Profile profile;
         PusherInfo pusherInfo;
 
-        public static PlayerLoginInfo of(Player player, LoginCookieInfo loginCookieInfo) {
+        public static PlayerLoginInfo of(IPlayerClient player, LoginCookieInfo loginCookieInfo) {
             return new PlayerLoginInfo(loginCookieInfo, player, null, null, PusherInfo.ofPlayer(player));
         }
 

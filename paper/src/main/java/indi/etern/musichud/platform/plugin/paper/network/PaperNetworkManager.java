@@ -1,10 +1,7 @@
 package indi.etern.musichud.platform.plugin.paper.network;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.network.ByteBufCodec;
-import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.network.NetworkReceiver;
+import indi.etern.musichud.network.*;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
@@ -12,11 +9,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
-import org.bukkit.craftbukkit.entity.CraftPlayer;
+import org.bukkit.entity.Player;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.bukkit.plugin.messaging.Messenger;
 import org.bukkit.plugin.messaging.PluginMessageListener;
@@ -98,16 +93,16 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
     }
 
     @Override
-    public void sendToNetworkPlayer(ServerPlayer serverPlayer, S2CPayload payload) {
+    public void sendToNetworkPlayer(IPlayerClient playerClient, S2CPayload payload) {
         @SuppressWarnings("unchecked")
         ByteBufCodec<S2CPayload> codec = (ByteBufCodec<S2CPayload>) s2cCodecs.get(payload.type());
         if (codec == null) {
             logger.warn("Skipping unregistered S2C payload {}", payload.type().id());
             return;
         }
-        org.bukkit.entity.Player bukkitPlayer = Bukkit.getPlayer(serverPlayer.getUUID());
+        Player bukkitPlayer = Bukkit.getPlayer(playerClient.getUUID());
         if (bukkitPlayer == null) {
-            logger.warn("Skipping {} because player {} is no longer online", payload.type().id(), serverPlayer.getScoreboardName());
+            logger.warn("Skipping {} because player {} is no longer online", payload.type().id(), playerClient.getName());
             return;
         }
         byte[] result;
@@ -159,7 +154,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
     }
 
     private PluginMessageListener createListener(String expectedChannel) {
-        return (channel, bukkitPlayer, message) -> {
+        return (channel, player, message) -> {
             if (!expectedChannel.equals(channel)) {
                 return;
             }
@@ -168,8 +163,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
                 return;
             }
             try {
-                Player player = ((CraftPlayer) bukkitPlayer).getHandle();
-                registered.receive(message, player);
+                registered.receive(message, PaperPlayerProxy.ofPlayer(player));
             } catch (Exception e) {
                 logger.error("Failed to process payload on channel {}", channel, e);
             }
@@ -196,7 +190,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
             ByteBufCodec<T> codec,
             NetworkReceiver<T> receiver
     ) {
-        private void receive(byte[] bytes, Player player) {
+        private void receive(byte[] bytes, IPlayerClient player) {
             T result;
             ByteBuf buffer = Unpooled.wrappedBuffer(bytes);
             try {

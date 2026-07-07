@@ -2,14 +2,12 @@ package indi.etern.musichud.platform.mod.neoforge.network;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
-import indi.etern.musichud.network.ByteBufCodec;
-import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.network.NetworkReceiver;
+import indi.etern.musichud.network.*;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.network.vanillaUtils.StreamCodecWrapper;
+import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
 import indi.etern.musichud.platform.Environment;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -47,7 +45,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
             registrar.playToServer(info.type(), StreamCodecWrapper.of(info.codec()), (payload, context) -> {
                 if (payload instanceof IPayload payload1) {
                     NetworkReceiver receiver = info.serverReceiver();
-                    receiver.receive(payload1, context.player());
+                    receiver.receive(payload1, VanillaPlayerProxy.ofPlayer(context.player()));
                 } else {
                     MusicHud.LOGGER.error("Client payload not implements IPayload");
                 }
@@ -57,7 +55,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
                 registrar.playToClient(info.type(), StreamCodecWrapper.of(info.codec()), (payload, context) -> {
                     if (payload instanceof IPayload payload1) {
                         NetworkReceiver receiver = info.clientReceiver();
-                        receiver.receive(payload1, context.player());
+                        receiver.receive(payload1, VanillaPlayerProxy.ofPlayer(context.player()));
                     } else {
                         MusicHud.LOGGER.error("Server payload not implements IPayload");
                     }
@@ -115,8 +113,10 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     }
 
     @Override
-    public void sendToNetworkPlayer(ServerPlayer serverPlayer, S2CPayload payload) {
-        PacketDistributor.sendToPlayer(serverPlayer, payload);
+    public void sendToNetworkPlayer(IPlayerClient playerClient, S2CPayload payload) {
+        if (playerClient instanceof VanillaPlayerProxy player && player.getPlayer() instanceof ServerPlayer serverPlayer) {
+            PacketDistributor.sendToPlayer(serverPlayer, payload);
+        }
     }
 
     private record RegistrationInfo<T extends IPayload>(

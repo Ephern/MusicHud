@@ -11,7 +11,6 @@ import indi.etern.musichud.server.api.IMusicApiService;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.ToString;
-import net.minecraft.world.entity.player.Player;
 
 import java.util.Objects;
 import java.util.UUID;

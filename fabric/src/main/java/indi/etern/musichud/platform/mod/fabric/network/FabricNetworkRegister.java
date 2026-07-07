@@ -8,6 +8,7 @@ import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.network.vanillaUtils.StreamCodecWrapper;
+import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
 import indi.etern.musichud.platform.Environment;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -40,7 +41,7 @@ public class FabricNetworkRegister implements INetworkRegister {
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
 
         ServerPlayNetworking.registerGlobalReceiver(type, (payload, context) -> {
-            serverReceiver.receive(payload, context.player());
+            serverReceiver.receive(payload, VanillaPlayerProxy.ofPlayer(context.player()));
         });
     }
 

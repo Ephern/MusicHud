@@ -9,6 +9,7 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.interfaces.ServerRegister;
+import indi.etern.musichud.network.IPlayerClient;
 import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.RefreshMusicQueueMessage;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.SwitchMusicMessage;
@@ -18,7 +19,6 @@ import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.SneakyThrows;
-import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -254,7 +254,7 @@ public class MusicPlayerServerService {
         }
     }
 
-    public void sendSyncPlayingStatusToPlayer(Player player) {
+    public void sendSyncPlayingStatusToPlayer(IPlayerClient player) {
         serverNetworkService.sendToPlayer(player,
                 new RefreshMusicQueueMessage(musicQueue));
         sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));

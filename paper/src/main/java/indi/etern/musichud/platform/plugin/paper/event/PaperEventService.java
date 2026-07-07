@@ -1,11 +1,9 @@
 package indi.etern.musichud.platform.plugin.paper.event;
 
-import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.IServerEventService;
 import indi.etern.musichud.interfaces.Unregister;
-import net.minecraft.world.entity.player.Player;
-import org.apache.logging.log4j.Logger;
-import org.bukkit.craftbukkit.entity.CraftPlayer;
+import indi.etern.musichud.network.IPlayerClient;
+import indi.etern.musichud.platform.plugin.paper.network.PaperPlayerProxy;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerQuitEvent;
@@ -17,8 +15,7 @@ import java.util.function.Consumer;
 
 public final class PaperEventService implements IServerEventService, Listener {
     private static volatile PaperEventService instance;
-    private final Logger logger = MusicHud.getLogger(PaperEventService.class);
-    private final Set<Consumer<Player>> disconnectListeners = new HashSet<>();
+    private final Set<Consumer<IPlayerClient>> disconnectListeners = new HashSet<>();
     private final Set<Runnable> stoppingListeners = new HashSet<>();
     private JavaPlugin plugin;
 
@@ -45,7 +42,7 @@ public final class PaperEventService implements IServerEventService, Listener {
     }
 
     @Override
-    public Unregister registerCommonPlayerQuit(Consumer<Player> listener) {
+    public Unregister registerCommonPlayerQuit(Consumer<IPlayerClient> listener) {
         disconnectListeners.add(listener);
         return () -> {
             disconnectListeners.remove(listener);
@@ -62,8 +59,7 @@ public final class PaperEventService implements IServerEventService, Listener {
 
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        Player player = ((CraftPlayer) event.getPlayer()).getHandle();
-        disconnectListeners.forEach(d -> d.accept(player));
+        disconnectListeners.forEach(d -> d.accept(PaperPlayerProxy.ofPlayer(event.getPlayer())));
     }
 
     public void fireServerStopping() {
