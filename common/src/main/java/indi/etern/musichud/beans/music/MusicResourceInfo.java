@@ -1,11 +1,9 @@
 package indi.etern.musichud.beans.music;
 
 import com.google.gson.annotations.SerializedName;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import lombok.*;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.Objects;
 
@@ -13,22 +11,22 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @Setter
 public class MusicResourceInfo {
-    public static final StreamCodec<RegistryFriendlyByteBuf, MusicResourceInfo> CODEC = StreamCodec.composite(
-            ByteBufCodecs.LONG,
+    public static final ByteBufCodec<MusicResourceInfo> CODEC = ByteBufCodec.composite(
+            Codecs.LONG,
             MusicResourceInfo::getId,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             MusicResourceInfo::getUrl,
-            ByteBufCodecs.INT,
+            Codecs.INT,
             MusicResourceInfo::getBitrate,
-            ByteBufCodecs.LONG,
+            Codecs.LONG,
             MusicResourceInfo::getSize,
             Codecs.ofEnum(FormatType.class),
             MusicResourceInfo::getType,
-            ByteBufCodecs.STRING_UTF8,
+            Codecs.STRING_UTF8,
             MusicResourceInfo::getMd5,
             Codecs.ofEnum(Fee.class),
             MusicResourceInfo::getFee,
-            ByteBufCodecs.INT,
+            Codecs.INT,
             MusicResourceInfo::getTime,
             MusicResourceInfo::new
     );

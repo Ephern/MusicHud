@@ -1,20 +1,19 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.interfaces.CommonRegister;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.payloads.S2CPayload;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.function.Consumer;
 
 public record SendPhoneValidationCodeResponse(boolean success, int timeout) implements S2CPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, SendPhoneValidationCodeResponse> CODEC =
-            StreamCodec.composite(
-                    ByteBufCodecs.BOOL,
+    public static final ByteBufCodec<SendPhoneValidationCodeResponse> CODEC =
+            ByteBufCodec.composite(
+                    Codecs.BOOL,
                     SendPhoneValidationCodeResponse::success,
-                    ByteBufCodecs.INT,
+                    Codecs.INT,
                     SendPhoneValidationCodeResponse::timeout,
                     SendPhoneValidationCodeResponse::new
             );

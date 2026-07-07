@@ -1,16 +1,16 @@
 package indi.etern.musichud.utils;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.network.IPlayerClient;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.throwable.ApiException;
-import net.minecraft.world.entity.player.Player;
 
 import java.util.function.BiConsumer;
 
 public class ServerDataPacketVThreadExecutor {
     public static <T extends IPayload> NetworkReceiver<T> execute(
-            BiConsumer<T, Player> consumer
+            BiConsumer<T, IPlayerClient> consumer
     ) {
         return (payload, player) -> {
             MusicHud.EXECUTOR.execute(() -> {

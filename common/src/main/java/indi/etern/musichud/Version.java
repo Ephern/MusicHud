@@ -1,33 +1,23 @@
 package indi.etern.musichud;
 
-import io.netty.buffer.ByteBuf;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
 import org.jetbrains.annotations.NotNull;
 
 public record Version(long mayor, long minor, long patch, BuildType build) implements Comparable<Version>{
-    public static final StreamCodec<? super RegistryFriendlyByteBuf, Version> PACKET_CODEC;
-    public static final Version current = new Version(1,2,14, BuildType.Stable);
+    public static final ByteBufCodec<Version> PACKET_CODEC = ByteBufCodec.composite(
+            Codecs.LONG_ARRAY, Version::toLongArray,
+            Version::ofLongArray
+    );
+    public static final Version current = new Version(1,2,15, BuildType.Alpha);
     public static final Version leastCapable = new Version(1,2,2,BuildType.Stable);
 
-    static {
-        PACKET_CODEC = new StreamCodec<ByteBuf, Version>() {
-            public @NotNull Version decode(@NotNull ByteBuf byteBuf) {
-                return Version.ofLongArray(RegistryFriendlyByteBuf.readLongArray(byteBuf));
-            }
-
-            public void encode(@NotNull ByteBuf byteBuf, @NotNull Version version) {
-                RegistryFriendlyByteBuf.writeLongArray(byteBuf, version.toLongArray());
-            }
-        };
+    private Long[] toLongArray() {
+        return new Long[]{mayor, minor, patch, (long) build.ordinal()};
     }
 
-    private long[] toLongArray() {
-        return new long[]{mayor, minor, patch, build.ordinal()};
-    }
-
-    private static Version ofLongArray(long[] longs) {
-        return new Version(longs[0], longs[1], longs[2], BuildType.ofOrdinal((int) longs[3]));
+    private static Version ofLongArray(Long[] longs) {
+        return new Version(longs[0], longs[1], longs[2], BuildType.ofOrdinal(longs[3].intValue()));
     }
 
     public enum BuildType {

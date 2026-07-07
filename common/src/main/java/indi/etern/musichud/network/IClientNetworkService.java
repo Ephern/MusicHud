@@ -4,6 +4,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
+import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
 import indi.etern.musichud.platform.Environment;
 import net.minecraft.client.Minecraft;
 
@@ -23,7 +24,7 @@ public interface IClientNetworkService {
             NetworkReceiver<T> receiver = (NetworkReceiver<T>) INetworkRegister.getInstance()
                     .getMetaDataOrNew(payload.getClass(), null).receiver();
             if (receiver != null) {
-                receiver.receive(payload, minecraft.player);
+                receiver.receive(payload, VanillaPlayerProxy.ofPlayer(minecraft.player));
             }
         }
     }

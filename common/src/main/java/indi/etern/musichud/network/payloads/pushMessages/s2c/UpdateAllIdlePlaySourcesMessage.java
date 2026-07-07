@@ -6,19 +6,18 @@ import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 
 import java.util.List;
 
 public record UpdateAllIdlePlaySourcesMessage(List<Playlist> playlistSources,
                                               List<Album> albumSources) implements S2CPayload {
-    public static final StreamCodec<RegistryFriendlyByteBuf, UpdateAllIdlePlaySourcesMessage> CODEC = StreamCodec.composite(
+    public static final ByteBufCodec<UpdateAllIdlePlaySourcesMessage> CODEC = ByteBufCodec.composite(
             Codecs.ofList(() -> Playlist.CODEC),
             UpdateAllIdlePlaySourcesMessage::playlistSources,
             Codecs.ofList(() -> Album.CODEC),

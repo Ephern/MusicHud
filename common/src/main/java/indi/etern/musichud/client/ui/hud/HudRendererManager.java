@@ -81,6 +81,10 @@ public class HudRendererManager {
                 LYRICS_LINE_RENDERER.setLines(style1, style2, 300);
             });
         });
+        PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
+            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
+            return PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo);
+        });
     }
 
     public static HudRendererManager getInstance() {
@@ -281,8 +285,6 @@ public class HudRendererManager {
                         .orElse("");
                 ARTISTS_AND_ALBUM_RENDERER.setText(artists + " - " + musicDetail.getAlbum().getName());
                 LYRICS_LINE_RENDERER.clear();
-                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-                PLAYER_HEAD_RENDERER.setSkinResource(PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo));
                 loadAlbumImage(musicDetail).thenAccept((unused) -> {
                     Duration musicDuration = nowPlayingInfo.getMusicDuration();
                     DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
@@ -323,7 +325,7 @@ public class HudRendererManager {
         ARTISTS_AND_ALBUM_RENDERER.setText("");
         LYRICS_LINE_RENDERER.clear();
         PLAY_TIME_RENDERER.setText("");
-        PLAYER_HEAD_RENDERER.setSkinResource(null);
+//        PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(null);
         musicDurationString = "";
         var nextData = BackgroundData.NONE;
         hudBaseData.getTransitionableBackground().startTransition(nextData);
@@ -357,8 +359,8 @@ public class HudRendererManager {
             hudRenderContext.clearContext();
             hudRenderContext.setGraphics(graphics);
 
-            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-            PLAYER_HEAD_RENDERER.setSkinResource(PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo));
+//            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
+//            PLAYER_HEAD_RENDERER.setSkinResource(PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo));
 
             BACKGROUND_RENDERER.render(hudRenderContext);
 

@@ -3,8 +3,6 @@ package indi.etern.musichud.network;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.platform.Environment;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
@@ -31,19 +29,19 @@ public interface INetworkRegister {
 
     <T extends IPayload> void registerC2SPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> serverReceiver
     );
 
     <T extends IPayload> void registerS2CPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> clientReceiver
     );
 
     <T extends IPayload> void autoRegisterPayload(
             Class<T> clazz,
-            StreamCodec<? super RegistryFriendlyByteBuf, T> codec,
+            ByteBufCodec<T> codec,
             NetworkReceiver<T> clientOrServerReceiver
     );
 

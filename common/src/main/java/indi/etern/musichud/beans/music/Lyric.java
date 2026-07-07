@@ -1,9 +1,11 @@
 package indi.etern.musichud.beans.music;
 
-import lombok.*;
-import net.minecraft.network.RegistryFriendlyByteBuf;
-import net.minecraft.network.codec.ByteBufCodecs;
-import net.minecraft.network.codec.StreamCodec;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
+import lombok.AccessLevel;
+import lombok.AllArgsConstructor;
+import lombok.EqualsAndHashCode;
+import lombok.NoArgsConstructor;
 
 import java.util.Objects;
 
@@ -11,8 +13,8 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 @EqualsAndHashCode
 public class Lyric {
-    public static final StreamCodec<RegistryFriendlyByteBuf, Lyric> CODEC = StreamCodec.composite(
-            ByteBufCodecs.STRING_UTF8,
+    public static final ByteBufCodec<Lyric> CODEC = ByteBufCodec.composite(
+            Codecs.STRING_UTF8,
             Lyric::getLyric,
             Lyric::new
     );
