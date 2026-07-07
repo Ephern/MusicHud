@@ -39,7 +39,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         if (minecraft.level == null || minecraft.player == null) return;
         long currentTimeMillis = System.currentTimeMillis();
         if (playerSkinSupplier != null) {
-            ResourceLocation skin = playerSkinSupplier.get();
+            Identifier skin = playerSkinSupplier.get();
             if (skinResource != skin) {
                 lastUpdateTime = currentTimeMillis;
                 previousSkinResource = skinResource;
