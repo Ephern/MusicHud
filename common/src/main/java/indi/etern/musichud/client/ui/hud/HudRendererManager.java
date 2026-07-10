@@ -339,9 +339,11 @@ public class HudRendererManager {
             }
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
             MusicDetail musicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-            if ((musicDetail == null || musicDetail.equals(MusicDetail.NONE)) &&
-                    clientConfig.getHideHudWhenNotPlaying()) {
-                return;
+            if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
+                TITLE_RENDERER.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));//To prevent i18n lazy loading result in wrong text
+                if (clientConfig.getHideHudWhenNotPlaying()) {
+                    return;
+                }
             }
             hudBaseData.getTransitionableBackground().updateTransition();
 
