@@ -331,7 +331,7 @@ public class HudRendererManager {
         hudBaseData.getTransitionableBackground().startTransition(nextData);
     }
 
-    public void renderFrame(GuiGraphics graphics, DeltaTracker deltaTracker) {
+    public void renderFrame(GuiGraphics graphics,@Nullable DeltaTracker deltaTracker) {
         try {
             if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
                 return;
