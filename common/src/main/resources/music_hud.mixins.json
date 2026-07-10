@@ -11,7 +11,7 @@
     "SpanSetMixin",
     "ToastManagerMixin",
     "ToastRecordAccessor",
-    "ReceivingLevelScreenMixin"
+    "LevelLoadingScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
