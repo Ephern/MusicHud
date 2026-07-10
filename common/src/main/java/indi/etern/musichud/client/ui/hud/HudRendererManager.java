@@ -85,6 +85,9 @@ public class HudRendererManager {
             PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
             return PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo);
         });
+        updateLayoutFromConfig();
+        refreshStyle();
+        reset();
     }
 
     public static HudRendererManager getInstance() {
@@ -92,8 +95,6 @@ public class HudRendererManager {
             synchronized (HudRendererManager.class) {
                 if (instance == null) {
                     instance = new HudRendererManager();
-                    instance.updateLayoutFromConfig();
-                    instance.refreshStyle();
 
                     updateStatus(StreamAudioPlayer.Status.IDLE);
                     StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
