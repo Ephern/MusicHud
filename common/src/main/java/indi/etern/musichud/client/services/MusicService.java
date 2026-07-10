@@ -78,6 +78,7 @@ public class MusicService {
     private final Set<Consumer<MusicDetail>> musicQueuePushListeners = ConcurrentHashMap.newKeySet();
     @Getter
     private final Set<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = ConcurrentHashMap.newKeySet();
+    private boolean initialSyncReceived = false;
     long lastPressTime = 0;
     @Getter
     private boolean idlePlaySourceLoaded = false;
@@ -248,7 +249,25 @@ public class MusicService {
         clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(index, musicDetail.getId()));
     }
 
+    /**
+     * If a SyncCurrentPlayingMessage has already been processed for this connection,
+     * do nothing (the state is already correct). Otherwise, reset all state to NONE.
+     * Must be called from EXECUTOR (same threading context as switchMusic) for correct ordering.
+     */
+    public synchronized boolean checkAndResetInitialSync() {
+        if (initialSyncReceived) return false;
+        initialSyncReceived = true;
+        switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
+        idlePlaySourceLoaded = false;
+        musicQueue.clear();
+        if (HudRendererManager.isLoaded()) {
+            HudRendererManager.getInstance().reset();
+        }
+        return true;
+    }
+
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
+        initialSyncReceived = true;
         if (clientConfig.getEnable()) {
             if (!message.isEmpty()) {
                 MuiModApi.postToUiThread(() -> {
@@ -427,7 +446,6 @@ public class MusicService {
         if (HudRendererManager.isLoaded()) {
             HudRendererManager.getInstance().reset();
         }
-        NowPlayingInfo.getInstance().switchMusicInfo(MusicDetail.NONE, MusicDetail.NONE);
     }
 
     @RegisterMark
