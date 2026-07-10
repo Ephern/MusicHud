@@ -221,6 +221,10 @@ public class NowPlayingInfo {
 //                System.out.println("position: " + position);
                 if (getPlayedDuration() == musicDuration) {
                     jmtc.setPlayingState(JMTCPlayingState.STOPPED);
+                } else if (clientConfig.getMuted()) {
+                    jmtc.setPlayingState(JMTCPlayingState.PAUSED);
+                } else {
+                    jmtc.setPlayingState(JMTCPlayingState.PLAYING);
                 }
                 updateDisplay = true;
             } else {

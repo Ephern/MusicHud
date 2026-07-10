@@ -6,9 +6,10 @@
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
     "GuiRendererHudMixin",
+    "ReactiveMusicCompatMixin",
     "SoundEngineMixin",
     "SpanSetMixin",
-    "ReactiveMusicCompatMixin"
+    "ReceivingLevelScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
