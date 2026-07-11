@@ -3,8 +3,6 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
-import indi.etern.musichud.client.audio.NowPlayingInfo;
-import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.screen.MainFragment;
@@ -58,9 +56,7 @@ public record ConnectResponse(boolean accepted, Version serverVersion,
                         LOGGER.info("Connecting {}", payload.accepted() ? "accepted" : "denied");
                         if (payload.accepted()) {
                             if (Version.compatibleWith(payload.serverVersion)) {
-                                MusicService.resetCurrentMusicStatus();
-                                NowPlayingInfo.getInstance().stop();
-                                StreamAudioPlayer.getInstance().stop();
+                                MusicHud.EXECUTOR.execute(MusicService.getInstance()::checkAndResetInitialSync);
                                 if (Minecraft.getInstance().getCurrentServer() != null
                                         && MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED
                                         && clientConfig != null && clientConfig.getEnableIsolatedMode()) {

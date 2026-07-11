@@ -20,6 +20,7 @@ import net.minecraft.client.resources.language.I18n;
 import net.minecraft.sounds.SoundSource;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.SOFTDirectChannels;
@@ -49,10 +50,10 @@ public class StreamAudioPlayer {
     private final int[] buffers = new int[BUFFER_COUNT];
     private final AtomicBoolean initialized = new AtomicBoolean(false);
     private final AtomicReference<Status> status = new AtomicReference<>(Status.IDLE);
-    private volatile BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(30); // 最大30个数据块的缓冲区
     @Getter
     private final Set<Consumer<Status>> statusChangeListener = new HashSet<>();
     private final AtomicLong totalBufferedBytes = new AtomicLong(0);
+    private volatile BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(30); // 最大30个数据块的缓冲区
     private int source = 0;
     private float lastVolume;
     private volatile CompletableFuture<?> playingFuture;
@@ -113,7 +114,7 @@ public class StreamAudioPlayer {
         }
     }
 
-    protected void fullyRetryCurrent() {
+    protected void fullyRetryCurrent(@Nullable CompletableFuture<ZonedDateTime> startPlayingFuture) {
         MusicDetail currentMusicDetail1 = currentMusicDetail;
         ZonedDateTime serverStartTime1 = serverStartTime;
         stopInternal();
@@ -122,7 +123,15 @@ public class StreamAudioPlayer {
         } catch (InterruptedException ignored) {
         } finally {
             LOGGER.info("Fully retrying");
-            playAsyncInternal(currentMusicDetail1, serverStartTime1);
+            CompletableFuture<ZonedDateTime> zonedDateTimeCompletableFuture = playAsyncInternal(currentMusicDetail1, serverStartTime1);
+            if (startPlayingFuture != null) {
+                zonedDateTimeCompletableFuture
+                        .thenAccept(value -> startPlayingFuture.complete(value))
+                        .exceptionally(e -> {
+                            startPlayingFuture.completeExceptionally(e);
+                            return null;
+                        });
+            }
         }
     }
 
@@ -180,7 +189,7 @@ public class StreamAudioPlayer {
                 LOGGER.error("Download thread error", e);
                 setStatus(Status.ERROR);
                 try {
-                    fullyRetryCurrent();
+                    fullyRetryCurrent(startPlayingFuture);
                 } catch (RuntimeException e1) {
                     LOGGER.error("Retry failed: {}: {}", e1.getClass(), e1.getMessage());
                 }
@@ -219,8 +228,10 @@ public class StreamAudioPlayer {
 
             if (totalBufferedBytes.get() == 0) {
                 LOGGER.error("No audio data available");
-                setStatus(Status.ERROR);
-                startPlayingFuture.completeExceptionally(new IOException("No audio data available"));
+                if (currentPlayingFuture != null && playingFuture != null) {
+                    setStatus(Status.ERROR);
+                }
+                fullyRetryCurrent(startPlayingFuture);
             } else {
                 synchronized (StreamAudioPlayer.class) {
                     if (!initialized.get() || source == 0) {
@@ -325,7 +336,7 @@ public class StreamAudioPlayer {
                         } catch (Exception e) {
                             LOGGER.error("Playback error: {}", e.getMessage(), e);
                             try {
-                                fullyRetryCurrent();
+                                fullyRetryCurrent(startPlayingFuture);
                             } catch (RuntimeException e1) {
                                 break;
                             }
@@ -337,10 +348,7 @@ public class StreamAudioPlayer {
         } catch (InterruptedException ignored) {
         } catch (Exception e) {
             LOGGER.error("Playback error: {}", e.getMessage(), e);
-            if (!startPlayingFuture.isDone()) {
-                startPlayingFuture.completeExceptionally(e);
-            }
-            fullyRetryCurrent();
+            fullyRetryCurrent(startPlayingFuture);
         } finally {
             if (currentPlayingFuture != null) {
                 currentPlayingFuture.complete(null);
