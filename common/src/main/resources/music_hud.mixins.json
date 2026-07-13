@@ -9,7 +9,7 @@
     "ReactiveMusicCompatMixin",
     "SoundEngineMixin",
     "SpanSetMixin",
-    "ReceivingLevelScreenMixin"
+    "LevelLoadingScreenMixin"
   ],
   "injectors": {
     "defaultRequire": 1
