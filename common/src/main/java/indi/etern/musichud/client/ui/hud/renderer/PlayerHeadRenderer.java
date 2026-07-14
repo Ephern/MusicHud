@@ -24,9 +24,15 @@ public class PlayerHeadRenderer implements HudRenderer {
 
     public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
-        lastUpdateTime = System.currentTimeMillis();
-        previousSkinResource = skinResource;
-        skinResource = playerSkinSupplier == null ? null : playerSkinSupplier.get();
+        ResourceLocation newSkin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
+        long now = System.currentTimeMillis();
+        if (now - lastUpdateTime > TRANSITION_DURATION) {
+            previousSkinResource = skinResource;
+        } else {
+            previousSkinResource = null;
+        }
+        lastUpdateTime = now;
+        skinResource = newSkin;
     }
 
     public void configure(Layout layout) {
@@ -38,15 +44,21 @@ public class PlayerHeadRenderer implements HudRenderer {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null) return;
         long currentTimeMillis = System.currentTimeMillis();
-        if (playerSkinSupplier != null) {
-            ResourceLocation skin = playerSkinSupplier.get();
-            if (skinResource != skin) {
-                lastUpdateTime = currentTimeMillis;
-                previousSkinResource = skinResource;
-                skinResource = skin;
+        try {
+            if (playerSkinSupplier != null) {
+                ResourceLocation skin = playerSkinSupplier.get();
+                if (skinResource != skin) {
+                    if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
+                        previousSkinResource = skinResource;
+                    } else {
+                        previousSkinResource = null;
+                    }
+                    lastUpdateTime = currentTimeMillis;
+                    skinResource = skin;
+                }
             }
-        }
-        if (skinResource == null) return;
+            if (skinResource == null) return;
+        } catch (Exception ignored) {}
 
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
         int w = (int) layout.getWidth();

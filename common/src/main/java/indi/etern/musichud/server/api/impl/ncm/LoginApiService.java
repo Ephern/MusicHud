@@ -263,6 +263,9 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public Profile loadUserProfile(IPlayerClient player, LoginCookieInfo loginCookieInfo) {
+        if (loginCookieInfo.type() == LoginType.ANONYMOUS) {
+            return Profile.ANONYMOUS;
+        }
         AccountDetail accountDetail = ApiClient.get(ServerApiMeta.User.ACCOUNT, loginCookieInfo.rawCookie(), true);
         Profile profile = accountDetail.profile();
         return postProcessProfile(player, loginCookieInfo, profile, accountDetail.account);

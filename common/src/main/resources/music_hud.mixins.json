@@ -7,11 +7,9 @@
   "client": [
     "GuiRendererHudMixin",
     "ReactiveMusicCompatMixin",
+    "ScreenMixin",
     "SoundEngineMixin",
-    "SpanSetMixin",
-    "ToastManagerMixin",
-    "ToastRecordAccessor",
-    "LevelLoadingScreenMixin"
+    "SpanSetMixin"
   ],
   "injectors": {
     "defaultRequire": 1
