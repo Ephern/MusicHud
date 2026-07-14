@@ -1,10 +1,13 @@
 package indi.etern.musichud.client.ui.pages;
 
+import com.google.gson.reflect.TypeToken;
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.ConfigItem;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.PreferencesFragment;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.style.URLSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.*;
@@ -13,6 +16,8 @@ import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.ToastUtil;
+import indi.etern.musichud.client.ui.components.Modal;
 import indi.etern.musichud.client.ui.components.DynamicIntegerOption;
 import indi.etern.musichud.client.ui.components.LyricLineView;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
@@ -24,20 +29,24 @@ import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
-import indi.etern.musichud.server.api.ApiProvider;
-import indi.etern.musichud.server.api.ApiServerManager;
-import indi.etern.musichud.server.api.ILoginApiService;
-import indi.etern.musichud.server.api.MusicPlayerServerService;
+import indi.etern.musichud.server.api.*;
+import indi.etern.musichud.utils.JsonUtil;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
 import net.minecraft.util.Util;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.commons.lang3.Range;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.glfw.GLFW;
+import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
-import java.util.Arrays;
-import java.util.List;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.*;
 import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -370,9 +379,7 @@ public class ConfigView extends LinearLayout {
             view.addView(multiplayerCategory);
 
             var integratedServerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.integratedServer"));
-            LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(0, dp(6), 0, dp(128));
-            view.addView(integratedServerCategory, params1);
+            view.addView(integratedServerCategory, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
             PreferencesFragment.BooleanOption enableInIntegratedServerOption = new PreferencesFragment.BooleanOption(
                     context,
@@ -398,22 +405,6 @@ public class ConfigView extends LinearLayout {
                 }
             });
 
-            PreferencesFragment.BooleanOption startupBinaryApiServerOption = new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.startupBinaryApiServerWhenLaunch"),
-                    serverConfig::getStartupBinaryApiServerWhenLaunch,
-                    serverConfig::setStartupBinaryApiServerWhenLaunch)
-                    .setDefaultValue(true);
-            startupBinaryApiServerOption.create(integratedServerCategory);
-
-            PreferencesFragment.BooleanOption useRandomCnIpOption = new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.useRandomCnIp"),
-                    serverConfig::getUseRandomCnIp,
-                    serverConfig::setUseRandomCnIp)
-                    .setDefaultValue(true);
-            useRandomCnIpOption.create(integratedServerCategory);
-
             PreferencesFragment.FloatOption pusherVoteAdditionalRateOption = new PreferencesFragment.FloatOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.integratedServer.pusherVoteAdditionalRate"),
@@ -423,8 +414,119 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(0.5);
             pusherVoteAdditionalRateOption.create(integratedServerCategory);
 
+            var apiCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.apiServer"));
+            LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params1.setMargins(0, dp(6), 0, dp(128));
+            view.addView(apiCategory, params1);
+
+            PreferencesFragment.BooleanOption startupBinaryApiServerOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.startupBinaryApiServerWhenLaunch"),
+                    serverConfig::getStartupBinaryApiServerWhenLaunch,
+                    serverConfig::setStartupBinaryApiServerWhenLaunch)
+                    .setDefaultValue(true);
+            startupBinaryApiServerOption.create(apiCategory);
+
+            PreferencesFragment.BooleanOption useRandomCnIpOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.useRandomCnIp"),
+                    serverConfig::getUseRandomCnIp,
+                    serverConfig::setUseRandomCnIp)
+                    .setDefaultValue(true);
+            useRandomCnIpOption.create(apiCategory);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableGeneralUnblock"),
+                    serverConfig::getEnableGeneralUnblock,
+                    serverConfig::setEnableGeneralUnblock)
+                    .setDefaultValue(true)
+                    .create(apiCategory);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableFlac"),
+                    serverConfig::getEnableFlac,
+                    serverConfig::setEnableFlac)
+                    .setDefaultValue(true)
+                    .create(apiCategory);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.selectMaxBr"),
+                    serverConfig::getSelectMaxBr,
+                    serverConfig::setSelectMaxBr)
+                    .setDefaultValue(false)
+                    .create(apiCategory);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.followSourceOrder"),
+                    serverConfig::getFollowSourceOrder,
+                    serverConfig::setFollowSourceOrder)
+                    .setDefaultValue(true)
+                    .create(apiCategory);
+
+            new PreferencesFragment.IntegerOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.port"),
+                    serverConfig::getPort,
+                    serverConfig::setPort)
+                    .setRange(1, 65535)
+                    .setDefaultValue(3000)
+                    .create(apiCategory);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableProxy"),
+                    serverConfig::getEnableProxy,
+                    serverConfig::setEnableProxy)
+                    .setDefaultValue(false)
+                    .create(apiCategory);
+
             {
-                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.integratedServer.serverApiBaseUrl"));
+                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.corsAllowOrigin"));
+                EditText input = inputBox.findViewById(R.id.input);
+                if (input != null) {
+                    input.setMinimumWidth(dp(256));
+                    input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+                    input.setText(serverConfig.getCorsAllowOrigin());
+                    input.setOnKeyListener((v, c, e) -> {
+                        if (c == GLFW.GLFW_KEY_ENTER) {
+                            input.clearFocus();
+                            return true;
+                        }
+                        return false;
+                    });
+                    input.setOnFocusChangeListener((v, b) -> {
+                        if (!b) {
+                            serverConfig.setCorsAllowOrigin(input.getText().toString());
+                        }
+                    });
+                }
+                apiCategory.addView(inputBox);
+            }
+
+            {
+                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.proxyUrl"));
+                EditText input = inputBox.findViewById(R.id.input);
+                if (input != null) {
+                    input.setMinimumWidth(dp(256));
+                    input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+                    input.setText(serverConfig.getProxyUrl());
+                    input.setOnKeyListener((v, c, e) -> {
+                        if (c == GLFW.GLFW_KEY_ENTER) {
+                            input.clearFocus();
+                            return true;
+                        }
+                        return false;
+                    });
+                    input.setOnFocusChangeListener((v, b) -> {
+                        if (!b) {
+                            serverConfig.setProxyUrl(input.getText().toString());
+                        }
+                    });
+                }
+                apiCategory.addView(inputBox);
+            }
+
+
+            {
+                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.serverApiBaseUrl"));
                 EditText input = inputBox.findViewById(R.id.input);
                 if (input != null) {
                     input.setMinimumWidth(dp(256));
@@ -443,11 +545,13 @@ public class ConfigView extends LinearLayout {
                         }
                     });
                 }
-                integratedServerCategory.addView(inputBox);
+                apiCategory.addView(inputBox);
             }
 
+            final EditText[] serverApiBinaryPathInput = {null};
+
             {
-                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.integratedServer.serverApiBinaryExecutablePath"));
+                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.serverApiBinaryExecutablePath"));
                 EditText input = inputBox.findViewById(R.id.input);
                 if (input != null) {
                     input.setMinimumWidth(dp(256));
@@ -466,7 +570,8 @@ public class ConfigView extends LinearLayout {
                         }
                     });
                 }
-                integratedServerCategory.addView(inputBox);
+                serverApiBinaryPathInput[0] = input;
+                apiCategory.addView(inputBox);
             }
 
             LinearLayout apiServerStatusLayout = new LinearLayout(context);
@@ -482,11 +587,14 @@ public class ConfigView extends LinearLayout {
             String binaryApiStatusTemplate = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
             apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerManager.getBinaryApiServerStatus().i18nKey())));
 
+            ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder().inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
+
+            Button downloadApiServerButton = createDownloadApiButton(context, backgroundFactory, serverApiBinaryPathInput);
+
             Button stopApiServerButton = new Button(context);
             stopApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.stopApiServer"));
             stopApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             stopApiServerButton.setTextSize(14);
-            ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder().inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
             stopApiServerButton.setBackground(backgroundFactory.newBackgroundDrawable());
             stopApiServerButton.setOnClickListener((v1) -> {
                 apiServerManager.stopApiServer();
@@ -502,9 +610,10 @@ public class ConfigView extends LinearLayout {
             });
 
             apiServerStatusLayout.addView(apiStatusLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+            apiServerStatusLayout.addView(downloadApiServerButton);
             apiServerStatusLayout.addView(stopApiServerButton);
             apiServerStatusLayout.addView(restartApiServerButton);
-            integratedServerCategory.addView(apiServerStatusLayout);
+            apiCategory.addView(apiServerStatusLayout);
 
             LinearLayout apiVersionLinearLayout = new LinearLayout(context);
             apiVersionLinearLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -531,7 +640,7 @@ public class ConfigView extends LinearLayout {
 
             apiVersionLinearLayout.addView(apiVersionLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
             apiVersionLinearLayout.addView(checkVersionButton);
-            integratedServerCategory.addView(apiVersionLinearLayout);
+            apiCategory.addView(apiVersionLinearLayout);
 
             Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiStatusListener) -> {
                 MuiModApi.postToUiThread(() -> {
@@ -559,6 +668,424 @@ public class ConfigView extends LinearLayout {
             instance = null;
             throw e;
         }
+    }
+
+    private @NotNull Button createDownloadApiButton(Context context, ButtonInsetBackgroundFactory backgroundFactory, EditText[] serverApiBinaryPathInput) {
+        Button downloadApiServerButton = new Button(context);
+        downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
+        downloadApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
+        downloadApiServerButton.setTextSize(14);
+        downloadApiServerButton.setBackground(backgroundFactory.newBackgroundDrawable());
+
+        final String downloadingText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.downloading");
+        final String button1Text = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button1");
+        final String button2Text = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button2");
+        final String button1YesText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button1.yes");
+        final String button2NoText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button2.no");
+        final String hideText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.hide");
+
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+
+        TextView title = new TextView(context);
+        title.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.title"));
+        title.setTextSize(Theme.TEXT_SIZE_LARGE);
+
+        TextView description = new TextView(context);
+        String desc = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.description");
+        int indexOfUrl = desc.indexOf("{url}");
+        String latestReleaseUrl = ApiServerFetcher.LATEST_RELEASE_URL;
+        String replace = desc.replace("{url}", latestReleaseUrl);
+        SpannableString spannableString = new SpannableString(replace);
+        spannableString.setSpan(new URLSpan(latestReleaseUrl), indexOfUrl, indexOfUrl + latestReleaseUrl.length(), SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
+        description.setText(spannableString);
+        description.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        description.setOnClickListener(v -> Util.getPlatform().openUri(latestReleaseUrl));
+
+        final Path[] targetDir = {Paths.get("music-hud")};
+        final ApiServerFetcher.ReleaseSummary[] latestRelease = {null};
+
+        LinearLayout releaseInfoLayout = new LinearLayout(context);
+        releaseInfoLayout.setOrientation(LinearLayout.HORIZONTAL);
+        releaseInfoLayout.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView existingVersionWarning = new TextView(context);
+        existingVersionWarning.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        existingVersionWarning.setTextColor(Theme.WARN_TEXT_COLOR);
+        existingVersionWarning.setVisibility(GONE);
+
+        TextView releaseNameLabel = new TextView(context);
+        releaseNameLabel.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        releaseNameLabel.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        releaseNameLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.fetching"));
+
+        Button refreshReleaseButton = new Button(context);
+        refreshReleaseButton.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.refresh"));
+        refreshReleaseButton.setTextColor(Theme.PRIMARY_COLOR);
+        refreshReleaseButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        refreshReleaseButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        refreshReleaseButton.setOnClickListener(v -> { refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning); });
+
+        releaseInfoLayout.addView(releaseNameLabel, new LayoutParams(0, WRAP_CONTENT, 1));
+        releaseInfoLayout.addView(refreshReleaseButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+        LinearLayout directoryLayout = new LinearLayout(context);
+        directoryLayout.setOrientation(LinearLayout.HORIZONTAL);
+        EditText directoryTextInput = new EditText(context, null, R.attr.editTextOutlinedStyle);
+        directoryTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.dir.field.hint"));
+        directoryTextInput.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        directoryTextInput.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        directoryTextInput.setText(targetDir[0].toString());
+
+        Button selectDirectoryButton = new Button(context);
+        selectDirectoryButton.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.dir.button.select"));
+        selectDirectoryButton.setTextColor(Theme.PRIMARY_COLOR);
+        selectDirectoryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        selectDirectoryButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        selectDirectoryButton.setOnClickListener(v -> {
+            Path defaultPath = targetDir[0].toAbsolutePath();
+            String folder = TinyFileDialogs.tinyfd_selectFolderDialog(
+                    I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.dir.dialog.title"), defaultPath.toString());
+            if (folder != null) {
+                targetDir[0] = Paths.get(folder);
+                directoryTextInput.setText(folder);
+                checkExistingVersion(targetDir[0], latestRelease[0], existingVersionWarning);
+            }
+        });
+
+        directoryLayout.addView(directoryTextInput, new LayoutParams(0, WRAP_CONTENT, 1));
+        directoryLayout.addView(selectDirectoryButton, new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0));
+
+        LinearLayout progressLayout = new LinearLayout(context);
+        progressLayout.setOrientation(LinearLayout.HORIZONTAL);
+        progressLayout.setGravity(Gravity.CENTER_VERTICAL);
+        progressLayout.setVisibility(GONE);
+
+        ProgressBar progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
+        progressBar.setMin(0);
+        progressBar.setMax(100);
+
+        TextView progressText = new TextView(context);
+        progressText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        progressText.setTextColor(Theme.NORMAL_TEXT_COLOR);
+
+        LayoutParams progParams = new LayoutParams(0, dp(24), 1);
+        progParams.setMargins(0, 0, progressBar.dp(4), 0);
+        progressLayout.addView(progressBar, progParams);
+        progressLayout.addView(progressText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+        LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        params4.setMargins(0, 0, 0, dp(8));
+        content.addView(title, params4);
+        content.addView(description);
+        LayoutParams params5 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        params5.setMargins(0, dp(4), 0, dp(4));
+        content.addView(directoryLayout, params5);
+        content.addView(releaseInfoLayout);
+        content.addView(existingVersionWarning);
+        content.addView(progressLayout);
+
+        LinearLayout doneContent = new LinearLayout(context);
+        doneContent.setOrientation(LinearLayout.VERTICAL);
+        doneContent.setVisibility(GONE);
+
+        TextView doneTitle = new TextView(context);
+        doneTitle.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.title"));
+        doneTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+
+        TextView doneDesc = new TextView(context);
+        doneDesc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.description"));
+        doneDesc.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        doneDesc.setTextColor(Theme.NORMAL_TEXT_COLOR);
+
+        doneContent.addView(doneTitle, params4);
+        doneContent.addView(doneDesc);
+        content.addView(doneContent);
+
+        final String[] downloadState = {"idle"};
+        final long[] lastSize = {0, 0};
+        final Path[] downloadedTempFile = {null};
+        final String[] releaseTag = {""};
+
+        Modal.ActionButton cancelBtn = new Modal.ActionButton(button2Text, (btn, dialog) -> {
+            if ("done".equals(downloadState[0])) {
+                resetToIdle(downloadState, doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout, existingVersionWarning);
+                downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
+            }
+            dialog.dismiss();
+        });
+
+        Modal.ActionButton confirmButton = new Modal.ActionButton(button1Text, (btn, dialog) -> {
+            if ("idle".equals(downloadState[0])) {
+                if (latestRelease[0] == null) {
+                    ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.notFetched"));
+                    return;
+                }
+                downloadState[0] = "downloading";
+                btn.setText(downloadingText);
+                btn.setEnabled(false);
+                cancelBtn.setText(hideText);
+                progressLayout.setVisibility(VISIBLE);
+                releaseInfoLayout.setVisibility(GONE);
+                existingVersionWarning.setVisibility(GONE);
+                progressBar.setProgress(0);
+                progressText.setText("");
+                downloadApiServerButton.setText(downloadingText);
+
+                targetDir[0] = Paths.get(directoryTextInput.getText().toString().trim());
+                try {
+                    Files.createDirectories(targetDir[0]);
+                } catch (IOException ignored) {}
+
+                releaseTag[0] = latestRelease[0].tag();
+                String tempFileName = ApiServerFetcher.Platform.detect().getAssetName() + "." + releaseTag[0] + ".temp";
+                Path tempFile = targetDir[0].resolve(tempFileName);
+                tempFile.toFile().deleteOnExit();
+
+                ApiServerFetcher.downloadLatestForCurrentPlatform(targetDir[0], tempFileName, (downloaded, total) -> {
+                    MuiModApi.postToUiThread(() -> {
+                        lastSize[0] = downloaded;
+                        lastSize[1] = total;
+                        int pct = (int) (((double) downloaded / total) * 100);
+                        progressBar.setProgress(pct);
+                        progressText.setText(formatBytes(downloaded) + " / " + formatBytes(total));
+                    });
+                }).thenRun(() -> {
+                    MuiModApi.postToUiThread(() -> {
+                        downloadState[0] = "done";
+                        downloadedTempFile[0] = tempFile;
+                        title.setVisibility(GONE);
+                        description.setVisibility(GONE);
+                        releaseInfoLayout.setVisibility(GONE);
+                        existingVersionWarning.setVisibility(GONE);
+                        directoryLayout.setVisibility(GONE);
+                        progressLayout.setVisibility(GONE);
+                        doneTitle.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.title"));
+                        doneDesc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.description").replace("{path}", tempFile.toString()));
+                        doneContent.setVisibility(VISIBLE);
+                        btn.setText(button1YesText);
+                        btn.setEnabled(true);
+                        cancelBtn.setText(button2NoText);
+                        cancelBtn.getButton().setVisibility(VISIBLE);
+                        cancelBtn.getButton().setScaleX(1f);
+                        cancelBtn.getButton().setAlpha(1f);
+                        downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServerDone"));
+                    });
+                }).exceptionally(ex -> {
+                    MuiModApi.postToUiThread(() -> {
+                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.error") + ": " + ex.getMessage());
+                        downloadState[0] = "idle";
+                        progressLayout.setVisibility(GONE);
+                        releaseInfoLayout.setVisibility(VISIBLE);
+                        btn.setText(button1Text);
+                        btn.setEnabled(true);
+                        cancelBtn.setText(button2Text);
+                        cancelBtn.getButton().setVisibility(VISIBLE);
+                        cancelBtn.getButton().setScaleX(1f);
+                        cancelBtn.getButton().setAlpha(1f);
+                        downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
+                    });
+                    return null;
+                });
+            } else if ("done".equals(downloadState[0])) {
+                Path finalPath = resolveFinalPath(downloadedTempFile[0], releaseTag[0]);
+                if (finalPath == null) {
+                    ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.renameFailed"));
+                    return;
+                }
+                updateMhApiJson(targetDir[0], releaseTag[0], finalPath.getFileName().toString());
+                String configPath = relativizeIfChild(finalPath);
+                serverConfig.setServerApiBinaryExecutablePath(configPath);
+                if (serverApiBinaryPathInput[0] != null) {
+                    serverApiBinaryPathInput[0].setText(configPath);
+                }
+                ApiServerManager apiServer = ApiServerManager.getInstance();
+                if (apiServer != null) {
+                    apiServer.restartApiServer();
+                }
+                downloadedTempFile[0] = null;
+                downloadState[0] = "resetting";
+                resetToIdle(downloadState, doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout, existingVersionWarning);
+                downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
+                btn.setText(button1Text);
+                cancelBtn.setText(button2Text);
+                dialog.dismiss();
+            }
+        });
+
+        Modal dialog = new Modal(context, content,
+                confirmButton, cancelBtn
+        );
+
+        dialog.setOnDismissListener(() -> {
+            if ("resetting".equals(downloadState[0])) {
+                downloadState[0] = "idle";
+                downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
+            } else if ("done".equals(downloadState[0])) {
+                downloadState[0] = "idle";
+                resetToIdle(downloadState, doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout, existingVersionWarning);
+                downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
+            }
+        });
+
+        downloadApiServerButton.setOnClickListener((v) -> {
+            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning);
+            applyContentByState(downloadState[0], doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout);
+            dialog.show();
+        });
+        return downloadApiServerButton;
+    }
+
+    private void refreshReleaseInfo(TextView releaseLabel, ApiServerFetcher.ReleaseSummary[] latest, Path[] targetDir, TextView warning) {
+        releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.fetching"));
+        ApiServerFetcher.listReleaseSummaries().thenAccept(summaries -> {
+            if (!summaries.isEmpty()) {
+                ApiServerFetcher.ReleaseSummary r = summaries.getFirst();
+                MuiModApi.postToUiThread(() -> {
+                    latest[0] = r;
+                    releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.label")
+                            .replace("{tag}", r.tag()));
+                    checkExistingVersion(targetDir[0], r, warning);
+                });
+            } else {
+                MuiModApi.postToUiThread(() -> releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.failed")));
+            }
+        }).exceptionally(ex -> {
+            MuiModApi.postToUiThread(() -> releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.failed")));
+            return null;
+        });
+    }
+
+    private void checkExistingVersion(Path targetDir, ApiServerFetcher.ReleaseSummary release, TextView warning) {
+        if (release == null) {
+            warning.setVisibility(GONE);
+            return;
+        }
+        Path jsonFile = targetDir.resolve("mh-api.json");
+        try {
+            if (Files.exists(jsonFile)) {
+                String content = Files.readString(jsonFile);
+                Map<String, String> map = JsonUtil.gson.fromJson(content, new TypeToken<Map<String, String>>(){}.getType());
+                if (map != null && map.containsKey(release.tag())) {
+                    String oldFile = map.get(release.tag());
+                    warning.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.existingVersion")
+                            .replace("{file}", oldFile).replace("{tag}", release.tag()));
+                    warning.setVisibility(VISIBLE);
+                    return;
+                }
+            }
+        } catch (Exception ignored) {}
+        warning.setVisibility(GONE);
+    }
+
+    private Path resolveFinalPath(Path tempFile, String releaseTag) {
+        if (tempFile == null || !Files.exists(tempFile)) return null;
+        String baseName = ApiServerFetcher.Platform.detect().getAssetName();
+        Path targetDir = tempFile.getParent();
+        Path namedFile = targetDir.resolve(baseName);
+
+        // proactively stop server if target file is the running executable
+        String currentPath = serverConfig.getServerApiBinaryExecutablePath();
+        if (namedFile.toAbsolutePath().normalize().toString()
+                .equals(Paths.get(currentPath).toAbsolutePath().normalize().toString())
+                && ApiServerManager.getInstance().getBinaryApiServerStatus() == ApiServerManager.BinaryApiServerStatus.RUNNING) {
+            ApiServerManager.getInstance().stopApiServer();
+            // retry with backoff until the lock is released
+            for (int retry = 0; retry < 20; retry++) {
+                try {
+                    Thread.sleep(150);
+                    Files.move(tempFile, namedFile, StandardCopyOption.REPLACE_EXISTING);
+                    return namedFile;
+                } catch (Exception ignored) {}
+            }
+        }
+
+        try {
+            Files.move(tempFile, namedFile, StandardCopyOption.REPLACE_EXISTING);
+            return namedFile;
+        } catch (IOException ignored) {}
+        // fallback: append .n before extension
+        String bn = baseName;
+        String ext = "";
+        int dotIdx = bn.lastIndexOf('.');
+        if (dotIdx > 0) {
+            ext = bn.substring(dotIdx);
+            bn = bn.substring(0, dotIdx);
+        }
+        for (int n = 1; n < 100; n++) {
+            Path numberedFile = targetDir.resolve(bn + "." + n + ext);
+            try {
+                Files.move(tempFile, numberedFile);
+                return numberedFile;
+            } catch (IOException ignored) {}
+        }
+        return null;
+    }
+
+    private void updateMhApiJson(Path targetDir, String releaseTag, String fileName) {
+        Path jsonFile = targetDir.resolve("mh-api.json");
+        Map<String, String> map = new HashMap<>();
+        try {
+            if (Files.exists(jsonFile)) {
+                String content = Files.readString(jsonFile);
+                Map<String, String> existing = JsonUtil.gson.fromJson(content, new TypeToken<Map<String, String>>(){}.getType());
+                if (existing != null) map.putAll(existing);
+            }
+        } catch (Exception ignored) {}
+        map.put(releaseTag, fileName);
+        try {
+            Files.writeString(jsonFile, JsonUtil.gson.toJson(map));
+        } catch (IOException ignored) {}
+    }
+
+    private static String relativizeIfChild(Path path) {
+        Path abs = path.toAbsolutePath().normalize();
+        Path cwd = Paths.get("").toAbsolutePath().normalize();
+        if (abs.startsWith(cwd)) {
+            Path relative = cwd.relativize(abs);
+            return relative.toString();
+        }
+        return abs.toString();
+    }
+
+    private void resetToIdle(String[] state, View doneContent, View title, View description, View directoryLayout, View progressLayout, View releaseInfoLayout, View warning) {
+        state[0] = "idle";
+        hideDownloadContent(doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout);
+        warning.setVisibility(GONE);
+    }
+
+    private static void applyContentByState(String state, LinearLayout doneContent, View title, View description, View directoryLayout, View progressLayout, View releaseInfoLayout) {
+        if ("done".equals(state)) {
+            title.setVisibility(GONE);
+            description.setVisibility(GONE);
+            releaseInfoLayout.setVisibility(GONE);
+            directoryLayout.setVisibility(GONE);
+            progressLayout.setVisibility(GONE);
+            doneContent.setVisibility(VISIBLE);
+        } else {
+            doneContent.setVisibility(GONE);
+            title.setVisibility(VISIBLE);
+            description.setVisibility(VISIBLE);
+            releaseInfoLayout.setVisibility(VISIBLE);
+            directoryLayout.setVisibility(VISIBLE);
+            progressLayout.setVisibility(GONE);
+        }
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        double mb = bytes / (1024.0 * 1024.0);
+        if (mb < 100) return String.format("%.1f MiB", mb);
+        return String.format("%.0f MiB", mb);
+    }
+
+    private static void hideDownloadContent(View doneContent, View title, View description, View directoryLayout, View progressLayout, View releaseInfoLayout) {
+        doneContent.setVisibility(GONE);
+        title.setVisibility(VISIBLE);
+        description.setVisibility(VISIBLE);
+        directoryLayout.setVisibility(VISIBLE);
+        progressLayout.setVisibility(VISIBLE);
+        releaseInfoLayout.setVisibility(VISIBLE);
     }
 
 }

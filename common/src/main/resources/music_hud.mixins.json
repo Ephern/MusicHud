@@ -7,9 +7,9 @@
   "client": [
     "GuiRendererHudMixin",
     "ReactiveMusicCompatMixin",
+    "ScreenMixin",
     "SoundEngineMixin",
-    "SpanSetMixin",
-    "LevelLoadingScreenMixin"
+    "SpanSetMixin"
   ],
   "injectors": {
     "defaultRequire": 1

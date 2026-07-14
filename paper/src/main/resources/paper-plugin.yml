@@ -2,7 +2,7 @@ name: MusicHud
 version: '${version}'
 main: indi.etern.musichud.paper.CommonInitializer
 api-version: '${apiVersion}'
-description: Request music in whole server powered by Netease Cloud Music (NCM) | 一个基于网易云的全服点歌模组
+description: Enjoy music in all situations powered by Netease Cloud Music (NCM) | 基于网易云的全场景音乐插件
 website: https://github.com/Etern-34520/MusicHud
 authors: [Etern]
 contributors: [Lotus (Paper adapter)]

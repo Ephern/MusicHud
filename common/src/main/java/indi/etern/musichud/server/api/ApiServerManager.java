@@ -16,6 +16,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Consumer;
 
 @RegisterMark
@@ -141,7 +142,27 @@ public class ApiServerManager implements ServerRegister {
                 try {
                     continueRestart = true;
                     setApiStatus(BinaryApiServerStatus.LAUNCHING);
-                    process = Runtime.getRuntime().exec(new String[]{binaryExecutableApiServerPath.toString()});
+
+                    // resolve actual executable path based on platform
+                    Path executablePath;
+                    if (Files.exists(windowsExePath) && Files.isExecutable(windowsExePath)) {
+                        executablePath = windowsExePath;
+                    } else {
+                        executablePath = binaryExecutableApiServerPath;
+                    }
+
+                    ProcessBuilder processBuilder = new ProcessBuilder(executablePath.toString());
+                    Map<String, String> env = processBuilder.environment();
+                    env.put("CORS_ALLOW_ORIGIN", serverConfig.getCorsAllowOrigin());
+                    env.put("ENABLE_PROXY", String.valueOf(serverConfig.getEnableProxy()));
+                    env.put("PROXY_URL", serverConfig.getProxyUrl());
+                    env.put("ENABLE_RANDOM_CN_IP", String.valueOf(serverConfig.getUseRandomCnIp()));
+                    env.put("ENABLE_GENERAL_UNBLOCK", String.valueOf(serverConfig.getEnableGeneralUnblock()));
+                    env.put("ENABLE_FLAC", String.valueOf(serverConfig.getEnableFlac()));
+                    env.put("SELECT_MAX_BR", String.valueOf(serverConfig.getSelectMaxBr()));
+                    env.put("FOLLOW_SOURCE_ORDER", String.valueOf(serverConfig.getFollowSourceOrder()));
+                    env.put("PORT", String.valueOf(serverConfig.getPort()));
+                    process = processBuilder.start();
 
                     // 使用虚拟线程池分别读取 stdout 和 stderr
                     MusicHud.EXECUTOR.execute(() -> {

@@ -22,6 +22,7 @@ public class Theme {
     public static final int SECONDARY_TEXT_COLOR = 0xFFA0A0A0;
 
     public static final int ERROR_TEXT_COLOR = 0xFFFF4F4F;
+    public static final int WARN_TEXT_COLOR = 0xFFFFB04F;
 
     public static final int GHOST_BUTTON_BACKGROUND = 0x00FFFFFF;
     public static final int GHOST_BUTTON_BACKGROUND_PRESSED = 0x05FFFFFF;

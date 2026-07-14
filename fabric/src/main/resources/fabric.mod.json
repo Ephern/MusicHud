@@ -3,7 +3,7 @@
   "id": "music_hud",
   "version": "${version}",
   "name": "Music HUD",
-  "description": "Request music in whole server powered by Netease Cloud Music (NCM) | 一个基于网易云的全服点歌模组",
+  "description": "Enjoy music in all situations powered by Netease Cloud Music (NCM) | 基于网易云的全场景音乐模组",
   "authors": [
     "Etern"
   ],
