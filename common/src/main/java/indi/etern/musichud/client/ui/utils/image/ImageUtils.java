@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.utils.image;
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import icyllis.arc3d.core.ColorSpaces;
 import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.annotation.Nullable;
@@ -323,9 +324,13 @@ public class ImageUtils {
     @NotNull
     private static ImageTextureData getImageTextureData(String data, Bitmap source) {
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
-        Minecraft.getInstance().submit(() -> {
+        if (RenderSystem.isOnRenderThread()) {
             texture.set(new DynamicTexture(convertBitmapToNativeImage(source)));
-        }).join();
+        } else {
+            Minecraft.getInstance().submit(() -> {
+                texture.set(new DynamicTexture(convertBitmapToNativeImage(source)));
+            }).join();
+        }
         return new ImageTextureData(data, texture.get());
     }
 

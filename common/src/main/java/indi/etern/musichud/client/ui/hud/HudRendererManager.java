@@ -85,6 +85,9 @@ public class HudRendererManager {
             PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
             return PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo);
         });
+        updateLayoutFromConfig();
+        refreshStyle();
+        reset();
     }
 
     public static HudRendererManager getInstance() {
@@ -92,8 +95,6 @@ public class HudRendererManager {
             synchronized (HudRendererManager.class) {
                 if (instance == null) {
                     instance = new HudRendererManager();
-                    instance.updateLayoutFromConfig();
-                    instance.refreshStyle();
 
                     updateStatus(StreamAudioPlayer.Status.IDLE);
                     StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
@@ -325,22 +326,23 @@ public class HudRendererManager {
         ARTISTS_AND_ALBUM_RENDERER.setText("");
         LYRICS_LINE_RENDERER.clear();
         PLAY_TIME_RENDERER.setText("");
-//        PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(null);
         musicDurationString = "";
         var nextData = BackgroundData.NONE;
         hudBaseData.getTransitionableBackground().startTransition(nextData);
     }
 
-    public void renderFrame(GuiGraphics graphics, DeltaTracker deltaTracker) {
+    public void renderFrame(GuiGraphics graphics,@Nullable DeltaTracker deltaTracker) {
         try {
             if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
                 return;
             }
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
             MusicDetail musicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-            if ((musicDetail == null || musicDetail.equals(MusicDetail.NONE)) &&
-                    clientConfig.getHideHudWhenNotPlaying()) {
-                return;
+            if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
+                TITLE_RENDERER.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));//To prevent i18n lazy loading result in wrong text
+                if (clientConfig.getHideHudWhenNotPlaying()) {
+                    return;
+                }
             }
             hudBaseData.getTransitionableBackground().updateTransition();
 

@@ -278,7 +278,15 @@ public class MusicApiService implements IMusicApiService {
             boolean available;
             do {
                 if (retryCount >= 5) {
-                    logger.error("Failed to load music resource for \"{}\"(id:{}), as resource url is not available", musicDetail.getName(), musicDetail.getId());
+                    logger.warn("Failed to load music resource for \"{}\"(id:{}), as resource url is not available", musicDetail.getName(), musicDetail.getId());
+                    try {
+                        musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
+                        if (musicResourceInfo != MusicResourceInfo.NONE && ApiClient.checkUrlAvailable(musicResourceInfo.getUrl(), 5000)) {
+                            completeLyricInfo(musicDetail);
+                            return musicResourceInfo;
+                        }
+                    } catch (Exception ignored) {}
+                    logger.error("Failed to get resource for music from substitute as last trial: {} (ID: {})", musicDetail.getName(), musicDetail.getId());
                     return MusicResourceInfo.NONE;
                 }
                 var request = new GetDirectResourceUrlRequest(musicDetail.getId(), false, quality);
@@ -286,9 +294,10 @@ public class MusicApiService implements IMusicApiService {
                 if (response.code == 200) {
                     musicResourceInfo = response.data.getFirst();
                     // 30 seconds trial or have no copyright
-                    if ((extraInfo == null || !extraInfo.cloudSource()) &&
-                            ((musicResourceInfo.getFee() == Fee.SEPARATELY_PURCHASE || (musicResourceInfo.getFee() == Fee.VIP && !vipAccessible.get()))
-                            ||musicResourceInfo.getUrl() == null)
+                    if (((extraInfo == null || !extraInfo.cloudSource())
+                            && ((musicResourceInfo.getFee() == Fee.SEPARATELY_PURCHASE
+                            || (musicResourceInfo.getFee() == Fee.VIP && !vipAccessible.get()))
+                            || musicResourceInfo.getUrl() == null))
                     ) {
                         logger.warn("Failed to get resource for music: {} (ID: {}), trying substitute", musicDetail.getName(), musicDetail.getId());
                         musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
@@ -304,7 +313,7 @@ public class MusicApiService implements IMusicApiService {
                         musicResourceInfo = MusicResourceInfo.NONE;
                     }
                 }
-                available = ApiClient.checkUrlAvailable(musicResourceInfo.getUrl(), 10000);
+                available = musicResourceInfo != MusicResourceInfo.NONE && ApiClient.checkUrlAvailable(musicResourceInfo.getUrl(), 5000);
                 retryCount++;
             } while (!available);
             return musicResourceInfo;
@@ -321,9 +330,16 @@ public class MusicApiService implements IMusicApiService {
     }
 
     private @NotNull MusicResourceInfo getMusicResourceInfoFromMatcher(MusicDetail musicDetail) {
+        // see also: @neteasecloudmusicapienhanced/unblockmusic-utils
+        // available sources (in /modules): baka bikonoo byfuns gdmusic msls qijieya unm whitisnot
+        // in default, api enhanced will try all available sources, but recently all api are unstable
         var unblockRequest = new GetMatchResourceUrlRequest(musicDetail.getId(), null);
         var unblockResponse = ApiClient.post(ServerApiMeta.Music.UNBLOCK, unblockRequest, loginApiService.randomVipCookieOrElse(null), true);
-        return MusicResourceInfo.from(unblockResponse.data, musicDetail);
+        if (unblockResponse.code == 200 && unblockResponse.data instanceof String url) {
+            return MusicResourceInfo.from(url, musicDetail);
+        } else {
+            return MusicResourceInfo.NONE;
+        }
     }
 
     @Override
@@ -464,7 +480,7 @@ public class MusicApiService implements IMusicApiService {
     public record GetDirectResourceUrlResponse(int code, List<MusicResourceInfo> data) {
     }
 
-    public record GetMatchResourceUrlResponse(int code, String data) {
+    public record GetMatchResourceUrlResponse(int code, Object data) {
     }
 
     public record PagedRequestDataWithUID(long uid, int limit, int offset) {
@@ -480,11 +496,11 @@ public class MusicApiService implements IMusicApiService {
     }
 
     public static class PlaylistsResponse {
-        @Getter
-        int code;
         @SerializedName("playlist")
         final
         List<Playlist> playlists = List.of();
+        @Getter
+        int code;
 
         public List<Playlist> getPlaylists() {
             if (playlists.isEmpty()) {
@@ -494,7 +510,7 @@ public class MusicApiService implements IMusicApiService {
         }
     }
 
-    public record MusicDetailsResponse (
+    public record MusicDetailsResponse(
             @SerializedName("songs")
             List<MusicDetail> musicDetails,
             @SerializedName("privileges")
