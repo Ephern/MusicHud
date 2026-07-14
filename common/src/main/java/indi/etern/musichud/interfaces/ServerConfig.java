@@ -38,6 +38,38 @@ public interface ServerConfig {
 
     void setUseRandomCnIp(boolean useRandomCnIp);
 
+    String getCorsAllowOrigin();
+
+    void setCorsAllowOrigin(String corsAllowOrigin);
+
+    boolean getEnableProxy();
+
+    void setEnableProxy(boolean enableProxy);
+
+    String getProxyUrl();
+
+    void setProxyUrl(String proxyUrl);
+
+    boolean getEnableGeneralUnblock();
+
+    void setEnableGeneralUnblock(boolean enableGeneralUnblock);
+
+    boolean getEnableFlac();
+
+    void setEnableFlac(boolean enableFlac);
+
+    boolean getSelectMaxBr();
+
+    void setSelectMaxBr(boolean selectMaxBr);
+
+    boolean getFollowSourceOrder();
+
+    void setFollowSourceOrder(boolean followSourceOrder);
+
+    int getPort();
+
+    void setPort(int port);
+
     void save();
 
     boolean isConfigured();
