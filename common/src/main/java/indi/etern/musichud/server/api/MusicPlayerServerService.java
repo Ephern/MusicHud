@@ -147,7 +147,7 @@ public class MusicPlayerServerService {
                     }
                 }
             }
-            logger.info("Music Pusher stopped due to no more music");
+            logger.info("Music Pusher stopped");
             pusherThread = null;
             pusherThreadRunning = false;
             MusicPlayerServerService.this.stopSendingMusic();

@@ -326,7 +326,6 @@ public class HudRendererManager {
         ARTISTS_AND_ALBUM_RENDERER.setText("");
         LYRICS_LINE_RENDERER.clear();
         PLAY_TIME_RENDERER.setText("");
-//        PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(null);
         musicDurationString = "";
         var nextData = BackgroundData.NONE;
         hudBaseData.getTransitionableBackground().startTransition(nextData);
