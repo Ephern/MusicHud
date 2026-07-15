@@ -10,7 +10,8 @@
     "ScreenMixin",
     "SoundEngineMixin",
     "SpanSetMixin",
-    "ToastManagerMixin"
+    "ToastManagerMixin",
+    "ToastRecordAccessor"
   ],
   "injectors": {
     "defaultRequire": 1
