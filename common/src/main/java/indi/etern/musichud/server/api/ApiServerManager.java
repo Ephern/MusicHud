@@ -8,20 +8,23 @@ import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
+import java.io.*;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 
 @RegisterMark
 public class ApiServerManager implements ServerRegister {
     private static final ServerConfig serverConfig = ServerConfig.getInstance();
+    private static final Path LOG_DIR = Paths.get("music-hud", "logs");
+    private static final DateTimeFormatter LOG_TIMESTAMP = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss");
     private static ClientConfig clientConfig;
     @Getter
     private static ApiServerManager instance;
@@ -29,12 +32,13 @@ public class ApiServerManager implements ServerRegister {
     @Getter
     private final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
     private volatile Process process;
-    private boolean continueRestart = true;
     @Getter
     private BinaryApiServerStatus binaryApiServerStatus = BinaryApiServerStatus.STOPPED;
     private int triedCount = 0;
     private boolean initialized = false;
     private Thread hook;
+    private CompletableFuture<Integer> processFuture;
+    private boolean continueRestart;
 
     static {
         if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
@@ -44,6 +48,13 @@ public class ApiServerManager implements ServerRegister {
                 clientConfig = null;
             }
         }
+    }
+
+    public void clearLogs() {
+        try (var stream = Files.list(getLogDir())) {
+            stream.filter(p -> p.getFileName().toString().endsWith(".log"))
+                    .forEach(p -> { try { Files.deleteIfExists(p); } catch (IOException ignored) {} });
+        } catch (IOException ignored) {}
     }
 
     public void log(String s, boolean error) {
@@ -81,11 +92,15 @@ public class ApiServerManager implements ServerRegister {
     public void restartApiServer() {
         triedCount = 0;
         stopApiServer();
-        launchApiServerInternal();
+        if (processFuture != null) {
+            processFuture.thenRun(this::launchApiServerInternal);
+        } else {
+            launchApiServerInternal();
+        }
     }
 
     private void addShutdownHook() {
-        if (hook == null) {//first call
+        if (hook == null) {
             hook = new Thread(this::stopApiServer);
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
                 IClientEventService.getInstance().registerClientLifecycleStopping(this::stopApiServer);
@@ -143,7 +158,6 @@ public class ApiServerManager implements ServerRegister {
                     continueRestart = true;
                     setApiStatus(BinaryApiServerStatus.LAUNCHING);
 
-                    // resolve actual executable path based on platform
                     Path executablePath;
                     if (Files.exists(windowsExePath) && Files.isExecutable(windowsExePath)) {
                         executablePath = windowsExePath;
@@ -164,12 +178,27 @@ public class ApiServerManager implements ServerRegister {
                     env.put("PORT", String.valueOf(serverConfig.getPort()));
                     process = processBuilder.start();
 
-                    // 使用虚拟线程池分别读取 stdout 和 stderr
+                    Path logFile;
+                    PrintWriter logWriter = null;
+                    try {
+                        Files.createDirectories(LOG_DIR);
+                        logFile = LOG_DIR.resolve("api-server-" + LocalDateTime.now().format(LOG_TIMESTAMP) + ".log");
+                        logWriter = new PrintWriter(new FileWriter(logFile.toFile(), true), true);
+                    } catch (IOException e) {
+                        apiLogger.error("Failed to create log file", e);
+                    }
+
+                    final PrintWriter writer = logWriter;
+
+                    CompletableFuture<Integer> future = new CompletableFuture<>();
+                    processFuture = future;
+
                     MusicHud.EXECUTOR.execute(() -> {
                         Thread.currentThread().setName("MHWorker-API-Console");
                         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
                             String line;
                             while ((line = reader.readLine()) != null) {
+                                if (writer != null) writer.println(line);
                                 if ((line.contains("Server started successfully") || line.contains("ncm_api_rs::server"))
                                         && binaryApiServerStatus == BinaryApiServerStatus.LAUNCHING) {
                                     setApiStatus(BinaryApiServerStatus.RUNNING);
@@ -194,6 +223,7 @@ public class ApiServerManager implements ServerRegister {
                         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
                             String line;
                             while ((line = reader.readLine()) != null) {
+                                if (writer != null) writer.println(line);
                                 log(line, true);
                             }
                         } catch (IOException e) {
@@ -201,27 +231,53 @@ public class ApiServerManager implements ServerRegister {
                         }
                     });
 
-                    // 在另一个虚拟线程中等待进程结束，并处理重启逻辑
                     MusicHud.EXECUTOR.execute(() -> {
                         Thread.currentThread().setName("MHWorker-API-Daemon");
                         try {
                             int exitCode = process.waitFor();
+                            if (writer != null) writer.close();
                             setApiStatus(BinaryApiServerStatus.STOPPED);
                             if (continueRestart) {
                                 apiLogger.warn("Api server unexpectedly stopped with code:{}, restarting...", exitCode);
+                                future.complete(exitCode);
                                 startEmbeddedApiServer();
                             } else {
                                 apiLogger.info("Api server stopped with code:{}", exitCode);
+                                future.complete(exitCode);
                             }
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();
                             apiLogger.error("Process wait interrupted", e);
+                            future.completeExceptionally(e);
                         }
                     });
                 } catch (Exception e) {
                     MusicHud.LOGGER.error("Failed to call binary server at path: \"{}\"", binaryExecutableApiServerPathString, e);
+                    if (processFuture != null) {
+                        processFuture.completeExceptionally(e);
+                    }
                 }
             }
+        }
+    }
+
+    public Path getLogDir() {
+        return LOG_DIR;
+    }
+
+    public long[] getLogStats() {
+        try {
+            Files.createDirectories(LOG_DIR);
+        } catch (IOException ignored) {}
+        try (var stream = Files.list(LOG_DIR)) {
+            long[] result = {0, 0};
+            stream.filter(p -> p.getFileName().toString().endsWith(".log")).forEach(p -> {
+                result[0]++;
+                try { result[1] += Files.size(p); } catch (IOException ignored) {}
+            });
+            return result;
+        } catch (IOException e) {
+            return new long[]{0, 0};
         }
     }
 

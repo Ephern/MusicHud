@@ -262,6 +262,17 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 String.class);
+        public static final UrlMeta<String> SCROBBLE = new UrlMeta<>(
+                "/scrobble/v1",
+                Set.of("id", "time"),
+                Set.of("sourceid", "source"/*list*/, "name", "artist", "bitrate"/*320*/, "level"/*exhigh*/, "total"/*in sec*/),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class
+        );
     }
 
     public static class Artist {
