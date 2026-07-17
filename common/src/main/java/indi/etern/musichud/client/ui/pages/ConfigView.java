@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.pages;
 
-import com.google.gson.reflect.TypeToken;
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.ConfigItem;
@@ -30,7 +29,6 @@ import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.*;
-import indi.etern.musichud.utils.JsonUtil;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
 import net.minecraft.util.Util;
@@ -45,7 +43,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardCopyOption;
 import java.util.*;
 import java.util.function.Consumer;
 
@@ -642,6 +639,70 @@ public class ConfigView extends LinearLayout {
             apiVersionLinearLayout.addView(checkVersionButton);
             apiCategory.addView(apiVersionLinearLayout);
 
+            LinearLayout apiLogLayout = new LinearLayout(context);
+            apiLogLayout.setOrientation(LinearLayout.HORIZONTAL);
+            apiLogLayout.setGravity(Gravity.LEFT);
+            apiLogLayout.setVerticalGravity(Gravity.CENTER);
+            LayoutParams logParams = new LayoutParams(MATCH_PARENT, dp(44));
+            logParams.setMargins(dp(6), 0, dp(6), 0);
+            apiLogLayout.setLayoutParams(logParams);
+
+            TextView apiLogLabel = new TextView(context);
+            apiLogLabel.setTextSize(14);
+            updateApiLogLabel(apiLogLabel);
+
+            Button refreshApiLogButton = new Button(context);
+            refreshApiLogButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refreshApiLog"));
+            refreshApiLogButton.setTextColor(Theme.PRIMARY_COLOR);
+            refreshApiLogButton.setTextSize(14);
+            refreshApiLogButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            refreshApiLogButton.setOnClickListener(v -> {
+                updateApiLogLabel(apiLogLabel);
+            });
+
+            Button openApiLogDirButton = new Button(context);
+            openApiLogDirButton.setText(I18n.get(MusicHud.MOD_ID + ".button.openApiLogDir"));
+            openApiLogDirButton.setTextColor(Theme.PRIMARY_COLOR);
+            openApiLogDirButton.setTextSize(14);
+            openApiLogDirButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            openApiLogDirButton.setOnClickListener(v -> {
+                Path logDir = apiServerManager.getLogDir();
+                try {
+                    Files.createDirectories(logDir);
+                } catch (IOException ignored) {}
+                Util.getPlatform().openFile(logDir.toFile());
+                updateApiLogLabel(apiLogLabel);
+            });
+
+            Button clearApiLogButton = new Button(context);
+            clearApiLogButton.setText(I18n.get(MusicHud.MOD_ID + ".button.clearApiLogs"));
+            clearApiLogButton.setTextColor(Theme.ERROR_TEXT_COLOR);
+            clearApiLogButton.setTextSize(14);
+            clearApiLogButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            clearApiLogButton.setOnClickListener(v -> {
+                LinearLayout warnContent = new LinearLayout(context);
+                warnContent.setOrientation(LinearLayout.VERTICAL);
+                TextView warnText = new TextView(context);
+                warnText.setText(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.warning"));
+                warnText.setTextSize(Theme.TEXT_SIZE_LARGE);
+                warnText.setTextColor(Theme.NORMAL_TEXT_COLOR);
+                warnContent.addView(warnText);
+                new Modal(context, warnContent,
+                        new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.button1"), (btn, modal) -> {
+                            ApiServerManager.getInstance().clearLogs();
+                            updateApiLogLabel(apiLogLabel);
+                            modal.dismiss();
+                        }),
+                        new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.button2"), (btn, modal) -> modal.dismiss())
+                ).show();
+            });
+
+            apiLogLayout.addView(apiLogLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+            apiLogLayout.addView(refreshApiLogButton);
+            apiLogLayout.addView(openApiLogDirButton);
+            apiLogLayout.addView(clearApiLogButton);
+            apiCategory.addView(apiLogLayout);
+
             Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiStatusListener) -> {
                 MuiModApi.postToUiThread(() -> {
                     apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiStatusListener.i18nKey())));
@@ -749,7 +810,7 @@ public class ConfigView extends LinearLayout {
             if (folder != null) {
                 targetDir[0] = Paths.get(folder);
                 directoryTextInput.setText(folder);
-                checkExistingVersion(targetDir[0], latestRelease[0], existingVersionWarning);
+                checkExistingVersion(targetDir[0], latestRelease[0] != null ? latestRelease[0].tag() : null, existingVersionWarning);
             }
         });
 
@@ -803,7 +864,6 @@ public class ConfigView extends LinearLayout {
         content.addView(doneContent);
 
         final String[] downloadState = {"idle"};
-        final long[] lastSize = {0, 0};
         final Path[] downloadedTempFile = {null};
         final String[] releaseTag = {""};
 
@@ -842,10 +902,10 @@ public class ConfigView extends LinearLayout {
                 Path tempFile = targetDir[0].resolve(tempFileName);
                 tempFile.toFile().deleteOnExit();
 
-                ApiServerFetcher.downloadLatestForCurrentPlatform(targetDir[0], tempFileName, (downloaded, total) -> {
+                ApiBinaryUpdateService updateService = ApiBinaryUpdateService.getInstance();
+
+                updateService.downloadToTemp(targetDir[0], releaseTag[0], (downloaded, total) -> {
                     MuiModApi.postToUiThread(() -> {
-                        lastSize[0] = downloaded;
-                        lastSize[1] = total;
                         int pct = (int) (((double) downloaded / total) * 100);
                         progressBar.setProgress(pct);
                         progressText.setText(formatBytes(downloaded) + " / " + formatBytes(total));
@@ -888,13 +948,14 @@ public class ConfigView extends LinearLayout {
                     return null;
                 });
             } else if ("done".equals(downloadState[0])) {
-                Path finalPath = resolveFinalPath(downloadedTempFile[0], releaseTag[0]);
+                ApiBinaryUpdateService updateService = ApiBinaryUpdateService.getInstance();
+                Path finalPath = updateService.resolveFinalPath(downloadedTempFile[0], releaseTag[0]);
                 if (finalPath == null) {
                     ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.renameFailed"));
                     return;
                 }
-                updateMhApiJson(targetDir[0], releaseTag[0], finalPath.getFileName().toString());
-                String configPath = relativizeIfChild(finalPath);
+                updateService.updateMhApiJson(targetDir[0], releaseTag[0], finalPath.getFileName().toString());
+                String configPath = updateService.relativizePath(finalPath);
                 serverConfig.setServerApiBinaryExecutablePath(configPath);
                 if (serverApiBinaryPathInput[0] != null) {
                     serverApiBinaryPathInput[0].setText(configPath);
@@ -938,14 +999,20 @@ public class ConfigView extends LinearLayout {
 
     private void refreshReleaseInfo(TextView releaseLabel, ApiServerFetcher.ReleaseSummary[] latest, Path[] targetDir, TextView warning) {
         releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.fetching"));
-        ApiServerFetcher.listReleaseSummaries().thenAccept(summaries -> {
-            if (!summaries.isEmpty()) {
-                ApiServerFetcher.ReleaseSummary r = summaries.getFirst();
+        ApiBinaryUpdateService.getInstance().fetchLatestRelease().thenAccept(r -> {
+            if (r != null) {
                 MuiModApi.postToUiThread(() -> {
                     latest[0] = r;
                     releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.label")
                             .replace("{tag}", r.tag()));
-                    checkExistingVersion(targetDir[0], r, warning);
+                    String oldFile = ApiBinaryUpdateService.getInstance().checkExistingVersion(targetDir[0], r.tag());
+                    if (oldFile != null) {
+                        warning.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.existingVersion")
+                                .replace("{file}", oldFile).replace("{tag}", r.tag()));
+                        warning.setVisibility(VISIBLE);
+                    } else {
+                        warning.setVisibility(GONE);
+                    }
                 });
             } else {
                 MuiModApi.postToUiThread(() -> releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.failed")));
@@ -956,96 +1023,19 @@ public class ConfigView extends LinearLayout {
         });
     }
 
-    private void checkExistingVersion(Path targetDir, ApiServerFetcher.ReleaseSummary release, TextView warning) {
-        if (release == null) {
+    private void checkExistingVersion(Path targetDir, String tag, TextView warning) {
+        if (tag == null) {
             warning.setVisibility(GONE);
             return;
         }
-        Path jsonFile = targetDir.resolve("mh-api.json");
-        try {
-            if (Files.exists(jsonFile)) {
-                String content = Files.readString(jsonFile);
-                Map<String, String> map = JsonUtil.gson.fromJson(content, new TypeToken<Map<String, String>>(){}.getType());
-                if (map != null && map.containsKey(release.tag())) {
-                    String oldFile = map.get(release.tag());
-                    warning.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.existingVersion")
-                            .replace("{file}", oldFile).replace("{tag}", release.tag()));
-                    warning.setVisibility(VISIBLE);
-                    return;
-                }
-            }
-        } catch (Exception ignored) {}
-        warning.setVisibility(GONE);
-    }
-
-    private Path resolveFinalPath(Path tempFile, String releaseTag) {
-        if (tempFile == null || !Files.exists(tempFile)) return null;
-        String baseName = ApiServerFetcher.Platform.detect().getAssetName();
-        Path targetDir = tempFile.getParent();
-        Path namedFile = targetDir.resolve(baseName);
-
-        // proactively stop server if target file is the running executable
-        String currentPath = serverConfig.getServerApiBinaryExecutablePath();
-        if (namedFile.toAbsolutePath().normalize().toString()
-                .equals(Paths.get(currentPath).toAbsolutePath().normalize().toString())
-                && ApiServerManager.getInstance().getBinaryApiServerStatus() == ApiServerManager.BinaryApiServerStatus.RUNNING) {
-            ApiServerManager.getInstance().stopApiServer();
-            // retry with backoff until the lock is released
-            for (int retry = 0; retry < 20; retry++) {
-                try {
-                    Thread.sleep(150);
-                    Files.move(tempFile, namedFile, StandardCopyOption.REPLACE_EXISTING);
-                    return namedFile;
-                } catch (Exception ignored) {}
-            }
+        String oldFile = ApiBinaryUpdateService.getInstance().checkExistingVersion(targetDir, tag);
+        if (oldFile != null) {
+            warning.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.existingVersion")
+                    .replace("{file}", oldFile).replace("{tag}", tag));
+            warning.setVisibility(VISIBLE);
+        } else {
+            warning.setVisibility(GONE);
         }
-
-        try {
-            Files.move(tempFile, namedFile, StandardCopyOption.REPLACE_EXISTING);
-            return namedFile;
-        } catch (IOException ignored) {}
-        // fallback: append .n before extension
-        String bn = baseName;
-        String ext = "";
-        int dotIdx = bn.lastIndexOf('.');
-        if (dotIdx > 0) {
-            ext = bn.substring(dotIdx);
-            bn = bn.substring(0, dotIdx);
-        }
-        for (int n = 1; n < 100; n++) {
-            Path numberedFile = targetDir.resolve(bn + "." + n + ext);
-            try {
-                Files.move(tempFile, numberedFile);
-                return numberedFile;
-            } catch (IOException ignored) {}
-        }
-        return null;
-    }
-
-    private void updateMhApiJson(Path targetDir, String releaseTag, String fileName) {
-        Path jsonFile = targetDir.resolve("mh-api.json");
-        Map<String, String> map = new HashMap<>();
-        try {
-            if (Files.exists(jsonFile)) {
-                String content = Files.readString(jsonFile);
-                Map<String, String> existing = JsonUtil.gson.fromJson(content, new TypeToken<Map<String, String>>(){}.getType());
-                if (existing != null) map.putAll(existing);
-            }
-        } catch (Exception ignored) {}
-        map.put(releaseTag, fileName);
-        try {
-            Files.writeString(jsonFile, JsonUtil.gson.toJson(map));
-        } catch (IOException ignored) {}
-    }
-
-    private static String relativizeIfChild(Path path) {
-        Path abs = path.toAbsolutePath().normalize();
-        Path cwd = Paths.get("").toAbsolutePath().normalize();
-        if (abs.startsWith(cwd)) {
-            Path relative = cwd.relativize(abs);
-            return relative.toString();
-        }
-        return abs.toString();
     }
 
     private void resetToIdle(String[] state, View doneContent, View title, View description, View directoryLayout, View progressLayout, View releaseInfoLayout, View warning) {
@@ -1062,6 +1052,13 @@ public class ConfigView extends LinearLayout {
             directoryLayout.setVisibility(GONE);
             progressLayout.setVisibility(GONE);
             doneContent.setVisibility(VISIBLE);
+        } else if ("downloading".equals(state)) {
+            doneContent.setVisibility(GONE);
+            title.setVisibility(VISIBLE);
+            description.setVisibility(VISIBLE);
+            releaseInfoLayout.setVisibility(GONE);
+            directoryLayout.setVisibility(GONE);
+            progressLayout.setVisibility(VISIBLE);
         } else {
             doneContent.setVisibility(GONE);
             title.setVisibility(VISIBLE);
@@ -1072,11 +1069,20 @@ public class ConfigView extends LinearLayout {
         }
     }
 
+    private static void updateApiLogLabel(TextView label) {
+        long[] stats = ApiServerManager.getInstance().getLogStats();
+        String template = I18n.get(MusicHud.MOD_ID + ".text.apiLogInfo");
+        label.setText(template.replace("{count}", String.valueOf(stats[0]))
+                .replace("{size}", formatBytes(stats[1])));
+    }
+
     private static String formatBytes(long bytes) {
         if (bytes < 1024) return bytes + " B";
-        double mb = bytes / (1024.0 * 1024.0);
-        if (mb < 100) return String.format("%.1f MiB", mb);
-        return String.format("%.0f MiB", mb);
+        double kib = bytes / 1024.0;
+        if (kib < 1024) return String.format("%.1f KiB", kib);
+        double mib = kib / 1024.0;
+        if (mib < 100) return String.format("%.1f MiB", mib);
+        return String.format("%.0f MiB", mib);
     }
 
     private static void hideDownloadContent(View doneContent, View title, View description, View directoryLayout, View progressLayout, View releaseInfoLayout) {
