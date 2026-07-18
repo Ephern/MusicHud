@@ -64,7 +64,7 @@ public class NowPlayingInfo {
     final Runnable lyricUpdater = () -> {
         Thread thread = Thread.currentThread();
         lyricUpdaterVThread = thread;
-        thread.setName("MH-Lyrics-Updater");
+        thread.setName("MHWorker-Lyrics-Updater");
         while (true) {
             if (this.musicStartTime == null) {
                 break;

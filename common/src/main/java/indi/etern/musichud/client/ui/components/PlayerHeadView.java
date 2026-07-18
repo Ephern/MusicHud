@@ -22,6 +22,18 @@ public class PlayerHeadView extends MinecraftSurfaceView {
     @Getter
     private Identifier skin;
 
+    private final int[] location = new int[2];
+
+    // local-space clip rect, null means fully visible; computed on the UI thread
+    // in updateSurface() so it stays consistent with the surface position snapshot
+    private volatile ClipBounds clipBounds;
+
+    private record ClipBounds(int left, int top, int right, int bottom) {
+        boolean isEmpty() {
+            return left >= right || top >= bottom;
+        }
+    }
+
     public PlayerHeadView(Context context) {
         super(context);
         setRenderer(new MinecraftSurfaceView.Renderer() {
@@ -35,11 +47,52 @@ public class PlayerHeadView extends MinecraftSurfaceView {
                     skin = playerSkinSupplier.get();
                 }
                 if (skin == null) return;
+                ClipBounds clip = clipBounds;
+                if (clip != null && clip.isEmpty()) return;
                 int w = (int) Math.ceil(getWidth() / guiScale);
                 int h = (int) Math.ceil(getHeight() / guiScale);
-                PlayerHeadRenderer.renderHead(gr, skin, 0, 0, w, h, alpha);
+                if (clip != null) {
+                    // scissor coordinates are local GUI scaled, transformed by the current pose
+                    gr.enableScissor(
+                            (int) Math.floor(clip.left / guiScale),
+                            (int) Math.floor(clip.top / guiScale),
+                            (int) Math.ceil(clip.right / guiScale),
+                            (int) Math.ceil(clip.bottom / guiScale));
+                }
+                try {
+                    PlayerHeadRenderer.renderHead(gr, skin, 0, 0, w, h, alpha);
+                } finally {
+                    if (clip != null) {
+                        gr.disableScissor();
+                    }
+                }
             }
         });
+    }
+
+    @Override
+    protected void updateSurface() {
+        // clip against the visible bounds of the parent chain,
+        // since MinecraftSurfaceView bypasses the canvas clip
+        getLocationInWindow(location);
+        int myLeft = location[0];
+        int myTop = location[1];
+        int clipLeft = 0, clipTop = 0, clipRight = getWidth(), clipBottom = getHeight();
+        ViewParent parent = getParent();
+        while (parent instanceof View viewParent) {
+            viewParent.getLocationInWindow(location);
+            clipLeft = Math.max(clipLeft, location[0] - myLeft);
+            clipTop = Math.max(clipTop, location[1] - myTop);
+            clipRight = Math.min(clipRight, location[0] + viewParent.getWidth() - myLeft);
+            clipBottom = Math.min(clipBottom, location[1] + viewParent.getHeight() - myTop);
+            parent = viewParent.getParent();
+        }
+        if (clipLeft <= 0 && clipTop <= 0 && clipRight >= getWidth() && clipBottom >= getHeight()) {
+            clipBounds = null;
+        } else {
+            clipBounds = new ClipBounds(clipLeft, clipTop, clipRight, clipBottom);
+        }
+        super.updateSurface();
     }
 
     public void setPlayerSkinSupplier(@Nullable Supplier<Identifier> playerSkinSupplier) {
