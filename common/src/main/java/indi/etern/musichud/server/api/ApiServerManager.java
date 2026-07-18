@@ -201,10 +201,18 @@ public class ApiServerManager implements ServerRegister {
                                 if (writer != null) writer.println(line);
                                 if ((line.contains("Server started successfully") || line.contains("ncm_api_rs::server"))
                                         && binaryApiServerStatus == BinaryApiServerStatus.LAUNCHING) {
-                                    setApiStatus(BinaryApiServerStatus.RUNNING);
                                     boolean available = ApiClient.checkAvailable();
+                                    setApiStatus(BinaryApiServerStatus.RUNNING);
                                     if (available) {
                                         apiLogger.info("Api server started, version: {}", ApiClient.getVersion());
+                                        try {
+                                            Path execPath = Paths.get(serverConfig.getServerApiBinaryExecutablePath());
+                                            Path parent = execPath.getParent();
+                                            if (parent != null) {
+                                                ApiBinaryUpdateService.getInstance().fixUnknownVersion(
+                                                        parent, ApiClient.getVersion());
+                                            }
+                                        } catch (Exception ignored) {}
                                     } else {
                                         apiLogger.info("Api server started, but unavailable, restarting");
                                         restartApiServer();

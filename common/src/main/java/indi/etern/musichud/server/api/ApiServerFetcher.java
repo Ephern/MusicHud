@@ -5,7 +5,6 @@ import com.google.gson.reflect.TypeToken;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.utils.JsonUtil;
 import lombok.Getter;
-import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.IOException;
@@ -22,7 +21,9 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
@@ -47,7 +48,7 @@ import java.util.regex.Pattern;
  * Not yet wired into the main flow — call methods directly as needed.
  */
 public class ApiServerFetcher {
-    private static final Logger LOG = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/API");
+    private static final Logger LOGGER = MusicHud.getLogger(ApiServerFetcher.class);
 
     public static final String REPO_OWNER = "MOPELotus";
     public static final String REPO_NAME = "api-enhanced";
@@ -62,6 +63,7 @@ public class ApiServerFetcher {
     private static final Pattern ENTRY_PATTERN = Pattern.compile("<entry>\\s*(.*?)\\s*</entry>", Pattern.DOTALL);
     private static final Pattern TITLE_PATTERN = Pattern.compile("<title[^>]*>\\s*(.*?)\\s*</title>", Pattern.DOTALL);
     private static final Pattern LINK_HREF_PATTERN = Pattern.compile("<link[^>]+href=\"([^\"]+)\"");
+    private static final Pattern TAG_PATTERN = Pattern.compile("<link[^>]+rel=\"alternate\"[^>]+href=\"[^\"]*/releases/tag/([^\"]+)\"");
     private static final Pattern UPDATED_PATTERN = Pattern.compile("<updated>\\s*(.*?)\\s*</updated>", Pattern.DOTALL);
 
     @Getter
@@ -127,6 +129,25 @@ public class ApiServerFetcher {
         }
     }
 
+    public enum DownloadProxy {
+        DIRECT(null),
+        CLOUDFLARE_IPV4("https://gh-proxy.org/"),
+        CLOUDFLARE_CN_IPV4("https://v4.gh-proxy.org/"),
+        CLOUDFLARE_CN_DUAL("https://v6.gh-proxy.org/"),
+        FASTLY_IPV4("https://cdn.gh-proxy.org/");
+
+        private final String proxyBase;
+
+        DownloadProxy(String proxyBase) {
+            this.proxyBase = proxyBase;
+        }
+
+        public String resolveUrl(String originalUrl) {
+            if (proxyBase == null) return originalUrl;
+            return proxyBase + originalUrl;
+        }
+    }
+
     // ---- public API ----
 
     /**
@@ -140,11 +161,12 @@ public class ApiServerFetcher {
     // -- zero-quota methods (prefer these) --
 
     /**
-     * List recent release titles via the Atom feed.
+     * List recent release titles via the Atom feed through a proxy.
      * <b>Zero REST API quota consumed.</b>
      */
     public static CompletableFuture<List<ReleaseSummary>> listReleaseSummaries() {
         return CompletableFuture.supplyAsync(() -> {
+            Thread.currentThread().setName("MHWorker-API-Fetcher");
             List<ReleaseSummary> result = new ArrayList<>();
             try {
                 HttpRequest request = HttpRequest.newBuilder()
@@ -154,7 +176,7 @@ public class ApiServerFetcher {
                         .build();
                 HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() != 200) {
-                    LOG.error("Atom feed returned status {}", response.statusCode());
+                    LOGGER.error("Atom feed returned status {}", response.statusCode());
                     return result;
                 }
                 String body = response.body();
@@ -165,15 +187,12 @@ public class ApiServerFetcher {
                     String htmlUrl = extractFirst(LINK_HREF_PATTERN, entry);
                     String updated = extractFirst(UPDATED_PATTERN, entry);
                     if (title == null || title.isBlank()) continue;
-                    // strip leading repo-name prefix if present (e.g. "api-enhanced: v1.0")
-                    String tag = title;
-                    if (title.contains(": ")) {
-                        tag = title.substring(title.indexOf(": ") + 2).trim();
-                    }
+                    String tag = extractFirst(TAG_PATTERN, entry);
+                    if (tag == null) tag = title;
                     result.add(new ReleaseSummary(tag, title, htmlUrl, updated));
                 }
             } catch (Exception e) {
-                LOG.error("Failed to fetch Atom feed", e);
+                LOGGER.error("Failed to fetch Atom feed", e);
             }
             return result;
         }, MusicHud.EXECUTOR);
@@ -216,10 +235,36 @@ public class ApiServerFetcher {
      * @param progress optional detailed progress callback (downloaded bytes, total bytes), may be null
      */
     public static CompletableFuture<Void> downloadLatestForCurrentPlatform(Path targetDir, String targetName, BiConsumer<Long, Long> progress) {
+        return downloadLatestForCurrentPlatform(targetDir, targetName, DownloadProxy.DIRECT, progress);
+    }
+
+    /**
+     * Download the latest binary for the current platform to a custom filename via a proxy.
+     * <b>Zero REST API quota consumed.</b>
+     *
+     * @param targetDir directory to save into
+     * @param targetName custom filename to use
+     * @param proxy download proxy to route through
+     * @param progress optional detailed progress callback (downloaded bytes, total bytes), may be null
+     */
+    public static CompletableFuture<Void> downloadLatestForCurrentPlatform(Path targetDir, String targetName, DownloadProxy proxy, BiConsumer<Long, Long> progress) {
         Platform platform = Platform.detect();
-        String url = LATEST_DOWNLOAD_URL + platform.getAssetName();
+        String originalUrl = LATEST_DOWNLOAD_URL + platform.getAssetName();
+        String url = proxy.resolveUrl(originalUrl);
         Path target = targetDir.resolve(targetName);
         return downloadFromUrl(url, target, progress);
+    }
+
+    /**
+     * Download the latest binary for the current platform with cancellation support.
+     * <b>Zero REST API quota consumed.</b>
+     */
+    public static CompletableFuture<Void> downloadLatestForCurrentPlatform(Path targetDir, String targetName, DownloadProxy proxy, BiConsumer<Long, Long> progress, AtomicBoolean cancelled) {
+        Platform platform = Platform.detect();
+        String originalUrl = LATEST_DOWNLOAD_URL + platform.getAssetName();
+        String url = proxy.resolveUrl(originalUrl);
+        Path target = targetDir.resolve(targetName);
+        return downloadFromUrl(url, target, progress, cancelled);
     }
 
     /**
@@ -251,6 +296,7 @@ public class ApiServerFetcher {
      */
     public static CompletableFuture<List<Release>> listReleases() {
         return CompletableFuture.supplyAsync(() -> {
+            Thread.currentThread().setName("MHWorker-API-Fetcher");
             try {
                 HttpRequest.Builder builder = HttpRequest.newBuilder()
                         .uri(URI.create(API_RELEASES + "?per_page=10"))
@@ -261,13 +307,17 @@ public class ApiServerFetcher {
                 }
                 HttpRequest request = builder.GET().build();
                 HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
+                if (response.statusCode() == 403 || response.statusCode() == 429) {
+                    LOGGER.warn("GitHub API rate limit reached. Set a token via ApiServerFetcher.setGitHubToken() to raise the limit, or wait for reset.");
+                    return List.<Release>of();
+                }
                 if (response.statusCode() != 200) {
-                    LOG.error("GitHub API returned status {}", response.statusCode());
+                    LOGGER.error("GitHub API returned status {}", response.statusCode());
                     return List.<Release>of();
                 }
                 return JsonUtil.gson.fromJson(response.body(), new TypeToken<List<Release>>() {}.getType());
             } catch (Exception e) {
-                LOG.error("Failed to fetch releases", e);
+                LOGGER.error("Failed to fetch releases", e);
                 return List.<Release>of();
             }
         }, MusicHud.EXECUTOR);
@@ -293,7 +343,12 @@ public class ApiServerFetcher {
     }
 
     private static CompletableFuture<Void> downloadFromUrl(String url, Path target, BiConsumer<Long, Long> progress) {
+        return downloadFromUrl(url, target, progress, new AtomicBoolean(false));
+    }
+
+    private static CompletableFuture<Void> downloadFromUrl(String url, Path target, BiConsumer<Long, Long> progress, AtomicBoolean cancelled) {
         return CompletableFuture.runAsync(() -> {
+            Thread.currentThread().setName("MHWorker-API-Fetcher");
             try {
                 Files.createDirectories(target.getParent());
                 HttpRequest request = HttpRequest.newBuilder()
@@ -313,6 +368,7 @@ public class ApiServerFetcher {
                     long downloaded = 0;
                     int n;
                     while ((n = in.read(buf)) != -1) {
+                        if (cancelled.get()) throw new CancellationException("Download cancelled");
                         out.write(buf, 0, n);
                         downloaded += n;
                         if (progress != null && total > 0) {
@@ -324,10 +380,12 @@ public class ApiServerFetcher {
                 if (!Platform.detect().getAssetName().endsWith(".exe")) {
                     target.toFile().setExecutable(true);
                 }
-                LOG.info("Downloaded {} -> {}", target.getFileName(), target);
+                LOGGER.info("Downloaded {} -> {}", target.getFileName(), target);
             } catch (Exception e) {
-                LOG.error("Failed to download from {}", url, e);
-                throw new RuntimeException(e);
+                if (!(e instanceof CancellationException)) {
+                    LOGGER.error("Failed to download from {}", url, e);
+                    throw new RuntimeException(e);
+                }
             }
         }, MusicHud.EXECUTOR);
     }

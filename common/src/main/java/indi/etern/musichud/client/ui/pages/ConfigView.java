@@ -9,6 +9,7 @@ import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.style.URLSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
+import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
@@ -44,6 +45,9 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.CancellationException;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -669,7 +673,8 @@ public class ConfigView extends LinearLayout {
                 Path logDir = apiServerManager.getLogDir();
                 try {
                     Files.createDirectories(logDir);
-                } catch (IOException ignored) {}
+                } catch (IOException ignored) {
+                }
                 Util.getPlatform().openFile(logDir.toFile());
                 updateApiLogLabel(apiLogLabel);
             });
@@ -703,10 +708,11 @@ public class ConfigView extends LinearLayout {
             apiLogLayout.addView(clearApiLogButton);
             apiCategory.addView(apiLogLayout);
 
-            Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiStatusListener) -> {
+            Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiServerStatus) -> {
                 MuiModApi.postToUiThread(() -> {
-                    apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiStatusListener.i18nKey())));
+                    apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerStatus.i18nKey())));
                     apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
+                    updateApiLogLabel(apiLogLabel);
                 });
             };
             List<Consumer<ApiServerManager.BinaryApiServerStatus>> apiStatusListeners = apiServerManager.getApiStatusListeners();
@@ -731,6 +737,22 @@ public class ConfigView extends LinearLayout {
         }
     }
 
+    private static void updateApiLogLabel(TextView label) {
+        long[] stats = ApiServerManager.getInstance().getLogStats();
+        String template = I18n.get(MusicHud.MOD_ID + ".text.apiLogInfo");
+        label.setText(template.replace("{count}", String.valueOf(stats[0]))
+                .replace("{size}", formatBytes(stats[1])));
+    }
+
+    private static String formatBytes(long bytes) {
+        if (bytes < 1024) return bytes + " B";
+        double kib = bytes / 1024.0;
+        if (kib < 1024) return String.format("%.1f KiB", kib);
+        double mib = kib / 1024.0;
+        if (mib < 100) return String.format("%.1f MiB", mib);
+        return String.format("%.0f MiB", mib);
+    }
+
     private @NotNull Button createDownloadApiButton(Context context, ButtonInsetBackgroundFactory backgroundFactory, EditText[] serverApiBinaryPathInput) {
         Button downloadApiServerButton = new Button(context);
         downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
@@ -741,9 +763,10 @@ public class ConfigView extends LinearLayout {
         final String downloadingText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.downloading");
         final String button1Text = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button1");
         final String button2Text = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button2");
-        final String button1YesText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button1.yes");
-        final String button2NoText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button2.no");
-        final String hideText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.hide");
+        final String button1CancelText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.downloading.button1");
+        final String button2hideText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.downloading.button2");
+        final String button1YesText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.button1");
+        final String button2NoText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.button2");
 
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -754,44 +777,35 @@ public class ConfigView extends LinearLayout {
 
         TextView description = new TextView(context);
         String desc = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.description");
-        int indexOfUrl = desc.indexOf("{url}");
+        description.setText(desc);
+        description.setTextSize(Theme.TEXT_SIZE_NORMAL);
+
+        TextView descriptionUrl = new TextView(context);
+        String url = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.description.url");
+        int indexOfUrl = url.indexOf("{url}");
         String latestReleaseUrl = ApiServerFetcher.LATEST_RELEASE_URL;
-        String replace = desc.replace("{url}", latestReleaseUrl);
+        String replace = url.replace("{url}", latestReleaseUrl);
         SpannableString spannableString = new SpannableString(replace);
         spannableString.setSpan(new URLSpan(latestReleaseUrl), indexOfUrl, indexOfUrl + latestReleaseUrl.length(), SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
-        description.setText(spannableString);
-        description.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        description.setOnClickListener(v -> Util.getPlatform().openUri(latestReleaseUrl));
+        descriptionUrl.setText(spannableString);
+        descriptionUrl.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        descriptionUrl.setOnClickListener(v -> Util.getPlatform().openUri(latestReleaseUrl));
 
         final Path[] targetDir = {Paths.get("music-hud")};
         final ApiServerFetcher.ReleaseSummary[] latestRelease = {null};
 
-        LinearLayout releaseInfoLayout = new LinearLayout(context);
-        releaseInfoLayout.setOrientation(LinearLayout.HORIZONTAL);
-        releaseInfoLayout.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout directoryLayout = new LinearLayout(context);
+        directoryLayout.setOrientation(LinearLayout.HORIZONTAL);
 
         TextView existingVersionWarning = new TextView(context);
         existingVersionWarning.setTextSize(Theme.TEXT_SIZE_NORMAL);
         existingVersionWarning.setTextColor(Theme.WARN_TEXT_COLOR);
         existingVersionWarning.setVisibility(GONE);
 
-        TextView releaseNameLabel = new TextView(context);
-        releaseNameLabel.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        releaseNameLabel.setTextColor(Theme.NORMAL_TEXT_COLOR);
-        releaseNameLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.fetching"));
+        TextView directoryText = new TextView(context);
+        directoryText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        directoryText.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.dir"));
 
-        Button refreshReleaseButton = new Button(context);
-        refreshReleaseButton.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.refresh"));
-        refreshReleaseButton.setTextColor(Theme.PRIMARY_COLOR);
-        refreshReleaseButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        refreshReleaseButton.setBackground(backgroundFactory.newBackgroundDrawable());
-        refreshReleaseButton.setOnClickListener(v -> { refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning); });
-
-        releaseInfoLayout.addView(releaseNameLabel, new LayoutParams(0, WRAP_CONTENT, 1));
-        releaseInfoLayout.addView(refreshReleaseButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-
-        LinearLayout directoryLayout = new LinearLayout(context);
-        directoryLayout.setOrientation(LinearLayout.HORIZONTAL);
         EditText directoryTextInput = new EditText(context, null, R.attr.editTextOutlinedStyle);
         directoryTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.dir.field.hint"));
         directoryTextInput.setTextSize(Theme.TEXT_SIZE_NORMAL);
@@ -814,13 +828,79 @@ public class ConfigView extends LinearLayout {
             }
         });
 
+        LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
+        params1.setMargins(0, 0, dp(8), 0);
+        directoryLayout.addView(directoryText, params1);
         directoryLayout.addView(directoryTextInput, new LayoutParams(0, WRAP_CONTENT, 1));
         directoryLayout.addView(selectDirectoryButton, new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0));
+
+        LinearLayout proxyLayout = new LinearLayout(context);
+        proxyLayout.setOrientation(HORIZONTAL);
+        proxyLayout.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView proxyText = new TextView(context);
+        proxyText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        proxyText.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.proxy"));
+
+        Spinner proxySpinner = new Spinner(context);
+        final Spinner[] proxySpinnerRef = {null};
+        proxySpinnerRef[0] = proxySpinner;
+        String[] proxyLabels = Arrays.stream(ApiServerFetcher.DownloadProxy.values())
+                .map(dp -> I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.proxy." + dp.name())).toArray(String[]::new);
+        ArrayAdapter<String> proxyAdapter = new ArrayAdapter<>(context, proxyLabels) {
+            @Override
+            @NotNull
+            public View getView(int position, View convertView, @NotNull ViewGroup parent) {
+                TextView tv = (TextView) super.getView(position, convertView, parent);
+                tv.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                return tv;
+            }
+            @Override
+            public View getDropDownView(int position, View convertView, @NotNull ViewGroup parent) {
+                View dropDownView = super.getDropDownView(position, convertView, parent);
+                if (dropDownView instanceof TextView tv) {
+                    tv.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                    return tv;
+                } else {
+                    return dropDownView;
+                }
+            }
+        };
+        proxySpinner.setAdapter(proxyAdapter);
+        proxySpinner.setSelection(0);
+
+        LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
+        params.setMargins(0, 0, dp(8), 0);
+        proxyLayout.addView(proxyText, params);
+        proxyLayout.addView(proxySpinner, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 1));
+
+        LayoutParams proxyParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        proxyParams.setMargins(0, 0, 0, dp(8));
+
+        LinearLayout releaseInfoLayout = new LinearLayout(context);
+        releaseInfoLayout.setOrientation(LinearLayout.HORIZONTAL);
+        releaseInfoLayout.setGravity(Gravity.CENTER_VERTICAL);
+
+        TextView releaseNameLabel = new TextView(context);
+        releaseNameLabel.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        releaseNameLabel.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        releaseNameLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.fetching"));
+
+        Button refreshReleaseButton = new Button(context);
+        refreshReleaseButton.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.refresh"));
+        refreshReleaseButton.setTextColor(Theme.PRIMARY_COLOR);
+        refreshReleaseButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        refreshReleaseButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        refreshReleaseButton.setOnClickListener(v -> {
+            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning, proxySpinnerRef[0]);
+        });
+
+        releaseInfoLayout.addView(releaseNameLabel, new LayoutParams(0, WRAP_CONTENT, 1));
+        releaseInfoLayout.addView(refreshReleaseButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         LinearLayout progressLayout = new LinearLayout(context);
         progressLayout.setOrientation(LinearLayout.HORIZONTAL);
         progressLayout.setGravity(Gravity.CENTER_VERTICAL);
-        progressLayout.setVisibility(GONE);
 
         ProgressBar progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
         progressBar.setMin(0);
@@ -837,57 +917,89 @@ public class ConfigView extends LinearLayout {
 
         LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         params4.setMargins(0, 0, 0, dp(8));
-        content.addView(title, params4);
-        content.addView(description);
         LayoutParams params5 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         params5.setMargins(0, dp(4), 0, dp(4));
-        content.addView(directoryLayout, params5);
-        content.addView(releaseInfoLayout);
-        content.addView(existingVersionWarning);
-        content.addView(progressLayout);
 
-        LinearLayout doneContent = new LinearLayout(context);
-        doneContent.setOrientation(LinearLayout.VERTICAL);
-        doneContent.setVisibility(GONE);
+        LinearLayout idlePage = new LinearLayout(context);
+        idlePage.setOrientation(LinearLayout.VERTICAL);
+        idlePage.addView(title, params4);
+        idlePage.addView(description);
+        idlePage.addView(descriptionUrl);
+        idlePage.addView(directoryLayout, params5);
+        idlePage.addView(proxyLayout, proxyParams);
+        idlePage.addView(releaseInfoLayout);
+        idlePage.addView(existingVersionWarning);
+
+        TextView dlTitle = new TextView(context);
+        dlTitle.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.title"));
+        dlTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+
+        TextView dlDesc = new TextView(context);
+        dlDesc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.downloading.description"));
+        dlDesc.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        dlDesc.setOnClickListener(v -> Util.getPlatform().openUri(latestReleaseUrl));
+
+        LinearLayout progressPage = new LinearLayout(context);
+        progressPage.setOrientation(LinearLayout.VERTICAL);
+        progressPage.setVisibility(GONE);
+        LayoutParams params6 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        params6.setMargins(0, 0, 0, dp(8));
+        progressPage.addView(dlTitle, params6);
+        progressPage.addView(dlDesc);
+        progressPage.addView(progressLayout);
+
+        LinearLayout donePage = new LinearLayout(context);
+        donePage.setOrientation(LinearLayout.VERTICAL);
+        donePage.setVisibility(GONE);
 
         TextView doneTitle = new TextView(context);
-        doneTitle.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.title"));
         doneTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+        doneTitle.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.title"));
 
         TextView doneDesc = new TextView(context);
-        doneDesc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.description"));
         doneDesc.setTextSize(Theme.TEXT_SIZE_NORMAL);
         doneDesc.setTextColor(Theme.NORMAL_TEXT_COLOR);
 
-        doneContent.addView(doneTitle, params4);
-        doneContent.addView(doneDesc);
-        content.addView(doneContent);
+        donePage.addView(doneTitle, params4);
+        donePage.addView(doneDesc);
 
-        final String[] downloadState = {"idle"};
+        content.addView(idlePage);
+        content.addView(progressPage);
+        content.addView(donePage);
+
         final Path[] downloadedTempFile = {null};
         final String[] releaseTag = {""};
 
+        enum Page { IDLE, DOWNLOADING, DONE, RESETTING }
+        final Page[] state = {Page.IDLE};
+        final CompletableFuture<?>[] downloadFuture = {null};
+        final AtomicBoolean cancelled = new AtomicBoolean(false);
+
+        java.util.function.Consumer<Page> setPage = page -> {
+            switch (page) {
+                case IDLE -> { idlePage.setVisibility(VISIBLE); progressPage.setVisibility(GONE); donePage.setVisibility(GONE); }
+                case DOWNLOADING -> { idlePage.setVisibility(GONE); progressPage.setVisibility(VISIBLE); donePage.setVisibility(GONE); }
+                case DONE -> { idlePage.setVisibility(GONE); progressPage.setVisibility(GONE); donePage.setVisibility(VISIBLE); }
+                case RESETTING -> { idlePage.setVisibility(VISIBLE); progressPage.setVisibility(GONE); donePage.setVisibility(GONE); }
+            }
+        };
+
         Modal.ActionButton cancelBtn = new Modal.ActionButton(button2Text, (btn, dialog) -> {
-            if ("done".equals(downloadState[0])) {
-                resetToIdle(downloadState, doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout, existingVersionWarning);
+            if (Page.DONE.equals(state[0])) {
+                state[0] = Page.IDLE;
+                setPage.accept(Page.IDLE);
                 downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
             }
             dialog.dismiss();
         });
 
         Modal.ActionButton confirmButton = new Modal.ActionButton(button1Text, (btn, dialog) -> {
-            if ("idle".equals(downloadState[0])) {
-                if (latestRelease[0] == null) {
-                    ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.notFetched"));
-                    return;
-                }
-                downloadState[0] = "downloading";
-                btn.setText(downloadingText);
-                btn.setEnabled(false);
-                cancelBtn.setText(hideText);
-                progressLayout.setVisibility(VISIBLE);
-                releaseInfoLayout.setVisibility(GONE);
-                existingVersionWarning.setVisibility(GONE);
+            if (Page.IDLE.equals(state[0])) {
+                cancelled.set(false);
+                state[0] = Page.DOWNLOADING;
+                btn.setText(button1CancelText);
+                cancelBtn.setText(button2hideText);
+                setPage.accept(Page.DOWNLOADING);
                 progressBar.setProgress(0);
                 progressText.setText("");
                 downloadApiServerButton.setText(downloadingText);
@@ -897,32 +1009,31 @@ public class ConfigView extends LinearLayout {
                     Files.createDirectories(targetDir[0]);
                 } catch (IOException ignored) {}
 
-                releaseTag[0] = latestRelease[0].tag();
+                releaseTag[0] = latestRelease[0] != null ? latestRelease[0].tag() : "unknown";
                 String tempFileName = ApiServerFetcher.Platform.detect().getAssetName() + "." + releaseTag[0] + ".temp";
                 Path tempFile = targetDir[0].resolve(tempFileName);
                 tempFile.toFile().deleteOnExit();
 
                 ApiBinaryUpdateService updateService = ApiBinaryUpdateService.getInstance();
 
-                updateService.downloadToTemp(targetDir[0], releaseTag[0], (downloaded, total) -> {
+                ApiServerFetcher.DownloadProxy selectedProxy = ApiServerFetcher.DownloadProxy.values()[proxySpinner.getSelectedItemPosition()];
+
+                CompletableFuture<Path> future = updateService.downloadToTemp(targetDir[0], releaseTag[0], selectedProxy, (downloaded, total) -> {
                     MuiModApi.postToUiThread(() -> {
+                        if (cancelled.get()) return;
                         int pct = (int) (((double) downloaded / total) * 100);
                         progressBar.setProgress(pct);
                         progressText.setText(formatBytes(downloaded) + " / " + formatBytes(total));
                     });
-                }).thenRun(() -> {
+                }, cancelled);
+                downloadFuture[0] = future;
+                future.thenRun(() -> {
                     MuiModApi.postToUiThread(() -> {
-                        downloadState[0] = "done";
+                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done"));
+                        state[0] = Page.DONE;
                         downloadedTempFile[0] = tempFile;
-                        title.setVisibility(GONE);
-                        description.setVisibility(GONE);
-                        releaseInfoLayout.setVisibility(GONE);
-                        existingVersionWarning.setVisibility(GONE);
-                        directoryLayout.setVisibility(GONE);
-                        progressLayout.setVisibility(GONE);
-                        doneTitle.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.title"));
                         doneDesc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.description").replace("{path}", tempFile.toString()));
-                        doneContent.setVisibility(VISIBLE);
+                        setPage.accept(Page.DONE);
                         btn.setText(button1YesText);
                         btn.setEnabled(true);
                         cancelBtn.setText(button2NoText);
@@ -933,10 +1044,13 @@ public class ConfigView extends LinearLayout {
                     });
                 }).exceptionally(ex -> {
                     MuiModApi.postToUiThread(() -> {
-                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.error") + ": " + ex.getMessage());
-                        downloadState[0] = "idle";
-                        progressLayout.setVisibility(GONE);
-                        releaseInfoLayout.setVisibility(VISIBLE);
+                        if (ex instanceof CancellationException || ex.getCause() instanceof CancellationException) {
+                            ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.cancelled"));
+                        } else {
+                            ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.error") + ": " + ex.getMessage());
+                        }
+                        state[0] = Page.IDLE;
+                        setPage.accept(Page.IDLE);
                         btn.setText(button1Text);
                         btn.setEnabled(true);
                         cancelBtn.setText(button2Text);
@@ -947,14 +1061,27 @@ public class ConfigView extends LinearLayout {
                     });
                     return null;
                 });
-            } else if ("done".equals(downloadState[0])) {
+            } else if (Page.DOWNLOADING.equals(state[0])) {
+                cancelled.set(true);
+                if (downloadFuture[0] != null) {
+                    downloadFuture[0].cancel(true);
+                    downloadFuture[0] = null;
+                }
+                state[0] = Page.IDLE;
+                setPage.accept(Page.IDLE);
+                btn.setText(button1Text);
+                btn.setEnabled(true);
+                cancelBtn.setText(button2Text);
+                downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
+            } else if (Page.DONE.equals(state[0])) {
                 ApiBinaryUpdateService updateService = ApiBinaryUpdateService.getInstance();
                 Path finalPath = updateService.resolveFinalPath(downloadedTempFile[0], releaseTag[0]);
                 if (finalPath == null) {
                     ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.renameFailed"));
                     return;
                 }
-                updateService.updateMhApiJson(targetDir[0], releaseTag[0], finalPath.getFileName().toString());
+                updateService.updateMhApiJson(targetDir[0], releaseTag[0],
+                        updateService.extractVersion(releaseTag[0]), finalPath.getFileName().toString());
                 String configPath = updateService.relativizePath(finalPath);
                 serverConfig.setServerApiBinaryExecutablePath(configPath);
                 if (serverApiBinaryPathInput[0] != null) {
@@ -965,8 +1092,7 @@ public class ConfigView extends LinearLayout {
                     apiServer.restartApiServer();
                 }
                 downloadedTempFile[0] = null;
-                downloadState[0] = "resetting";
-                resetToIdle(downloadState, doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout, existingVersionWarning);
+                state[0] = Page.RESETTING;
                 downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
                 btn.setText(button1Text);
                 cancelBtn.setText(button2Text);
@@ -979,25 +1105,22 @@ public class ConfigView extends LinearLayout {
         );
 
         dialog.setOnDismissListener(() -> {
-            if ("resetting".equals(downloadState[0])) {
-                downloadState[0] = "idle";
-                downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
-            } else if ("done".equals(downloadState[0])) {
-                downloadState[0] = "idle";
-                resetToIdle(downloadState, doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout, existingVersionWarning);
+            if (Page.RESETTING.equals(state[0])) {
+                state[0] = Page.IDLE;
+                setPage.accept(Page.IDLE);
                 downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
             }
         });
 
         downloadApiServerButton.setOnClickListener((v) -> {
-            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning);
-            applyContentByState(downloadState[0], doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout);
+            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning, proxySpinnerRef[0]);
+            setPage.accept(state[0] == Page.DOWNLOADING ? Page.DOWNLOADING : state[0] == Page.DONE ? Page.DONE : Page.IDLE);
             dialog.show();
         });
         return downloadApiServerButton;
     }
 
-    private void refreshReleaseInfo(TextView releaseLabel, ApiServerFetcher.ReleaseSummary[] latest, Path[] targetDir, TextView warning) {
+    private void refreshReleaseInfo(TextView releaseLabel, ApiServerFetcher.ReleaseSummary[] latest, Path[] targetDir, TextView warning, Spinner proxySpinner) {
         releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.fetching"));
         ApiBinaryUpdateService.getInstance().fetchLatestRelease().thenAccept(r -> {
             if (r != null) {
@@ -1005,10 +1128,10 @@ public class ConfigView extends LinearLayout {
                     latest[0] = r;
                     releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.label")
                             .replace("{tag}", r.tag()));
-                    String oldFile = ApiBinaryUpdateService.getInstance().checkExistingVersion(targetDir[0], r.tag());
-                    if (oldFile != null) {
+                    String oldVersion = ApiBinaryUpdateService.getInstance().checkExistingVersion(targetDir[0], r.tag());
+                    if (oldVersion != null) {
                         warning.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.existingVersion")
-                                .replace("{file}", oldFile).replace("{tag}", r.tag()));
+                                .replace("{version}", oldVersion).replace("{tag}", r.tag()));
                         warning.setVisibility(VISIBLE);
                     } else {
                         warning.setVisibility(GONE);
@@ -1028,70 +1151,13 @@ public class ConfigView extends LinearLayout {
             warning.setVisibility(GONE);
             return;
         }
-        String oldFile = ApiBinaryUpdateService.getInstance().checkExistingVersion(targetDir, tag);
-        if (oldFile != null) {
+        String oldVersion = ApiBinaryUpdateService.getInstance().checkExistingVersion(targetDir, tag);
+        if (oldVersion != null) {
             warning.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.existingVersion")
-                    .replace("{file}", oldFile).replace("{tag}", tag));
+                    .replace("{version}", oldVersion).replace("{tag}", tag));
             warning.setVisibility(VISIBLE);
         } else {
             warning.setVisibility(GONE);
         }
     }
-
-    private void resetToIdle(String[] state, View doneContent, View title, View description, View directoryLayout, View progressLayout, View releaseInfoLayout, View warning) {
-        state[0] = "idle";
-        hideDownloadContent(doneContent, title, description, directoryLayout, progressLayout, releaseInfoLayout);
-        warning.setVisibility(GONE);
-    }
-
-    private static void applyContentByState(String state, LinearLayout doneContent, View title, View description, View directoryLayout, View progressLayout, View releaseInfoLayout) {
-        if ("done".equals(state)) {
-            title.setVisibility(GONE);
-            description.setVisibility(GONE);
-            releaseInfoLayout.setVisibility(GONE);
-            directoryLayout.setVisibility(GONE);
-            progressLayout.setVisibility(GONE);
-            doneContent.setVisibility(VISIBLE);
-        } else if ("downloading".equals(state)) {
-            doneContent.setVisibility(GONE);
-            title.setVisibility(VISIBLE);
-            description.setVisibility(VISIBLE);
-            releaseInfoLayout.setVisibility(GONE);
-            directoryLayout.setVisibility(GONE);
-            progressLayout.setVisibility(VISIBLE);
-        } else {
-            doneContent.setVisibility(GONE);
-            title.setVisibility(VISIBLE);
-            description.setVisibility(VISIBLE);
-            releaseInfoLayout.setVisibility(VISIBLE);
-            directoryLayout.setVisibility(VISIBLE);
-            progressLayout.setVisibility(GONE);
-        }
-    }
-
-    private static void updateApiLogLabel(TextView label) {
-        long[] stats = ApiServerManager.getInstance().getLogStats();
-        String template = I18n.get(MusicHud.MOD_ID + ".text.apiLogInfo");
-        label.setText(template.replace("{count}", String.valueOf(stats[0]))
-                .replace("{size}", formatBytes(stats[1])));
-    }
-
-    private static String formatBytes(long bytes) {
-        if (bytes < 1024) return bytes + " B";
-        double kib = bytes / 1024.0;
-        if (kib < 1024) return String.format("%.1f KiB", kib);
-        double mib = kib / 1024.0;
-        if (mib < 100) return String.format("%.1f MiB", mib);
-        return String.format("%.0f MiB", mib);
-    }
-
-    private static void hideDownloadContent(View doneContent, View title, View description, View directoryLayout, View progressLayout, View releaseInfoLayout) {
-        doneContent.setVisibility(GONE);
-        title.setVisibility(VISIBLE);
-        description.setVisibility(VISIBLE);
-        directoryLayout.setVisibility(VISIBLE);
-        progressLayout.setVisibility(VISIBLE);
-        releaseInfoLayout.setVisibility(VISIBLE);
-    }
-
 }
