@@ -3,7 +3,6 @@ package indi.etern.musichud.network.payloads.pushMessages.s2c;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -14,8 +13,6 @@ import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
 import net.minecraft.client.resources.language.I18n;
-
-import java.util.Queue;
 
 public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, String message) implements S2CPayload {
     public static final ByteBufCodec<SwitchMusicMessage> CODEC = ByteBufCodec.composite(
@@ -55,14 +52,6 @@ public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, 
                         }
                         MusicService musicService = MusicService.getInstance();
                         musicService.switchMusic(message.musicDetail, message.nextIdle, null, message1);
-                        Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
-                        if (musicQueue.isEmpty()) {
-                            if (!message.nextIdle.equals(MusicDetail.NONE)) {
-                                ImageUtils.downloadAsync(message.nextIdle.getAlbum().getThumbnailPicUrl(240));
-                            }
-                        } else {
-                            ImageUtils.downloadAsync(musicQueue.peek().getAlbum().getThumbnailPicUrl(240));
-                        }
                     });
                 };
             }
