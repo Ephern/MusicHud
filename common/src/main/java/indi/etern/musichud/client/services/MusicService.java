@@ -269,6 +269,14 @@ public class MusicService {
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         initialSyncReceived = true;
         if (clientConfig.getEnable()) {
+            if (!musicQueue.isEmpty()) {// preload image
+                MusicDetail peek = musicQueue.peek();
+                ImageUtils.downloadAsync(peek.getAlbum().getThumbnailPicUrl(240));
+                HudRendererManager.getInstance().preloadAlbumImage(peek.getAlbum());
+            } else if (nextIdleMusicDetail != null && !nextIdleMusicDetail.equals(MusicDetail.NONE)) {
+                ImageUtils.downloadAsync(nextIdleMusicDetail.getAlbum().getThumbnailPicUrl(240));
+                HudRendererManager.getInstance().preloadAlbumImage(nextIdleMusicDetail.getAlbum());
+            }
             if (!message.isEmpty()) {
                 MuiModApi.postToUiThread(() -> {
                     //noinspection UnstableApiUsage

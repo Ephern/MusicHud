@@ -28,7 +28,7 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
         this.mixedColors = ColorExtractor.mixBaseColorsWithAlpha(themedColors, 0xFF1A1A1A, mixAlpha);
     }
 
-    BackgroundData(BackgroundImages image, ThemedColors themedColors) {
+    public BackgroundData(BackgroundImages image, ThemedColors themedColors) {
         this.image = image;
         this.mixAlpha = (float) clientConfig.getHudBackgroundMixAlpha();
         this.themedColors = themedColors;
