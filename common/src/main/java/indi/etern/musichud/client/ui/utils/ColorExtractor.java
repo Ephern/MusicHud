@@ -8,7 +8,6 @@ import java.util.HashMap;
 import java.util.Map;
 
 import static indi.etern.musichud.client.ui.utils.UniformDataUtils.interpolateARGB;
-import static indi.etern.musichud.client.ui.utils.UniformDataUtils.rgbToHsl;
 
 public class ColorExtractor {
     /**
@@ -26,14 +25,14 @@ public class ColorExtractor {
         int height = image.getHeight();
         if (width == 0 || height == 0) return getDefaultColors();
 
-        // 采样步长（可保持原样或略提高）
-        int step = Math.max(1, (int) Math.sqrt((width * height) / 2500.0));
+        // 采样步长
+        int step = Math.max(1, (int) Math.sqrt((width * height) / 6400.0));
         Map<Integer, Float> colorWeight = new HashMap<>();  // 量化颜色 -> 累计权重
 
         // 在 extractColors 方法内，完成 colorWeight 统计后，计算总权重
         float totalWeight = 0;
 
-        int bits = 5;  // 可改为4~6
+        int bits = 5;  // 4~6
         int shift = 8 - bits;
 
         for (int y = 0; y < height; y += step) {
@@ -72,7 +71,7 @@ public class ColorExtractor {
 
         final float PRIMARY_SAT_WEIGHT = 0.3f;
         final float SECONDARY_SAT_WEIGHT = 0.2f;
-        final float LUM_WEIGHT = 0.1f;
+        final float LUM_WEIGHT = 0.3f;
         final float FREQ_WEIGHT = 0.5f;
         final float DIST_EPSILON = 0.001f;
         final float BD_SAT_TARGET = 0.13f;
@@ -113,6 +112,8 @@ public class ColorExtractor {
 
         int primary = 0;
         float bestPrimaryScore = -1;
+        int primaryFallback = 0;
+        float bestPrimaryFallbackScore = -1;
         for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
             int quant = entry.getKey();
             float weight = entry.getValue();
@@ -126,14 +127,22 @@ public class ColorExtractor {
             // sqrt 压制部分高频优势
             float freqFactor = (float) Math.sqrt(weight) / (float) Math.sqrt(totalWeight);
             float score = (vivid + freqFactor * FREQ_WEIGHT) * (dist1 + DIST_EPSILON) * (dist2 + DIST_EPSILON);
-            if (score > bestPrimaryScore) {
-                bestPrimaryScore = score;
-                primary = rgb;
+            if (dist2 > 0.08f) {
+                if (score > bestPrimaryScore) {
+                    bestPrimaryScore = score;
+                    primary = rgb;
+                }
+            } else if (score > bestPrimaryFallbackScore) {
+                bestPrimaryFallbackScore = score;
+                primaryFallback = rgb;
             }
         }
+        if (primary == 0) primary = primaryFallback;
 
         int secondary = primary;
         float bestSecondaryScore = -1;
+        int secondaryFallback = primary;
+        float bestSecondaryFallbackScore = -1;
         for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
             int quant = entry.getKey();
             float weight = entry.getValue();
@@ -148,11 +157,17 @@ public class ColorExtractor {
             float dist3 = colorDistance(dark, rgb);
             float freqFactor = (float) Math.sqrt(weight) / (float) Math.sqrt(totalWeight);
             float score = (vivid + freqFactor * FREQ_WEIGHT) * (dist1 + DIST_EPSILON) * (dist2 + DIST_EPSILON) * (dist3 + DIST_EPSILON);
-            if (score > bestSecondaryScore && dist1 > 0.1f) {
-                bestSecondaryScore = score;
-                secondary = rgb;
+            if (dist1 > 0.1f && dist2 > 0.08f) {
+                if (score > bestSecondaryScore) {
+                    bestSecondaryScore = score;
+                    secondary = rgb;
+                }
+            } else if (dist1 > 0.1f && score > bestSecondaryFallbackScore) {
+                bestSecondaryFallbackScore = score;
+                secondaryFallback = rgb;
             }
         }
+        if (secondary == primary) secondary = secondaryFallback;
 
         return new ThemedColors(
                 0xFF000000 | primary,
@@ -172,24 +187,32 @@ public class ColorExtractor {
         return (max - min) / (float) max;
     }
 
+    /**
+     * Weighted color distance using the "redmean" formula, widely used in
+     * image quantization (e.g. ImageMagick). Applies perceptual weighting
+     * in sRGB space: higher weight on green luminosity and adaptive red/blue
+     * weighting by mean red level.
+     *
+     * @return perceptual distance normalized to [0, 1]
+     */
     private static float colorDistance(int rgb1, int rgb2) {
-        float[] hsl1 = rgbToHsl(rgb1);
-        float[] hsl2 = rgbToHsl(rgb2);
+        int r1 = (rgb1 >> 16) & 0xFF;
+        int g1 = (rgb1 >> 8) & 0xFF;
+        int b1 = rgb1 & 0xFF;
+        int r2 = (rgb2 >> 16) & 0xFF;
+        int g2 = (rgb2 >> 8) & 0xFF;
+        int b2 = rgb2 & 0xFF;
 
-        float hueDist = 0;
-        if (hsl1[1] > 0.25f && hsl2[1] > 0.25f) {
-            hueDist = Math.abs(hsl1[0] - hsl2[0]);
-            if (hueDist > 0.5f) hueDist = 1.0f - hueDist;
-        }
-        hueDist *= 2;
+        int rMean = (r1 + r2) >>> 1;
+        int dR = r1 - r2;
+        int dG = g1 - g2;
+        int dB = b1 - b2;
 
-        float satDist = Math.abs(hsl1[1] - hsl2[1]);
-        float lumDist = Math.abs(hsl1[2] - hsl2[2]);
-
-        float HUE_WEIGHT = 0.5f;
-        float SAT_WEIGHT = 0.2f;
-        float LUM_WEIGHT = 0.3f;
-        return hueDist * HUE_WEIGHT + satDist * SAT_WEIGHT + lumDist * LUM_WEIGHT;
+        return (float) Math.sqrt(
+                ((512 + rMean) * dR * dR) / 256.0 +
+                4 * dG * dG +
+                ((767 - rMean) * dB * dB) / 256.0
+        ) / 765.0f;
     }
 
     private static float getLuminance(int rgb) {
