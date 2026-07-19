@@ -69,6 +69,7 @@ public class PlayerHeadView extends FrameLayout {
     @Override
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
+        lastRenderedSkin = null;
         getViewTreeObserver().addOnPreDrawListener(preDrawListener);
     }
 
@@ -99,12 +100,29 @@ public class PlayerHeadView extends FrameLayout {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) return;
 
-        try (NativeImage skinImage = loadSkinImage(skin)) {
+        NativeImage skinImage = null;
+        boolean readFromStream = false;
+        try {
+            var texture = minecraft.getTextureManager().getTexture(skin);
+            if (texture instanceof DynamicTexture dt) {
+                skinImage = dt.getPixels();
+            } else {
+                try {
+                    var resource = minecraft.getResourceManager()
+                            .getResource(skin).orElse(null);
+                    if (resource != null) {
+                        try (InputStream stream = resource.open()) {
+                            skinImage = NativeImage.read(stream);
+                            readFromStream = true;
+                        }
+                    }
+                } catch (Exception ignored) {
+                }
+            }
             if (skinImage == null) return;
 
             try (NativeImage faceNat = new NativeImage(NativeImage.Format.RGBA, HEAD_SIZE, HEAD_SIZE, false);
                  NativeImage hatNat = new NativeImage(NativeImage.Format.RGBA, HEAD_SIZE, HEAD_SIZE, false)) {
-                // copyRect(dst, srcX, srcY, dstX, dstY, width, height, flipX, flipY)
                 skinImage.copyRect(faceNat, SKIN_FACE_U, SKIN_FACE_V, 0, 0, HEAD_SIZE, HEAD_SIZE, false, false);
                 skinImage.copyRect(hatNat, SKIN_HAT_U, SKIN_HAT_V, 0, 0, HEAD_SIZE, HEAD_SIZE, false, false);
 
@@ -124,24 +142,10 @@ public class PlayerHeadView extends FrameLayout {
                 }
             } catch (Exception ignored) {
             }
-        }
-    }
-
-    @Nullable
-    private static NativeImage loadSkinImage(ResourceLocation skinId) {
-        var texture = Minecraft.getInstance().getTextureManager().getTexture(skinId);
-        if (texture instanceof DynamicTexture dt) {
-            return dt.getPixels();
-        }
-        try {
-            var resource = Minecraft.getInstance().getResourceManager()
-                    .getResource(skinId).orElse(null);
-            if (resource != null) {
-                try (InputStream stream = resource.open()) {
-                    return NativeImage.read(stream);
-                }
+        } finally {
+            if (readFromStream) {
+                skinImage.close();
             }
-        } catch (Exception ignored) {}
-        return null;
+        }
     }
 }
