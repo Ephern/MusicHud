@@ -99,30 +99,32 @@ public class PlayerHeadView extends FrameLayout {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null) return;
 
-        NativeImage skinImage = loadSkinImage(skin);
-        if (skinImage == null) return;
+        try (NativeImage skinImage = loadSkinImage(skin)) {
+            if (skinImage == null) return;
 
-        try (NativeImage faceNat = new NativeImage(NativeImage.Format.RGBA, HEAD_SIZE, HEAD_SIZE, false);
-             NativeImage hatNat = new NativeImage(NativeImage.Format.RGBA, HEAD_SIZE, HEAD_SIZE, false)) {
-            // copyRect(dst, srcX, srcY, dstX, dstY, width, height, flipX, flipY)
-            skinImage.copyRect(faceNat, SKIN_FACE_U, SKIN_FACE_V, 0, 0, HEAD_SIZE, HEAD_SIZE, false, false);
-            skinImage.copyRect(hatNat, SKIN_HAT_U, SKIN_HAT_V, 0, 0, HEAD_SIZE, HEAD_SIZE, false, false);
+            try (NativeImage faceNat = new NativeImage(NativeImage.Format.RGBA, HEAD_SIZE, HEAD_SIZE, false);
+                 NativeImage hatNat = new NativeImage(NativeImage.Format.RGBA, HEAD_SIZE, HEAD_SIZE, false)) {
+                // copyRect(dst, srcX, srcY, dstX, dstY, width, height, flipX, flipY)
+                skinImage.copyRect(faceNat, SKIN_FACE_U, SKIN_FACE_V, 0, 0, HEAD_SIZE, HEAD_SIZE, false, false);
+                skinImage.copyRect(hatNat, SKIN_HAT_U, SKIN_HAT_V, 0, 0, HEAD_SIZE, HEAD_SIZE, false, false);
 
-            var bitmap = ImageUtils.convertNativeImageToBitmap(faceNat);
-            var resources = getContext().getResources();
-            Image faceImage = Image.createTextureFromBitmap(bitmap);
-            bitmap = ImageUtils.convertNativeImageToBitmap(hatNat);
-            Image hatImage = Image.createTextureFromBitmap(bitmap);
-            if (faceImage != null && hatImage != null) {
-                var faceDrawable = new ImageDrawable(resources, faceImage);
-                var hatDrawable = new ImageDrawable(resources, hatImage);
-                faceDrawable.setFilter(false);
-                hatDrawable.setFilter(false);
-                faceView.setImageDrawable(faceDrawable);
-                hatView.setImageDrawable(hatDrawable);
-                lastRenderedSkin = skin;
+                var bitmap = ImageUtils.convertNativeImageToBitmap(faceNat);
+                var resources = getContext().getResources();
+                Image faceImage = Image.createTextureFromBitmap(bitmap);
+                bitmap = ImageUtils.convertNativeImageToBitmap(hatNat);
+                Image hatImage = Image.createTextureFromBitmap(bitmap);
+                if (faceImage != null && hatImage != null) {
+                    var faceDrawable = new ImageDrawable(resources, faceImage);
+                    var hatDrawable = new ImageDrawable(resources, hatImage);
+                    faceDrawable.setFilter(false);
+                    hatDrawable.setFilter(false);
+                    faceView.setImageDrawable(faceDrawable);
+                    hatView.setImageDrawable(hatDrawable);
+                    lastRenderedSkin = skin;
+                }
+            } catch (Exception ignored) {
             }
-        } catch (Exception ignored) {}
+        }
     }
 
     @Nullable
