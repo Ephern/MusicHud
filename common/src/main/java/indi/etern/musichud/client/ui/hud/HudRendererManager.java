@@ -1,6 +1,8 @@
 package indi.etern.musichud.client.ui.hud;
 
+import com.mojang.blaze3d.platform.Window;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
@@ -8,13 +10,16 @@ import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
+import indi.etern.musichud.client.ui.utils.ColorExtractor;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
+import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientEventService;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
@@ -52,6 +57,7 @@ public class HudRendererManager {
     private float contentInterval;
     private String musicDurationString = "";
     private Logger logger;
+    private int albumImageThumbnailSize = -1;
 
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
@@ -183,7 +189,7 @@ public class HudRendererManager {
             float titleY = showProgress ? contentPadding + 1f : contentPadding + (contentHeight - titleSize) / 2;
             float statusX = Math.max(mainContentX + contentWidth - titleSize, imageHeightAndWidth + contentPadding - titleSize);
             boolean statusVisible = !(maxTitleWidth - 1.25 * titleSize <= 0);
-            float headX = statusX - (statusVisible ? titleSize + Math.max(4, contentInterval): 0);
+            float headX = statusX - (statusVisible ? titleSize + Math.max(4, contentInterval) : 0);
 
             boolean showInfoLine = contentHeight - titleSize > 11f;
             float infoTextSize = showInfoLine ? contentUnit * 5.5f : 0;
@@ -224,11 +230,28 @@ public class HudRendererManager {
             playTimeLayout.setParent(baseLayout);
             ARTISTS_AND_ALBUM_RENDERER.configure(artistAndAlbumLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.LEFT);
             PLAY_TIME_RENDERER.configure(playTimeLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.RIGHT);
+
+            refreshThumbnailSize();
         } catch (Exception e) {
             if (logger == null) {
                 logger = MusicHud.getLogger(HudRendererManager.class);
             }
             logger.error("While refresh HUD style", e);
+        }
+    }
+
+    private void refreshThumbnailSize() {
+        Window window = Minecraft.getInstance().getWindow();
+        //noinspection ConstantValue
+        if (window != null) {
+            int thumbnailSize = (int) (imageDisplayData.getLayout().getWidth() * window.getGuiScale());
+            if (albumImageThumbnailSize != thumbnailSize) {
+                albumImageThumbnailSize = thumbnailSize;
+                MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+                if (currentlyPlayingMusicDetail != null && currentlyPlayingMusicDetail != MusicDetail.NONE) {
+                    loadAndSwitchAlbumImageWithRetry(currentlyPlayingMusicDetail);
+                }
+            }
         }
     }
 
@@ -286,13 +309,7 @@ public class HudRendererManager {
                         .orElse("");
                 ARTISTS_AND_ALBUM_RENDERER.setText(artists + " - " + musicDetail.getAlbum().getName());
                 LYRICS_LINE_RENDERER.clear();
-                loadAlbumImage(musicDetail).thenAccept((unused) -> {
-                    Duration musicDuration = nowPlayingInfo.getMusicDuration();
-                    DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
-                            LONG_DATE_TIME_FORMATTER :
-                            SHORT_DATE_TIME_FORMATTER;
-                    musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
-                });
+                loadAndSwitchAlbumImageWithRetry(musicDetail);
             }
         } catch (Exception e) {
             if (logger == null) {
@@ -302,23 +319,43 @@ public class HudRendererManager {
         }
     }
 
+    private void loadAndSwitchAlbumImageWithRetry(MusicDetail musicDetail) {
+        CompletableFuture<Void> voidCompletableFuture = loadAlbumImage(musicDetail);
+        voidCompletableFuture.exceptionallyAsync(e -> {
+            var nextData = BackgroundData.NONE;
+            hudBaseData.getTransitionableBackground().startTransition(nextData);
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException ignored) {
+            }
+            loadAndSwitchAlbumImageWithRetry(musicDetail);
+            return null;
+        }, MusicHud.EXECUTOR);
+        voidCompletableFuture.thenRun(() -> {
+            Duration musicDuration = nowPlayingInfo.getMusicDuration();
+            DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
+                    LONG_DATE_TIME_FORMATTER :
+                    SHORT_DATE_TIME_FORMATTER;
+            musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
+        });
+    }
+
     private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail) {
-        return ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240))
-                .thenAccept(imageTextureData -> {
+        ImageTextureData[] imageTextures = new ImageTextureData[2];
+        return CompletableFuture.allOf(
+                        ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(albumImageThumbnailSize)).thenAccept(imageTextureData -> {
+                            imageTextures[0] = imageTextureData;
+                        }),
+                        ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240)).thenAccept(imageTextureData -> {
+                            imageTextures[1] = imageTextureData;
+                        })
+                ).thenAccept(imageTextureData -> {
                     if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
-                        BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
-                        var nextData = new BackgroundData(backgroundImages);
+                        BackgroundImages backgroundImages = new BackgroundImages(imageTextures[0], 1f);
+                        var nextData = new BackgroundData(backgroundImages, ColorExtractor.extractColors(imageTextures[1].getTexture()));
                         hudBaseData.getTransitionableBackground().startTransition(nextData);
                     }
-                }).exceptionallyAsync(e -> {
-                    var nextData = BackgroundData.NONE;
-                    hudBaseData.getTransitionableBackground().startTransition(nextData);
-                    try {
-                        Thread.sleep(1000);
-                    } catch (InterruptedException ignored) {}
-                    loadAlbumImage(musicDetail);
-                    return null;
-                }, MusicHud.EXECUTOR);
+                });
     }
 
     public void reset() {
@@ -331,11 +368,15 @@ public class HudRendererManager {
         hudBaseData.getTransitionableBackground().startTransition(nextData);
     }
 
-    public void renderFrame(GuiGraphics graphics,@Nullable DeltaTracker deltaTracker) {
+    public void renderFrame(GuiGraphics graphics, @Nullable DeltaTracker deltaTracker) {
         try {
             if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
                 return;
             }
+            if (albumImageThumbnailSize == -1) {
+                refreshThumbnailSize();
+            }
+
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
             MusicDetail musicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
             if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
@@ -394,5 +435,9 @@ public class HudRendererManager {
             }
             logger.error("While rendering HUD frame", e);
         }
+    }
+
+    public void preloadAlbumImage(Album album) {
+        ImageUtils.downloadAsync(album.getThumbnailPicUrl(albumImageThumbnailSize));
     }
 }
