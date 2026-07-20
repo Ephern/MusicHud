@@ -74,8 +74,8 @@ public class ColorExtractor {
         final float LUM_WEIGHT = 0.3f;
         final float FREQ_WEIGHT = 0.5f;
         final float DIST_EPSILON = 0.001f;
-        final float BD_SAT_TARGET = 0.13f;
-        final float BD_SAT_SPREAD = 0.3f;
+        final float BD_SAT_TARGET = 0.15f;
+        final float BD_SAT_SPREAD = 0.7f;
 
         int bright = 0;
         float bestBrightScore = -1;
