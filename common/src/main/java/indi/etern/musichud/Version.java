@@ -6,11 +6,11 @@ import org.jetbrains.annotations.NotNull;
 
 public record Version(long mayor, long minor, long patch, BuildType build) implements Comparable<Version>{
     public static final ByteBufCodec<Version> PACKET_CODEC;
-    public static final Version current = new Version(1,2,15, BuildType.Alpha);
+    public static final Version current = new Version(1,2,15, BuildType.Stable);
     public static final Version leastCapable = new Version(1,2,2,BuildType.Stable);
 
     static {
-        PACKET_CODEC = new ByteBufCodec<Version>() {
+        PACKET_CODEC = new ByteBufCodec<>() {
             public @NotNull Version decode(@NotNull ByteBuf byteBuf) {
                 return new Version(byteBuf.readLong(), byteBuf.readLong(), byteBuf.readLong(), BuildType.ofOrdinal(byteBuf.readInt()));
             }
