@@ -22,6 +22,8 @@ public class HudRenderPipelines {
             .withUniform("MHBasePosition", UniformType.UNIFORM_BUFFER)
             .withUniform("MHNowPlayingThemeColor", UniformType.UNIFORM_BUFFER)
             .withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER)
+            .withSampler("Sampler0")
+            .withSampler("Sampler1")
             .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
             .build();
 

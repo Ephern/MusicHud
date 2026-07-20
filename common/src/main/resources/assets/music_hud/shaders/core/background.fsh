@@ -1,5 +1,8 @@
 #version 150
 
+uniform sampler2D Sampler0;
+uniform sampler2D Sampler1;
+
 layout(std140) uniform MHBasePosition {
     mat4 u_Translation;
     vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
@@ -48,45 +51,19 @@ float snoise(vec2 v) {
     return 130.0 * dot(m, g);
 }
 
-float fbm(vec2 uv) {
-    float value = 0.0;
-    float amplitude = 0.5;
-    float frequency = 4.0;
-    for(int i = 0; i < 3; i++) {
-        value += amplitude * snoise(uv * frequency);
-        amplitude *= 0.5;
-        frequency *= 2.0;
-    }
-    return value * 0.5 + 0.5;
-}
-
-const float SPLIT_C0 = 0.2;
-const float SPLIT_C1 = 0.36;
-const float SPLIT_C2 = 0.64;
-const float SPLIT_C3 = 0.8;
-
-vec4 mix4Colors(vec4 c0, vec4 c1, vec4 c2, vec4 c3, float t) {
-    t = clamp(t, SPLIT_C0, SPLIT_C3);
-    float s0 = SPLIT_C0; float s1 = SPLIT_C1; float s2 = SPLIT_C2; float s3 = SPLIT_C3;
-    s1 = clamp(s1, s0, s3); s2 = clamp(s2, s1, s3);
-    if (t <= s1) {
-        float f = (t - s0) / (s1 - s0); f = f * f * (3.0 - 2.0 * f); return mix(c0, c1, f);
-    } else if (t <= s2) {
-        float f = (t - s1) / (s2 - s1); f = f * f * (3.0 - 2.0 * f); return mix(c1, c2, f);
-    } else {
-        float f = (t - s2) / (s3 - s2); f = f * f * (3.0 - 2.0 * f); return mix(c2, c3, f);
-    }
-}
-
-vec4 mix4ColorsDirectional(vec4 c0, vec4 c1, vec4 c2, vec4 c3, float t, float direction) {
-    if (direction < 0.0) { t = 1.0 - t; vec4 tmp = c0; c0 = c3; c3 = tmp; tmp = c1; c1 = c2; c2 = tmp; }
-    return mix4Colors(c0, c1, c2, c3, t);
-}
-
 float aastep(float x) {
     vec2 grad = vec2(dFdx(x), dFdy(x));
     float afwidth = 0.7 * length(grad);
     return smoothstep(-afwidth, afwidth, x);
+}
+
+float hashFloat(float n) {
+    return fract(sin(n) * 43758.5453123);
+}
+
+vec2 mirrorTileX(float tilePos, float yPos) {
+    float mt = fract((tilePos + 1.0) / 2.0) * 2.0 - 1.0;
+    return vec2(abs(mt), yPos - floor(yPos));
 }
 
 void main() {
@@ -94,51 +71,79 @@ void main() {
     float halfHeight = u_Layout[1];
     float radius     = u_Layout[2];
     float timestamp  = u_Dynamic1[0];
+    float fadeProgress = u_Dynamic1[2];
 
-    vec2 noiseUv = f_Position / 40;
+    vec2 halfSize = vec2(halfWidth, halfHeight);
+    vec2 normalizedPos = (f_Position / halfSize) * 0.5 + 0.5;
+    float hudAspect = halfSize.x / halfSize.y;
+
     float speed = 0.014;
     vec2 scrollVec = vec2(timestamp * speed, timestamp * speed * 0.7);
 
-    float wx = snoise(noiseUv * 0.015 + scrollVec * 0.3);
-    float wy = snoise(noiseUv * 0.02 + scrollVec * 0.4 + vec2(2.7, 1.3));
-    vec2 warped = noiseUv + vec2(wx, wy) * 3.0;
+    float tileSpeed = 0.018;
+    vec2 tileScroll = vec2(
+        snoise(vec2(timestamp * tileSpeed, 0.0)),
+        snoise(vec2(timestamp * tileSpeed * 0.7, 1.7))
+    ) * 0.5;
 
-    float a = 0.03;
-    float w0 = fbm(warped * (a) + scrollVec);
-    float w1 = fbm(warped * (a + 0.004) - scrollVec * 0.6 + vec2(3.7, 5.2));
-    float w2 = fbm(warped * (a + 0.002) + scrollVec * 0.5 + vec2(7.1, 2.9));
-    float w3 = fbm(warped * (a + 0.006) + scrollVec * 0.4 + vec2(1.8, 6.4));
+    // mirror tiling on X-axis; short-edge fit on Y
+    float tileCount = hudAspect;
+    float tilePos = normalizedPos.x * tileCount + tileScroll.x;
+    float tileIndex = floor(tilePos);
+    float yPos = normalizedPos.y + tileScroll.y;
 
-    w0 = smoothstep(0.15, 0.85, w0);
-    w1 = smoothstep(0.15, 0.85, w1);
-    w2 = smoothstep(0.15, 0.85, w2);
-    w3 = smoothstep(0.15, 0.85, w3);
+    // per-tile random Y phase offset to break grid alignment
+    float yPhase = hashFloat(tileIndex + floor(timestamp * 0.1)) * 0.03;
+    yPos += yPhase;
 
-    float total = w0 + w1 + w2 + w3 + 0.001;
-    w0 /= total; w1 /= total; w2 /= total; w3 /= total;
+    vec2 baseUV = mirrorTileX(tilePos, yPos);
 
-    vec3 r0 = u_Dark.rgb;
-    vec3 r1 = u_Primary.rgb;
-    vec3 r2 = u_Secondary.rgb;
-    vec3 r3 = u_Bright.rgb;
+    // multi-octave displacement on HUD-space coords
+    vec2 displace = vec2(0.0);
+    float amp = 0.18;
+    float freq = 0.7;
+    for (int i = 0; i < 4; i++) {
+        displace.x += snoise(normalizedPos * freq + scrollVec * (0.2 + float(i) * 0.15)) * amp;
+        displace.y += snoise(normalizedPos * freq + scrollVec * (0.25 + float(i) * 0.15) + vec2(2.7, 1.3)) * amp;
+        freq *= 2.4;
+        amp *= 0.45;
+    }
 
-    float dir = snoise(noiseUv * 0.02 + noiseUv.yx * 0.01 + timestamp * 0.01);
-    float reverse = step(dir, 0.0);
+    vec2 warpedUV = baseUV + displace;
 
-    vec3 c0 = mix(r0, r3, reverse); vec3 c3 = mix(r3, r0, reverse);
-    vec3 c1 = mix(r1, r2, reverse); vec3 c2 = mix(r2, r1, reverse);
-    float rw0 = mix(w0, w3, reverse);
-    float rw1 = mix(w1, w2, reverse);
-    float rw2 = mix(w2, w1, reverse);
-    float rw3 = mix(w3, w0, reverse);
+    // screen-pixel blur
+    float stepX = length(vec2(dFdx(warpedUV.x), dFdy(warpedUV.x)));
+    float stepY = length(vec2(dFdx(warpedUV.y), dFdy(warpedUV.y)));
+    vec2 pixelStep = vec2(stepX, stepY) * 2.5;
 
-    vec3 rgb = c0 * rw0 + c1 * rw1 + c2 * rw2 + c3 * rw3;
-    float alpha = u_Dark.a * rw0 + u_Primary.a * rw1 + u_Secondary.a * rw2 + u_Bright.a * rw3;
+    const int R = 3;
+    vec4 blur0 = vec4(0.0);
+    vec4 blur1 = vec4(0.0);
+    float totalWeight = 0.0;
+    for (int x = -R; x <= R; x++) {
+        for (int y = -R; y <= R; y++) {
+            vec2 offset = vec2(float(x), float(y)) * pixelStep;
+            float w = 1.0 / (1.0 + float(x*x + y*y));
+            blur0 += texture(Sampler0, fract(warpedUV + offset)) * w;
+            blur1 += texture(Sampler1, fract(warpedUV + offset)) * w;
+            totalWeight += w;
+        }
+    }
+    blur0 /= totalWeight;
+    blur1 /= totalWeight;
 
-    vec2 halfSize = vec2(halfWidth, halfHeight);
+    float t = smoothstep(0.0, 1.0, fadeProgress);
+    vec4 finalImage = mix(blur0, blur1, t);
+
+    // atmospheric color wash
+    vec3 wash = u_Dark.rgb * 0.4 + u_Primary.rgb * 0.15;
+    finalImage.rgb = mix(finalImage.rgb, wash, 0.6);
+    finalImage.rgb *= 0.75;
+
+    // rounded rect mask
     vec2 d = abs(f_Position) - halfSize + radius;
     float dis = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
     float mask = 1.0 - aastep(dis);
 
-    fragColor = vec4(rgb, alpha * mask);
+    fragColor = vec4(finalImage.rgb, finalImage.a * mask);
 }
