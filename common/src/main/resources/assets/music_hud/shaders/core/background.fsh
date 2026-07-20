@@ -109,10 +109,10 @@ void main() {
     float w2 = fbm(warped * (a + 0.002) + scrollVec * 0.5 + vec2(7.1, 2.9));
     float w3 = fbm(warped * (a + 0.006) + scrollVec * 0.4 + vec2(1.8, 6.4));
 
-    w0 = smoothstep(0.15, 0.85, w0);
+    w0 = smoothstep(0.05, 0.6, w0);
     w1 = smoothstep(0.15, 0.85, w1);
     w2 = smoothstep(0.15, 0.85, w2);
-    w3 = smoothstep(0.15, 0.85, w3);
+    w3 = smoothstep(0.3, 0.95, w3);
 
     float total = w0 + w1 + w2 + w3 + 0.001;
     w0 /= total; w1 /= total; w2 /= total; w3 /= total;

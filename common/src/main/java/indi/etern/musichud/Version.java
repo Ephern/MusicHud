@@ -9,7 +9,7 @@ public record Version(long mayor, long minor, long patch, BuildType build) imple
             Codecs.LONG_ARRAY, Version::toLongArray,
             Version::ofLongArray
     );
-    public static final Version current = new Version(1,2,15, BuildType.Alpha);
+    public static final Version current = new Version(1,2,15, BuildType.Stable);
     public static final Version leastCapable = new Version(1,2,2,BuildType.Stable);
 
     private Long[] toLongArray() {
