@@ -18,7 +18,6 @@ public class ScreenMixin {
     private void music_hud$onRender(GuiGraphics guiGraphics, int i, int j, float f, CallbackInfo ci) {
         //noinspection ConstantValue (incorrect warning)
         if (((Object) this instanceof ServerReconfigScreen) || ((Object) this instanceof ReceivingLevelScreen)) {
-            guiGraphics.nextStratum();
             HudRendererManager.getInstance().renderFrame(guiGraphics, null);
         }
     }
