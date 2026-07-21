@@ -22,6 +22,17 @@ repositories {
         name = "Terraformers"
         url = "https://maven.terraformersmc.com/"
     }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
     maven {
         name "IzzelAliz Maven"
         url "https://maven.izzel.io/releases/"
@@ -74,7 +85,7 @@ dependencies {
     implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
     implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
 
-    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.1.2-${rootProject.modernui_version}.+"
+    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.2-${rootProject.modernui_version}.+"
 }
 
 java {

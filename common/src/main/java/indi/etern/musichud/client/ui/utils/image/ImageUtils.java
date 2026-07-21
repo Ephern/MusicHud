@@ -30,8 +30,8 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.time.Duration;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -45,7 +45,7 @@ public class ImageUtils {
     private static final int DEFAULT_MAX_CONCURRENT_DOWNLOADS = 40;
     @Getter(AccessLevel.PACKAGE)
     private static final Cache<String, ImageTextureData> cachedTexturesData = CacheBuilder.newBuilder()
-            .expireAfterAccess(20, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(20))
             .maximumSize(64)
             .build();
     private static final ConcurrentHashMap<PendingKey, CompletableFuture<?>> pendingDownloads =
@@ -54,7 +54,7 @@ public class ImageUtils {
     private static ExecutorService downloadExecutor;
     private static Semaphore downloadSemaphore;
     private static int maxConcurrentDownloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS;
-    private static final Map<String, Image> cachedIconImageMap = new HashMap<>();
+    private static final Map<String, Image> cachedIconImageMap = new ConcurrentHashMap<>();
 
     static {
         initializeVirtualThreadExecutor();

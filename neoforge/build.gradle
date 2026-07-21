@@ -37,6 +37,17 @@ repositories {
         name = "Terraformers"
         url = "https://maven.terraformersmc.com/"
     }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
     maven {
         name "JitPack"
         url 'https://jitpack.io'
@@ -81,7 +92,7 @@ dependencies {
 
     compileOnly "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
 
-    implementation("icyllis.modernui:ModernUI-NeoForge:26.1.2-${rootProject.modernui_version}.+")
+    implementation("icyllis.modernui:ModernUI-NeoForge:26.2-${rootProject.modernui_version}.+")
     implementation("dev.icyllis:modernui-core:$rootProject.modernui_version") {
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "org.apache.logging.log4j", module: "log4j-core"
