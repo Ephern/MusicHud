@@ -23,6 +23,7 @@ import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 
@@ -34,7 +35,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class AccountView extends LinearLayout {
     @Getter
     private static AccountView instance;
-    private final LoginService loginService = LoginService.getInstance();
+    private final IClientLoginService IClientLoginService = LoginService.getInstance();
 
     public AccountView(Context context) {
         super(context);
@@ -105,7 +106,7 @@ public class AccountView extends LinearLayout {
             logoutButton.setBackground(background2);
             logoutButton.setLayoutParams(new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
             logoutButton.setOnClickListener(b -> {
-                loginService.logout();
+                IClientLoginService.logout();
             });
 
             ProgressBar progressRing = new ProgressBar(context);
@@ -124,7 +125,7 @@ public class AccountView extends LinearLayout {
                     retryButton.setVisibility(GONE);
                     progressRing.setVisibility(VISIBLE);
                 });
-                loginService.loginToServer(null);
+                IClientLoginService.loginToServer(null);
             });
 
 
@@ -201,7 +202,7 @@ public class AccountView extends LinearLayout {
             var background2 = backgroundFactory.newBackgroundDrawable();
             logoutButton.setBackground(background2);
             logoutButton.setOnClickListener(b -> {
-                loginService.logout();
+                IClientLoginService.logout();
             });
             buttonsLayout.addView(logoutButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 

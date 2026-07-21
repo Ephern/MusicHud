@@ -10,16 +10,18 @@ import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.user.Profile;
+import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
-import indi.etern.musichud.client.config.ProfileConfigData;
+import indi.etern.musichud.client.interfaces.IClientEventService;
+import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.account.AccountView;
 import indi.etern.musichud.client.ui.pages.account.LoginView;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
-import indi.etern.musichud.interfaces.IClientEventService;
+import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
@@ -29,10 +31,11 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.AnonymousLoginR
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.CookieLoginRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse;
-import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
@@ -47,7 +50,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
-public class LoginService {
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class LoginService implements IClientLoginService {
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final Logger logger = MusicHud.getLogger(LoginService.class);
@@ -139,12 +143,14 @@ public class LoginService {
         }
     }
 
+    @Override
     public boolean isLogined() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         return loginCookieInfo.type() != LoginType.UNLOGGED &&
                 loginCookieInfo.type() != LoginType.ANONYMOUS;
     }
 
+    @Override
     public void connectAsPrevious() {
         if (connectionType == ConnectionType.EXTERNAL) {
             connectToExternalServer();
@@ -153,12 +159,14 @@ public class LoginService {
         }
     }
 
+    @Override
     public void connectToExternalServer() {
         if (clientConfig.getEnable()) {
             clientNetworkService.sendToServer(new ConnectRequest(Version.current));
         }
     }
 
+    @Override
     public void loginToServer(ConnectionType type) {
         if (type != null) {
             connectionType = type;
@@ -181,12 +189,14 @@ public class LoginService {
         }
     }
 
+    @Override
     public void logout() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         Profile.setCurrent(Profile.ANONYMOUS);
         loginAsAnonymousToServer();
     }
 
+    @Override
     public void disconnectToExternalOrIntegratedServer() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         MusicService.resetCurrentMusicStatus();
@@ -197,6 +207,7 @@ public class LoginService {
 //        Profile.setCurrent(Profile.ANONYMOUS);
     }
 
+    @Override
     public void switchToIsolate() {
         disconnectToExternalOrIntegratedServer();
         launchIsolated();
@@ -210,10 +221,12 @@ public class LoginService {
         MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(VanillaPlayerProxy.ofPlayer(Minecraft.getInstance().player));
     }
 
+    @Override
     public void switchToServer() {
         connectToExternalServer();
     }
 
+    @Override
     public Boolean toggleConnection() {
         MusicHud.ConnectStatus connectStatus = MusicHud.getConnectStatus();
         if (connectStatus == MusicHud.ConnectStatus.CONNECTED) {
@@ -251,6 +264,7 @@ public class LoginService {
         }
     }
 
+    @Override
     public void keyBindsToggleConnection() {
         boolean integratedServer = Minecraft.getInstance().getCurrentServer() == null;
         if (!integratedServer) {
@@ -284,10 +298,6 @@ public class LoginService {
                 ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.switchConnectionUnavailableInIntegratedServer"), Toast.LENGTH_SHORT));
             });
         }
-    }
-
-    public enum ConnectionType {
-        EXTERNAL, INTERNAL
     }
 
     @RegisterMark

@@ -11,12 +11,22 @@ import net.minecraft.resources.ResourceLocation;
 
 public class PlayingStatusRenderer implements HudRenderer {
     // From Lucide Icons
-    public static final ResourceLocation LOADING_ICON_LOCATION = MusicHud.location("textures/gui/icons/loader_circle.png");
-    public static final ResourceLocation RETRYING_ICON_LOCATION = MusicHud.location("textures/gui/icons/rotate_cw.png");
-    public static final ResourceLocation ERROR_ICON_LOCATION = MusicHud.location("textures/gui/icons/circle_x.png");
-    public static final ResourceLocation PLAYING_CONNECTED_ICON_LOCATION = MusicHud.location("textures/gui/icons/link.png");
-    public static final ResourceLocation PLAYING_ISOLATED_LOCATION = MusicHud.location("textures/gui/icons/unlink.png");
-    public static final ResourceLocation MUTED_LOCATION = MusicHud.location("textures/gui/icons/volume_x.png");
+    public static final ResourceLocation LOADING_ICON_LOCATION;
+    public static final ResourceLocation RETRYING_ICON_LOCATION;
+    public static final ResourceLocation ERROR_ICON_LOCATION;
+    public static final ResourceLocation PLAYING_CONNECTED_ICON_LOCATION;
+    public static final ResourceLocation PLAYING_ISOLATED_LOCATION;
+    public static final ResourceLocation MUTED_LOCATION;
+
+    static {
+        LOADING_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/loader_circle.png");
+        RETRYING_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/rotate_cw.png");
+        ERROR_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/circle_x.png");
+        PLAYING_CONNECTED_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/link.png");
+        PLAYING_ISOLATED_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/unlink.png");
+        MUTED_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/volume_x.png");
+    }
+
     private static volatile PlayingStatusRenderer instance;
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     StreamAudioPlayer.Status status;

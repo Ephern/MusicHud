@@ -4,7 +4,7 @@ import icyllis.modernui.mc.FontResourceManager;
 import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.LyricLine;
+import indi.etern.musichud.client.ui.beans.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.utils.Easing;

@@ -1,6 +1,6 @@
 package indi.etern.musichud.platform.mod.neoforge.event;
 
-import indi.etern.musichud.interfaces.IClientEventService;
+import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
@@ -9,7 +9,6 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
-import net.neoforged.neoforge.event.GameShuttingDownEvent;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -21,7 +20,6 @@ public class NeoForgeClientEventService implements IClientEventService {
     private final Set<Consumer<Player>> joinListeners = new HashSet<>();
     private final Set<Consumer<Player>> quitListeners = new HashSet<>();
     private final Set<Runnable> tickPostListeners = new HashSet<>();
-    private final Set<Runnable> stoppingListeners = new HashSet<>();
 
     private NeoForgeClientEventService() {
         NeoForge.EVENT_BUS.register(this);
@@ -45,12 +43,6 @@ public class NeoForgeClientEventService implements IClientEventService {
         return () -> tickPostListeners.remove(listener);
     }
 
-    @Override
-    public Unregister registerClientLifecycleStopping(Runnable listener) {
-        stoppingListeners.add(listener);
-        return () -> stoppingListeners.remove(listener);
-    }
-
     @SubscribeEvent
     public void onClientPlayerJoin(ClientPlayerNetworkEvent.LoggingIn event) {
         ServerData currentServer = Minecraft.getInstance().getCurrentServer();
@@ -71,11 +63,6 @@ public class NeoForgeClientEventService implements IClientEventService {
     @SubscribeEvent
     public void onClientTickPost(ClientTickEvent.Post event) {
         tickPostListeners.forEach(Runnable::run);
-    }
-
-    @SubscribeEvent
-    public void onGameShuttingDown(GameShuttingDownEvent event) {
-        stoppingListeners.forEach(Runnable::run);
     }
 
     public static NeoForgeClientEventService getInstance() {

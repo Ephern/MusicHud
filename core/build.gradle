@@ -1,0 +1,62 @@
+plugins {
+    id 'java-library'
+    id 'maven-publish'
+}
+
+base {
+    archivesName = "$rootProject.archives_name-$project.name"
+}
+
+repositories {
+    mavenCentral()
+    maven { url 'https://jitpack.io' }
+}
+
+dependencies {
+    compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    compileOnly "org.jetbrains:annotations:26.0.2"
+    annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+    testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+    testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+
+    api "net.java.dev.jna:jna:5.15.0"
+    api "org.apache.logging.log4j:log4j-api:2.24.1"
+    api "org.apache.logging.log4j:log4j-core:2.24.1"
+    api "org.apache.logging.log4j:log4j-iostreams:2.24.1"
+    api "org.apache.logging.log4j:log4j-slf4j2-impl:2.24.1"
+    api "com.google.code.gson:gson:2.11.0"
+    api "com.google.guava:guava:33.3.1-jre"
+    api "io.netty:netty-buffer:4.1.118.Final"
+    api "io.netty:netty-codec:4.1.118.Final"
+    api "com.github.umjammer:jlayer:$rootProject.jlayer_version"
+    api "org.jflac:jflac-codec:$rootProject.jflac_version"
+    api "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    api "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+test {
+    useJUnitPlatform()
+    enabled = false
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = base.archivesName.get()
+            from components.java
+        }
+    }
+    repositories { }
+}

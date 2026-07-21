@@ -21,6 +21,8 @@ processResources {
 }
 
 dependencies {
+    api project(':core')
+
     // We depend on Fabric Loader here to use the Fabric @Environment annotations,
     // which get remapped to the correct annotations on each platform.
     // Do NOT use other classes from Fabric Loader.
@@ -32,11 +34,6 @@ dependencies {
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
     api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
 
-    implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
-    implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
-//    implementation "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
-    implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
-    implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
     compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.8-$rootProject.modernui_version.+"
 }
 

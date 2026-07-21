@@ -21,6 +21,7 @@ dependencyResolutionManagement {
 
 rootProject.name = 'music_hud'
 
+include 'core'
 include 'common'
 include 'fabric'
 include 'neoforge'

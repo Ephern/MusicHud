@@ -1,8 +1,7 @@
 package indi.etern.musichud.platform.mod.fabric.event;
 
-import indi.etern.musichud.interfaces.IClientEventService;
+import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.interfaces.Unregister;
-import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.multiplayer.ServerData;
@@ -19,7 +18,6 @@ public class FabricClientEventService implements IClientEventService {
     private final Set<Consumer<Player>> joinListeners = new HashSet<>();
     private final Set<Consumer<Player>> quitListeners = new HashSet<>();
     private final Set<Runnable> tickPostListeners = new HashSet<>();
-    private final Set<Runnable> stoppingListeners = new HashSet<>();
 
     private FabricClientEventService() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
@@ -36,7 +34,6 @@ public class FabricClientEventService implements IClientEventService {
             }
         });
         ClientTickEvents.END_CLIENT_TICK.register(client -> tickPostListeners.forEach(Runnable::run));
-        ClientLifecycleEvents.CLIENT_STOPPING.register(client -> stoppingListeners.forEach(Runnable::run));
     }
 
     public static FabricClientEventService getInstance() {
@@ -66,11 +63,5 @@ public class FabricClientEventService implements IClientEventService {
     public Unregister registerClientTickPost(Runnable listener) {
         tickPostListeners.add(listener);
         return () -> tickPostListeners.remove(listener);
-    }
-
-    @Override
-    public Unregister registerClientLifecycleStopping(Runnable listener) {
-        stoppingListeners.add(listener);
-        return () -> stoppingListeners.remove(listener);
     }
 }

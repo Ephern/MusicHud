@@ -2,7 +2,7 @@ package indi.etern.musichud.client.ui.utils.lyrics;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricInfo;
-import indi.etern.musichud.beans.music.LyricLine;
+import indi.etern.musichud.client.ui.beans.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.ui.utils.lyrics.beans.MetaInfoLine;
 import indi.etern.musichud.interfaces.ClientConfig;

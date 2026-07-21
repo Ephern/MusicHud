@@ -17,7 +17,7 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.beans.music.LyricLine;
+import indi.etern.musichud.client.ui.beans.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
@@ -32,6 +32,7 @@ import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -51,7 +52,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MainFragment extends Fragment {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
-    private static final LoginService loginService = LoginService.getInstance();
+    private static final IClientLoginService I_CLIENT_LOGIN_SERVICE = LoginService.getInstance();
     private static volatile MainFragment instance = null;
 
     static {
@@ -438,7 +439,7 @@ public class MainFragment extends Fragment {
                         .build().newBackgroundDrawable();
                 switchServerConnectButton.setBackground(background1);
                 switchServerConnectButton.setOnClickListener(b -> {
-                    MusicHud.EXECUTOR.execute(loginService::toggleConnection);
+                    MusicHud.EXECUTOR.execute(I_CLIENT_LOGIN_SERVICE::toggleConnection);
                 });
                 serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(40)));
                 refreshServerConnectStatus();

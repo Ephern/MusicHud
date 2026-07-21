@@ -9,21 +9,24 @@ import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
-import indi.etern.musichud.client.config.ProfileConfigData;
+import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
-import indi.etern.musichud.interfaces.IClientEventService;
+import indi.etern.musichud.interfaces.IClientMusicService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.*;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import indi.etern.musichud.throwable.ApiException;
+import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NoArgsConstructor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.world.entity.player.Player;
@@ -34,13 +37,15 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
-public class MusicService {
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class MusicService implements IClientMusicService {
     private static final Logger logger = MusicHud.getLogger(MusicService.class);
     private static final Cache<Long, Playlist> playlistCache = CacheBuilder.newBuilder()
             .expireAfterAccess(5, TimeUnit.MINUTES)
@@ -115,6 +120,7 @@ public class MusicService {
         }
     }
 
+    @Override
     public CompletableFuture<? extends MusicCollection> loadIdlePlaySource(Class<?> type, long id) {
         if (type.equals(Album.class)) {
             return loadAlbumDetail(id, false);
@@ -124,6 +130,7 @@ public class MusicService {
         return null;
     }
 
+    @Override
     public CompletableFuture<Playlist> loadPlaylistDetail(long id, boolean ignoreCache) {
         if (!ignoreCache) {
             Playlist cachedPlaylist = playlistCache.getIfPresent(id);
@@ -144,6 +151,7 @@ public class MusicService {
         return completableFuture.orTimeout(5, TimeUnit.SECONDS);
     }
 
+    @Override
     public CompletableFuture<Album> loadAlbumDetail(long id, boolean ignoreCache) {
         if (!ignoreCache) {
             Album cachedPlaylist = albumCache.getIfPresent(id);
@@ -162,6 +170,7 @@ public class MusicService {
         return completableFuture.orTimeout(5, TimeUnit.SECONDS);
     }
 
+    @Override
     public void addToIdlePlaySource(MusicCollection idlePlaySourceCollection) {
         PusherInfo pusherInfo = idlePlaySourceCollection.getPusherInfo();
         MusicCollection collection;
@@ -181,6 +190,7 @@ public class MusicService {
         clientNetworkService.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
     }
 
+    @Override
     public void removeFromIdlePlaySource(MusicCollection collection) {
         localIdlePlaySources.removeIf(c -> c.getId() == collection.getId());
         localIdlePlaySourceRemoveListeners.forEach(l -> l.accept(collection));
@@ -191,6 +201,7 @@ public class MusicService {
         clientNetworkService.sendToServer(new RemoveFromIdlePlaySourceMessage(idlePlaySource));
     }
 
+    @Override
     public synchronized void refreshQueue(Queue<MusicDetail> queue) {
         Iterator<MusicDetail> originalIterator = musicQueue.iterator();
         Iterator<MusicDetail> newIterator = queue.iterator();
@@ -241,19 +252,17 @@ public class MusicService {
         });
     }
 
+    @Override
     public void sendPushMusicToQueue(MusicDetail musicDetail) {
         clientNetworkService.sendToServer(new ClientPushMusicToQueueMessage(musicDetail.getId()));
     }
 
+    @Override
     public void sendRemoveMusicFromQueue(int index, MusicDetail musicDetail) {
         clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(index, musicDetail.getId()));
     }
 
-    /**
-     * If a SyncCurrentPlayingMessage has already been processed for this connection,
-     * do nothing (the state is already correct). Otherwise, reset all state to NONE.
-     * Must be called from EXECUTOR (same threading context as switchMusic) for correct ordering.
-     */
+    @Override
     public synchronized boolean checkAndResetInitialSync() {
         if (initialSyncReceived) return false;
         initialSyncReceived = true;
@@ -266,6 +275,7 @@ public class MusicService {
         return true;
     }
 
+    @Override
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         initialSyncReceived = true;
         if (clientConfig.getEnable()) {
@@ -302,13 +312,15 @@ public class MusicService {
         }
     }
 
+    @Override
     public CompletableFuture<Artist> loadArtist(long id) {
         CompletableFuture<Artist> future = new CompletableFuture<>();
         GetArtistDetailResponse.setReceiver(id, future::complete);
-        clientNetworkService.sendToServer(new GetArtistDetailRequest(id));
+        clientNetworkService.sendToServer(new indi.etern.musichud.network.payloads.requestResponseCycle.GetArtistDetailRequest(id));
         return future;
     }
 
+    @Override
     public CompletableFuture<List<MusicDetail>> loadArtistMusic(long id, int offset) {
         CompletableFuture<List<MusicDetail>> future = new CompletableFuture<>();
         GetArtistMoreMusicResponse.RequestData requestData = new GetArtistMoreMusicResponse.RequestData(id, offset);
@@ -317,12 +329,14 @@ public class MusicService {
         return future;
     }
 
+    @Override
     public void voteForSkipCurrent() {
         if (NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail() != null) {
             clientNetworkService.sendToServer(new VoteSkipCurrentMusicMessage(NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail().getId()));
         }
     }
 
+    @Override
     public void keyBindsVoteSkipCurrent() {
         MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
         if (currentlyPlayingMusicDetail != null && currentlyPlayingMusicDetail != MusicDetail.NONE) {
@@ -346,6 +360,7 @@ public class MusicService {
         }
     }
 
+    @Override
     public synchronized void updateAllIdlePlaySources(List<Playlist> playlistSources, List<Album> albumSources) {
         Set<MusicCollection> toRemove = new HashSet<>();
         Set<MusicCollection> toAdd = new HashSet<>();
@@ -379,6 +394,7 @@ public class MusicService {
         });
     }
 
+    @Override
     public CompletableFuture<List<Playlist>> loadUserPlaylists() {
         CompletableFuture<List<Playlist>> completableFuture = new CompletableFuture<>();
         if (LoginService.getInstance().isLogined()) {
@@ -401,6 +417,7 @@ public class MusicService {
         return completableFuture;
     }
 
+    @Override
     public CompletableFuture<List<Album>> loadUserAlbums() {
         CompletableFuture<List<Album>> completableFuture = new CompletableFuture<>();
         if (LoginService.getInstance().isLogined()) {
@@ -423,6 +440,7 @@ public class MusicService {
         return completableFuture;
     }
 
+    @Override
     public CompletableFuture<List<Artist>> loadUserArtists() {
         CompletableFuture<List<Artist>> completableFuture = new CompletableFuture<>();
         if (LoginService.getInstance().isLogined()) {
@@ -454,6 +472,35 @@ public class MusicService {
         if (HudRendererManager.isLoaded()) {
             HudRendererManager.getInstance().reset();
         }
+    }
+
+    @Override
+    public CompletableFuture<Artist> loadArtistDetailAsync(Artist artist) {
+        List<MusicDetail> musicDetails = artist.getMusicDetails();
+        if (musicDetails == null || musicDetails.isEmpty()) {
+            return loadArtist(artist.getId());
+        } else return CompletableFuture.completedFuture(artist);
+    }
+
+    @Override
+    public CompletableFuture<List<MusicDetail>> loadMoreMusicOfArtist(Artist artist) {
+        CompletableFuture<List<MusicDetail>> future = new CompletableFuture<>();
+        MusicService.getInstance().loadArtistMusic(artist.getId(), artist.getMusicDetails().size()).thenAccept(musicDetails1 -> {
+            artist.getMusicDetails().addAll(musicDetails1);
+            future.complete(musicDetails1);
+        });
+        return future;
+    }
+
+    @Override
+    public CompletionStage<Collection<MusicDetail>> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache) {
+        CompletableFuture<Collection<MusicDetail>> future = new CompletableFuture<>();
+        if (musicCollection instanceof Album album) {
+            loadAlbumDetail(album.getId(), ignoreCache).thenAccept(albumInfo -> future.complete(albumInfo.getMusicDetails()));
+        } else if (musicCollection instanceof Playlist playlist) {
+            loadPlaylistDetail(playlist.getId(), ignoreCache).thenAccept(playlist1 -> future.complete(playlist1.getTracks()));
+        }
+        return future;
     }
 
     @RegisterMark

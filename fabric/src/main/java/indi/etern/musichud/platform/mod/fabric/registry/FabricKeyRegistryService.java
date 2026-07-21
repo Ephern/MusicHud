@@ -1,7 +1,7 @@
 package indi.etern.musichud.platform.mod.fabric.registry;
 
-import indi.etern.musichud.interfaces.IClientEventService;
-import indi.etern.musichud.interfaces.IKeyRegistryService;
+import indi.etern.musichud.client.interfaces.IClientEventService;
+import indi.etern.musichud.client.interfaces.IKeyRegistryService;
 import net.fabricmc.fabric.api.client.keybinding.v1.KeyBindingHelper;
 import net.minecraft.client.KeyMapping;
 

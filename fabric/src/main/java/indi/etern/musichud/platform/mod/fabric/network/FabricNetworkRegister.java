@@ -1,14 +1,16 @@
 package indi.etern.musichud.platform.mod.fabric.network;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.network.vanilla.CustomPacketPayloadWrapper;
+import indi.etern.musichud.client.network.vanilla.IVanillaNetworkRegister;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
-import indi.etern.musichud.network.vanillaUtils.StreamCodecWrapper;
-import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
+import indi.etern.musichud.client.network.vanilla.StreamCodecWrapper;
+import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
 import indi.etern.musichud.platform.Environment;
 import net.fabricmc.fabric.api.networking.v1.PayloadTypeRegistry;
 import net.fabricmc.fabric.api.networking.v1.ServerPlayNetworking;
@@ -35,13 +37,13 @@ public class FabricNetworkRegister implements INetworkRegister {
             ByteBufCodec<T> codec,
             NetworkReceiver<T> serverReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, serverReceiver).type();
+        CustomPacketPayload.Type<CustomPacketPayloadWrapper<T>> type = IVanillaNetworkRegister.getMetaDataOrNew(clazz, serverReceiver).type();
         PayloadTypeRegistry.playC2S().register(type, StreamCodecWrapper.of(codec));
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
 
-        ServerPlayNetworking.registerGlobalReceiver(type, (payload, context) -> {
-            serverReceiver.receive(payload, VanillaPlayerProxy.ofPlayer(context.player()));
+        ServerPlayNetworking.registerGlobalReceiver(type, (receive, context) -> {
+            serverReceiver.receive(receive.getPayload(), VanillaPlayerProxy.ofPlayer(context.player()));
         });
     }
 
@@ -51,7 +53,7 @@ public class FabricNetworkRegister implements INetworkRegister {
             ByteBufCodec<T> codec,
             NetworkReceiver<T> clientReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, clientReceiver).type();
+        CustomPacketPayload.Type<CustomPacketPayloadWrapper<T>> type = IVanillaNetworkRegister.getMetaDataOrNew(clazz, clientReceiver).type();
         PayloadTypeRegistry.playS2C().register(type, StreamCodecWrapper.of(codec));
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();

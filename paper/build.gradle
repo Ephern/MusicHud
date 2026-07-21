@@ -2,7 +2,6 @@ plugins {
     id 'java-library'
     id 'maven-publish'
     id 'com.gradleup.shadow'
-    id 'io.papermc.paperweight.userdev'
     id 'xyz.jpenilla.run-paper' version '3.0.2'
 }
 
@@ -11,12 +10,12 @@ base {
 }
 
 configurations {
-    common {
+    core {
         canBeResolved = true
         canBeConsumed = false
     }
-    compileClasspath.extendsFrom common
-    runtimeClasspath.extendsFrom common
+    compileClasspath.extendsFrom core
+    runtimeClasspath.extendsFrom core
     shadowBundle {
         canBeResolved = true
         canBeConsumed = false
@@ -25,6 +24,7 @@ configurations {
 
 repositories {
     mavenCentral()
+    maven { url 'https://jitpack.io' }
     maven {
         name = 'PaperMC'
         url = 'https://repo.papermc.io/repository/maven-public/'
@@ -32,10 +32,10 @@ repositories {
 }
 
 dependencies {
-    paperweight.paperDevBundle("${rootProject.minecraft_version}-R0.1-SNAPSHOT")
+    compileOnly "io.papermc.paper:paper-api:${rootProject.minecraft_version}-R0.1-SNAPSHOT"
 
-    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
-    shadowBundle(project(path: ':common', configuration: 'namedElements')) { transitive = false }
+    core(project(path: ':core'))
+    shadowBundle(project(path: ':core')) { transitive = false }
 
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
@@ -81,16 +81,11 @@ tasks.processResources {
 
 tasks.shadowJar {
     configurations = [project.configurations.shadowBundle]
-    archiveClassifier = 'dev-shadow'
-}
-
-tasks.reobfJar {
-    inputJar.set(tasks.shadowJar.archiveFile)
-    dependsOn(tasks.shadowJar)
+    archiveClassifier = ''
 }
 
 tasks.assemble {
-    dependsOn tasks.reobfJar
+    dependsOn tasks.shadowJar
 }
 
 tasks.runServer {

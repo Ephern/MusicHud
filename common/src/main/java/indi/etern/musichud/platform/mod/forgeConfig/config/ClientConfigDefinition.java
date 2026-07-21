@@ -4,7 +4,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.client.config.ProfileConfigData;
+import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -293,23 +293,23 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public VerticalAlign getHudVerticalPosition() {
-        return VerticalAlign.valueOf(hudVerticalPosition.get());
+    public String getHudVerticalPosition() {
+        return hudVerticalPosition.get();
     }
 
     @Override
-    public void setHudVerticalPosition(VerticalAlign hudVerticalPosition) {
-        this.hudVerticalPosition.set(hudVerticalPosition.name());
+    public void setHudVerticalPosition(String hudVerticalPosition) {
+        this.hudVerticalPosition.set(hudVerticalPosition);
     }
 
     @Override
-    public HorizontalAlign getHudHorizontalPosition() {
-        return HorizontalAlign.valueOf(hudHorizontalPosition.get());
+    public String getHudHorizontalPosition() {
+        return hudHorizontalPosition.get();
     }
 
     @Override
-    public void setHudHorizontalPosition(HorizontalAlign hudHorizontalPosition) {
-        this.hudHorizontalPosition.set(hudHorizontalPosition.name());
+    public void setHudHorizontalPosition(String hudHorizontalPosition) {
+        this.hudHorizontalPosition.set(hudHorizontalPosition);
     }
 
     @Override

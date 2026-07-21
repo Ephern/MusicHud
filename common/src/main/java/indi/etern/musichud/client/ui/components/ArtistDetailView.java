@@ -166,7 +166,7 @@ public class ArtistDetailView extends LinearLayout {
             checkInfiniteScroll(scrollY, scrollView);
         });
 
-        artist.loadDetail().thenAcceptAsync(artist1 -> {
+        MusicService.getInstance().loadArtistDetailAsync(artist).thenAcceptAsync(artist1 -> {
             if (artist1 != null) {
                 ArtistDetailView.this.artist = artist1;
                 MuiModApi.postToUiThread(() -> {
@@ -209,7 +209,7 @@ public class ArtistDetailView extends LinearLayout {
                     });
                 } else {
                     loadingMore = true;
-                    artist.loadMoreMusic().thenAccept((musicDetails) -> {
+                    MusicService.getInstance().loadMoreMusicOfArtist(artist).thenAccept((musicDetails) -> {
                         MuiModApi.postToUiThread(() -> {
                             for (MusicDetail musicDetail : musicDetails) {
                                 addItem(getContext(), musicDetail);

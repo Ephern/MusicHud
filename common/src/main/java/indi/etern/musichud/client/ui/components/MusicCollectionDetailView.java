@@ -184,7 +184,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         tracksListView.removeAllViews();
         progressBar.setVisibility(View.VISIBLE);
         progressBar.setIndeterminate(true);
-        musicCollection.loadMusicDetails(ignoreCache).thenAcceptAsync(playlistDetail -> {
+        MusicService.getInstance().loadMoreMusicOfCollection(musicCollection, ignoreCache).thenAcceptAsync(playlistDetail -> {
             MuiModApi.postToUiThread(() -> {
                 type.setText(I18n.get(collectionNameI18n) + "  " + I18n.get(MusicHud.MOD_ID + ".text.totalCount").replace("{}", String.valueOf(playlistDetail.size())));
                 if (!playlistDetail.isEmpty()) {

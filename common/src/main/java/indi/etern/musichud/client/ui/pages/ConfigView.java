@@ -28,6 +28,7 @@ import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.*;
 import indi.etern.musichud.utils.http.ApiClient;
@@ -58,7 +59,7 @@ public class ConfigView extends LinearLayout {
     private static final ServerConfig serverConfig = ServerConfig.getInstance();
     @Getter
     static volatile ConfigView instance;
-    private final LoginService loginService = LoginService.getInstance();
+    private final IClientLoginService IClientLoginService = LoginService.getInstance();
 
     public ConfigView(Context context) {
         super(context);
@@ -91,9 +92,9 @@ public class ConfigView extends LinearLayout {
             booleanOption.setOnChanged(() -> {
                 MuiModApi.postToUiThread(MainFragment::refresh);
                 if (clientConfig.getEnable()) {
-                    loginService.connectAsPrevious();
+                    IClientLoginService.connectAsPrevious();
                 } else {
-                    loginService.disconnectToExternalOrIntegratedServer();
+                    IClientLoginService.disconnectToExternalOrIntegratedServer();
                 }
             });
             PreferencesFragment.BooleanOption translatedLyricOption = new PreferencesFragment.BooleanOption(context,
@@ -191,8 +192,8 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.layout.verticalAlign"),
                     VerticalAlign.values(),
                     VerticalAlign::ordinal,
-                    clientConfig::getHudVerticalPosition,
-                    clientConfig::setHudVerticalPosition)
+                    () -> VerticalAlign.valueOf(VerticalAlign.class, clientConfig.getHudVerticalPosition()),
+                    (vp) -> clientConfig.setHudVerticalPosition(vp.name()))
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
@@ -204,8 +205,8 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.layout.horizontalAlign"),
                     HorizontalAlign.values(),
                     HorizontalAlign::ordinal,
-                    clientConfig::getHudHorizontalPosition,
-                    clientConfig::setHudHorizontalPosition)
+                    () -> HorizontalAlign.valueOf(HorizontalAlign.class, clientConfig.getHudHorizontalPosition()),
+                    (hp) -> clientConfig.setHudHorizontalPosition(hp.name()))
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
@@ -294,9 +295,9 @@ public class ConfigView extends LinearLayout {
             enableIsolatedMode.setOnChanged(() -> {
                 if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED) {
                     if (clientConfig.getEnableIsolatedMode()) {
-                        loginService.switchToIsolate();
+                        IClientLoginService.switchToIsolate();
                     } else {
-                        loginService.disconnectToExternalOrIntegratedServer();
+                        IClientLoginService.disconnectToExternalOrIntegratedServer();
                     }
                     MainFragment.refresh();
                 }

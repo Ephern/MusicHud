@@ -14,7 +14,7 @@ allprojects {
     version = rootProject.mod_version + "+" + rootProject.minecraft_version_range
 }
 
-configure(subprojects.findAll { it.name != 'paper' }) {
+configure(subprojects.findAll { it.name != 'paper' && it.name != 'core' }) {
     apply plugin: 'dev.architectury.loom'
     apply plugin: 'architectury-plugin'
     apply plugin: 'com.gradleup.shadow'

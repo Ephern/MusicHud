@@ -15,7 +15,7 @@ import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.Privacy;
 import indi.etern.musichud.beans.music.PusherInfo;
-import indi.etern.musichud.client.config.ProfileConfigData;
+import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;

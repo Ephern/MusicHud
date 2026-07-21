@@ -8,7 +8,7 @@ import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.platform.mod.forgeConfig.config.ClientConfigDefinition;
 import indi.etern.musichud.platform.mod.forgeConfig.config.ServerConfigDefinition;
 import indi.etern.musichud.platform.mod.neoforge.event.NeoForgeClientEventService;
-import indi.etern.musichud.platform.mod.neoforge.event.NeoForgeServerEventService;
+import indi.etern.musichud.platform.mod.neoforge.event.NeoForgeCommonEventService;
 import indi.etern.musichud.platform.mod.neoforge.network.NeoForgeNetworkManager;
 import indi.etern.musichud.platform.mod.neoforge.registry.NeoForgeKeyRegistryService;
 import net.neoforged.bus.api.IEventBus;
@@ -64,7 +64,7 @@ public final class CommonInitializer {
             hudRendererManager = HudRendererManager.getInstance();
             NeoForge.EVENT_BUS.addListener(CommonInitializer::onRenderGui);
         }
-        NeoForgeServerEventService.getInstance();
+        NeoForgeCommonEventService.getInstance();
     }
 
     @SubscribeEvent

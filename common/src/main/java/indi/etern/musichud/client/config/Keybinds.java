@@ -6,6 +6,7 @@ import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
 import icyllis.modernui.text.style.ImageSpan;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.interfaces.IKeyRegistryService;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
@@ -14,7 +15,7 @@ import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
-import indi.etern.musichud.interfaces.IKeyRegistryService;
+import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import lombok.SneakyThrows;
 import net.minecraft.client.KeyMapping;
@@ -25,7 +26,7 @@ import org.lwjgl.glfw.GLFW;
 @RegisterMark
 public class Keybinds implements ClientRegister {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
-    private static final LoginService loginService = LoginService.getInstance();
+    private static final IClientLoginService I_CLIENT_LOGIN_SERVICE = LoginService.getInstance();
 
     public void register() {
         String category = "key.category.music_hud.music_hud";
@@ -87,7 +88,7 @@ public class Keybinds implements ClientRegister {
             });
         });
         service.register(toggleIsolatedMode, () -> {
-            MusicHud.EXECUTOR.execute(loginService::keyBindsToggleConnection);
+            MusicHud.EXECUTOR.execute(I_CLIENT_LOGIN_SERVICE::keyBindsToggleConnection);
         });
         service.register(muteMapping, () -> {
             MusicHud.EXECUTOR.execute(() -> {

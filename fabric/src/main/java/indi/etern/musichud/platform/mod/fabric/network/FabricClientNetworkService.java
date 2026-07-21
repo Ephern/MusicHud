@@ -1,8 +1,11 @@
 package indi.etern.musichud.platform.mod.fabric.network;
 
-import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.client.network.vanilla.CustomPacketPayloadWrapper;
+import indi.etern.musichud.client.network.vanilla.VanillaClientNetworkService;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
 import net.fabricmc.fabric.api.client.networking.v1.ClientPlayNetworking;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 
@@ -10,7 +13,8 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 @SuppressWarnings("unused")
-public class FabricClientNetworkService implements IClientNetworkService {
+@NoArgsConstructor(access = AccessLevel.PRIVATE)
+public class FabricClientNetworkService implements VanillaClientNetworkService {
     private static volatile FabricClientNetworkService instance;
     private final Map<Class<? extends IPayload>, CustomPacketPayload.Type<?>> typeMap = new ConcurrentHashMap<>();
 
@@ -27,6 +31,6 @@ public class FabricClientNetworkService implements IClientNetworkService {
 
     @Override
     public void sendToNetworkServer(C2SPayload payload) {
-        ClientPlayNetworking.send(payload);
+        ClientPlayNetworking.send(new CustomPacketPayloadWrapper<>(payload));
     }
 }

@@ -1,7 +1,7 @@
 package indi.etern.musichud.platform.mod.neoforge.registry;
 
-import indi.etern.musichud.interfaces.IClientEventService;
-import indi.etern.musichud.interfaces.IKeyRegistryService;
+import indi.etern.musichud.client.interfaces.IClientEventService;
+import indi.etern.musichud.client.interfaces.IKeyRegistryService;
 import net.minecraft.client.KeyMapping;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.neoforge.client.event.RegisterKeyMappingsEvent;

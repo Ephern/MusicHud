@@ -7,6 +7,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
+import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
@@ -15,7 +16,6 @@ import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.interfaces.IClientEventService;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
@@ -127,8 +127,8 @@ public class HudRendererManager {
                     clientConfig.getHudWidth(),
                     clientConfig.getHudHeight(),
                     clientConfig.getHudCornerRadius(),
-                    clientConfig.getHudHorizontalPosition(),
-                    clientConfig.getHudVerticalPosition()
+                    HorizontalAlign.valueOf(clientConfig.getHudHorizontalPosition()),
+                    VerticalAlign.valueOf(clientConfig.getHudVerticalPosition())
             );
             setBaseLayout(layout);
             IClientEventService.getInstance().registerClientPlayerJoin((player) -> {

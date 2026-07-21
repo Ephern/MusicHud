@@ -2,12 +2,14 @@ package indi.etern.musichud.platform.mod.neoforge.network;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
+import indi.etern.musichud.client.network.vanilla.CustomPacketPayloadWrapper;
+import indi.etern.musichud.client.network.vanilla.StreamCodecWrapper;
+import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
+import indi.etern.musichud.client.network.vanilla.VanillaServerNetworkService;
 import indi.etern.musichud.network.*;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
 import indi.etern.musichud.network.payloads.S2CPayload;
-import indi.etern.musichud.network.vanillaUtils.StreamCodecWrapper;
-import indi.etern.musichud.network.vanillaUtils.VanillaPlayerProxy;
 import indi.etern.musichud.platform.Environment;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.server.level.ServerPlayer;
@@ -20,8 +22,10 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
+import static indi.etern.musichud.client.network.vanilla.IVanillaNetworkRegister.getMetaDataOrNew;
+
 @SuppressWarnings("unused")
-public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkService {
+public class NeoForgeNetworkManager implements INetworkRegister, VanillaServerNetworkService {
     private static volatile NeoForgeNetworkManager instance;
     private final Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
     private final Map<Class<? extends IPayload>, CustomPacketPayload.Type<?>> typeMap = new ConcurrentHashMap<>();
@@ -73,7 +77,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
             ByteBufCodec<T> codec,
             NetworkReceiver<T> serverReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, serverReceiver).type();
+        CustomPacketPayload.Type<CustomPacketPayloadWrapper<T>> type = getMetaDataOrNew(clazz, serverReceiver).type();
         RegistrationInfo<T> registrationInfo = new RegistrationInfo<>(clazz, type, codec, null, serverReceiver);
         pendingRegistrations.add(registrationInfo);
     }
@@ -84,7 +88,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
             ByteBufCodec<T> codec,
             NetworkReceiver<T> clientReceiver
     ) {
-        CustomPacketPayload.Type<T> type = getMetaDataOrNew(clazz, clientReceiver).type();
+        CustomPacketPayload.Type<CustomPacketPayloadWrapper<T>> type = getMetaDataOrNew(clazz, clientReceiver).type();
         RegistrationInfo<T> registrationInfo = new RegistrationInfo<>(clazz, type, codec, clientReceiver, null);
         pendingRegistrations.add(registrationInfo);
     }
@@ -115,13 +119,13 @@ public class NeoForgeNetworkManager implements INetworkRegister, IServerNetworkS
     @Override
     public void sendToNetworkPlayer(IPlayerClient playerClient, S2CPayload payload) {
         if (playerClient instanceof VanillaPlayerProxy player && player.getPlayer() instanceof ServerPlayer serverPlayer) {
-            PacketDistributor.sendToPlayer(serverPlayer, payload);
+            PacketDistributor.sendToPlayer(serverPlayer, new CustomPacketPayloadWrapper<>(payload));
         }
     }
 
     private record RegistrationInfo<T extends IPayload>(
             Class<T> clazz,
-            CustomPacketPayload.Type<T> type,
+            CustomPacketPayload.Type<CustomPacketPayloadWrapper<T>> type,
             ByteBufCodec<T> codec,
             NetworkReceiver<T> clientReceiver,
             NetworkReceiver<T> serverReceiver
