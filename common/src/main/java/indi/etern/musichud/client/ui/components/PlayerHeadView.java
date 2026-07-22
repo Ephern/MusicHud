@@ -1,18 +1,23 @@
 package indi.etern.musichud.client.ui.components;
 
 import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.systems.RenderSystem;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.ImageDrawable;
 import icyllis.modernui.view.ViewTreeObserver;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.ImageView;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
+import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.io.InputStream;
@@ -27,19 +32,21 @@ public class PlayerHeadView extends FrameLayout {
     private static final int SKIN_HAT_U = 40;
     private static final int SKIN_HAT_V = 8;
     private static final float FACE_SCALE = 0.87f;
-
+    private static final Logger logger = MusicHud.getLogger(PlayerHeadView.class);
+    private final ImageView faceView;
+    private final ImageView hatView;
     @Getter
     private Supplier<ResourceLocation> playerSkinSupplier;
-
     @Setter
     @Getter
     private ResourceLocation skin;
-
-    private final ImageView faceView;
-    private final ImageView hatView;
     private ResourceLocation lastRenderedSkin;
     private final ViewTreeObserver.OnPreDrawListener preDrawListener = () -> {
+//        if (RenderSystem.isOnRenderThread()) {
         updateHeadImage();
+//        } else {
+//            Minecraft.getInstance().submit(this::updateHeadImage);
+//        }
         return true;
     };
 
@@ -82,7 +89,11 @@ public class PlayerHeadView extends FrameLayout {
     public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
         skin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
+//        if (RenderSystem.isOnRenderThread()) {
         updateHeadImage();
+//        } else {
+//            Minecraft.getInstance().submit(this::updateHeadImage);
+//        }
     }
 
     private void updateHeadImage() {
@@ -103,22 +114,14 @@ public class PlayerHeadView extends FrameLayout {
         NativeImage skinImage = null;
         boolean readFromStream = false;
         try {
-            var texture = minecraft.getTextureManager().getTexture(skin);
-            if (texture instanceof DynamicTexture dt) {
-                skinImage = dt.getPixels();
+            SkinImageResult skinImageResult;
+            if (RenderSystem.isOnRenderThread()) {
+                skinImageResult = loadSkinImage();
             } else {
-                try {
-                    var resource = minecraft.getResourceManager()
-                            .getResource(skin).orElse(null);
-                    if (resource != null) {
-                        try (InputStream stream = resource.open()) {
-                            skinImage = NativeImage.read(stream);
-                            readFromStream = true;
-                        }
-                    }
-                } catch (Exception ignored) {
-                }
+                skinImageResult = minecraft.submit(this::loadSkinImage).get();
             }
+            skinImage = skinImageResult.skinImage;
+            readFromStream = skinImageResult.readFromStream;
             if (skinImage == null) return;
 
             try (NativeImage faceNat = new NativeImage(NativeImage.Format.RGBA, HEAD_SIZE, HEAD_SIZE, false);
@@ -140,12 +143,41 @@ public class PlayerHeadView extends FrameLayout {
                     hatView.setImageDrawable(hatDrawable);
                     lastRenderedSkin = skin;
                 }
-            } catch (Exception ignored) {
+            } catch (Exception e) {
+                logger.warn(e);
             }
+        } catch (Exception e) {
+            logger.warn(e);
         } finally {
-            if (readFromStream) {
+            if (readFromStream && skinImage != null) {
                 skinImage.close();
             }
         }
+    }
+
+    private @NotNull PlayerHeadView.SkinImageResult loadSkinImage() {
+        NativeImage skinImage = null;
+        Minecraft minecraft = Minecraft.getInstance();
+        boolean readFromStream = false;
+        AbstractTexture texture = minecraft.getTextureManager().getTexture(skin);
+        if (texture instanceof DynamicTexture dt) {
+            skinImage = dt.getPixels();
+        } else {
+            try {
+                var resource = minecraft.getResourceManager()
+                        .getResource(skin).orElse(null);
+                if (resource != null) {
+                    try (InputStream stream = resource.open()) {
+                        skinImage = NativeImage.read(stream);
+                        readFromStream = true;
+                    }
+                }
+            } catch (Exception ignored) {
+            }
+        }
+        return new SkinImageResult(skinImage, readFromStream);
+    }
+
+    private record SkinImageResult(NativeImage skinImage, boolean readFromStream) {
     }
 }

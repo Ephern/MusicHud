@@ -35,6 +35,11 @@ dependencies {
     api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
 
     compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.8-$rootProject.modernui_version.+"
+
+    implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
+    implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
+    implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
+    implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
 }
 
 test {

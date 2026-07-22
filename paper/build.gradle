@@ -37,6 +37,9 @@ dependencies {
     core(project(path: ':core'))
     shadowBundle(project(path: ':core')) { transitive = false }
 
+    compileOnly "io.netty:netty-buffer:4.1.118.Final"
+    compileOnly "io.netty:netty-codec:4.1.118.Final"
+
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
