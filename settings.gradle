@@ -1,10 +1,5 @@
 pluginManagement {
     repositories {
-        maven { url = 'https://maven.fabricmc.net/' }
-        maven { url = 'https://maven.architectury.dev/' }
-        maven { url = 'https://files.minecraftforge.net/maven/' }
-        maven { url = "https://maven.shedaniel.me/" }
-        maven { url = "https://maven.terraformersmc.com/releases/" }
         maven { url = 'https://repo.papermc.io/repository/maven-public/' }
         gradlePluginPortal()
     }
@@ -22,7 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = 'music_hud'
 
 include 'core'
-include 'common'
-include 'fabric'
-include 'neoforge'
 include 'paper'
