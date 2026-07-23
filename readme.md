@@ -18,7 +18,7 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 [Third-party Bukkit plugin 2](https://github.com/MOPELotus/MusicHud-Paper) (1.1.4 hotfix +, now partly merged into main repository)
 
 ## Prerequisites
-- ModernUI (only client) 
+- ModernUI (only client, using mVUS fork on 1.21.9-11, [this fork](https://github.com/Chino081/ModernUI-MC/releases/tag/26.2) on 26.2)
 - Forge Config API Port (only fabric)
 - ~~Architectury API~~ (Mod edition, 1.2.0 and below)
 
@@ -71,6 +71,10 @@ There are 2 methods to deploy.
 >
 > Due to some limitations, API Server may not be auto-closed when game exit abnormal (e.g., due to a crash)
 
+##### Auto Deploy
+You can find "Download API..." button in setting page, which will open a download guide, and download NetEase Cloud Music Enhanced from [a trusted repository](https://github.com/MOPELotus/api-enhanced) which automatically releases artifact powered by GitHub Actions to bypass login restrictions of accessing artifacts from GitHub Actions, with optional GH Proxy speedup
+
+##### Manual Deploy
 1. **Login to GitHub (Important, otherwise can NOT download artifacts)** and go to https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-dev.yml
 2. Click latest action runs in type "Build Artifacts" and download platform binary artifacts matches to your pc/server platform
 3. Uncompress the binary executable file from ZIP file to ...
@@ -96,7 +100,7 @@ There are 2 methods to deploy.
 [第三方 Bukkit 插件实现 2](https://github.com/MOPELotus/MusicHud-Paper) (1.1.4 hotfix +，目前已部分合并至主仓库)
 
 ## 前置依赖
-- ModernUI （仅客户端）
+- ModernUI （仅客户端，在 1.21.9 上使用 mVUS 分支，在 26.2 上使用[该分支](https://github.com/Chino081/ModernUI-MC/releases/tag/26.2)）
 - Forge Config API Port （仅 Fabric）
 - ~~Architectury API~~ （非插件版，1.2.0 以及更低版本）
 
@@ -151,6 +155,10 @@ There are 2 methods to deploy.
 >
 > 由于一些限制，在游戏非正常退出时（如崩溃）无法自动结束进程
 
+##### 自动部署（客户端，1.2.15+）
+在设置页面中的 API 状态一栏中可找到“下载 API...”按钮，可打开一个下载指引，会从一个通过 GitHub Actions 自动发布 release 的[可信的分支仓库](https://github.com/MOPELotus/api-enhanced)下载 NetEase Cloud Music Enhanced 以绕过访问 GitHub Actions 工件的登录限制，可选使用 GH Proxy 加速下载
+
+##### 手动部署
 1. **登录到 GitHub (重要，否则无法下载工件)** 并跳转到 https://github.com/NeteaseCloudMusicApiEnhanced/api-enhanced/actions/workflows/build-dev.yml
 2. 在 actions 类型中选择 "Build Artifacts" 并进入最新的构建中根据你的平台下载对应的二进制构建产物
 3. 解压下载得到的压缩包并将其中的二进制可执行文件放置到...
