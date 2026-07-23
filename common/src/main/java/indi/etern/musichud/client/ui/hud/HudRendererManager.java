@@ -373,7 +373,7 @@ public class HudRendererManager {
             if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
                 return;
             }
-            if (albumImageThumbnailSize == -1 || albumImageThumbnailSize == 0) {
+            if (albumImageThumbnailSize <= 0) {
                 refreshThumbnailSize();
             }
 
