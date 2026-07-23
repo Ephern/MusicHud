@@ -134,7 +134,9 @@ public class ImageUtils {
             opts.inPreferredFormat = Bitmap.Format.RGBA_8888;
 
             try (Bitmap source = BitmapFactory.decodeStream(inputStream, opts)) {
-                return getImageTextureData(url, source);
+                ImageTextureData imageTextureData = getImageTextureData(url, source);
+                cachedTexturesData.put(url, imageTextureData);
+                return imageTextureData;
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
