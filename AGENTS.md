@@ -19,23 +19,31 @@ Multi-loader Minecraft mod (Fabric + NeoForge + Paper) for 1.21.8 (Java 21). A G
 
 ## Critical Quirks
 
-- **Tests are DISABLED by default** (`enabled = false` in `common/build.gradle:42`). To run: edit the file and change `enabled` to `true` — there is no Gradle property to override this at runtime.
+- **Tests are DISABLED by default** (`enabled = false` in `common/build.gradle:46`). To run: edit the file and change `enabled` to `true` — there is no Gradle property to override this at runtime.
 - **No CI, no linter, no formatter, no typechecker** configured. Do not look for or run these.
-- **Paper module is separate** — uses `paperweight.userdev` directly, NOT Architectury Loom.
+- **Paper module is separate** — uses `paperweight.userdev` directly, NOT Architectury Loom. Paper is NOT in `settings.gradle` on this branch.
 - **Build scripts are Groovy DSL** (`.gradle`), not Kotlin (`.gradle.kts`).
+- **`core` module is a plain `java-library` (NO Loom)** — excluded by `build.gradle:16`: `configure(subprojects.findAll { it.name != 'core' })`.
+  - Platform modules (`fabric`/`neoforge`) add `core` via a dedicated `coreLib` configuration that extends `compileClasspath` + `runtimeClasspath` but **NOT** `developmentFabric`/`developmentNeoForge` — this prevents Architectury Transformer from applying unnecessary transforms (`GenerateFakeFabricMod`, `RemapInjectables`).
+- **`-Dfabric.dli.config` must be overridden in Fabric `loom.runs`** — Architectury Loom 1.17.487 generates DLI config at `.gradle/loom-cache/projects/<subproject>/launch.cfg` but the injector property points to `<subproject>/.gradle/loom-cache/launch.cfg`. Without the override, `dev-launch-injector` enters pass-through mode → mods and Minecraft assets won't load.
+- **Mixin count: 6** — `SoundEngineMixin`, `GuiRendererHudMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin` + `MusicHudMixinPlugin` (plugin class).
 
 ## Architecture
 
 ```
-common/          — all shared code (network, UI, logic, data models, mixins)
-fabric/          — Fabric loader adapter layer (shadow-jars common)
-neoforge/        — NeoForge adapter layer (shadow-jars common)
-paper/           — Paper/Bukkit plugin (shadows common independently)
+core/            — platform-independent Java library (no Minecraft deps)
+                   network codecs, payload interfaces, data beans, JMTC (SMTC/MPRIS),
+                   server API interfaces, utility classes (RegistrationManager, etc.)
+common/          — Architectury common module with Minecraft deps
+                   UI (ModernUI), audio (stream decoders), mixins, platform service impls
+fabric/          — Fabric loader adapter layer (shadow-jars common + core)
+neoforge/        — NeoForge adapter layer (shadow-jars common + core)
+paper/           — Paper/Bukkit plugin (on a separate branch, not in settings here)
 ```
 
-Platform modules depend on `common`. Each produces a standalone fat jar via Shadow.
+`common` depends on `core` (`api project(':core')` in `common/build.gradle:24`). Platform modules shadow both `common` and `core` via `shadowBundle`.
 
-The `architectury_enabled_platforms` property in `gradle.properties` only lists `fabric,neoforge` — Paper is explicitly excluded from the Loom plugin in `build.gradle:17` (`configure(subprojects.findAll { it.name != 'paper' })`).
+The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradle:16` applies Loom to `common`, `fabric`, `neoforge` — but NOT `core`.
 
 ## Key Patterns
 
@@ -43,7 +51,7 @@ The `architectury_enabled_platforms` property in `gradle.properties` only lists 
 - **Auto-Registration**: `RegistrationManager` loads classes by string array, instantiates `Register` implementors. `@RegisterMark` annotation marks registered classes. Called via `performCommonAutoRegistration()` / `performSideAutoRegistration()`.
 - **Custom Network Protocol**: 30+ `CustomPacketPayload` classes in `network/payloads/`. Request/response cycle (`requestResponseCycle/`) + push messages (`pushMessages/`). Register via `INetworkRegister`.
 - **Virtual Threads**: `MusicHud.EXECUTOR` = `Executors.newVirtualThreadPerTaskExecutor()`. Used for audio decoding, API server management, network I/O.
-- **Mixin**: Only 2 client-side mixins in `common/` — `SoundEngineMixin` (silence vanilla music) and `MixinGuiRendererHud` (inject HUD render). Config: `music_hud.mixins.json`.
+- **Mixin**: Config `music_hud.mixins.json`. 6 classes: `SoundEngineMixin`, `GuiRendererHudMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin` + `MusicHudMixinPlugin`.
 - **Config**: Forge Config API Port (Fabric, shared with NeoForge) / native NeoForge `ModConfig` / Paper `config.yml`.
 
 ## Frameworks & Dependencies
