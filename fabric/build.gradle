@@ -45,7 +45,7 @@ dependencies {
     modImplementation "com.terraformersmc:modmenu:$rootProject.modmenu_version"
 
     // ModernUI Fabric
-    modImplementation("icyllis.modernui:ModernUI-Fabric:1.21.8-${rootProject.modernui_version}.+")
+    modImplementation("icyllis.modernui:ModernUI-Fabric:1.21.1-${rootProject.modernui_version}.+")
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"

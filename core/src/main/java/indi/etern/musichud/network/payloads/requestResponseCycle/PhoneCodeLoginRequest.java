@@ -15,7 +15,7 @@ public record PhoneCodeLoginRequest(int regionCode, long phone, int code) implem
             ByteBufCodec.composite(
                     Codecs.INT,
                     PhoneCodeLoginRequest::regionCode,
-                    Codecs.LONG,
+                    Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
                     PhoneCodeLoginRequest::phone,
                     Codecs.INT,
                     PhoneCodeLoginRequest::code,

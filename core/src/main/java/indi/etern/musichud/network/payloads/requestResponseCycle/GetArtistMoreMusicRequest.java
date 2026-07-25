@@ -16,7 +16,7 @@ import java.util.List;
 
 public record GetArtistMoreMusicRequest(long id, int offset) implements C2SPayload {
     public static final ByteBufCodec<GetArtistMoreMusicRequest> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
+            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
             GetArtistMoreMusicRequest::id,
             Codecs.INT,
             GetArtistMoreMusicRequest::offset,

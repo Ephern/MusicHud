@@ -16,7 +16,7 @@ public class MusicDetail {
     public static final ByteBufCodec<MusicDetail> CODEC = ByteBufCodec.composite(
             Codecs.STRING_UTF8,
             MusicDetail::getName,
-            Codecs.LONG,
+            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
             MusicDetail::getId,
             Codecs.ofList(() -> Artist.CODEC),
             MusicDetail::getArtists,

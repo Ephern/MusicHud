@@ -15,19 +15,15 @@ public class ServerDataPacketVThreadExecutor {
         return (payload, player) -> {
             MusicHud.EXECUTOR.execute(() -> {
                 Thread.currentThread().setName("MHWorker-Network-V");
-//                if (player instanceof Player player) {
-                    try {
-                        consumer.accept(payload, player);
-                    } catch (ApiException e) {
-                        MusicHud.getLogger(payload.getClass()).error(e);
-                    } catch (Exception e) {
-                        MusicHud.getLogger(payload.getClass()).error(e);
-                        //noinspection CallToPrintStackTrace
-                        e.printStackTrace();
-                    }
-//                } else {
-//                    throw new IllegalStateException("Player must be a server player");
-//                }
+                try {
+                    consumer.accept(payload, player);
+                } catch (ApiException e) {
+                    MusicHud.getLogger(payload.getClass()).error(e);
+                } catch (Exception e) {
+                    MusicHud.getLogger(payload.getClass()).error(e);
+                    //noinspection CallToPrintStackTrace
+                    e.printStackTrace();
+                }
             });
         };
     }

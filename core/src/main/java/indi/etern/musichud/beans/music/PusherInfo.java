@@ -14,7 +14,7 @@ import java.util.UUID;
 
 public final class PusherInfo {
     public static final ByteBufCodec<PusherInfo> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
+            Codecs.VAR_LONG,
             (pusherInfo) -> -1L,// for compatibility with older versions. TODO: remove when bump to 1.3.0
             Codecs.UUID,
             PusherInfo::getPlayerUUID,

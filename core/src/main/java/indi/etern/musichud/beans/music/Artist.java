@@ -14,7 +14,7 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Artist {
     public static final ByteBufCodec<Artist> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
+            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
             Artist::getId,
             Codecs.STRING_UTF8,
             Artist::getName,

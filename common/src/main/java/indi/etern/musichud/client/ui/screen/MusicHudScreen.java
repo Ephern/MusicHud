@@ -6,7 +6,7 @@ package indi.etern.musichud.client.ui.screen;
 
 /*
  * Modern UI.
- * Copyright (C) 2019-2023 BloCamLimb. All rights reserved.
+ * Copyright (C) 2026 BloCamLimb. All rights reserved.
  *
  * Modern UI is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -39,8 +39,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * Represents the GUI screen that receives events from Minecraft.
- * All vanilla methods are completely taken over by Modern UI.
+ * Base screen that provides ModernUI.
+ *
+ * @see MenuScreen
+ * @since 3.13
  */
 @SuppressWarnings("UnstableApiUsage")
 public class MusicHudScreen extends Screen implements MuiScreen {
@@ -56,13 +58,11 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Setter
     private static double darken = ClientConfig.getInstance().getMainScreenAdditionalBackgroundDarken();
 
-    MusicHudScreen(UIManager host, Fragment fragment,
+    MusicHudScreen(Fragment fragment,
                    @Nullable ScreenCallback callback, @Nullable Screen previous,
-                   @Nullable CharSequence title) {
-        super(title == null || title.isEmpty()
-                ? CommonComponents.EMPTY
-                : Component.literal(title.toString()));
-        mHost = host;
+                   @NonNull Component title) {
+        super(title);
+        mHost = UIManager.getInstance();
         mPrevious = previous;
         mFragment = Objects.requireNonNull(fragment);
         mCallback = callback != null ? callback :
@@ -80,8 +80,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
                                               @Nullable ScreenCallback callback,
                                               @Nullable Screen previousScreen,
                                               @Nullable CharSequence title) {
-        return new MusicHudScreen(UIManager.getInstance(),
-                fragment, callback, previousScreen, title);
+        return new MusicHudScreen(fragment, callback, previousScreen, Component.literal(title == null ? "" : title.toString()));
     }
 
     @Override
@@ -107,11 +106,12 @@ public class MusicHudScreen extends Screen implements MuiScreen {
             float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
             gr.fill(0, 0, this.width, this.height, Color.argb((int) (progress * darken * 255), 0, 0, 0));//additional darken
         }
+        mHost.render(gr, mouseX, mouseY, deltaTick);
     }
 
     @Override
     public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
-        mHost.render(gr, mouseX, mouseY, deltaTick);
+        super.render(gr, mouseX, mouseY, deltaTick);
     }
 
     @Override
@@ -164,45 +164,60 @@ public class MusicHudScreen extends Screen implements MuiScreen {
 
     @Override
     public void mouseMoved(double mouseX, double mouseY) {
+        super.mouseMoved(mouseX, mouseY);
         mHost.onHoverMove(true);
     }
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int mouseButton) {
+        super.mouseClicked(mouseX, mouseY, mouseButton);
         return false;
     }
 
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int mouseButton) {
+        super.mouseReleased(mouseX, mouseY, mouseButton);
         return false;
     }
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int mouseButton, double deltaX, double deltaY) {
+        super.mouseDragged(mouseX, mouseY, mouseButton, deltaX, deltaY);
         return true;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        if (super.mouseScrolled(mouseX, mouseY, deltaX, deltaY)) {
+            return true;
+        }
         mHost.onScroll(deltaX, deltaY);
         return true;
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (getFocused() != null && getFocused().keyPressed(keyCode, scanCode, modifiers)) {
+            return true;
+        }
         mHost.onKeyPress(keyCode, scanCode, modifiers);
         return false;
     }
 
     @Override
     public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
+        if (getFocused() != null && getFocused().keyReleased(keyCode, scanCode, modifiers)) {
+            return true;
+        }
         mHost.onKeyRelease(keyCode, scanCode, modifiers);
         return false;
     }
 
     @Override
     public boolean charTyped(char ch, int modifiers) {
+        if (getFocused() != null && getFocused().charTyped(ch, modifiers)) {
+            return true;
+        }
         return mHost.onCharTyped(ch);
     }
 }
-

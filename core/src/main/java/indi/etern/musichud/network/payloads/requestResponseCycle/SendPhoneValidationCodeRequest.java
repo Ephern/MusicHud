@@ -3,6 +3,7 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.server.api.ApiProvider;
@@ -13,7 +14,7 @@ public record SendPhoneValidationCodeRequest(int regionCode, long phone) impleme
     public static final ByteBufCodec<SendPhoneValidationCodeRequest> CODEC = ByteBufCodec.composite(
                     Codecs.INT,
                     SendPhoneValidationCodeRequest::regionCode,
-                    Codecs.LONG,
+                    Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
                     SendPhoneValidationCodeRequest::phone,
                     SendPhoneValidationCodeRequest::new
             );

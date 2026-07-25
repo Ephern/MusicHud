@@ -12,13 +12,13 @@ import java.util.Objects;
 @Setter
 public class MusicResourceInfo {
     public static final ByteBufCodec<MusicResourceInfo> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
+            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
             MusicResourceInfo::getId,
             Codecs.STRING_UTF8,
             MusicResourceInfo::getUrl,
             Codecs.INT,
             MusicResourceInfo::getBitrate,
-            Codecs.LONG,
+            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
             MusicResourceInfo::getSize,
             Codecs.ofEnum(FormatType.class),
             MusicResourceInfo::getType,

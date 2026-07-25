@@ -5,7 +5,7 @@ import indi.etern.musichud.client.network.vanilla.VanillaClientNetworkService;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
-import net.neoforged.neoforge.client.network.ClientPacketDistributor;
+import net.neoforged.neoforge.network.PacketDistributor;
 
 @SuppressWarnings("unused")
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -25,6 +25,6 @@ public class NeoForgeClientNetworkService implements VanillaClientNetworkService
 
     @Override
     public void sendToNetworkServer(C2SPayload payload) {
-        ClientPacketDistributor.sendToServer(new CustomPacketPayloadWrapper<>(payload));
+        PacketDistributor.sendToServer(new CustomPacketPayloadWrapper<>(payload));
     }
 }

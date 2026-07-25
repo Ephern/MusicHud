@@ -427,8 +427,6 @@ public class HudRendererManager {
             ARTISTS_AND_ALBUM_RENDERER.getLayout().setWidth(progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - contentInterval);
             ARTISTS_AND_ALBUM_RENDERER.render(hudRenderContext);
             PLAY_TIME_RENDERER.render(hudRenderContext);
-
-            hudRenderContext.prepareUniforms();
         } catch (Exception e) {
             if (logger == null) {
                 logger = MusicHud.getLogger(HudRendererManager.class);

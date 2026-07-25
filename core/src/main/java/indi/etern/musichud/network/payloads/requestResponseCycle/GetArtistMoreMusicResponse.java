@@ -16,7 +16,7 @@ import java.util.function.Consumer;
 public record GetArtistMoreMusicResponse(long artistId, int offset, List<MusicDetail> musicDetails) implements S2CPayload {
     public static final ByteBufCodec<GetArtistMoreMusicResponse> CODEC =
             ByteBufCodec.composite(
-                    Codecs.LONG,
+                    Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
                     GetArtistMoreMusicResponse::artistId,
                     Codecs.INT,
                     GetArtistMoreMusicResponse::offset,

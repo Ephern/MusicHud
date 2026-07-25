@@ -27,6 +27,10 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.VarHandle;
+import java.lang.reflect.Field;
+import java.lang.reflect.Modifier;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
@@ -56,8 +60,37 @@ public class ImageUtils {
     private static int maxConcurrentDownloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS;
     private static final Map<String, Image> cachedIconImageMap = new HashMap<>();
 
+    private static final VarHandle NATIVE_IMAGE_PIXELS_HANDLE;
+
     static {
         initializeVirtualThreadExecutor();
+        VarHandle handle = null;
+        try {
+            Field found = null;
+            for (Field f : NativeImage.class.getDeclaredFields()) {
+                if (f.getType() == long.class && !Modifier.isFinal(f.getModifiers())) {
+                    if (found != null) {
+                        throw new IllegalStateException("Multiple long non-final fields in NativeImage");
+                    }
+                    found = f;
+                }
+            }
+            if (found == null) {
+                throw new IllegalStateException("No long non-final field found in NativeImage");
+            }
+            MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(NativeImage.class, MethodHandles.lookup());
+            handle = lookup.unreflectVarHandle(found);
+        } catch (Throwable t) {
+            LOGGER.error("Failed to init VarHandle for NativeImage pixels", t);
+        }
+        NATIVE_IMAGE_PIXELS_HANDLE = handle;
+    }
+
+    private static long getNativeImagePixels(NativeImage image) {
+        if (NATIVE_IMAGE_PIXELS_HANDLE == null) {
+            throw new IllegalStateException("NativeImage pixels VarHandle not initialized");
+        }
+        return (long) NATIVE_IMAGE_PIXELS_HANDLE.get(image);
     }
 
     /**
@@ -221,8 +254,9 @@ public class ImageUtils {
         int height = bitmap.getHeight();
         NativeImage nativeImage = new NativeImage(width, height, false);
 
+        //noinspection UnstableApiUsage
         try (Bitmap wrap = Bitmap.wrap(
-                nativeImage.getPointer(),
+                getNativeImagePixels(nativeImage),
                 width * 4,
                 null,
                 width,
@@ -240,7 +274,9 @@ public class ImageUtils {
         int width = nativeImage.getWidth();
         int height = nativeImage.getHeight();
 
-        return Bitmap.wrap(nativeImage.getPointer(),
+        //noinspection UnstableApiUsage
+        return Bitmap.wrap(
+                getNativeImagePixels(nativeImage),
                 width * 4,
                 null,
                 width,
@@ -291,10 +327,10 @@ public class ImageUtils {
     private static ImageTextureData getImageTextureData(String data, Bitmap source) {
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
         if (RenderSystem.isOnRenderThread()) {
-            texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), convertBitmapToNativeImage(source)));
+            texture.set(new DynamicTexture(convertBitmapToNativeImage(source)));
         } else {
             Minecraft.getInstance().submit(() -> {
-                texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), convertBitmapToNativeImage(source)));
+                texture.set(new DynamicTexture(convertBitmapToNativeImage(source)));
             }).join();
         }
         return new ImageTextureData(data, texture.get());

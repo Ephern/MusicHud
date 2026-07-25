@@ -14,7 +14,7 @@ import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 public record GetMusicResourceRequest(long id,Quality quality,String retryForUrl) implements C2SPayload {
     public static final ByteBufCodec<GetMusicResourceRequest> CODEC =
             ByteBufCodec.composite(
-                    Codecs.LONG,
+                    Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
                     GetMusicResourceRequest::id,
                     Codecs.ofEnum(Quality.class),
                     GetMusicResourceRequest::quality,

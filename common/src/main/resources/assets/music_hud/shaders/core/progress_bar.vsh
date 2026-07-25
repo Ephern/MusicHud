@@ -1,11 +1,20 @@
 #version 150
 
-#moj_import <minecraft:dynamictransforms.glsl>
-#moj_import <minecraft:projection.glsl>
+uniform mat4 ProjMat;
+uniform mat4 ModelViewMat;
 
 layout(std140) uniform MHProgressPosition {
     mat4 u_Translation;
     vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
+};
+layout(std140) uniform MHProgressStyle {
+    vec3 u_Gradient; // (gradientLength, rightOffset, transitionBorderRate)
+    vec4 u_PlayedColor;
+    vec4 u_CurrentColor;
+    vec4 u_BackgroundColor;
+};
+layout(std140) uniform MHDynamicStatus {
+    vec4 u_Dynamic1; // (timestamp, playedProgress, switchProgress)
 };
 
 in vec3 Position;

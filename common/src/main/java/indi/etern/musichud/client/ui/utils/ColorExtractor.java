@@ -37,14 +37,15 @@ public class ColorExtractor {
 
         for (int y = 0; y < height; y += step) {
             for (int x = 0; x < width; x += step) {
-                int argb = image.getPixel(x, y);
-                if ((argb >>> 24) == 0) continue;
-                int rgb = argb & 0x00FFFFFF;
-
-                // 颜色量化
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
+                // getPixelRGBA() returns 0xAABBGGRR in 1.21.1 (ABGR memory layout)
+                int rgba = image.getPixelRGBA(x, y);
+                int a = (rgba >> 24) & 0xFF;
+                if (a == 0) continue;
+                // Extract actual RGB from ABGR layout
+                int r = rgba & 0xFF;
+                int g = (rgba >> 8) & 0xFF;
+                int b = (rgba >> 16) & 0xFF;
+                int rgb = (r << 16) | (g << 8) | b;
 
                 int qr = r >> shift;
                 int qg = g >> shift;

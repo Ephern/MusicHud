@@ -11,7 +11,7 @@ import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 
 public record VoteSkipCurrentMusicMessage(long id) implements C2SPayload {
     public static final ByteBufCodec<VoteSkipCurrentMusicMessage> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
+            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
             VoteSkipCurrentMusicMessage::id,
             VoteSkipCurrentMusicMessage::new
     );

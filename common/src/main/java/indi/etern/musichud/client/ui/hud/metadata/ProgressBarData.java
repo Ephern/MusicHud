@@ -1,8 +1,7 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
+import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
 import indi.etern.musichud.client.ui.utils.UniformDataUtils;
 import lombok.Getter;
 import lombok.Setter;
@@ -10,7 +9,7 @@ import lombok.Setter;
 import java.util.Objects;
 
 public class ProgressBarData implements HudUniform {
-    public static final int UBO_SIZE = new Std140SizeCalculator().putVec3().putVec4().putVec4().putVec4().align(16).get();
+    public static final int UBO_SIZE = new Std140BufferWriter.Calculator().putVec3().putVec4().putVec4().putVec4().align(16).get();
     public final int playedColor;
     public final int currentColor;
     public final int backgroundColor;
@@ -43,11 +42,14 @@ public class ProgressBarData implements HudUniform {
     }
 
     @Override
-    public void write(Std140Builder builder) {
-        builder.putVec3(gradientLength, gradientRightOffset, transitionBorderRate)
-               .putVec4(UniformDataUtils.colorToVector(playedColor))
-               .putVec4(UniformDataUtils.colorToVector(currentColor))
-               .putVec4(UniformDataUtils.colorToVector(backgroundColor));
+    public void write(Std140BufferWriter builder) {
+        builder.putVec3(gradientLength, gradientRightOffset, transitionBorderRate);
+        org.joml.Vector4f v = UniformDataUtils.colorToVector(playedColor);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(currentColor);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(backgroundColor);
+        builder.putVec4(v.x, v.y, v.z, v.w);
     }
 
     @Override

@@ -3,6 +3,7 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.server.api.ApiProvider;
@@ -12,7 +13,7 @@ import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 public record PhonePasswordLoginRequest(long phone, String md5password) implements C2SPayload {
     public static final ByteBufCodec<PhonePasswordLoginRequest> CODEC =
             ByteBufCodec.composite(
-                    Codecs.LONG,
+                    Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
                     PhonePasswordLoginRequest::phone,
                     Codecs.STRING_UTF8,
                     PhonePasswordLoginRequest::md5password,

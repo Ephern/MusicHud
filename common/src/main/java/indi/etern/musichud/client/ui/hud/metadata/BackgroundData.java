@@ -1,8 +1,7 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
+import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
 import indi.etern.musichud.client.ui.utils.ColorExtractor;
 import indi.etern.musichud.client.ui.utils.Mixable;
 import indi.etern.musichud.client.ui.utils.UniformDataUtils;
@@ -67,7 +66,7 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
         return new ThemedColors(c1, c2, c3, c4);
     }
 
-    public static final int UBO_SIZE = new Std140SizeCalculator().putVec4().putVec4().putVec4().putVec4().align(16).get();
+    public static final int UBO_SIZE = new Std140BufferWriter.Calculator().putVec4().putVec4().putVec4().putVec4().align(16).get();
 
     @Override
     public String getUBOName() {
@@ -80,11 +79,16 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
     }
 
     @Override
-    public void write(Std140Builder builder) {
-        builder.putVec4(UniformDataUtils.colorToVector(mixedColors.primary));
-        builder.putVec4(UniformDataUtils.colorToVector(mixedColors.secondary));
-        builder.putVec4(UniformDataUtils.colorToVector(mixedColors.bright));
-        builder.putVec4(UniformDataUtils.colorToVector(mixedColors.dark));
+    public void write(Std140BufferWriter builder) {
+        // Use float overload to avoid JOML Vector4f.get(ByteBuffer) being stripped by transformers
+        org.joml.Vector4f v = UniformDataUtils.colorToVector(mixedColors.primary);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(mixedColors.secondary);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(mixedColors.bright);
+        builder.putVec4(v.x, v.y, v.z, v.w);
+        v = UniformDataUtils.colorToVector(mixedColors.dark);
+        builder.putVec4(v.x, v.y, v.z, v.w);
     }
 
     @Override

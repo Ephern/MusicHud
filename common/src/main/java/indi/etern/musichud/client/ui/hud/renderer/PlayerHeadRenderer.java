@@ -1,12 +1,13 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.ARGB;
+import net.minecraft.util.FastColor;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
@@ -85,22 +86,28 @@ public class PlayerHeadRenderer implements HudRenderer {
         }
         float scale = 0.87f;
         float inset = (1 - scale) / 2;
-        gr.nextStratum();
 
+        float[] prevColor = RenderSystem.getShaderColor();
         // Inner face layer (8,8 to 16,16) - slightly smaller for depth
-        gr.pose().pushMatrix();
-        gr.pose().translate(x + w * inset, y + h * inset);
-        gr.pose().scale(scale);
-        int alphaColor = ARGB.color(Math.min(alpha, 1), 0xFFFFFF);
-        gr.blit(RenderPipelines.GUI_TEXTURED, skin,
-                0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
-        gr.pose().popMatrix();
+        gr.setColor(1, 1, 1, Math.min(alpha, 1));
+        PoseStack pose = gr.pose();
+        pose.pushPose();
+        pose.translate(x + w * inset, y + h * inset, 0);
+        pose.scale(scale, scale, 1);
+        gr.blit(skin,
+                0, 0, w, h,
+                8, 8, 8, 8,
+                SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE);
+        pose.popPose();
 
-        gr.pose().pushMatrix();
-        gr.pose().translate(x, y);
+        pose.pushPose();
+        pose.translate(x, y, 0);
         // Outer hat layer (40,8 to 48,16) - full size on top
-        gr.blit(RenderPipelines.GUI_TEXTURED, skin,
-                0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
-        gr.pose().popMatrix();
+        gr.blit(skin,
+                0, 0, w, h,
+                40, 8, 8, 8,
+                SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE);
+        pose.popPose();
+        gr.setColor(prevColor[0], prevColor[1], prevColor[2], prevColor[3]);
     }
 }

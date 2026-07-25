@@ -16,7 +16,7 @@ public class Profile {
                     Profile::getNickname,
                     Codecs.STRING_UTF8,
                     Profile::getAvatarUrl,
-                    Codecs.LONG,
+                    Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
                     Profile::getUserId,
                     Profile::new
             );
