@@ -19,12 +19,12 @@ public class PlayingStatusRenderer implements HudRenderer {
     public static final Identifier MUTED_LOCATION;
 
     static {
-        LOADING_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/loader_circle.png");
-        RETRYING_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/rotate_cw.png");
-        ERROR_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/circle_x.png");
-        PLAYING_CONNECTED_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/link.png");
-        PLAYING_ISOLATED_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/unlink.png");
-        MUTED_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/volume_x.png");
+        LOADING_ICON_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/loader_circle.png");
+        RETRYING_ICON_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/rotate_cw.png");
+        ERROR_ICON_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/circle_x.png");
+        PLAYING_CONNECTED_ICON_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/link.png");
+        PLAYING_ISOLATED_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/unlink.png");
+        MUTED_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/volume_x.png");
     }
 
     private static volatile PlayingStatusRenderer instance;

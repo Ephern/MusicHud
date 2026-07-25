@@ -57,21 +57,38 @@ dependencies {
 
     implementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
 
-    common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     coreLib(project(path: ':core')) { transitive = false }
-    shadowBundle(project(path: ':common', configuration: 'transformProductionFabric')) { transitive = false }
     shadowBundle(project(path: ':core')) { transitive = false }
 
     implementation "net.fabricmc.fabric-api:fabric-api:$rootProject.fabric_api_version"
 
-    common project(':common')
-    shadowBundle (project(':common')) {transitive = false}
+    common(project(':common')) { transitive = false }
+    shadowBundle(project(':common')) { transitive = false }
 
     api "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:$rootProject.forge_config_api_port_version"
 
     implementation "com.terraformersmc:modmenu:$rootProject.modmenu_version"
 
     implementation("icyllis.modernui:ModernUI-Fabric:26.1.2-${rootProject.modernui_version}.+")
+    implementation("dev.icyllis:modernui-core:$rootProject.modernui_version") {
+        exclude group: "org.slf4j", module: "slf4j-api"
+        exclude group: "org.apache.logging.log4j", module: "log4j-core"
+        exclude group: "org.apache.logging.log4j", module: "log4j-api"
+        exclude group: "com.google.code.findbugs", module: "jsr305"
+        exclude group: "org.jetbrains", module: "annotations"
+        exclude group: "com.ibm.icu", module: "icu4j"
+        exclude group: "it.unimi.dsi", module: "fastutil"
+    }
+    implementation("icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version") {
+        exclude group: "org.slf4j", module: "slf4j-api"
+        exclude group: "org.apache.logging.log4j", module: "log4j-core"
+        exclude group: "org.apache.logging.log4j", module: "log4j-api"
+        exclude group: "com.google.code.findbugs", module: "jsr305"
+        exclude group: "org.jetbrains", module: "annotations"
+        exclude group: "com.ibm.icu", module: "icu4j"
+        exclude group: "it.unimi.dsi", module: "fastutil"
+        exclude group: "org.commonmark"
+    }
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"

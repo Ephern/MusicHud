@@ -5,7 +5,7 @@ import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.IPayload;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.apache.commons.lang3.StringUtils;
 import org.jetbrains.annotations.Nullable;
 
@@ -23,7 +23,7 @@ public interface IVanillaNetworkRegister extends INetworkRegister {
                 throw new IllegalStateException("No pre-cached metadata, and networkReceiver is null");
             }
             String name = String.join("_", StringUtils.splitByCharacterTypeCamelCase(clazz.getSimpleName())).toLowerCase();
-            return new PayloadMetadata<T>(new CustomPacketPayload.Type<>(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, name)), networkReceiver);
+            return new PayloadMetadata<T>(new CustomPacketPayload.Type<>(Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, name)), networkReceiver);
         });
     }
 }
