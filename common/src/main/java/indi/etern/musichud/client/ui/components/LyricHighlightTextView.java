@@ -109,7 +109,7 @@ public class LyricHighlightTextView extends TextView {
             if (statusUpdateProcessing) {
                 float fraction = (float) (getMillisBetween(playedDuration, statusUpdateTime) - fullLineHighlightDelay) / animationDurationMillis;
                 if (0 <= fraction && fraction < 1) {
-                    setTextColor(ColorEvaluator.evaluate(fraction, Color.toArgb(getCurrentTextColor()), Theme.EMPHASIZE_LYRIC_COLOR));
+                    setTextColor(ColorEvaluator.evaluate(fraction, getCurrentTextColor(), Theme.EMPHASIZE_LYRIC_COLOR));
                 } else if (fraction >= 1) {
                     setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
                     statusUpdateProcessing = false;

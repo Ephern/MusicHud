@@ -4,26 +4,28 @@ import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import icyllis.arc3d.core.ColorSpaces;
-import icyllis.modernui.annotation.NonNull;
-import icyllis.modernui.annotation.Nullable;
+import icyllis.arc3d.core.ColorSpace;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.core.Core;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.text.FontMetricsInt;
+import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.text.style.ImageSpan;
 import indi.etern.musichud.MusicHud;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -229,7 +231,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpaces.SRGB)
+                ColorSpace.get(ColorSpace.Named.SRGB))
         ) {
             wrap.setPixels(bitmap, 0, 0, 0, 0, width, height);
         }
@@ -247,7 +249,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpaces.SRGB);
+                ColorSpace.get(ColorSpace.Named.SRGB));
     }
 
     @SuppressWarnings("unused")
@@ -332,7 +334,17 @@ public class ImageUtils {
         return cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
             try (InputStream iconResourceStream = MusicHud.class.getResourceAsStream(s)) {
                 if (iconResourceStream != null) {
-                    return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                    if (Core.isOnUiThread()) {
+                        return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                    } else {
+                        CompletableFuture<Image> future = new CompletableFuture<>();
+                        MuiModApi.postToUiThread(() -> {
+                            try {
+                                future.complete(Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream)));
+                            } catch (Exception ignored) {}
+                        });
+                        return future.get();
+                    }
                 } else {
                     return null;
                 }

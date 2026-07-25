@@ -9,7 +9,9 @@
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
-    "SpanSetMixin"
+    "SpanSetMixin",
+    "ToastManagerMixin",
+    "ToastRecordAccessor"
   ],
   "injectors": {
     "defaultRequire": 1

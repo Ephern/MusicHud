@@ -29,7 +29,7 @@ public class Keybinds implements ClientRegister {
     private static final IClientLoginService I_CLIENT_LOGIN_SERVICE = LoginService.getInstance();
 
     public void register() {
-        String category = "key.category.music_hud.music_hud";
+        KeyMapping.Category category = KeyMapping.Category.register(MusicHud.location(MusicHud.MOD_ID));
         var mainMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".open_main",
                 InputConstants.Type.KEYSYM,

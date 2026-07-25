@@ -47,29 +47,31 @@ dependencies {
     implementation("net.neoforged.fancymodloader:earlydisplay:${rootProject.fancymodloader_version}")
     implementation("net.neoforged.fancymodloader:securejarhandler:${rootProject.fancymodloader_version}")
 
-    implementation("icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+")
-    modImplementation("dev.icyllis:modernui-core:${modernui_version}") {
-        exclude group: "org.slf4j", module: "slf4j-api"
-        exclude group: "org.apache.logging.log4j", module: "log4j-core"
-        exclude group: "org.apache.logging.log4j", module: "log4j-api"
-        exclude group: "com.google.code.findbugs", module: "jsr305"
-        exclude group: "org.jetbrains", module: "annotations"
-        exclude group: "com.ibm.icu", module: "icu4j"
-        exclude group: "it.unimi.dsi", module: "fastutil"
-//        exclude group: "org.commonmark"
-    }
-
-    modImplementation("icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version") {
-//        exclude group: "icyllis.modernui", module: "ModernUI-Core"
-        exclude group: "org.slf4j", module: "slf4j-api"
-        exclude group: "org.apache.logging.log4j", module: "log4j-core"
-        exclude group: "org.apache.logging.log4j", module: "log4j-api"
-        exclude group: "com.google.code.findbugs", module: "jsr305"
-        exclude group: "org.jetbrains", module: "annotations"
-        exclude group: "com.ibm.icu", module: "icu4j"
-        exclude group: "it.unimi.dsi", module: "fastutil"
-        exclude group: "org.commonmark"
-    }
+    // ModernUI NeoForge (replaced by fork JAR in run/client/mods/)
+    compileOnly("icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+")
+    // implementation("icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+")
+    // modImplementation("icyllis.modernui:ModernUI-Core:${modernui_version}") {
+    //     exclude group: "org.slf4j", module: "slf4j-api"
+    //     exclude group: "org.apache.logging.log4j", module: "log4j-core"
+    //     exclude group: "org.apache.logging.log4j", module: "log4j-api"
+    //     exclude group: "com.google.code.findbugs", module: "jsr305"
+    //     exclude group: "org.jetbrains", module: "annotations"
+    //     exclude group: "com.ibm.icu", module: "icu4j"
+    //     exclude group: "it.unimi.dsi", module: "fastutil"
+    //     // exclude group: "org.commonmark"
+    // }
+    //
+    // modImplementation("icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version") {
+    //     // exclude group: "icyllis.modernui", module: "ModernUI-Core"
+    //     exclude group: "org.slf4j", module: "slf4j-api"
+    //     exclude group: "org.apache.logging.log4j", module: "log4j-core"
+    //     exclude group: "org.apache.logging.log4j", module: "log4j-api"
+    //     exclude group: "com.google.code.findbugs", module: "jsr305"
+    //     exclude group: "org.jetbrains", module: "annotations"
+    //     exclude group: "com.ibm.icu", module: "icu4j"
+    //     exclude group: "it.unimi.dsi", module: "fastutil"
+    //     exclude group: "org.commonmark"
+    // }
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"
