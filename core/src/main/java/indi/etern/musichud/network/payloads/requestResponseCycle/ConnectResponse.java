@@ -53,7 +53,7 @@ public record ConnectResponse(boolean accepted, Version serverVersion,
                         if (payload.accepted()) {
                             if (Version.compatibleWith(payload.serverVersion)) {
                                 MusicHud.EXECUTOR.execute(IClientMusicService.getInstance()::checkAndResetInitialSync);
-                                if (clientDistUtil.inIntegratedServer()
+                                if (!clientDistUtil.inIntegratedServer()
                                         && MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED
                                         && clientConfig.getEnableIsolatedMode()) {
                                     clientLoginService.disconnectToExternalOrIntegratedServer();
