@@ -8,7 +8,7 @@ import indi.etern.musichud.network.IPlayerClient;
 import indi.etern.musichud.platform.Environment;
 import net.minecraft.world.entity.player.Player;
 import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.neoforge.client.event.lifecycle.ClientStoppingEvent;
+import net.neoforged.neoforge.event.GameShuttingDownEvent;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.server.ServerStoppingEvent;
@@ -57,7 +57,7 @@ public class NeoForgeCommonEventService implements ICommonEventService {
     }
 
     @SubscribeEvent
-    public void onClientStopping(ClientStoppingEvent event) {
+    public void onClientStopping(GameShuttingDownEvent event) {
         if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
             stoppingListeners.forEach(Runnable::run);
         }
