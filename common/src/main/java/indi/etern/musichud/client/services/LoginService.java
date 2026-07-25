@@ -308,24 +308,22 @@ public class LoginService implements IClientLoginService {
             eventService.registerClientPlayerJoin((player) -> {
                 MusicHud.EXECUTOR.execute(() -> {
                     ServerData currentServer = Minecraft.getInstance().getCurrentServer();
+                    LoginService loginService = getInstance();
                     if (currentServer != null) {
                         boolean autoConnectToServer = clientConfig.getEnableAutoConnect();
+                        loginService.launchIsolated();
                         if (autoConnectToServer) {
                             AutoConnectServerFilterType connectServerFilterType = clientConfig.getConnectServerFilterType();
                             if ((connectServerFilterType == AutoConnectServerFilterType.BLACK_LIST
                                     && clientConfig.getBlackList().stream().noneMatch(i -> Pattern.matches(i, currentServer.ip)))
                                     || (connectServerFilterType == AutoConnectServerFilterType.WHITE_LIST
                                     && clientConfig.getWhiteList().stream().anyMatch(i -> Pattern.matches(i, currentServer.ip)))) {
-                                getInstance().connectToExternalServer();
-                            } else {
-                                getInstance().launchIsolated();
+                                loginService.connectToExternalServer();
                             }
-                        } else {
-                            getInstance().launchIsolated();
                         }
                     } else {
                         // Single Player
-                        getInstance().connectToExternalServer();
+                        loginService.connectToExternalServer();
                     }
                 });
             });
