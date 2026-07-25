@@ -18,7 +18,9 @@ import net.minecraft.client.resources.language.I18n;
 import net.minecraft.sounds.SoundSource;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
+import org.lwjgl.openal.SOFTDirectChannels;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
@@ -164,6 +166,9 @@ public class StreamAudioPlayer {
             AL10.alSourcei(source, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE);
             AL10.alSource3f(source, AL10.AL_POSITION, 0, 0, 0);
             AL10.alSourcef(source, AL10.AL_ROLLOFF_FACTOR, 0);
+            if (AL.getCapabilities().AL_SOFT_direct_channels) {
+                AL10.alSourcei(source, SOFTDirectChannels.AL_DIRECT_CHANNELS_SOFT, AL10.AL_TRUE);
+            }
             checkALError("source configuration");
             lastVolume = 1;
 
