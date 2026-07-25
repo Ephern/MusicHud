@@ -33,7 +33,7 @@ import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.*;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.commons.lang3.Range;
 import org.jetbrains.annotations.NotNull;

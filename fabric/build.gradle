@@ -1,10 +1,37 @@
 plugins {
+    id 'net.fabricmc.fabric-loom' version '1.17.12'
     id 'com.gradleup.shadow'
+    id 'maven-publish'
 }
 
-architectury {
-    platformSetupLoomIde()
-    fabric()
+base {
+    archivesName = "$rootProject.archives_name-$project.name"
+}
+
+repositories {
+    maven {
+        name = 'NeoForged'
+        url = 'https://maven.neoforged.net/releases'
+    }
+    maven {
+        name = "Fuzs Mod Resources"
+        url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/"
+    }
+    maven {
+        name = "Terraformers"
+        url = "https://maven.terraformersmc.com/"
+    }
+    maven {
+        name "IzzelAliz Maven"
+        url "https://maven.izzel.io/releases/"
+    }
+    maven {
+        name "JitPack"
+        url 'https://jitpack.io'
+    }
+    flatDir {
+        dir rootProject.file('libs')
+    }
 }
 
 configurations {
@@ -18,10 +45,7 @@ configurations {
     }
     compileClasspath.extendsFrom common, coreLib
     runtimeClasspath.extendsFrom common, coreLib
-    developmentFabric.extendsFrom common
 
-    // Files in this configuration will be bundled into your mod using the Shadow plugin.
-    // Don't use the `shadow` configuration from the plugin itself as it's meant for excluding files.
     shadowBundle {
         canBeResolved = true
         canBeConsumed = false
@@ -29,27 +53,25 @@ configurations {
 }
 
 dependencies {
-    modImplementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
+    minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
 
-    // Fabric API. This is technically optional, but you probably want it anyway.
-    modImplementation "net.fabricmc.fabric-api:fabric-api:$rootProject.fabric_api_version"
+    implementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
 
     common(project(path: ':common', configuration: 'namedElements')) { transitive = false }
     coreLib(project(path: ':core')) { transitive = false }
     shadowBundle(project(path: ':common', configuration: 'transformProductionFabric')) { transitive = false }
     shadowBundle(project(path: ':core')) { transitive = false }
 
-    // Forge Config Api Port for Fabric
-    modApi "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:$rootProject.forge_config_api_port_version"
+    implementation "net.fabricmc.fabric-api:fabric-api:$rootProject.fabric_api_version"
 
-    modApi("me.shedaniel.cloth:cloth-config-fabric:$rootProject.cloth_config_version") {
-        exclude(group: "net.fabricmc.fabric-api")
-    }
+    common project(':common')
+    shadowBundle (project(':common')) {transitive = false}
 
-    modImplementation "com.terraformersmc:modmenu:$rootProject.modmenu_version"
+    api "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:$rootProject.forge_config_api_port_version"
 
-    // ModernUI Fabric
-    modImplementation("icyllis.modernui:ModernUI-Fabric:1.21.8-${rootProject.modernui_version}.+")
+    implementation "com.terraformersmc:modmenu:$rootProject.modmenu_version"
+
+    implementation("icyllis.modernui:ModernUI-Fabric:26.1.2-${rootProject.modernui_version}.+")
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"
@@ -63,6 +85,31 @@ dependencies {
     shadowBundle "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
     implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
     shadowBundle "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
+
+    compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+    testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+    testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+sourceSets {
+    main {
+        resources {
+            srcDir project(':common').file('src/main/resources')
+        }
+    }
+}
+
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(25)
+    }
+    withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
 }
 
 processResources {
@@ -79,26 +126,36 @@ shadowJar {
     exclude 'org/slf4j/**'
 }
 
-remapJar {
-    inputFile.set shadowJar.archiveFile
+jar {
     dependsOn shadowJar
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    from(zipTree(shadowJar.archiveFile))
 }
 
 loom {
     runs {
         client {
-            setRunDirectory file("run/client")
+            setRunDirectory file("../fabric/run/client")
             jvmArguments.addAll(
                     "-Dmusichud.log.level=DEBUG",
                     "-Dfabric.dli.config=${rootProject.rootDir}/.gradle/loom-cache/projects/${project.name}/launch.cfg"
             )
         }
         server {
-            setRunDirectory file("run/server")
+            setRunDirectory file("../fabric/run/server")
             jvmArguments.addAll(
                     "-Dmusichud.log.level=DEBUG",
                     "-Dfabric.dli.config=${rootProject.rootDir}/.gradle/loom-cache/projects/${project.name}/launch.cfg"
             )
+        }
+    }
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            artifactId = base.archivesName.get()
+            from components.java
         }
     }
 }

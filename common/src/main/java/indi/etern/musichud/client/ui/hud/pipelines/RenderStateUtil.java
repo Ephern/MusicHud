@@ -1,8 +1,8 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
-import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.render.state.GuiElementRenderState;
-import net.minecraft.client.gui.render.state.GuiRenderState;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
+import net.minecraft.client.renderer.state.gui.GuiRenderState;
 
 import java.lang.invoke.MethodHandles;
 import java.lang.invoke.VarHandle;
@@ -13,7 +13,7 @@ public class RenderStateUtil {
 
     public RenderStateUtil() {
         try {
-            Class<?> clazz = GuiGraphics.class;
+            Class<?> clazz = GuiGraphicsExtractor.class;
             Field found = null;
             for (Field f : clazz.getDeclaredFields()) {
                 if (f.getType() == GuiRenderState.class) {
@@ -33,14 +33,14 @@ public class RenderStateUtil {
         }
     }
 
-    private GuiRenderState getGuiRenderState(GuiGraphics graphics) {
+    private GuiRenderState getGuiRenderState(GuiGraphicsExtractor graphics) {
         return (GuiRenderState) guiRenderStateHandle.get(graphics);
     }
 
     public void submitGuiElementRenderState(
-            GuiGraphics gr,
+            GuiGraphicsExtractor gr,
             GuiElementRenderState renderState
     ) {
-        getGuiRenderState(gr).submitGuiElement(renderState);
+        getGuiRenderState(gr).addGuiElement(renderState);
     }
 }

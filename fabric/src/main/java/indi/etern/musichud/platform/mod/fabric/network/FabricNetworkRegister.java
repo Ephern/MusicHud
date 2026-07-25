@@ -38,7 +38,7 @@ public class FabricNetworkRegister implements INetworkRegister {
             NetworkReceiver<T> serverReceiver
     ) {
         CustomPacketPayload.Type<CustomPacketPayloadWrapper<T>> type = IVanillaNetworkRegister.getMetaDataOrNew(clazz, serverReceiver).type();
-        PayloadTypeRegistry.playC2S().register(type, StreamCodecWrapper.of(codec));
+        PayloadTypeRegistry.serverboundPlay().register(type, StreamCodecWrapper.of(codec));
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
 
@@ -54,7 +54,7 @@ public class FabricNetworkRegister implements INetworkRegister {
             NetworkReceiver<T> clientReceiver
     ) {
         CustomPacketPayload.Type<CustomPacketPayloadWrapper<T>> type = IVanillaNetworkRegister.getMetaDataOrNew(clazz, clientReceiver).type();
-        PayloadTypeRegistry.playS2C().register(type, StreamCodecWrapper.of(codec));
+        PayloadTypeRegistry.clientboundPlay().register(type, StreamCodecWrapper.of(codec));
 
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
         if (side == Environment.Side.CLIENT) {

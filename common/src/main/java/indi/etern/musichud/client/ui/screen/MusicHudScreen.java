@@ -29,9 +29,11 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.Nullable;
@@ -91,16 +93,11 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public void resize(@NonNull Minecraft minecraft, int width, int height) {
-        super.resize(minecraft, width, height);
-    }
-
-    @Override
-    public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
+    public void extractBackground(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
         if (callback == null || callback.hasDefaultBackground()) {
-            if (minecraft != null && minecraft.level == null) {
-                super.renderBackground(gr, mouseX, mouseY, deltaTick);
+            if (minecraft.level == null) {
+                super.extractBackground(gr, mouseX, mouseY, deltaTick);
             } else {
                 BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
             }
@@ -110,8 +107,9 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
+    public void extractRenderState(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
         mHost.render(gr, mouseX, mouseY, deltaTick);
+        super.extractRenderState(gr, mouseX, mouseY, deltaTick);
     }
 
     @Override
@@ -155,54 +153,69 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         return false;
     }
 
-    // IMPL - GuiEventListener
-
     @Override
     public void onBackPressed() {
         mHost.getOnBackPressedDispatcher().onBackPressed();
     }
 
+    // IMPL - GuiEventListener
+
     @Override
     public void mouseMoved(double mouseX, double mouseY) {
+        super.mouseMoved(mouseX, mouseY);
         mHost.onHoverMove(true);
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int mouseButton) {
+    public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
+        super.mouseClicked(event, doubleClick);
         return false;
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int mouseButton) {
+    public boolean mouseReleased(@NonNull MouseButtonEvent event) {
+        super.mouseReleased(event);
         return false;
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int mouseButton, double deltaX, double deltaY) {
+    public boolean mouseDragged(@NonNull MouseButtonEvent event, double dx, double dy) {
+        super.mouseDragged(event, dx, dy);
         return true;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
+        if (super.mouseScrolled(mouseX, mouseY, deltaX, deltaY)) {
+            return true;
+        }
         mHost.onScroll(deltaX, deltaY);
         return true;
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        mHost.onKeyPress(keyCode, scanCode, modifiers);
+    public boolean keyPressed(@NonNull KeyEvent event) {
+        if (getFocused() != null && getFocused().keyPressed(event)) {
+            return true;
+        }
+        mHost.onKeyPress(event.key(), event.scancode(), event.modifiers());
         return false;
     }
 
     @Override
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        mHost.onKeyRelease(keyCode, scanCode, modifiers);
+    public boolean keyReleased(@NonNull KeyEvent event) {
+        if (getFocused() != null && getFocused().keyReleased(event)) {
+            return true;
+        }
+        mHost.onKeyRelease(event.key(), event.scancode(), event.modifiers());
         return false;
     }
 
     @Override
-    public boolean charTyped(char ch, int modifiers) {
-        return mHost.onCharTyped(ch);
+    public boolean charTyped(@NonNull CharacterEvent event) {
+        if (getFocused() != null && getFocused().charTyped(event)) {
+            return true;
+        }
+        return mHost.onCharTyped(event.codepoint());
     }
 }
-

@@ -60,8 +60,10 @@ public class AlbumImageRenderer implements HudRenderer {
         TextureSetup textureSetup;
         if (currentTexture != null) {
             textureSetup = transitionTexture != null ?
-                    TextureSetup.doubleTexture(currentTexture.getTextureView(), transitionTexture.getTextureView())
-                    : TextureSetup.singleTexture(currentTexture.getTextureView());
+                    TextureSetup.doubleTexture(
+                            currentTexture.getTextureView(), currentTexture.getSampler(),
+                            transitionTexture.getTextureView(), transitionTexture.getSampler()
+                    ) : TextureSetup.singleTexture(currentTexture.getTextureView(), currentTexture.getSampler());
         } else {
             textureSetup = TextureSetup.noTexture();
         }

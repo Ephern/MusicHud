@@ -3,9 +3,9 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 import org.jetbrains.annotations.Nullable;
 
@@ -15,16 +15,16 @@ public class PlayerHeadRenderer implements HudRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
     @Getter
     private Layout layout;
-    private ResourceLocation previousSkinResource;
-    private ResourceLocation skinResource;
+    private Identifier previousSkinResource;
+    private Identifier skinResource;
     @Getter
-    private Supplier<ResourceLocation> playerSkinSupplier;
+    private Supplier<Identifier> playerSkinSupplier;
     private long lastUpdateTime = -1;
     private static final int TRANSITION_DURATION = 400;
 
-    public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
+    public void setPlayerSkinSupplier(@Nullable Supplier<Identifier> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
-        ResourceLocation newSkin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
+        Identifier newSkin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
         long now = System.currentTimeMillis();
         if (now - lastUpdateTime > TRANSITION_DURATION) {
             previousSkinResource = skinResource;
@@ -46,7 +46,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         long currentTimeMillis = System.currentTimeMillis();
         try {
             if (playerSkinSupplier != null) {
-                ResourceLocation skin = playerSkinSupplier.get();
+                Identifier skin = playerSkinSupplier.get();
                 if (skinResource != skin) {
                     if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
                         previousSkinResource = skinResource;
@@ -78,7 +78,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         }
     }
 
-    public static void renderHead(GuiGraphics gr, ResourceLocation skin,
+    public static void renderHead(GuiGraphicsExtractor gr, Identifier skin,
                                    float x, float y, int w, int h, float alpha) {
         if (alpha <= 0.003) {
             return;

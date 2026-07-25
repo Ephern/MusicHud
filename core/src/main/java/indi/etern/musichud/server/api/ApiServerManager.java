@@ -79,7 +79,7 @@ public class ApiServerManager implements ServerRegister {
             return;
         }
         initialized = true;
-        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && !clientConfig.getEnabledInIntegratedServer()) {
+        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT && clientConfig != null && !clientConfig.getEnabledInIntegratedServer()) {
             return;
         }
         if (serverConfig.getStartupBinaryApiServerWhenLaunch()) {
