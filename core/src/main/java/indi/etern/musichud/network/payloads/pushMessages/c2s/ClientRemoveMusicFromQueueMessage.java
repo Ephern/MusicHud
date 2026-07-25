@@ -13,7 +13,7 @@ public record ClientRemoveMusicFromQueueMessage(int index, long id) implements C
     public static final ByteBufCodec<ClientRemoveMusicFromQueueMessage> CODEC = ByteBufCodec.composite(
             Codecs.INT,
             ClientRemoveMusicFromQueueMessage::index,
-            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
+            Codecs.LONG,
             ClientRemoveMusicFromQueueMessage::id,
             ClientRemoveMusicFromQueueMessage::new
     );

@@ -14,7 +14,7 @@ public record SendPhoneValidationCodeRequest(int regionCode, long phone) impleme
     public static final ByteBufCodec<SendPhoneValidationCodeRequest> CODEC = ByteBufCodec.composite(
                     Codecs.INT,
                     SendPhoneValidationCodeRequest::regionCode,
-                    Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
+                    Codecs.LONG,
                     SendPhoneValidationCodeRequest::phone,
                     SendPhoneValidationCodeRequest::new
             );

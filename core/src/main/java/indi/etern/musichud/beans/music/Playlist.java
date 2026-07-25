@@ -15,11 +15,11 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Playlist implements MusicCollection {
     public static final ByteBufCodec<Playlist> CODEC = ByteBufCodec.composite(
-            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
+            Codecs.LONG,
             Playlist::getId,
             Codecs.STRING_UTF8,
             Playlist::getName,
-            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
+            Codecs.LONG,
             Playlist::getCoverImgId,
             Codecs.STRING_UTF8,
             Playlist::getCoverImgId_str,

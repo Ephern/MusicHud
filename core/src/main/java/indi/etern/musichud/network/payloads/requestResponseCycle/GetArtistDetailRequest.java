@@ -14,7 +14,7 @@ import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 
 public record GetArtistDetailRequest(long id) implements C2SPayload {
     public static final ByteBufCodec<GetArtistDetailRequest> CODEC = ByteBufCodec.composite(
-            Codecs.VAR_LONG,//TODO replace with Codecs.LONG in 1.3.0
+            Codecs.LONG,
             GetArtistDetailRequest::id,
             GetArtistDetailRequest::new
     );
