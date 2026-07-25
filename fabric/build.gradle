@@ -49,8 +49,8 @@ dependencies {
     modImplementation "com.terraformersmc:modmenu:$rootProject.modmenu_version"
 
     // ModernUI Fabric (replaced by fork JAR in run/client/mods/)
-    compileOnly("icyllis.modernui:ModernUI-Fabric:1.21.8-${rootProject.modernui_version}.+")
-    // modImplementation("icyllis.modernui:ModernUI-Fabric:1.21.8-${rootProject.modernui_version}.+")
+    implementation "icyllis.modernui:ModernUI-Fabric:1.21.8-${rootProject.modernui_version}.+"
+//     modImplementation("icyllis.modernui:ModernUI-Fabric:1.21.8-${rootProject.modernui_version}.+")
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"

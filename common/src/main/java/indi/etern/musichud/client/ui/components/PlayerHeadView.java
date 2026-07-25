@@ -15,7 +15,7 @@ import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -36,11 +36,11 @@ public class PlayerHeadView extends FrameLayout {
     private final ImageView faceView;
     private final ImageView hatView;
     @Getter
-    private Supplier<ResourceLocation> playerSkinSupplier;
+    private Supplier<Identifier> playerSkinSupplier;
     @Setter
     @Getter
-    private ResourceLocation skin;
-    private ResourceLocation lastRenderedSkin;
+    private Identifier skin;
+    private Identifier lastRenderedSkin;
     private final ViewTreeObserver.OnPreDrawListener preDrawListener = () -> {
 //        if (RenderSystem.isOnRenderThread()) {
         updateHeadImage();
@@ -86,7 +86,7 @@ public class PlayerHeadView extends FrameLayout {
         getViewTreeObserver().removeOnPreDrawListener(preDrawListener);
     }
 
-    public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
+    public void setPlayerSkinSupplier(@Nullable Supplier<Identifier> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
         skin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
 //        if (RenderSystem.isOnRenderThread()) {

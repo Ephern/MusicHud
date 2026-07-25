@@ -7,24 +7,24 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.resources.ResourceLocation;
+import net.minecraft.resources.Identifier;
 
 public class PlayingStatusRenderer implements HudRenderer {
     // From Lucide Icons
-    public static final ResourceLocation LOADING_ICON_LOCATION;
-    public static final ResourceLocation RETRYING_ICON_LOCATION;
-    public static final ResourceLocation ERROR_ICON_LOCATION;
-    public static final ResourceLocation PLAYING_CONNECTED_ICON_LOCATION;
-    public static final ResourceLocation PLAYING_ISOLATED_LOCATION;
-    public static final ResourceLocation MUTED_LOCATION;
+    public static final Identifier LOADING_ICON_LOCATION;
+    public static final Identifier RETRYING_ICON_LOCATION;
+    public static final Identifier ERROR_ICON_LOCATION;
+    public static final Identifier PLAYING_CONNECTED_ICON_LOCATION;
+    public static final Identifier PLAYING_ISOLATED_LOCATION;
+    public static final Identifier MUTED_LOCATION;
 
     static {
-        LOADING_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/loader_circle.png");
-        RETRYING_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/rotate_cw.png");
-        ERROR_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/circle_x.png");
-        PLAYING_CONNECTED_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/link.png");
-        PLAYING_ISOLATED_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/unlink.png");
-        MUTED_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/volume_x.png");
+        LOADING_ICON_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/loader_circle.png");
+        RETRYING_ICON_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/rotate_cw.png");
+        ERROR_ICON_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/circle_x.png");
+        PLAYING_CONNECTED_ICON_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/link.png");
+        PLAYING_ISOLATED_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/unlink.png");
+        MUTED_LOCATION = Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/volume_x.png");
     }
 
     private static volatile PlayingStatusRenderer instance;
@@ -34,7 +34,7 @@ public class PlayingStatusRenderer implements HudRenderer {
     private Layout layout;
     @Setter
     private boolean visibility = true;
-    private ResourceLocation currentResourceLocation;
+    private Identifier currentResourceLocation;
 
     public static PlayingStatusRenderer getInstance() {
         if (instance == null) {
@@ -74,7 +74,7 @@ public class PlayingStatusRenderer implements HudRenderer {
 
     @Override
     public void render(HudRenderContext hudRenderContext) {
-        ResourceLocation currentResourceLocation1 = currentResourceLocation;
+        Identifier currentResourceLocation1 = currentResourceLocation;
         if (currentResourceLocation1 != null && visibility) {
             float rotationRadians;
             if (currentResourceLocation1 == RETRYING_ICON_LOCATION || currentResourceLocation1 == LOADING_ICON_LOCATION) {
