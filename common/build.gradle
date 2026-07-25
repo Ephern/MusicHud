@@ -22,6 +22,17 @@ repositories {
         name = "Terraformers"
         url = "https://maven.terraformersmc.com/"
     }
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
     maven {
         name "IzzelAliz Maven"
         url "https://maven.izzel.io/releases/"
@@ -68,7 +79,7 @@ dependencies {
 
     api "dev.icyllis:modernui-core:$rootProject.modernui_version"
     api "icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version"
-    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.1.2-$rootProject.modernui_version.+"
+    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.2-$rootProject.modernui_version.+"
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"

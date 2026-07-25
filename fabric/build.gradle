@@ -17,9 +17,16 @@ repositories {
         name = "Fuzs Mod Resources"
         url = "https://raw.githubusercontent.com/Fuzss/modresources/main/maven/"
     }
-    maven {
-        name = "Terraformers"
-        url = "https://maven.terraformersmc.com/"
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
     }
     maven {
         name "IzzelAliz Maven"
@@ -67,9 +74,9 @@ dependencies {
 
     api "fuzs.forgeconfigapiport:forgeconfigapiport-fabric:$rootProject.forge_config_api_port_version"
 
-    implementation "com.terraformersmc:modmenu:$rootProject.modmenu_version"
+    implementation "maven.modrinth:modmenu:$rootProject.modmenu_version"
 
-    implementation("icyllis.modernui:ModernUI-Fabric:26.1.2-${rootProject.modernui_version}.+")
+    implementation("icyllis.modernui:ModernUI-Fabric:26.2-${rootProject.modernui_version}.+")
     implementation("dev.icyllis:modernui-core:$rootProject.modernui_version") {
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "org.apache.logging.log4j", module: "log4j-core"

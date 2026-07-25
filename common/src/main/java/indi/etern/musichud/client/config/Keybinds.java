@@ -75,7 +75,7 @@ public class Keybinds implements ClientRegister {
         );
         IKeyRegistryService service = IKeyRegistryService.getInstance();
         service.register(mainMapping, () -> {
-            Minecraft.getInstance().setScreen(MusicHudScreen.createScreen(new MainFragment(), null, null, "Music HUD"));
+            Minecraft.getInstance().gui.setScreen(MusicHudScreen.createScreen(new MainFragment(), null, null, "Music HUD"));
         });
         service.register(voteMapping, () -> {
             MusicHud.EXECUTOR.execute(() -> {
