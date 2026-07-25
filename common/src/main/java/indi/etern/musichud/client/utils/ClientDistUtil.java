@@ -49,7 +49,7 @@ public class ClientDistUtil implements IClientDistUtil {
 
     @Override
     public boolean inIntegratedServer() {
-        return Minecraft.getInstance().getCurrentServer() != null;
+        return Minecraft.getInstance().getCurrentServer() == null;
     }
 
     @Override
