@@ -9,7 +9,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.MusicListItem;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 

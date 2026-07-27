@@ -273,6 +273,50 @@ public class ServerApiMeta {
                 Set.of(200),
                 String.class
         );
+        public static final UrlMeta<String> MODIFY_LIKE_LIST = new UrlMeta<>(
+                "/like",
+                Set.of("id"),
+                Set.of("like"),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class
+        );
+        public static final UrlMeta<String> MODIFY_LIKE_LIST_V1 = new UrlMeta<>(
+                "/like",
+                Set.of("id", "uid", "like"),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class
+        );
+        public static final UrlMeta<String> GAIN_30MIN_FREE_LISTEN = new UrlMeta<>(
+                "/ad/listening/rights/gain",
+                null,
+                Set.of("reqUid"),
+                true,
+                false,
+                false,
+                false,
+                Set.of(200),
+                String.class
+        );
+        public static final UrlMeta<String> FREE_LISTEN_REMAIN_TIME = new UrlMeta<>(
+                "/ad/listening/rights",
+                null,
+                null,
+                true,
+                false,
+                false,
+                false,
+                Set.of(200),
+                String.class
+        );
     }
 
     public static class Artist {

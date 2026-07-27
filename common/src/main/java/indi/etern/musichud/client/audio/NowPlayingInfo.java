@@ -4,7 +4,7 @@ import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.LyricInfo;
-import indi.etern.musichud.client.ui.beans.LyricLine;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;

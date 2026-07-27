@@ -17,7 +17,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SearchRequest;

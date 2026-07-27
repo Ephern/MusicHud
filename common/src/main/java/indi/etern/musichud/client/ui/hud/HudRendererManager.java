@@ -11,7 +11,7 @@ import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
-import indi.etern.musichud.client.ui.utils.ColorExtractor;
+import indi.etern.musichud.client.ui.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;

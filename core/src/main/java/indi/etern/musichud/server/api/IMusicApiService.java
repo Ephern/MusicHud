@@ -47,4 +47,12 @@ public interface IMusicApiService {
     List<Artist> getPlayersUserSubscribedArtists(UUID playerUUID);
 
     LyricInfo getLyricInfo(MusicDetail musicDetail);
+
+    void addToLikedList(long musicId, UUID uuid);
+
+    void removeFromLikedList(long musicId, UUID uuid);
+
+    void addToPlaylist(long playlistId, long musicId, UUID uuid);
+
+    void removeFromPlaylist(long playlistId, long musicId, UUID uuid);
 }

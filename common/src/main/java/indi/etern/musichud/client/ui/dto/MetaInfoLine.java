@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.utils.lyrics.beans;
+package indi.etern.musichud.client.ui.dto;
 
 import com.google.gson.annotations.SerializedName;
 

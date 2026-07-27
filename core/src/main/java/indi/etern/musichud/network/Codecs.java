@@ -11,6 +11,16 @@ import java.util.*;
 import java.util.function.Supplier;
 
 public class Codecs {
+    public static final ByteBufCodec<Void> VOID = new ByteBufCodec<Void>() {
+        @Override
+        public void encode(ByteBuf byteBuf, Void value) {
+        }
+
+        @Override
+        public Void decode(ByteBuf byteBuf) {
+            return null;
+        }
+    };
     public static final ByteBufCodec<Boolean> BOOL = new ByteBufCodec<>() {
         public Boolean decode(ByteBuf byteBuf) {
             return byteBuf.readBoolean();

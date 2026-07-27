@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.beans;
+package indi.etern.musichud.client.ui.dto;
 
 import icyllis.modernui.graphics.Canvas;
 import icyllis.modernui.graphics.text.FontMetricsInt;

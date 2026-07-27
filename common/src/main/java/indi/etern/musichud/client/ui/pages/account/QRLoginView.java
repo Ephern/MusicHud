@@ -11,7 +11,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.UrlImageView;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.requestResponseCycle.CancelQRLoginRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginRequest;
@@ -48,8 +48,6 @@ public class QRLoginView extends LinearLayout implements ILoginView{
         urlImageView.setLayoutParams(imageParams);
 
         loginButton = new Button(context);
-        loginButton.setFocusable(true);
-        loginButton.setClickable(true);
         loginButton.setTextColor(Theme.PRIMARY_COLOR);
         loginButton.setHeight(dp(36));
         loginButton.setWidth(dp(84));

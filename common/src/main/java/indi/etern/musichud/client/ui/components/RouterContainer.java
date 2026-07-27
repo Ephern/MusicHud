@@ -6,8 +6,8 @@ import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
-import indi.etern.musichud.client.ui.utils.EasingInterpolator;
-import indi.etern.musichud.client.ui.utils.Easing;
+import indi.etern.musichud.client.ui.utils.ui.EasingInterpolator;
+import indi.etern.musichud.client.ui.utils.ui.Easing;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -243,7 +243,7 @@ public class RouterContainer extends FrameLayout {
     }
 
     public void navigateToRoot(@NonNull String key, @Nullable TransitionType transitionType) {
-        if (key.equals(currentPageKey) && !isTransitioning) {
+        if (key.equals(currentPageKey) && routeStack.size() == 1 && !isTransitioning) {
             return;
         }
 

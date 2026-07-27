@@ -2,8 +2,11 @@ package indi.etern.musichud.client.ui.pages;
 
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
@@ -12,7 +15,7 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ScrollView;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.beans.LyricLine;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
@@ -22,7 +25,8 @@ import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicListItem;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
@@ -344,7 +348,13 @@ public class HomeView extends LinearLayout {
         assert Minecraft.getInstance().player != null;
         if (musicDetail.getPusherInfo().getPlayerUUID().equals(Minecraft.getInstance().player.getUUID())) {
             Button removeButton = new Button(getContext());
-            removeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.remove"));
+            String removeText = I18n.get(MusicHud.MOD_ID + ".button.remove");
+            SpannableString removeSpannableString = new SpannableString(removeText);
+            Image removeIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/trash_2.png");
+            if (removeIcon != null) {
+                removeSpannableString.setSpan(ImageUtils.getIconSpan(removeIcon), 0, removeText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            removeButton.setText(removeSpannableString);
             removeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             removeButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             Drawable background = ButtonInsetBackgroundFactory.builder()

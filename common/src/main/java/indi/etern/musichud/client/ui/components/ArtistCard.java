@@ -8,7 +8,7 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import net.minecraft.client.resources.language.I18n;
 
 public class ArtistCard extends LinearLayout {
@@ -39,7 +39,9 @@ public class ArtistCard extends LinearLayout {
         addView(texts);
 
         artistName = new TextView(context);
-        artistName.setSingleLine();
+        artistName.setSingleLine(false);
+        artistName.setMaxLines(2);
+        artistName.setMaxWidth(dp(100));
         artistName.setTextSize(Theme.TEXT_SIZE_LARGE);
         artistName.setTextColor(Theme.NORMAL_TEXT_COLOR);
         artistName.setTextAlignment(TEXT_ALIGNMENT_CENTER);

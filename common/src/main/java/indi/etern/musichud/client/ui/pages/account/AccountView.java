@@ -22,7 +22,7 @@ import indi.etern.musichud.client.ui.components.ArtistCard;
 import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.UrlImageView;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
@@ -73,8 +73,6 @@ public class AccountView extends LinearLayout {
             textView.setLayoutParams(params1);
 
             Button retryButton = new Button(context);
-            retryButton.setFocusable(true);
-            retryButton.setClickable(true);
             retryButton.setTextColor(Theme.PRIMARY_COLOR);
             retryButton.setHeight(dp(36));
             retryButton.setWidth(dp(84));
@@ -95,8 +93,6 @@ public class AccountView extends LinearLayout {
                     .cornerRadius(dp(4)).inset(dp(1)).build();
 
             Button logoutButton = new Button(context);
-            logoutButton.setFocusable(true);
-            logoutButton.setClickable(true);
             logoutButton.setTextColor(Theme.PRIMARY_COLOR);
             logoutButton.setHeight(dp(36));
             logoutButton.setWidth(dp(84));
@@ -180,8 +176,6 @@ public class AccountView extends LinearLayout {
             infoLayout.addView(buttonsLayout);
 
             Button refreshButton = new Button(context);
-            refreshButton.setFocusable(true);
-            refreshButton.setClickable(true);
             refreshButton.setTextColor(Theme.PRIMARY_COLOR);
             refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             refreshButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));

@@ -6,9 +6,13 @@ import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
+import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.util.DataSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.LayoutInflater;
@@ -17,7 +21,7 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.client.ui.beans.LyricLine;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
@@ -29,8 +33,9 @@ import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
+import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.NonNull;
@@ -79,6 +84,7 @@ public class MainFragment extends Fragment {
     private TextView serverConnectStatus;
     private Button switchServerConnectButton;
     private PlayerHeadView pusherHeadView;
+    private LinearLayout buttonsLayout;
 
     public MainFragment() {
     }
@@ -115,7 +121,7 @@ public class MainFragment extends Fragment {
                 instance.pusherText.setText("");
                 instance.progressBar.setVisibility(View.GONE);
                 instance.progressText.setText("");
-                instance.skipCurrentButton.setVisibility(View.GONE);
+                instance.buttonsLayout.setVisibility(View.GONE);
             } else {
                 instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(240));
@@ -148,8 +154,6 @@ public class MainFragment extends Fragment {
                             .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
                             .build().newBackgroundDrawable();
                     artistButton.setBackground(background);
-                    artistButton.setFocusable(true);
-                    artistButton.setClickable(true);
                     artistButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
                     artistButton.setTextColor(Theme.PRIMARY_COLOR);
                     artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
@@ -173,8 +177,6 @@ public class MainFragment extends Fragment {
                         .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
                         .build().newBackgroundDrawable();
                 albumButton.setBackground(background);
-                albumButton.setFocusable(true);
-                albumButton.setClickable(true);
                 albumButton.setTextColor(Theme.PRIMARY_COLOR);
                 albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 albumButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
@@ -189,12 +191,10 @@ public class MainFragment extends Fragment {
                 });
                 instance.albumContainer.addView(albumButton);
 
-                instance.skipCurrentButton.setText(I18n.get(MusicHud.MOD_ID + ".button.voteForSkip"));
-                instance.skipCurrentButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+                instance.skipCurrentButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.voteForSkip"));
                 instance.skipCurrentButton.setEnabled(true);
-                instance.skipCurrentButton.setVisibility(clientConfig.getEnable() ? View.VISIBLE : View.GONE);
                 instance.progressBar.setVisibility(View.VISIBLE);
-                instance.skipCurrentButton.setVisibility(View.VISIBLE);
+                instance.buttonsLayout.setVisibility(View.VISIBLE);
                 startProgressUpdater(musicDetail);
             }
             HomeView homeView = HomeView.getInstance();
@@ -269,14 +269,19 @@ public class MainFragment extends Fragment {
 
                 var sideMenu = new SideMenu(context, routerContainer);
                 if (Minecraft.getInstance().player != null) {//in game
-                    var homeNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
-                    var searchNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.search"), SearchView::new);
-                    var accountNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.account"), AccountBaseView::new);
-                    var settingsNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
+                    var homeNav = sideMenu.createNavigationPage("Home", "/assets/music_hud/textures/gui/icons/house.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
+                    var searchNav = sideMenu.createNavigationPage("Search", "/assets/music_hud/textures/gui/icons/search.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.search"), SearchView::new);
+                    var accountNav = sideMenu.createNavigationPage("Account", "/assets/music_hud/textures/gui/icons/square_user_round.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.account"), AccountBaseView::new);
+                    var settingsNav = sideMenu.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
                     SideMenu.NavigationMeta defaultMeta = List.of(homeNav, searchNav, accountNav, settingsNav).get(defaultSelectedIndex);
                     defaultMeta.select();
                 } else {
-                    var settingsNav = sideMenu.createNavigationPage(I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
+                    var settingsNav = sideMenu.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
                     settingsNav.select();
                 }
 
@@ -370,39 +375,93 @@ public class MainFragment extends Fragment {
                 params3.setMargins(0, sideContent.dp(4), 0, 0);
                 musicInfo.addView(progressText, params3);
 
-                skipCurrentButton = new Button(context);
-                skipCurrentButton.setFocusable(true);
-                skipCurrentButton.setClickable(true);
-                skipCurrentButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                skipCurrentButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                skipCurrentButton.setGravity(Gravity.CENTER);
-                skipCurrentButton.setText(I18n.get(MusicHud.MOD_ID + ".button.voteForSkip"));
+                buttonsLayout = new LinearLayout(context);
+                buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
+
+                ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                        .padding(new ButtonInsetBackgroundFactory.Padding(buttonsLayout.dp(2), buttonsLayout.dp(1), buttonsLayout.dp(2), buttonsLayout.dp(1)))
+                        .cornerRadius(buttonsLayout.dp(4)).build();
+                {
+                    Button likeButton = new Button(context);
+                    likeButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+                    likeButton.setGravity(Gravity.CENTER);
+                    String text = I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicLike");
+                    SpannableString iconLikeText = new SpannableString(text);
+                    Image likeImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/heart.png");
+                    if (likeImage != null) {
+                        ImageSpan span = ImageUtils.getIconSpan(likeImage);
+                        iconLikeText.setSpan(span, 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        likeButton.setText(iconLikeText);
+                        likeButton.setTextSize(Theme.TEXT_SIZE_LARGE);
+                        likeButton.setTooltipText(text);
+                    } else {
+                        likeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                        likeButton.setText(text);
+                    }
+                    likeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+                    buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
+                }
+                {
+                    Button addToPlaylistButton = new Button(context);
+                    addToPlaylistButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+                    addToPlaylistButton.setGravity(Gravity.CENTER);
+                    String text = I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicPlaylist");
+                    SpannableString iconLikeText = new SpannableString(text);
+                    Image likeImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_plus.png");
+                    if (likeImage != null) {
+                        ImageSpan span = ImageUtils.getIconSpan(likeImage);
+                        iconLikeText.setSpan(span, 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        addToPlaylistButton.setText(iconLikeText);
+                        addToPlaylistButton.setTextSize(Theme.TEXT_SIZE_LARGE);
+                        addToPlaylistButton.setTooltipText(text);
+                    } else {
+                        addToPlaylistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                        addToPlaylistButton.setText(text);
+                    }
+                    addToPlaylistButton.setBackground(backgroundFactory.newBackgroundDrawable());
+                    buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
+                }
+                {
+                    skipCurrentButton = new Button(context);
+                    skipCurrentButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+                    skipCurrentButton.setGravity(Gravity.CENTER);
+                    String skipText = I18n.get(MusicHud.MOD_ID + ".button.voteForSkip");
+                    SpannableString iconSkipText = new SpannableString(skipText);
+                    Image skipImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/skip_forward.png");
+                    if (skipImage != null) {
+                        ImageSpan span = ImageUtils.getIconSpan(skipImage);
+                        iconSkipText.setSpan(span, 0, skipText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                        skipCurrentButton.setText(iconSkipText);
+                        skipCurrentButton.setTextSize(Theme.TEXT_SIZE_LARGE);
+                        skipCurrentButton.setTooltipText(skipText);
+                    } else {
+                        skipCurrentButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                        skipCurrentButton.setText(skipText);
+                    }
+
+                    skipCurrentButton.setBackground(backgroundFactory.newBackgroundDrawable());
+                    skipCurrentButton.setOnClickListener((v) -> {
+                        MusicService.getInstance().voteForSkipCurrent();
+                        MuiModApi.postToUiThread(() -> {
+                            skipCurrentButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                            skipCurrentButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".text.voted"));
+                            skipCurrentButton.setEnabled(false);
+                        });
+                    });
+                    buttonsLayout.addView(skipCurrentButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
+                }
 
                 NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
                 MusicDetail currentlyPlayingMusicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
                 MusicDetail nextToPlayMusicDetail = nowPlayingInfo.getNextToPlayIdleMusicDetail();
 
-                skipCurrentButton.setHeight(skipCurrentButton.dp(40));
-
-                var background = ButtonInsetBackgroundFactory.builder()
-                        .padding(new ButtonInsetBackgroundFactory.Padding(skipCurrentButton.dp(2), skipCurrentButton.dp(1), skipCurrentButton.dp(2), skipCurrentButton.dp(1)))
-                        .cornerRadius(skipCurrentButton.dp(4)).build().newBackgroundDrawable();
-                skipCurrentButton.setBackground(background);
-                skipCurrentButton.setOnClickListener((v) -> {
-                    MusicService.getInstance().voteForSkipCurrent();
-                    MuiModApi.postToUiThread(() -> {
-                        skipCurrentButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                        skipCurrentButton.setText(I18n.get(MusicHud.MOD_ID + ".text.voted"));
-                        skipCurrentButton.setEnabled(false);
-                    });
-                });
-                LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-                buttonParams.setMargins(0, sideContent.dp(2), 0, 0);
+                LinearLayout.LayoutParams buttonsParams = new LinearLayout.LayoutParams(MATCH_PARENT, buttonsLayout.dp(40));
+                buttonsParams.setMargins(0, sideContent.dp(2), 0, 0);
 
                 var params1 = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
                 params1.setMargins(sideContent.dp(8), sideContent.dp(4), sideContent.dp(8), sideContent.dp(24));
 
-                musicInfo.addView(skipCurrentButton, buttonParams);
+                musicInfo.addView(buttonsLayout, buttonsParams);
                 musicInfo.setMinimumHeight(sideContent.dp(132));
 
                 sideContent.addView(musicInfo, params1);
@@ -416,7 +475,6 @@ public class MainFragment extends Fragment {
 
                 sideScrollView.addView(sideContent, sideParams);
 
-
                 LinearLayout serverConnectPanel = new LinearLayout(context);
                 serverConnectPanel.setOrientation(LinearLayout.VERTICAL);
 
@@ -426,8 +484,6 @@ public class MainFragment extends Fragment {
                 serverConnectPanel.addView(serverConnectStatus, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
                 switchServerConnectButton = new Button(context);
-                switchServerConnectButton.setFocusable(true);
-                switchServerConnectButton.setClickable(true);
                 switchServerConnectButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 switchServerConnectButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));

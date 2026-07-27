@@ -414,6 +414,26 @@ public class MusicApiService implements IMusicApiService {
         }
     }
 
+    @Override
+    public void addToLikedList(long musicId, UUID uuid) {
+        //TODO
+    }
+
+    @Override
+    public void removeFromLikedList(long musicId, UUID uuid) {
+        //TODO
+    }
+
+    @Override
+    public void addToPlaylist(long playlistId, long musicId, UUID uuid) {
+        //TODO
+    }
+
+    @Override
+    public void removeFromPlaylist(long playlistId, long musicId, UUID uuid) {
+        //TODO
+    }
+
     record IdRequest(long id) {
     }
 

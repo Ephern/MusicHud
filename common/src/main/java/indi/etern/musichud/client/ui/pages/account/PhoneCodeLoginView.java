@@ -9,7 +9,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.payloads.requestResponseCycle.PhoneCodeLoginRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeRequest;

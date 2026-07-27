@@ -18,8 +18,8 @@ import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
-import indi.etern.musichud.client.ui.utils.Easing;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.Easing;
 import lombok.Getter;
 
 import java.util.function.BiConsumer;

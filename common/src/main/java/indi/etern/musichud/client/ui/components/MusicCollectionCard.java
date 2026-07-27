@@ -1,9 +1,13 @@
 package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.Button;
@@ -19,8 +23,9 @@ import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
+import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -54,9 +59,17 @@ public class MusicCollectionCard extends LinearLayout {
         imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp(128)));
         imageView.setCornerRadius(dp(8));
 
+        LinearLayout nameRow = new LinearLayout(context);
+        nameRow.setOrientation(HORIZONTAL);
+        nameRow.setBaselineAligned(false);
+        nameRow.setGravity(Gravity.TOP);
+        addView(nameRow);
+
         TextView name = new TextView(context);
         name.setTextSize(Theme.TEXT_SIZE_NORMAL);
         name.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        name.setSingleLine(false);
+        name.setMaxWidth(dp(120));
         boolean isPrivatePlaylistToUser =
                 musicCollection instanceof Playlist playlist && playlist.getPrivacy() == Privacy.PRIVATE
                         && !playlist.getCreator().equals(ProfileConfigData.getInstance().getProfile());
@@ -65,25 +78,23 @@ public class MusicCollectionCard extends LinearLayout {
         } else {
             name.setText(musicCollection.getName());
         }
-        LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        params1.setMargins(dp(4), 0, 0, 0);
-        addView(name, params1);
+        nameRow.addView(name, new LayoutParams(0, WRAP_CONTENT, 1));
 
         PusherInfo pusherInfo = musicCollection.getPusherInfo();
         LocalPlayer localPlayer = Minecraft.getInstance().player;
         if (pusherInfo == null || pusherInfo.equals(PusherInfo.EMPTY)
                 || (localPlayer != null && pusherInfo.getPlayerUUID().equals(localPlayer.getUUID()))) {
-            Button addToIdleSourceButton = new Button(context);
-            updateButton(addToIdleSourceButton);
-            addToIdleSourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            addToIdleSourceButton.setTextSize(Theme.TEXT_SIZE_SMALL);
+            Button modifyIdleSourceButton = new Button(context);
+            updateButton(modifyIdleSourceButton);
+            modifyIdleSourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            modifyIdleSourceButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             Drawable background1 = ButtonInsetBackgroundFactory.builder()
                     .inset(0)
                     .cornerRadius(dp(8))
-                    .padding(new ButtonInsetBackgroundFactory.Padding(dp(4), dp(8), dp(4), dp(8)))
+                    .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
                     .build().newBackgroundDrawable();
-            addToIdleSourceButton.setBackground(background1);
-            addToIdleSourceButton.setOnClickListener((v) -> {
+            modifyIdleSourceButton.setBackground(background1);
+            modifyIdleSourceButton.setOnClickListener((v) -> {
                 if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
                     ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
                     musicService.removeFromIdlePlaySource(musicCollection);
@@ -92,17 +103,19 @@ public class MusicCollectionCard extends LinearLayout {
                     musicService.addToIdlePlaySource(musicCollection);
                 }
             });
-            addView(addToIdleSourceButton, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            nameRow.addView(modifyIdleSourceButton, new LayoutParams(nameRow.dp(22), nameRow.dp(22), 0));
 
             Consumer<MusicCollection> listener = collection -> {
                 if (collection.equals(musicCollection)) {
-                    MuiModApi.postToUiThread(() -> updateButton(addToIdleSourceButton));
+                    MuiModApi.postToUiThread(() -> updateButton(modifyIdleSourceButton));
                 }
             };
 
+            musicService.getLocalIdlePlaySourceChangeListeners().add(listener);
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
                 @Override
                 public void onViewAttachedToWindow(View v) {
+                    updateButton(modifyIdleSourceButton);
                     musicService.getLocalIdlePlaySourceChangeListeners().add(listener);
                 }
 
@@ -168,11 +181,25 @@ public class MusicCollectionCard extends LinearLayout {
         }
     }
 
-    private void updateButton(Button addToIdleSourceButton) {
+    private void updateButton(Button modifyIdleSourceButton) {
         if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
-            addToIdleSourceButton.setText(I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"));
+            SpannableString text = new SpannableString("★");
+            Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/star_filled.png");
+            if (image != null) {
+                ImageSpan span = ImageUtils.getIconSpan(image);
+                text.setSpan(span, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            modifyIdleSourceButton.setText(text);
+            modifyIdleSourceButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"));
         } else {
-            addToIdleSourceButton.setText(I18n.get(MusicHud.MOD_ID + ".button.addToIdlePlaySource"));
+            SpannableString text = new SpannableString("☆");
+            Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/star.png");
+            if (image != null) {
+                ImageSpan span = ImageUtils.getIconSpan(image);
+                text.setSpan(span, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            modifyIdleSourceButton.setText(text);
+            modifyIdleSourceButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.addToIdlePlaySource"));
         }
     }
 }

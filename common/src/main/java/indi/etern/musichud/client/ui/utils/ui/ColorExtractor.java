@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.utils;
+package indi.etern.musichud.client.ui.utils.ui;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
@@ -7,7 +7,7 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import java.util.HashMap;
 import java.util.Map;
 
-import static indi.etern.musichud.client.ui.utils.UniformDataUtils.interpolateARGB;
+import static indi.etern.musichud.client.ui.utils.ui.UniformDataUtils.interpolateARGB;
 
 public class ColorExtractor {
     /**

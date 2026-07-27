@@ -12,7 +12,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import lombok.Getter;
 import lombok.Setter;
@@ -142,8 +142,6 @@ public class MusicListItem extends LinearLayout {
                     .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
                     .build().newBackgroundDrawable();
             artistButton.setBackground(background);
-            artistButton.setFocusable(true);
-            artistButton.setClickable(true);
             artistButton.setTextColor(Theme.PRIMARY_COLOR);
             artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             artistButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
@@ -170,8 +168,6 @@ public class MusicListItem extends LinearLayout {
                 .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
                 .build().newBackgroundDrawable();
         albumButton.setBackground(background);
-        albumButton.setFocusable(true);
-        albumButton.setClickable(true);
         albumButton.setTextColor(Theme.PRIMARY_COLOR);
         albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         albumButton.setText(musicDetail.getAlbum().getName());

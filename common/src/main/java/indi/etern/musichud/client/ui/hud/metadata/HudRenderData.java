@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import indi.etern.musichud.client.ui.utils.Transitionable;
+import indi.etern.musichud.client.ui.utils.ui.Transitionable;
 import lombok.Getter;
 import lombok.Setter;
 

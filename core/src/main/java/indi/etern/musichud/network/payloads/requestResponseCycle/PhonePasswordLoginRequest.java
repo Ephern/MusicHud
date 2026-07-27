@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.interfaces.CommonRegister;
+import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
@@ -19,6 +20,7 @@ public record PhonePasswordLoginRequest(long phone, String md5password) implemen
                     PhonePasswordLoginRequest::new
             );
 
+    @RegisterMark
     public static class RegisterImpl implements CommonRegister {
         @Override
         public void register() {
