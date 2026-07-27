@@ -69,6 +69,7 @@ public class MusicCollectionCard extends LinearLayout {
         name.setTextSize(Theme.TEXT_SIZE_NORMAL);
         name.setTextColor(Theme.NORMAL_TEXT_COLOR);
         name.setSingleLine(false);
+        name.setMaxLines(4);
         name.setMaxWidth(dp(120));
         boolean isPrivatePlaylistToUser =
                 musicCollection instanceof Playlist playlist && playlist.getPrivacy() == Privacy.PRIVATE
@@ -78,7 +79,9 @@ public class MusicCollectionCard extends LinearLayout {
         } else {
             name.setText(musicCollection.getName());
         }
-        nameRow.addView(name, new LayoutParams(0, WRAP_CONTENT, 1));
+        LayoutParams params1 = new LayoutParams(0, WRAP_CONTENT, 1);
+        params1.setMargins(dp(2), 0, dp(2), 0);
+        nameRow.addView(name, params1);
 
         PusherInfo pusherInfo = musicCollection.getPusherInfo();
         LocalPlayer localPlayer = Minecraft.getInstance().player;

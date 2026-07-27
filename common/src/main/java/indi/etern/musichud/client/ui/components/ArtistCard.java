@@ -40,7 +40,7 @@ public class ArtistCard extends LinearLayout {
 
         artistName = new TextView(context);
         artistName.setSingleLine(false);
-        artistName.setMaxLines(2);
+        artistName.setMaxLines(4);
         artistName.setMaxWidth(dp(100));
         artistName.setTextSize(Theme.TEXT_SIZE_LARGE);
         artistName.setTextColor(Theme.NORMAL_TEXT_COLOR);

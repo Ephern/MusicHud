@@ -79,12 +79,13 @@ public class MainFragment extends Fragment {
     @Setter
     private int defaultSelectedIndex = 0;
     private ProgressBar progressBar;
-    private TextView progressText;
     private Button skipCurrentButton;
     private TextView serverConnectStatus;
     private Button switchServerConnectButton;
     private PlayerHeadView pusherHeadView;
     private LinearLayout buttonsLayout;
+    private TextView playedTimeText;
+    private TextView totalTimeText;
 
     public MainFragment() {
     }
@@ -120,7 +121,8 @@ public class MainFragment extends Fragment {
                 instance.pusherHeadView.setVisibility(View.GONE);
                 instance.pusherText.setText("");
                 instance.progressBar.setVisibility(View.GONE);
-                instance.progressText.setText("");
+                instance.playedTimeText.setText("");
+                instance.totalTimeText.setText("");
                 instance.buttonsLayout.setVisibility(View.GONE);
             } else {
                 instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
@@ -206,25 +208,23 @@ public class MainFragment extends Fragment {
 
     private static void startProgressUpdater(MusicDetail musicDetail) {
         NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+        Duration musicDuration = nowPlayingInfo.getMusicDuration();
+        DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
+                DateTimeFormatter.ofPattern("HH:mm:ss") :
+                DateTimeFormatter.ofPattern("mm:ss");
+        String totalTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
         MusicHud.EXECUTOR.execute(() -> {
             do {
                 if (instance == null || instance.progressBar == null) {
                     return;
                 }
                 Duration playedDuration = nowPlayingInfo.getPlayedDuration();
-                Duration musicDuration = nowPlayingInfo.getMusicDuration();
-                DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
-                        DateTimeFormatter.ofPattern("HH:mm:ss") :
-                        DateTimeFormatter.ofPattern("mm:ss");
-                String playtimeText = formatter.format(
-                        LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds())
-                ) + " / " + formatter.format(
-                        LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds())
-                );
+                String playedTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()));
                 MuiModApi.postToUiThread(() -> {
                     if (instance != null && instance.progressBar != null) {
                         instance.progressBar.setProgress((int) (nowPlayingInfo.getProgressRate() * 100));
-                        instance.progressText.setText(playtimeText);
+                        instance.playedTimeText.setText(playedTimeString);
+                        instance.totalTimeText.setText(totalTimeString);
                     }
                 });
                 try {
@@ -368,12 +368,23 @@ public class MainFragment extends Fragment {
                 params2.setMargins(0, sideContent.dp(1), 0, sideContent.dp(-4));
                 musicInfo.addView(progressBar, params2);
 
-                progressText = new TextView(context);
-                progressText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                progressText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                LinearLayout progressTexts = new LinearLayout(context);
+                progressTexts.setOrientation(LinearLayout.HORIZONTAL);
                 LinearLayout.LayoutParams params3 = new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(16));
-                params3.setMargins(0, sideContent.dp(4), 0, 0);
-                musicInfo.addView(progressText, params3);
+                params3.setMargins(0, sideContent.dp(6), 0, 0);
+                musicInfo.addView(progressTexts, params3);
+
+                playedTimeText = new TextView(context);
+                playedTimeText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                playedTimeText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                progressTexts.addView(playedTimeText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
+
+                progressTexts.addView(new View(context), new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT, 1));
+
+                totalTimeText = new TextView(context);
+                totalTimeText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                totalTimeText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                progressTexts.addView(totalTimeText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
 
                 buttonsLayout = new LinearLayout(context);
                 buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);

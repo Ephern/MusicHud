@@ -15,13 +15,13 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ScrollView;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.components.FlexWrapLayout;
 import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicListItem;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
@@ -59,7 +59,7 @@ public class HomeView extends LinearLayout {
     private LinearLayout playQueueListView;
     private LinearLayout clientIdlePlaySourceView;
     private LinearLayout serverIdlePlaySourceView;
-    private AutoFlowGridLayout clientIdlePlaySourceCardsList;
+    private FlexWrapLayout clientIdlePlaySourceCardsList;
     private final Consumer<MusicCollection> localAddListener = collection -> {
         MuiModApi.postToUiThread(() -> {
             if (!idlePlaySourceCardMap.containsKey(collection)) {
@@ -77,7 +77,7 @@ public class HomeView extends LinearLayout {
             }
         });
     };
-    private AutoFlowGridLayout serverIdlePlaySourceCardsList;
+    private FlexWrapLayout serverIdlePlaySourceCardsList;
     private final Consumer<MusicCollection> serverRemoveListener = collection -> {
         MuiModApi.postToUiThread(() -> {
             MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
@@ -193,8 +193,7 @@ public class HomeView extends LinearLayout {
             idlePlaySourceViewDescription.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
             clientIdlePlaySourceView.addView(idlePlaySourceViewDescription, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-            clientIdlePlaySourceCardsList = new AutoFlowGridLayout(context);
-            clientIdlePlaySourceCardsList.setRowMinWidth(dp(143));
+            clientIdlePlaySourceCardsList = new FlexWrapLayout(context);
             LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params4.setMargins(0, dp(16), 0, 0);
             clientIdlePlaySourceView.addView(clientIdlePlaySourceCardsList, params4);
@@ -220,8 +219,7 @@ public class HomeView extends LinearLayout {
             idlePlaySourceViewDescription1.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
             serverIdlePlaySourceView.addView(idlePlaySourceViewDescription1, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-            serverIdlePlaySourceCardsList = new AutoFlowGridLayout(context);
-            serverIdlePlaySourceCardsList.setRowMinWidth(dp(143));
+            serverIdlePlaySourceCardsList = new FlexWrapLayout(context);
             LayoutParams params6 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params6.setMargins(0, dp(16), 0, 0);
             serverIdlePlaySourceView.addView(serverIdlePlaySourceCardsList, params6);
@@ -296,7 +294,7 @@ public class HomeView extends LinearLayout {
         }
     }
 
-    private void addIdlePlaySourceTo(MusicCollection idlePlaySource, Context context, AutoFlowGridLayout targetView) {
+    private void addIdlePlaySourceTo(MusicCollection idlePlaySource, Context context, FlexWrapLayout targetView) {
         MusicCollectionCard child = new MusicCollectionCard(context, idlePlaySource);
         targetView.addView(child);
         idlePlaySourceCardMap.put(idlePlaySource, child);

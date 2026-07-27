@@ -14,20 +14,22 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MusicDetail {
     public static final ByteBufCodec<MusicDetail> CODEC = ByteBufCodec.composite(
-            Codecs.STRING_UTF8,
-            MusicDetail::getName,
             Codecs.LONG,
             MusicDetail::getId,
-            Codecs.ofList(() -> Artist.CODEC),
-            MusicDetail::getArtists,
-            Codecs.ofList(() -> Codecs.STRING_UTF8),
-            MusicDetail::getAlias,
-            Album.CODEC,
-            MusicDetail::getAlbum,
+            Codecs.STRING_UTF8,
+            MusicDetail::getName,
             Codecs.INT,
             MusicDetail::getDurationMillis,
+            Codecs.ofEnum(Fee.class),
+            MusicDetail::getFee,
+            Album.CODEC,
+            MusicDetail::getAlbum,
+            Codecs.ofList(() -> Codecs.STRING_UTF8),
+            MusicDetail::getAlias,
             Codecs.ofList(() -> Codecs.STRING_UTF8),
             MusicDetail::getTranslations,
+            Codecs.ofList(() -> Artist.CODEC),
+            MusicDetail::getArtists,
             PusherInfo.CODEC,
             MusicDetail::getPusherInfo,
             LyricInfo.CODEC,
@@ -55,6 +57,8 @@ public class MusicDetail {
     long mark; // bit mask
     @SerializedName("tns")
     List<String> translations = List.of();
+    @Getter
+    Fee fee = Fee.UNSET;
 
     // only useful for server, and its a optional api field
     @SerializedName("privilege")
@@ -68,13 +72,14 @@ public class MusicDetail {
     LyricInfo lyricInfo = LyricInfo.NONE;
 
     protected MusicDetail(
-            String name,
             long id,
-            List<Artist> artists,
-            List<String> alias,
-            Album album,
+            String name,
             int durationMillis,
+            Fee fee,
+            Album album,
+            List<String> alias,
             List<String> translations,
+            List<Artist> artists,
             PusherInfo pusherInfo,
             LyricInfo lyricInfo
     ) {
@@ -82,6 +87,7 @@ public class MusicDetail {
         this.id = id;
         this.artists = artists;
         this.alias = alias;
+        this.fee = fee;
         this.album = album;
         this.durationMillis = durationMillis;
         this.translations = translations;

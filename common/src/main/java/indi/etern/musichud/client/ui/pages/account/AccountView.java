@@ -18,10 +18,7 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.ArtistCard;
-import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
-import indi.etern.musichud.client.ui.components.MusicCollectionCard;
-import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.components.*;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.Getter;
@@ -219,8 +216,7 @@ public class AccountView extends LinearLayout {
             myPlaylistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myPlaylists"));
             content.addView(myPlaylistText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-            AutoFlowGridLayout playlistCards = new AutoFlowGridLayout(context);
-            playlistCards.setRowMinWidth(dp(143));
+            FlexWrapLayout playlistCards = new FlexWrapLayout(context);
             LayoutParams playlistsParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             playlistsParams.setMargins(0, dp(16), 0, dp(32));
             content.addView(playlistCards, playlistsParams);
@@ -231,8 +227,7 @@ public class AccountView extends LinearLayout {
             albumText.setText(I18n.get(MusicHud.MOD_ID + ".text.myAlbums"));
             content.addView(albumText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-            AutoFlowGridLayout albumCards = new AutoFlowGridLayout(context);
-            albumCards.setRowMinWidth(dp(143));
+            FlexWrapLayout albumCards = new FlexWrapLayout(context);
             LayoutParams albumParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             albumParams.setMargins(0, dp(16), 0, dp(32));
             content.addView(albumCards, albumParams);
@@ -243,8 +238,7 @@ public class AccountView extends LinearLayout {
             artistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myArtists"));
             content.addView(artistText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-            AutoFlowGridLayout artistCards = new AutoFlowGridLayout(context);
-            artistCards.setRowMinWidth(dp(143));
+            FlexWrapLayout artistCards = new FlexWrapLayout(context);
             LayoutParams artistParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             artistParams.setMargins(0, dp(16), 0, dp(32));
             content.addView(artistCards, artistParams);

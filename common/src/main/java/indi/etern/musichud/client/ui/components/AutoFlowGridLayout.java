@@ -9,9 +9,6 @@ import lombok.Getter;
 import lombok.Setter;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class AutoFlowGridLayout extends GridLayout {
@@ -27,54 +24,24 @@ public class AutoFlowGridLayout extends GridLayout {
     }
 
     @Override
-    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
-        int width = getWidth();
+    protected void onMeasure(int widthSpec, int heightSpec) {
+        int width = MeasureSpec.getSize(widthSpec);
         if (width != lastMeasuredWidth && width > 0) {
             lastMeasuredWidth = width;
             int availableWidth = width - getPaddingLeft() - getPaddingRight();
-            int newColumnCount = Math.max(1, availableWidth / calculateActualMinWidth());
-
+            int newColumnCount = Math.max(1, availableWidth / rowMinWidth);
             if (newColumnCount != getColumnCount()) {
-                post(() -> {
-                    performRelayout(newColumnCount);
-                });
+                post(() -> setColumnCount(newColumnCount));
             }
         }
+        super.onMeasure(widthSpec, heightSpec);
+    }
 
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
     }
 
-    private void performRelayout(int newColumnCount) {
-        if (getChildCount() == 0) {
-            setColumnCount(newColumnCount);
-            return;
-        }
-
-        List<View> children = new ArrayList<>();
-        for (int i = 0; i < getChildCount(); i++) {
-            children.add(getChildAt(i));
-        }
-
-        removeAllViews();
-        setColumnCount(newColumnCount);
-
-        for (View child : children) {
-            addViewInternal(WRAP_CONTENT, WRAP_CONTENT, child);
-        }
-    }
-
-    private int calculateActualMinWidth() {
-        int minWidth = Integer.MAX_VALUE;
-        for (int i = 0; i < getChildCount(); i++) {
-            View child = getChildAt(i);
-            child.measure(
-                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-            );
-            minWidth = Math.min(minWidth, child.getMeasuredWidth());
-        }
-        return minWidth == Integer.MAX_VALUE ? rowMinWidth : minWidth;
-    }
 
     @Override
     public void addView(@NotNull View view) {
@@ -86,7 +53,8 @@ public class AutoFlowGridLayout extends GridLayout {
         LayoutParams params = new LayoutParams();
         params.width = width;
         params.height = height;
-//        params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL, 1f);
+        params.columnSpec = GridLayout.spec(GridLayout.UNDEFINED);
+        params.rowSpec = GridLayout.spec(GridLayout.UNDEFINED, GridLayout.TOP);
         super.addView(view, params);
     }
 

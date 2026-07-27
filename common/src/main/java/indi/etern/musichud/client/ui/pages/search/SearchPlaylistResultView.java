@@ -2,13 +2,13 @@ package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.beans.music.Playlist;
-import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
+import indi.etern.musichud.client.ui.components.WaterfallLayout;
 import lombok.Getter;
 
 import java.util.List;
 
-public class SearchPlaylistResultView extends AutoFlowGridLayout {
+public class SearchPlaylistResultView extends WaterfallLayout {
     @Getter
     private static SearchPlaylistResultView instance;
     private static List<Playlist> result;
