@@ -19,7 +19,10 @@ import lombok.SneakyThrows;
 import net.minecraft.client.resources.language.I18n;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -77,10 +80,14 @@ public class SearchResultTabPage extends FrameLayout {
 
         addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
             @Override
-            public void onViewAttachedToWindow(View v) {}
+            public void onViewAttachedToWindow(View v) {
+            }
 
             @Override
             public void onViewDetachedFromWindow(View v) {
+                if (pager.getAdapter() instanceof ResultAdapter adapter) {
+                    adapter.unregisterAllListeners();
+                }
                 clearResult();
             }
         });
@@ -99,6 +106,8 @@ public class SearchResultTabPage extends FrameLayout {
     }
 
     private class ResultAdapter extends PagerAdapter {
+        private final Map<View, Consumer<SearchView.SearchMeta>> registeredListeners = new HashMap<>();
+
         @Override
         public int getCount() {
             return 4; // 页面数量
@@ -151,14 +160,16 @@ public class SearchResultTabPage extends FrameLayout {
                     yield new SearchMusicResultView(context);
                 }
             };
+            Consumer<SearchView.SearchMeta> refreshListener = (searchMeta) -> {
+                if (searchMeta.getSearchType() == searchType) {
+                    CompletableFuture<SearchView.CompletingType> pendingFuture = searchMeta.pendingFuture;
+                    checkFuture(noMoreResultText, loadingMoreProgressBar, pendingFuture);
+                }
+            };
             SearchView instance = SearchView.getInstance();
             if (instance != null) {
-                instance.getSearchRefreshListeners().add((searchMeta) -> {
-                    if (searchMeta.getSearchType() == searchType) {
-                        CompletableFuture<SearchView.CompletingType> pendingFuture = searchMeta.pendingFuture;
-                        checkFuture(noMoreResultText, loadingMoreProgressBar, pendingFuture);
-                    }
-                });
+                instance.getSearchRefreshListeners().add(refreshListener);
+                registeredListeners.put(sv, refreshListener);
             }
 
             LinearLayout ll = new LinearLayout(context);
@@ -232,20 +243,32 @@ public class SearchResultTabPage extends FrameLayout {
 
         @Override
         public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
-            SearchType searchType = switch (position) {
-                case 0 -> SearchType.MUSIC;
-                case 1 -> SearchType.PLAYLIST;
-                case 2 -> SearchType.ALBUM;
-                case 3 -> SearchType.ARTIST;
-                default -> SearchType.MUSIC;
-            };
+            if (object instanceof View view) {
+                container.removeView(view);
+                SearchType searchType = switch (position) {
+                    case 0 -> SearchType.MUSIC;
+                    case 1 -> SearchType.PLAYLIST;
+                    case 2 -> SearchType.ALBUM;
+                    case 3 -> SearchType.ARTIST;
+                    default -> SearchType.MUSIC;
+                };
+                SearchView instance = SearchView.getInstance();
+                if (instance != null) {
+                    Consumer<SearchView.SearchMeta> listener = registeredListeners.remove(object);
+                    if (listener != null) {
+                        instance.getSearchRefreshListeners().remove(listener);
+                    }
+                    instance.getSearchMetas().remove(searchType);
+                }
+            }
+        }
+
+        void unregisterAllListeners() {
             SearchView instance = SearchView.getInstance();
             if (instance != null) {
-                instance.getSearchMetas().remove(searchType);
+                instance.getSearchRefreshListeners().removeAll(registeredListeners.values());
             }
-
-            ClampingScrollView view = (ClampingScrollView) object;
-            container.removeView(view);
+            registeredListeners.clear();
         }
 
         @Override

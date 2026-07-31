@@ -46,6 +46,10 @@
   "music_hud.text.playQueue": "播放队列",
   "music_hud.text.playlist": "播放列表",
   "music_hud.text.album": "专辑",
+  "music_hud.text.album.type.album": "专辑",
+  "music_hud.text.album.type.compilation": "精选集",
+  "music_hud.text.album.type.ep": "EP",
+  "music_hud.text.album.type.single": "单曲",
   "music_hud.text.artist.album": "{} 专辑",
   "music_hud.text.artist.music": "{} 单曲",
   "music_hud.text.totalCount": "共 {} 项",
@@ -60,9 +64,11 @@
   "music_hud.button.loadingError": "加载失败",
   "music_hud.button.downloadError": "下载失败",
   "music_hud.button.logout": "登出",
-  "music_hud.text.myPlaylists": "我的歌单 / 收藏的歌单",
+  "music_hud.text.myPlaylists": "我创建的歌单",
+  "music_hud.text.mySubscribedPlaylists": "我收藏的歌单",
   "music_hud.text.myAlbums": "我收藏的专辑",
   "music_hud.text.myArtists": "我收藏的歌手",
+  "music_hud.text.accountLoadError": "Failed to load collections",
   "music_hud.text.idlePlaySources": "我的空闲播放源",
   "music_hud.text.idlePlaySourcesDescription": "播放器空闲时可能会播放这些歌单或专辑中的音乐",
   "music_hud.text.othersIdlePlaySources": "其他玩家的空闲播放源",
@@ -201,5 +207,8 @@
   "music_hud.modal.clearApiLogs.button1": "是",
   "music_hud.modal.clearApiLogs.button2": "否",
   "music_hud.internal.clientCookie": "客户端内部 Cookie",
-  "music_hud.internal.clientAccountConfig": "客户端内部账户信息"
+  "music_hud.internal.clientAccountConfig": "客户端内部账户信息",
+  "music_hud.modal.modifyPlaylistTrack.title": "修改曲目所属歌单",
+  "music_hud.button.confirm": "确认",
+  "music_hud.button.cancel": "取消"
 }

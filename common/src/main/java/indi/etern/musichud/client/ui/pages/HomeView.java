@@ -5,26 +5,22 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.text.SpannableString;
-import icyllis.modernui.text.Spanned;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
-import icyllis.modernui.widget.Button;
-import icyllis.modernui.widget.LinearLayout;
-import icyllis.modernui.widget.ScrollView;
-import icyllis.modernui.widget.TextView;
+import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.components.FlexWrapLayout;
-import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
-import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.components.FlexWrapLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicListItem;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
+import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -87,6 +83,8 @@ public class HomeView extends LinearLayout {
             }
         });
     };
+    private Consumer<MusicDetail> musicQueuePushListener;
+    private BiConsumer<Integer, MusicDetail> musicQueueRemoveListener;
     private LocalPlayer localPlayer = Minecraft.getInstance().player;
     private final Consumer<MusicCollection> serverAddListener = collection -> {
         MuiModApi.postToUiThread(() -> {
@@ -105,6 +103,12 @@ public class HomeView extends LinearLayout {
 
     public void refresh() {
         instance = this;
+        if (musicQueuePushListener != null) {
+            musicService.getMusicQueuePushListeners().remove(musicQueuePushListener);
+        }
+        if (musicQueueRemoveListener != null) {
+            musicService.getMusicQueueRemoveListeners().remove(musicQueueRemoveListener);
+        }
         Context context = getContext();
         removeAllViews();
         idlePlaySourceCardMap.clear();
@@ -258,13 +262,13 @@ public class HomeView extends LinearLayout {
                 addMusicQueueItem(musicDetail, playQueueListView);
             }
 
-            Consumer<MusicDetail> musicQueuePushListener = musicDetail -> {
+            musicQueuePushListener = musicDetail -> {
                 MuiModApi.postToUiThread(() -> {
                     addMusicQueueItem(musicDetail, playQueueListView);
                     checkQueue(queue);
                 });
             };
-            BiConsumer<Integer, MusicDetail> musicQueueRemoveListener = (removeIndex, musicDetail) -> {
+            musicQueueRemoveListener = (removeIndex, musicDetail) -> {
                 MuiModApi.postToUiThread(() -> {
                     if (removeIndex >= 0 && removeIndex < playQueueListView.getChildCount()) {
                         playQueueListView.removeViewAt(removeIndex);
@@ -341,32 +345,23 @@ public class HomeView extends LinearLayout {
         musicListItem.bindData(musicDetail);
         LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, WRAP_CONTENT);
         layoutParams.setMargins(0, 0, 0, dp(16));
-        LinearLayout actions = new LinearLayout(getContext());
 
         assert Minecraft.getInstance().player != null;
         if (musicDetail.getPusherInfo().getPlayerUUID().equals(Minecraft.getInstance().player.getUUID())) {
-            Button removeButton = new Button(getContext());
-            String removeText = I18n.get(MusicHud.MOD_ID + ".button.remove");
-            SpannableString removeSpannableString = new SpannableString(removeText);
+            ImageButton removeButton = new ImageButton(getContext());
             Image removeIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/trash_2.png");
-            if (removeIcon != null) {
-                removeSpannableString.setSpan(ImageUtils.getIconSpan(removeIcon), 0, removeText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
-            removeButton.setText(removeSpannableString);
-            removeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            removeButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            removeButton.setScaleType(ImageView.ScaleType.CENTER);
+            removeButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), removeIcon, dp(8), dp(16), dp(16)));
             Drawable background = ButtonInsetBackgroundFactory.builder()
-                    .inset(1)
-                    .padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(2), dp(2), dp(8)))
+                    .inset(dp(2))
                     .cornerRadius(dp(4))
                     .build().newBackgroundDrawable();
             removeButton.setBackground(background);
             removeButton.setOnClickListener(v -> {
                 MusicService.getInstance().sendRemoveMusicFromQueue(playQueueView.indexOfChild(musicListItem), musicDetail);
             });
-            actions.addView(removeButton, new LayoutParams(WRAP_CONTENT, dp(MusicListItem.imageSize)));
+            musicListItem.getButtonsLayout().addView(removeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
         }
-        musicListItem.addView(actions);
         musicListItem.setLayoutParams(layoutParams);
         playQueueView.addView(musicListItem, layoutParams);
     }

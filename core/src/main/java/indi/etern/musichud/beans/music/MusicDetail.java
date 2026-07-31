@@ -14,26 +14,16 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MusicDetail {
     public static final ByteBufCodec<MusicDetail> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
-            MusicDetail::getId,
-            Codecs.STRING_UTF8,
-            MusicDetail::getName,
-            Codecs.INT,
-            MusicDetail::getDurationMillis,
-            Codecs.ofEnum(Fee.class),
-            MusicDetail::getFee,
-            Album.CODEC,
-            MusicDetail::getAlbum,
-            Codecs.ofList(() -> Codecs.STRING_UTF8),
-            MusicDetail::getAlias,
-            Codecs.ofList(() -> Codecs.STRING_UTF8),
-            MusicDetail::getTranslations,
-            Codecs.ofList(() -> Artist.CODEC),
-            MusicDetail::getArtists,
-            PusherInfo.CODEC,
-            MusicDetail::getPusherInfo,
-            LyricInfo.CODEC,
-            MusicDetail::getLyricInfo,
+            Codecs.LONG, MusicDetail::getId,
+            Codecs.STRING_UTF8, MusicDetail::getName,
+            Codecs.INT, MusicDetail::getDurationMillis,
+            Codecs.ofEnum(Fee.class), MusicDetail::getFee,
+            Album.CODEC, MusicDetail::getAlbum,
+            Codecs.ofList(() -> Codecs.STRING_UTF8), MusicDetail::getAlias,
+            Codecs.ofList(() -> Codecs.STRING_UTF8), MusicDetail::getTranslations,
+            Codecs.ofList(() -> Artist.CODEC), MusicDetail::getArtists,
+            PusherInfo.CODEC, MusicDetail::getPusherInfo,
+            LyricInfo.CODEC, MusicDetail::getLyricInfo,
             MusicDetail::new
     );
     public static final MusicDetail NONE = new MusicDetail();

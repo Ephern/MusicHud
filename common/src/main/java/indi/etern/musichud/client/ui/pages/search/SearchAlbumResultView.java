@@ -15,7 +15,7 @@ public class SearchAlbumResultView extends WaterfallLayout {
 
     public SearchAlbumResultView(Context context) {
         super(context);
-        setRowMinWidth(dp(143));
+        setRowMinWidth(dp(174));
         instance = this;
         refresh();
     }

@@ -201,5 +201,8 @@
   "music_hud.modal.clearApiLogs.button1": "是",
   "music_hud.modal.clearApiLogs.button2": "否",
   "music_hud.internal.clientCookie": "用戶端內部 Cookie",
-  "music_hud.internal.clientAccountConfig": "用戶端內部帳戶資訊"
+  "music_hud.internal.clientAccountConfig": "用戶端內部帳戶資訊",
+  "music_hud.modal.modifyPlaylistTrack.title": "修改播放清單曲目",
+  "music_hud.button.confirm": "確認",
+  "music_hud.button.cancel": "取消"
 }

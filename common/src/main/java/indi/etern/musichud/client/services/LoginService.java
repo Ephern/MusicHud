@@ -15,6 +15,7 @@ import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.account.AccountView;
@@ -98,14 +99,14 @@ public class LoginService implements IClientLoginService {
                     MuiModApi.postToUiThread(() -> {
                         AccountView accountView = AccountView.getInstance();
                         if (accountView != null) {
-                            accountView.refresh();
+                            accountView.refresh(false);
                         }
                     });
                 } else {
                     MuiModApi.postToUiThread(() -> {
                         AccountView accountView = AccountView.getInstance();
                         if (accountView != null) {
-                            accountView.refresh();
+                            accountView.refresh(false);
                         }
                         LoginView loginView = LoginView.getInstance();
                         if (loginView != null) {

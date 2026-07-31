@@ -18,6 +18,7 @@ import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
+import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.ui.Easing;
 import lombok.Getter;
@@ -48,11 +49,11 @@ public class Modal {
     private boolean isDismissing;
     private boolean finishingAnimation;
 
-    public Modal(Context context, LinearLayout contentView, ActionButton... buttons) {
-        this(context, contentView, null, buttons);
+    public Modal(Context context, View contentView, ActionButton... buttons) {
+        this(context, null, contentView, buttons);
     }
 
-    public Modal(Context context, LinearLayout contentView, TextView titleView, ActionButton... buttons) {
+    public Modal(Context context, TextView titleView, View contentView, ActionButton... buttons) {
         popupWindow = new PopupWindow(context) {
             @Override
             public void dismiss() {
@@ -99,7 +100,7 @@ public class Modal {
             } else {
                 titleView.setTextColor(0xFFFFFFFF);
             }
-            titleView.setTextSize(16);
+            titleView.setTextSize(Theme.TEXT_SIZE_LARGER);
             LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             titleParams.setMargins(0, 0, 0, card.dp(CONTENT_PADDING));
             card.addView(titleView, titleParams);
@@ -211,6 +212,15 @@ public class Modal {
         if (decorView == null) {
             return;
         }
+        long now = System.currentTimeMillis();
+        decorView.dispatchGenericMotionEvent(
+                MotionEvent.obtain(now, MotionEvent.ACTION_HOVER_EXIT, 0, 0, 0)
+        );
+
+        View focused = decorView.findFocus();
+        if (focused != null) {
+            focused.clearFocus();
+        }
 
         card.setAlpha(0f);
         card.setScaleX(0.95f);
@@ -222,6 +232,8 @@ public class Modal {
         finishingAnimation = false;
 
         popupWindow.showAtLocation(decorView, Gravity.CENTER, 0, 0);
+        popupWindow.getContentView().setFocusableInTouchMode(true);
+        popupWindow.getContentView().requestFocus();
 
         card.post(() -> {
             card.setPivotX(card.getWidth() / 2f);

@@ -96,8 +96,10 @@ public class ApiClient {
                         } else {
                             jsonObject.addProperty("noCookie", true);
                         }
+                        String payloadString = payload.toString();
+                        LOGGER.debug("POST \"{}\" with payload: \"{}\"", urlMeta.toURI().toString(), payloadString);
                         requestBuilder.POST(HttpRequest.BodyPublishers.ofString(
-                                        payload.toString(),
+                                        payloadString,
                                         StandardCharsets.UTF_8
                                 )
                         );
@@ -111,6 +113,7 @@ public class ApiClient {
                             requestBuilder.header("Cookie", cleanCookie);
                         }
                     }
+                    LOGGER.debug("POST \"{}\" without payload", urlMeta.toURI().toString());
                     requestBuilder.POST(HttpRequest.BodyPublishers.noBody());
                 }
                 HttpRequest request = requestBuilder
@@ -173,6 +176,7 @@ public class ApiClient {
                         requestBuilder.header("Cookie", cleanCookie);
                     }
                 }
+                LOGGER.debug("GET \"{}\" without payload", urlMeta.toURI().toString());
                 HttpRequest request = requestBuilder
                         .GET()
                         .build();

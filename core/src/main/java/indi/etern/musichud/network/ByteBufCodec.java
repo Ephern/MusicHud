@@ -242,8 +242,8 @@ public interface ByteBufCodec<V> {
                 T1 t1 = byteBufCodec1.decode(byteBuf);
                 T2 t2 = byteBufCodec2.decode(byteBuf);
                 T3 t3 = byteBufCodec3.decode(byteBuf);
-                T5 t5 = byteBufCodec5.decode(byteBuf);
                 T4 t4 = byteBufCodec4.decode(byteBuf);
+                T5 t5 = byteBufCodec5.decode(byteBuf);
                 T6 t6 = byteBufCodec6.decode(byteBuf);
                 T7 t7 = byteBufCodec7.decode(byteBuf);
                 T8 t8 = byteBufCodec8.decode(byteBuf);

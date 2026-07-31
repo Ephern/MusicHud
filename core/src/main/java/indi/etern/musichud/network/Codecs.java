@@ -8,6 +8,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
+import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class Codecs {
@@ -198,8 +199,6 @@ public class Codecs {
             byteBuf.writeLong(uuid.getLeastSignificantBits());
         }
     };
-
-    private static final int STRING_SIZE = 32767;
     public static final ByteBufCodec<Class<?>> CLASS =
             new ByteBufCodec<>() {
                 @Override
@@ -216,53 +215,42 @@ public class Codecs {
                     VanillaUtf8String.write(buf, clazz.getName(), STRING_SIZE);
                 }
             };
+    private static final int STRING_SIZE = 32767;
 
-    public static <T> ByteBufCodec<List<T>> ofList(Supplier<ByteBufCodec<T>> codecSupplier) {
-        return new ByteBufCodec<>() {
-            @Override
-            @NonNull
-            public List<T> decode(@NonNull ByteBuf buf) {
-                int length = buf.readInt();
-                List<T> tList = new ArrayList<>(length);
-                ByteBufCodec<T> codec = codecSupplier.get();
-                for (int i = 0; i < length; i++) {
-                    tList.add(codec.decode(buf));
-                }
-                return tList;
-            }
 
-            @Override
-            public void encode(@NonNull ByteBuf buf, @NonNull List<T> tList) {
-                List<T> NonNullList = new ArrayList<>(tList);
-                NonNullList.removeIf(Objects::isNull);
-                buf.writeInt(NonNullList.size());
-                ByteBufCodec<T> codec = codecSupplier.get();
-                for (T t : NonNullList) {
-                    codec.encode(buf, t);
-                }
-            }
-        };
+    public static  <T> ByteBufCodec<List<T>> ofList(Supplier<ByteBufCodec<T>> codecSupplier) {
+        return ofCollection(ArrayList::new, codecSupplier);
+    }
+
+    public static  <T> ByteBufCodec<Set<T>> ofSet(Supplier<ByteBufCodec<T>> codecSupplier) {
+        return ofCollection(LinkedHashSet::new, codecSupplier);
     }
 
     public static <T> ByteBufCodec<Queue<T>> ofQueue(Supplier<ByteBufCodec<T>> codecSupplier) {
+        return ofCollection(ArrayDeque::new, codecSupplier);
+    }
+
+    public static <T, S extends Collection<T>> ByteBufCodec<S>
+            ofCollection(Function<Integer, S> collectionSupplier, Supplier<ByteBufCodec<T>> codecSupplier) {
         return new ByteBufCodec<>() {
             @Override
             @NonNull
-            public Queue<T> decode(@NonNull ByteBuf buf) {
+            public S decode(@NonNull ByteBuf buf) {
                 int length = buf.readInt();
-                Queue<T> tList = new ArrayDeque<>(length);
+                S ts = collectionSupplier.apply(length);
                 ByteBufCodec<T> codec = codecSupplier.get();
                 for (int i = 0; i < length; i++) {
-                    tList.add(codec.decode(buf));
+                    ts.add(codec.decode(buf));
                 }
-                return tList;
+                return ts;
             }
 
             @Override
-            public void encode(@NonNull ByteBuf buf, @NonNull Queue<T> tList) {
-                buf.writeInt(tList.size());
+            public void encode(@NonNull ByteBuf buf, @NonNull S s) {
+                int count = Math.toIntExact(s.stream().filter(Objects::nonNull).count());
+                buf.writeInt(count);
                 ByteBufCodec<T> codec = codecSupplier.get();
-                for (T t : tList) {
+                for (T t : s) {
                     codec.encode(buf, t);
                 }
             }
@@ -275,7 +263,7 @@ public class Codecs {
             @NonNull
             public T decode(@NonNull ByteBuf buf) {
                 //noinspection unchecked,rawtypes
-                return (T)((Enum[])enumClass.getEnumConstants())[VanillaVarInt.read(buf)];
+                return (T) ((Enum[]) enumClass.getEnumConstants())[VanillaVarInt.read(buf)];
             }
 
             @Override

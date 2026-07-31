@@ -11,7 +11,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import net.minecraft.client.resources.language.I18n;
 
-public class ArtistCard extends LinearLayout {
+public class ArtistCard extends LinearLayout {//TODO
     public static final int imageSize = 104;
     private UrlImageView albumImage;
     private TextView artistName;

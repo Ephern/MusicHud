@@ -14,22 +14,14 @@ import java.util.Objects;
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Artist {
     public static final ByteBufCodec<Artist> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
-            Artist::getId,
-            Codecs.STRING_UTF8,
-            Artist::getName,
-            Codecs.STRING_UTF8,
-            Artist::getAvatarUrl,
-            Codecs.INT,
-            Artist::getAlbumCount,
-            Codecs.INT,
-            Artist::getMusicCount,
-            Codecs.STRING_UTF8,
-            Artist::getDescription,
-            Codecs.ofList(() -> MusicDetail.CODEC),// Attention! may cause loop if abuse (MusicDetails <=> Artists)
-            Artist::getMusicDetails,
-            Codecs.INT,
-            Artist::getTotalMusicCount,
+            Codecs.LONG, Artist::getId,
+            Codecs.STRING_UTF8, Artist::getName,
+            Codecs.STRING_UTF8, Artist::getAvatarUrl,
+            Codecs.INT, Artist::getAlbumCount,
+            Codecs.INT, Artist::getMusicCount,
+            Codecs.STRING_UTF8, Artist::getDescription,
+            Codecs.ofList(() -> MusicDetail.CODEC), Artist::getMusicDetails,
+            Codecs.INT, Artist::getTotalMusicCount,
             Artist::new
     );
     long id;

@@ -16,7 +16,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.LoginService;
-import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
@@ -24,6 +24,7 @@ import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 
+import java.util.LinkedHashSet;
 import java.util.concurrent.CompletableFuture;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -33,10 +34,18 @@ public class AccountView extends LinearLayout {
     @Getter
     private static AccountView instance;
     private final IClientLoginService IClientLoginService = LoginService.getInstance();
+    private FlexWrapLayout myPlaylistCards;
+    private FlexWrapLayout mySubscribedPlaylistCards;
+    private FlexWrapLayout albumCards;
+    private FlexWrapLayout artistCards;
+    private LinearLayout myPlaylistsContent;
+    private LinearLayout mySubscribedPlaylistsContent;
+    private LinearLayout mySubscribedAlbumsContent;
+    private LinearLayout mySubscribedArtistsContent;
 
     public AccountView(Context context) {
         super(context);
-        refresh();
+        refresh(false);
         instance = this;
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
@@ -50,7 +59,7 @@ public class AccountView extends LinearLayout {
         });
     }
 
-    public void refresh() {
+    public void refresh(boolean ignoreCache) {
         removeAllViews();
         setOrientation(LinearLayout.VERTICAL);
         setLayoutParams(new LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -182,7 +191,7 @@ public class AccountView extends LinearLayout {
             params.setMargins(0, 0, dp(8), 0);
             refreshButton.setLayoutParams(params);
             refreshButton.setOnClickListener(b -> {
-                refresh();
+                refresh(true);
             });
             buttonsLayout.addView(refreshButton);
 
@@ -205,73 +214,140 @@ public class AccountView extends LinearLayout {
             progressBar.setIndeterminate(true);
             addView(progressBar, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
+            TextView errorText = new TextView(context);
+            errorText.setText(I18n.get(MusicHud.MOD_ID + ".text.accountLoadError"));
+            errorText.setGravity(Gravity.CENTER);
+            errorText.setTextAlignment(TEXT_ALIGNMENT_CENTER);
+            errorText.setVisibility(GONE);
+            addView(errorText, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
             LinearLayout content = new LinearLayout(context);
             content.setOrientation(VERTICAL);
             content.setLayoutParams(new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
             addView(content);
 
-            TextView myPlaylistText = new TextView(context);
-            myPlaylistText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            myPlaylistText.setTextSize(Theme.TEXT_SIZE_LARGE);
-            myPlaylistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myPlaylists"));
-            content.addView(myPlaylistText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+            {
+                myPlaylistsContent = new LinearLayout(context);
+                myPlaylistsContent.setOrientation(VERTICAL);
+                myPlaylistsContent.setVisibility(GONE);
+                LayoutParams myPlaylistsContentParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+                myPlaylistsContentParams.setMargins(0, 0, 0, dp(32));
+                content.addView(myPlaylistsContent, myPlaylistsContentParams);
 
-            FlexWrapLayout playlistCards = new FlexWrapLayout(context);
-            LayoutParams playlistsParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            playlistsParams.setMargins(0, dp(16), 0, dp(32));
-            content.addView(playlistCards, playlistsParams);
+                TextView myPlaylistsText = new TextView(context);
+                myPlaylistsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+                myPlaylistsText.setTextSize(Theme.TEXT_SIZE_LARGE);
+                myPlaylistsText.setText(I18n.get(MusicHud.MOD_ID + ".text.myPlaylists"));
+                LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+                titleParam.setMargins(0, 0, 0, dp(16));
+                myPlaylistsContent.addView(myPlaylistsText, titleParam);
 
-            TextView albumText = new TextView(context);
-            albumText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            albumText.setTextSize(Theme.TEXT_SIZE_LARGE);
-            albumText.setText(I18n.get(MusicHud.MOD_ID + ".text.myAlbums"));
-            content.addView(albumText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                myPlaylistCards = new FlexWrapLayout(context);
+                myPlaylistsContent.addView(myPlaylistCards, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            }
+            {
+                mySubscribedPlaylistsContent = new LinearLayout(context);
+                mySubscribedPlaylistsContent.setOrientation(VERTICAL);
+                mySubscribedPlaylistsContent.setVisibility(GONE);
+                LayoutParams mySubscribedPlaylistsContentParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+                mySubscribedPlaylistsContentParams.setMargins(0, 0, 0, dp(32));
+                content.addView(mySubscribedPlaylistsContent, mySubscribedPlaylistsContentParams);
 
-            FlexWrapLayout albumCards = new FlexWrapLayout(context);
-            LayoutParams albumParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            albumParams.setMargins(0, dp(16), 0, dp(32));
-            content.addView(albumCards, albumParams);
+                TextView subscribedPlaylistsText = new TextView(context);
+                subscribedPlaylistsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+                subscribedPlaylistsText.setTextSize(Theme.TEXT_SIZE_LARGE);
+                subscribedPlaylistsText.setText(I18n.get(MusicHud.MOD_ID + ".text.mySubscribedPlaylists"));
+                LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+                titleParam.setMargins(0, 0, 0, dp(16));
+                mySubscribedPlaylistsContent.addView(subscribedPlaylistsText, titleParam);
 
-            TextView artistText = new TextView(context);
-            artistText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            artistText.setTextSize(Theme.TEXT_SIZE_LARGE);
-            artistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myArtists"));
-            content.addView(artistText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                mySubscribedPlaylistCards = new FlexWrapLayout(context);
+                mySubscribedPlaylistsContent.addView(mySubscribedPlaylistCards, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            }
+            {
+                mySubscribedAlbumsContent = new LinearLayout(context);
+                mySubscribedAlbumsContent.setOrientation(VERTICAL);
+                mySubscribedAlbumsContent.setVisibility(GONE);
+                LayoutParams mySubscribedAlbumsContentParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+                mySubscribedAlbumsContentParams.setMargins(0, 0, 0, dp(32));
+                content.addView(mySubscribedAlbumsContent, mySubscribedAlbumsContentParams);
 
-            FlexWrapLayout artistCards = new FlexWrapLayout(context);
-            LayoutParams artistParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            artistParams.setMargins(0, dp(16), 0, dp(32));
-            content.addView(artistCards, artistParams);
+                TextView subscribedAlbumsText = new TextView(context);
+                subscribedAlbumsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+                subscribedAlbumsText.setTextSize(Theme.TEXT_SIZE_LARGE);
+                subscribedAlbumsText.setText(I18n.get(MusicHud.MOD_ID + ".text.myAlbums"));
+                LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+                titleParam.setMargins(0, 0, 0, dp(16));
+                mySubscribedAlbumsContent.addView(subscribedAlbumsText, titleParam);
+
+                albumCards = new FlexWrapLayout(context);
+                mySubscribedAlbumsContent.addView(albumCards, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            }
+            {
+                mySubscribedArtistsContent = new LinearLayout(context);
+                mySubscribedArtistsContent.setOrientation(VERTICAL);
+                mySubscribedArtistsContent.setVisibility(GONE);
+                LayoutParams mySubscribedArtistsContentParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+                mySubscribedArtistsContentParams.setMargins(0, 0, 0, dp(32));
+                content.addView(mySubscribedArtistsContent, mySubscribedArtistsContentParams);
+
+                TextView artistText = new TextView(context);
+                artistText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+                artistText.setTextSize(Theme.TEXT_SIZE_LARGE);
+                artistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myArtists"));
+                LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+                titleParam.setMargins(0, 0, 0, dp(16));
+                mySubscribedArtistsContent.addView(artistText, titleParam);
+
+                artistCards = new FlexWrapLayout(context);
+                mySubscribedArtistsContent.addView(artistCards, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            }
 
             MusicService musicService = MusicService.getInstance();
             CompletableFuture.allOf(
-                    musicService.loadUserPlaylists().thenAcceptAsync(playlists -> {
+                    musicService.loadUserPlaylists(ignoreCache).thenAcceptAsync(playlists -> {
                         MuiModApi.postToUiThread(() -> {
-                            for (Playlist playlist : playlists) {
-                                playlistCards.addView(new MusicCollectionCard(context, playlist));
+                            myPlaylistCards.addView(new MusicCollectionCard(context, playlists.getLikeList()));
+                            LinkedHashSet<Playlist> createdPlaylist = playlists.getCreatedPlaylist();
+                            for (Playlist playlist : createdPlaylist) {
+                                myPlaylistCards.addView(new MusicCollectionCard(context, playlist));
                             }
+                            LinkedHashSet<Playlist> subscribedPlaylist = playlists.getSubscribedPlaylist();
+                            for (Playlist playlist : subscribedPlaylist) {
+                                mySubscribedPlaylistCards.addView(new MusicCollectionCard(context, playlist));
+                            }
+                            myPlaylistsContent.setVisibility(createdPlaylist.isEmpty() ? GONE : VISIBLE);
+                            mySubscribedPlaylistsContent.setVisibility(subscribedPlaylist.isEmpty() ? GONE : VISIBLE);
                         });
                     }, MusicHud.EXECUTOR),
-                    musicService.loadUserAlbums().thenAcceptAsync(albums -> {
+                    musicService.loadUserAlbums(ignoreCache).thenAcceptAsync(albums -> {
                         MuiModApi.postToUiThread(() -> {
                             for (Album playlist : albums) {
                                 albumCards.addView(new MusicCollectionCard(context, playlist));
                             }
+                            mySubscribedAlbumsContent.setVisibility(albums.isEmpty() ? GONE : VISIBLE);
                         });
                     }),
-                    musicService.loadUserArtists().thenAcceptAsync(artists -> {
+                    musicService.loadUserArtists(ignoreCache).thenAcceptAsync(artists -> {
                         MuiModApi.postToUiThread(() -> {
                             for (Artist artist : artists) {
                                 ArtistCard artistCard = new ArtistCard(context);
                                 artistCard.bindData(artist);
                                 artistCards.addView(artistCard);
                             }
+                            mySubscribedArtistsContent.setVisibility(artists.isEmpty() ? GONE : VISIBLE);
                         });
                     })
             ).thenAccept((v) -> {
                 MuiModApi.postToUiThread(() -> {
                     progressBar.setVisibility(View.GONE);
                 });
+            }).exceptionally((e) -> {
+                MuiModApi.postToUiThread(() -> {
+                    progressBar.setVisibility(View.GONE);
+                    errorText.setVisibility(View.VISIBLE);
+                });
+                return null;
             });
         }
     }

@@ -57,7 +57,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private final Paint fadeEdgePaint = new Paint();
     Runnable staggeringEndListener = null;
-    boolean firstStagger = true;
     boolean scrollFinished = false;
     @Getter
     private volatile ScrollStatus scrollStatus = ScrollStatus.FOLLOW_LYRICS;
@@ -155,7 +154,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 slideOut.addListener(new AnimatorListener() {
                     @Override
                     public void onAnimationEnd(@NonNull Animator animation) {
-                        firstStagger = true;
                         justHighlightedLyricLine = null;
                         lastHighlightedLyricLine = null;
                         animatingLyricViews.clear();
@@ -498,7 +496,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 ? baseOffset - baseOffsetAtRedirect
                 : baseOffset;
 
-        firstStagger = false;
         for (int i = 0; i < lyricLineViewList.size(); i++) {
             LyricLineView line = lyricLineViewList.get(i);
             float delay = delayMillis == null ? 0 : delayMillis[i >= delayMillis.length ? delayMillis.length - 1 : i];

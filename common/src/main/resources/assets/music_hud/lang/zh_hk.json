@@ -61,6 +61,7 @@
   "music_hud.button.downloadError": "下載失敗",
   "music_hud.button.logout": "登出",
   "music_hud.text.myPlaylists": "我的播放列表 / 收藏的播放列表",
+  "music_hud.text.mySubscribedPlaylists": "我收藏的播放列表",
   "music_hud.text.myAlbums": "我收藏的專輯",
   "music_hud.text.myArtists": "我收藏的歌手",
   "music_hud.text.idlePlaySources": "我的空閒播放來源",
@@ -201,5 +202,8 @@
   "music_hud.modal.clearApiLogs.button1": "係",
   "music_hud.modal.clearApiLogs.button2": "否",
   "music_hud.internal.clientCookie": "客戶端內部 Cookie",
-  "music_hud.internal.clientAccountConfig": "客戶端內部帳戶資訊"
+  "music_hud.internal.clientAccountConfig": "客戶端內部帳戶資訊",
+  "music_hud.modal.modifyPlaylistTrack.title": "修改播放清單曲目",
+  "music_hud.button.confirm": "確認",
+  "music_hud.button.cancel": "取消"
 }

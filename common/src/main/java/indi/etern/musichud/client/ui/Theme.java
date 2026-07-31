@@ -29,7 +29,7 @@ public class Theme {
     public static final int GHOST_BUTTON_BACKGROUND_HOVERED = 0x07FFFFFF;
     public static final int GHOST_BUTTON_BACKGROUND_CHECKED = 0x08FFFFFF;
 
-    public static final ColorStateList GHOST_BUTTON_STATES = new ColorStateList(
+    public static final ColorStateList GHOST_CHECK_BUTTON_STATES = new ColorStateList(
             new int[][]{
                     new int[]{R.attr.state_pressed},
                     new int[]{R.attr.state_checked},
@@ -39,6 +39,19 @@ public class Theme {
             new int[]{
                     Theme.GHOST_BUTTON_BACKGROUND_PRESSED,
                     Theme.GHOST_BUTTON_BACKGROUND_CHECKED,
+                    Theme.GHOST_BUTTON_BACKGROUND_HOVERED,
+                    Theme.GHOST_BUTTON_BACKGROUND
+            }
+    );
+
+    public static final ColorStateList GHOST_BUTTON_STATES = new ColorStateList(
+            new int[][]{
+                    new int[]{R.attr.state_pressed},
+                    new int[]{R.attr.state_hovered},
+                    StateSet.WILD_CARD
+            },
+            new int[]{
+                    Theme.GHOST_BUTTON_BACKGROUND_PRESSED,
                     Theme.GHOST_BUTTON_BACKGROUND_HOVERED,
                     Theme.GHOST_BUTTON_BACKGROUND
             }

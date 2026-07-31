@@ -18,7 +18,7 @@ public interface IMusicApiService {
         throw new IllegalArgumentException("Invalid api provider");
     }
 
-    Playlist getPlaylistDetail(long id, @Nullable UUID player);
+    Playlist getPlaylistDetail(long id, boolean ignoreCache, @Nullable UUID player);
 
     List<Album> searchAlbums(String keywords, int offset);
 
@@ -32,7 +32,7 @@ public interface IMusicApiService {
 
     List<MusicDetail> getMusicDetailByIds(List<Long> ids, UUID playerUUID);
 
-    Album getAlbumInfoDetail(long id, UUID playerUUID);
+    Album getAlbumInfoDetail(long id, boolean ignoreCache, UUID playerUUID);
 
     Artist getArtistDetail(long id, UUID playerUUID);
 
@@ -40,17 +40,13 @@ public interface IMusicApiService {
 
     MusicResourceInfo getResourceInfo(MusicDetail musicDetail, Quality quality, UUID playerUUID);
 
-    List<Playlist> getPlayersUserSubscribedPlaylists(UUID playerUUID);
+    UserCategoryPlaylists getPlayersUserPlaylists(boolean ignoreCache, UUID playerUUID);
 
-    List<Album> getPlayersUserSubscribedAlbums(UUID playerUUID);
+    List<Album> getPlayersUserSubscribedAlbums(boolean ignoreCache, UUID playerUUID);
 
-    List<Artist> getPlayersUserSubscribedArtists(UUID playerUUID);
+    List<Artist> getPlayersUserSubscribedArtists(boolean ignoreCache, UUID playerUUID);
 
     LyricInfo getLyricInfo(MusicDetail musicDetail);
-
-    void addToLikedList(long musicId, UUID uuid);
-
-    void removeFromLikedList(long musicId, UUID uuid);
 
     void addToPlaylist(long playlistId, long musicId, UUID uuid);
 

@@ -6,7 +6,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
@@ -162,7 +162,7 @@ public class NowPlayingInfo {
                         .map(Artist::getName)
                         .reduce((a, b) -> a + " / " + b)
                         .orElse("");
-                List<MusicDetail> albumTracks = musicDetail.getAlbum().getMusicDetails();
+                ArrayList<MusicDetail> albumTracks = new ArrayList<>(musicDetail.getAlbum().getMusicDetails());
                 long durationMillis = musicDetail.getDurationMillis();
                 jmtc.setTimelineProperties(new JMTCTimelineProperties(0L, durationMillis, 0L, durationMillis));
                 URI artUri = null;
@@ -219,7 +219,7 @@ public class NowPlayingInfo {
                 long position = playedDuration.toMillis();
                 jmtc.setPosition(position);
 //                System.out.println("position: " + position);
-                if (getPlayedDuration() == musicDuration) {
+                if (getPlayedDuration().equals(musicDuration)) {
                     jmtc.setPlayingState(JMTCPlayingState.STOPPED);
                 } else if (clientConfig.getMuted()) {
                     jmtc.setPlayingState(JMTCPlayingState.PAUSED);

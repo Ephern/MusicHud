@@ -8,7 +8,7 @@ import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.payloads.S2CPayload;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.Consumer;
@@ -26,7 +26,7 @@ public record GetArtistMoreMusicResponse(long artistId, int offset, List<MusicDe
             );
 
     public record RequestData(long artistId, int offset){}
-    static final Map<RequestData, Consumer<List<MusicDetail>>> consumerMap = new HashMap<>();
+    static final Map<RequestData, Consumer<List<MusicDetail>>> consumerMap = new ConcurrentHashMap<>();
     public static void setReceiver(RequestData requestData, Consumer<List<MusicDetail>> consumer) {
         if (consumerMap.containsKey(requestData)) {
             consumerMap.get(requestData).accept(null);

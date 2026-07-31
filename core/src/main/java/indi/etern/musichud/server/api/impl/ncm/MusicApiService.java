@@ -7,17 +7,24 @@ import com.google.gson.annotations.SerializedName;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.music.actions.ModifyType;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.utils.JsonUtil;
 import indi.etern.musichud.utils.http.ApiClient;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.NoArgsConstructor;
+import lombok.NonNull;
+import lombok.SneakyThrows;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
@@ -41,7 +48,7 @@ public class MusicApiService implements IMusicApiService {
             .expireAfterAccess(10, TimeUnit.MINUTES)
             .maximumSize(50)
             .build();
-    private static final Cache<Long, List<Playlist>> userSubscribedPlaylistCache = CacheBuilder.newBuilder()
+    private static final Cache<Long, UserCategoryPlaylists> userPlaylistCache = CacheBuilder.newBuilder()
             .expireAfterAccess(10, TimeUnit.MINUTES)
             .maximumSize(50)
             .build();
@@ -68,6 +75,70 @@ public class MusicApiService implements IMusicApiService {
         return MusicApiService.musicApiService;
     }
 
+    @SneakyThrows
+    private static UserCategoryPlaylists loadUserCategoryPlaylist(long userId, LoginApiService.PlayerLoginInfo loginInfo) {
+        CompletableFuture<Void> createdPlaylistFuture = new CompletableFuture<>();
+        CompletableFuture<Void> subscribedPlaylistFuture = new CompletableFuture<>();
+        UserCategoryPlaylists userCategoryPlaylists = new UserCategoryPlaylists();
+        CompletableFuture<Void> totalComplete = CompletableFuture.allOf(createdPlaylistFuture, subscribedPlaylistFuture);
+        MusicHud.EXECUTOR.submit(() -> {
+            LinkedHashSet<Playlist> playlists = loadUserCreatedPlaylists(userId, loginInfo);
+            userCategoryPlaylists.setLikeList(playlists.removeFirst());
+            userCategoryPlaylists.setCreatedPlaylist(playlists);
+            createdPlaylistFuture.complete(null);
+        });
+        MusicHud.EXECUTOR.submit(() -> {
+            userCategoryPlaylists.setSubscribedPlaylist(loadUserSubscribedPlaylists(userId, loginInfo));
+            subscribedPlaylistFuture.complete(null);
+        });
+        totalComplete.get(5, TimeUnit.SECONDS);
+        if (totalComplete.state() == Future.State.SUCCESS) {
+            return userCategoryPlaylists;
+        } else {
+            return UserCategoryPlaylists.EMPTY;
+        }
+    }
+
+    private static LinkedHashSet<Playlist> loadUserSubscribedPlaylists(long userId, LoginApiService.PlayerLoginInfo loginInfo) {
+        PlaylistsResponse playlistData = ApiClient.post(
+                ServerApiMeta.User.SUBSCRIBED_PLAYLIST,
+                new PagedRequestDataWithUID(userId, 100, 0),
+                loginInfo.getLoginCookieInfo().rawCookie(),
+                true);
+        LinkedHashSet<Playlist> playlists = playlistData.data.playlists;
+        return playlists == null ? new LinkedHashSet<>(0) : playlists.stream().filter(Objects::nonNull)
+                .collect(LinkedHashSet::new, Set::add, LinkedHashSet::addAll);
+    }
+
+    private static LinkedHashSet<Playlist> loadUserCreatedPlaylists(long userId, LoginApiService.PlayerLoginInfo loginInfo) {
+        PlaylistsResponse playlistData = ApiClient.post(
+                ServerApiMeta.User.CREATED_PLAYLIST,
+                new PagedRequestDataWithUID(userId, 100, 0),
+                loginInfo.getLoginCookieInfo().rawCookie(),
+                true);
+        LinkedHashSet<Playlist> playlists = playlistData.data.playlists;
+        return playlists == null ? new LinkedHashSet<>(0) : playlists.stream().filter(Objects::nonNull)
+                .collect(LinkedHashSet::new, Set::add, LinkedHashSet::addAll);
+    }
+
+    private static List<Album> loadUserSubscribedAlbums(long userId, LoginApiService.PlayerLoginInfo loginInfo) {
+        UserSubscribedAlbumResponse userSubscribedAlbumResponse = ApiClient.post(
+                ServerApiMeta.User.SUBSCRIBED_ALBUMS,
+                new PagedRequestDataWithUID(userId, 50, 0),
+                loginInfo.getLoginCookieInfo().rawCookie(),
+                true);
+        return userSubscribedAlbumResponse.data();
+    }
+
+    private static List<Artist> loadUserSubscribedArtists(long userId, LoginApiService.PlayerLoginInfo loginInfo) {
+        UserSubscribedArtistResponse userSubscribedArtistResponse = ApiClient.post(
+                ServerApiMeta.User.SUBSCRIBED_ARTISTS,
+                new PagedRequestDataWithUID(userId, 50, 0),
+                loginInfo.getLoginCookieInfo().rawCookie(),
+                true);
+        return userSubscribedArtistResponse.data();
+    }
+
     private List<MusicDetail> appendArtistMusic(int offset, Artist artist, UUID playerUUID) {
         String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
         GetArtistMusicResponse response = ApiClient.post(ServerApiMeta.Artist.ALL_SONGS, new ArtistAllMusicRequest(artist.getId(), 50, offset, "time"), rawCookie, true);
@@ -79,8 +150,8 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
-    public Playlist getPlaylistDetail(long id, @Nullable UUID playerUUID) {
-        Playlist cached = playlistCache.getIfPresent(id);
+    public Playlist getPlaylistDetail(long id, boolean ignoreCache, @Nullable UUID playerUUID) {
+        Playlist cached = ignoreCache ? null : playlistCache.getIfPresent(id);
         Playlist playlist = Playlist.empty(id);
         if (cached != null && !cached.getTracks().isEmpty()) {
             playlist = cached;
@@ -212,19 +283,28 @@ public class MusicApiService implements IMusicApiService {
 
     @SneakyThrows
     @Override
-    public Album getAlbumInfoDetail(long id, UUID playerUUID) {
-        return albumsCache.get(id,
-                () -> {
-                    String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
-                    GetAlbumDetailResult post = ApiClient.post(ServerApiMeta.Album.DETAIL, new IdRequest(id), rawCookie, true);
-                    Album album = post.album();
-                    post.songs.forEach(song -> {
-                        song.setAlbum(album.shallowCopyBriefInfo());// prevent loop reference
-                    });
-                    album.setMusicDetails(post.songs);
-                    return album;
-                }
-        );
+    public Album getAlbumInfoDetail(long id, boolean ignoreCache, UUID playerUUID) {
+        if (ignoreCache) {
+            Album album = loadAlbumInfoDetail(id, playerUUID);
+            albumsCache.put(id, album);
+            return album;
+        } else {
+            return albumsCache.get(id,
+                    () -> loadAlbumInfoDetail(id, playerUUID)
+            );
+        }
+    }
+
+    @NotNull
+    private Album loadAlbumInfoDetail(long id, UUID playerUUID) {
+        String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
+        GetAlbumDetailResult post = ApiClient.post(ServerApiMeta.Album.DETAIL, new IdRequest(id), rawCookie, true);
+        Album album = post.album();
+        post.songs.forEach(song -> {
+            song.setAlbum(album.shallowCopyBriefInfo());// prevent loop reference
+        });
+        album.setMusicDetails(post.songs);
+        return album;
     }
 
     @SneakyThrows
@@ -281,7 +361,8 @@ public class MusicApiService implements IMusicApiService {
                             completeLyricInfo(musicDetail);
                             return musicResourceInfo;
                         }
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                     logger.error("Failed to get resource for music from substitute as last trial: {} (ID: {})", musicDetail.getName(), musicDetail.getId());
                     return MusicResourceInfo.NONE;
                 }
@@ -340,29 +421,28 @@ public class MusicApiService implements IMusicApiService {
 
     @Override
     @SneakyThrows
-    public List<Playlist> getPlayersUserSubscribedPlaylists(UUID playerUUID) {
+    public UserCategoryPlaylists getPlayersUserPlaylists(boolean ignoreCache, UUID playerUUID) {
         if (playerUUID == null) {
-            return Collections.emptyList();
+            return UserCategoryPlaylists.EMPTY;
         }
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayerUUID(playerUUID);
         if (loginInfo == null || loginInfo.getProfile() == null) {
-            return List.of();
+            return UserCategoryPlaylists.EMPTY;
         } else {
             long userId = loginInfo.getProfile().getUserId();
-            return userSubscribedPlaylistCache.get(userId, () -> {
-                PlaylistsResponse playlistData = ApiClient.post(
-                        ServerApiMeta.User.PLAYLIST,
-                        new PagedRequestDataWithUID(userId, 50, 0),
-                        loginInfo.getLoginCookieInfo().rawCookie(),
-                        true);
-                return playlistData.getPlaylists();
-            });
+            if (ignoreCache) {
+                UserCategoryPlaylists userCategoryPlaylists = loadUserCategoryPlaylist(userId, loginInfo);
+                userPlaylistCache.put(userId, userCategoryPlaylists);
+                return userCategoryPlaylists;
+            } else {
+                return userPlaylistCache.get(userId, () -> loadUserCategoryPlaylist(userId, loginInfo));
+            }
         }
     }
 
     @Override
     @SneakyThrows
-    public List<Album> getPlayersUserSubscribedAlbums(UUID playerUUID) {
+    public List<Album> getPlayersUserSubscribedAlbums(boolean ignoreCache, UUID playerUUID) {
         if (playerUUID == null) {
             return Collections.emptyList();
         }
@@ -371,20 +451,19 @@ public class MusicApiService implements IMusicApiService {
             return List.of();
         } else {
             long userId = loginInfo.getProfile().getUserId();
-            return userSubscribedAlbumsCache.get(userId, () -> {
-                UserSubscribedAlbumResponse userSubscribedAlbumResponse = ApiClient.post(
-                        ServerApiMeta.User.SUBSCRIBED_ALBUMS,
-                        new PagedRequestDataWithUID(userId, 50, 0),
-                        loginInfo.getLoginCookieInfo().rawCookie(),
-                        true);
-                return userSubscribedAlbumResponse.data();
-            });
+            if (ignoreCache) {
+                List<Album> albums = loadUserSubscribedAlbums(userId, loginInfo);
+                userSubscribedAlbumsCache.put(userId, albums);
+                return albums;
+            } else {
+                return userSubscribedAlbumsCache.get(userId, () -> loadUserSubscribedAlbums(userId, loginInfo));
+            }
         }
     }
 
     @Override
     @SneakyThrows
-    public List<Artist> getPlayersUserSubscribedArtists(UUID playerUUID) {
+    public List<Artist> getPlayersUserSubscribedArtists(boolean ignoreCache, UUID playerUUID) {
         if (playerUUID == null) {
             return Collections.emptyList();
         }
@@ -393,14 +472,12 @@ public class MusicApiService implements IMusicApiService {
             return List.of();
         } else {
             long userId = loginInfo.getProfile().getUserId();
-            return userSubscribedArtistsCache.get(userId, () -> {
-                UserSubscribedArtistResponse userSubscribedArtistResponse = ApiClient.post(
-                        ServerApiMeta.User.SUBSCRIBED_ARTISTS,
-                        new PagedRequestDataWithUID(userId, 50, 0),
-                        loginInfo.getLoginCookieInfo().rawCookie(),
-                        true);
-                return userSubscribedArtistResponse.data();
-            });
+            if (ignoreCache) {
+                List<Artist> artists = loadUserSubscribedArtists(userId, loginInfo);
+                userSubscribedArtistsCache.put(userId, artists);
+                return artists;
+            }
+            return userSubscribedArtistsCache.get(userId, () -> loadUserSubscribedArtists(userId, loginInfo));
         }
     }
 
@@ -415,23 +492,38 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
-    public void addToLikedList(long musicId, UUID uuid) {
-        //TODO
+    public void addToPlaylist(long playlistId, long musicId, UUID playerUUID) {
+        ApiClient.post(ServerApiMeta.Playlist.MODIFY_TRACKS,
+                new ModifyTracksRequest(ModifyType.ADD.getApiOperationName(), playlistId, String.valueOf(musicId)),
+                loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
+                true);
+        Playlist playlist = playlistCache.getIfPresent(playlistId);
+        if (playlist != null) {
+            SequencedSet<MusicDetail> musicDetails = playlist.getMusicDetails();
+            MusicDetail musicDetail = getMusicDetailByIds(List.of(musicId), playerUUID).getFirst();
+            boolean contains = musicDetails.contains(musicDetail);
+            if (!contains) {
+                musicDetails.addFirst(musicDetail);
+                playlist.setMusicTrackCount(playlist.getMusicTrackCount() + 1);
+            }
+        }
     }
 
     @Override
-    public void removeFromLikedList(long musicId, UUID uuid) {
-        //TODO
-    }
-
-    @Override
-    public void addToPlaylist(long playlistId, long musicId, UUID uuid) {
-        //TODO
-    }
-
-    @Override
-    public void removeFromPlaylist(long playlistId, long musicId, UUID uuid) {
-        //TODO
+    public void removeFromPlaylist(long playlistId, long musicId, UUID playerUUID) {
+        ApiClient.post(ServerApiMeta.Playlist.MODIFY_TRACKS,
+                new ModifyTracksRequest(ModifyType.REMOVE.getApiOperationName(), playlistId, String.valueOf(musicId)),
+                loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
+                true);
+        Playlist playlist = playlistCache.getIfPresent(playlistId);
+        if (playlist != null) {
+            playlist.getMusicDetails().stream().filter(m -> m.getId() == playlistId).findFirst()
+                    .ifPresent(musicDetail -> {
+                        playlist.getMusicDetails().remove(musicDetail);
+                        playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
+                    }
+            );
+        }
     }
 
     record IdRequest(long id) {
@@ -443,7 +535,7 @@ public class MusicApiService implements IMusicApiService {
     record SearchRequestBody(String keywords, int limit, int offset, String cookie, SearchType type) {
     }
 
-    public record GetAlbumDetailResult(Album album, List<MusicDetail> songs) {
+    public record GetAlbumDetailResult(Album album, LinkedHashSet<MusicDetail> songs) {
     }
 
     public record SearchAlbumsResult(List<Album> albums) {
@@ -511,18 +603,12 @@ public class MusicApiService implements IMusicApiService {
     public record UserSubscribedArtistResponse(List<Artist> data) {
     }
 
-    public static class PlaylistsResponse {
-        @SerializedName("playlist")
-        final
-        List<Playlist> playlists = List.of();
-        @Getter
-        int code;
-
-        public List<Playlist> getPlaylists() {
-            if (playlists.isEmpty()) {
-                return List.of();
-            }
-            return playlists.stream().filter(Objects::nonNull).toList();
+    public record PlaylistsResponse(@SerializedName("data") Data data, int code) {
+        public record Data(
+                @SerializedName("subCount") int subCount,
+                @SerializedName("playlist") LinkedHashSet<Playlist> playlists,
+                @SerializedName("more") boolean hasMore,
+                @SerializedName("count") int count) {
         }
     }
 
@@ -541,5 +627,15 @@ public class MusicApiService implements IMusicApiService {
                 }
             }
         }
+    }
+
+    public record ModifyTracksRequest(
+            @SerializedName("op")
+            String operationType,
+            @SerializedName("pid")
+            long playlistId,
+            @SerializedName("tracks")
+            String tracks
+    ) {
     }
 }

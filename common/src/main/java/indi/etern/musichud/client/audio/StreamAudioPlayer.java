@@ -6,7 +6,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.audio.decoder.*;
-import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IClientNetworkService;
@@ -447,6 +447,8 @@ public class StreamAudioPlayer {
                 if (e instanceof SocketException e1 && e1.getMessage().equals("Closed by interrupt")) break;
                 LOGGER.error("Download error (attempt {})\n{} : {}", localRetryCount + 1, e.getClass().getSimpleName(), e.getMessage());
 
+                localAudioBuffer.clear();
+                totalBufferedBytes.set(0);
                 playedBytes = 0;
                 forceSyncInternal = true;
                 localRetryCount++;

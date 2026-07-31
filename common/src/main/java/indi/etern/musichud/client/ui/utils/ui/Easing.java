@@ -42,7 +42,7 @@ public enum Easing implements TimeInterpolator{
     EASE_OUT_SINE {
         @Override
         public float getInterpolation(float t) {
-            return (float) (-(Math.cos(Math.PI * t) - 1) / 2);
+            return (float) Math.sin((t * Math.PI) / 2);
         }
     },
     EASE_IN_SINE {

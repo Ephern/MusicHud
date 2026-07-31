@@ -202,6 +202,26 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 MusicApiService.PlaylistsResponse.class);
+        public static final UrlMeta<MusicApiService.PlaylistsResponse> CREATED_PLAYLIST = new UrlMeta<>(
+                "/user/playlist/create",
+                Set.of("uid"),
+                Set.of("limit"/*default:100*/, "offset"),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                MusicApiService.PlaylistsResponse.class);
+        public static final UrlMeta<MusicApiService.PlaylistsResponse> SUBSCRIBED_PLAYLIST = new UrlMeta<>(
+                "/user/playlist/collect",
+                Set.of("uid"),
+                Set.of("limit"/*default:100*/, "offset"),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                MusicApiService.PlaylistsResponse.class);
         public static final UrlMeta<String> DJ = new UrlMeta<>(
                 "/user/dj",
                 Set.of("uid"),
@@ -433,6 +453,16 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 MusicApiService.PlaylistTracksResponse.class);
+        public static final UrlMeta<String> MODIFY_TRACKS = new UrlMeta<>(
+                "/playlist/tracks",
+                Set.of("op"/*add|del*/, "pid"/*playlistId*/, "tracks"/*musicIds*/),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class);
     }
 
     public static class Music {

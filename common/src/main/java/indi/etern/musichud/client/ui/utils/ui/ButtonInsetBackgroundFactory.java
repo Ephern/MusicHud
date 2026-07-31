@@ -17,7 +17,7 @@ public class ButtonInsetBackgroundFactory {
     @Builder.Default
     int inset = 0;
     @Builder.Default
-    ColorStateList backgroundColor = Theme.GHOST_BUTTON_STATES;
+    ColorStateList backgroundColor = Theme.GHOST_CHECK_BUTTON_STATES;
     public record Padding(int left,int top,int right,int bottom) {}
 
     public Drawable newBackgroundDrawable() {

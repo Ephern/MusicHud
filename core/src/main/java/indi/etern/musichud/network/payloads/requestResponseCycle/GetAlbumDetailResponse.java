@@ -7,7 +7,7 @@ import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.payloads.S2CPayload;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.Map;
 import java.util.function.Consumer;
 
@@ -19,12 +19,16 @@ public record GetAlbumDetailResponse(Album album) implements S2CPayload {
                     GetAlbumDetailResponse::new
             );
 
-    static final Map<Long, Consumer<Album>> consumerMap = new HashMap<>();
+    static final Map<Long, Consumer<Album>> consumerMap = new ConcurrentHashMap<>();
     public static void setReceiver(long id, Consumer<Album> consumer) {
         if (consumerMap.containsKey(id)) {
             consumerMap.get(id).accept(null);
         }
         GetAlbumDetailResponse.consumerMap.put(id, consumer);
+    }
+
+    public static void removeReceiver(long id) {
+        consumerMap.remove(id);
     }
 
     @RegisterMark

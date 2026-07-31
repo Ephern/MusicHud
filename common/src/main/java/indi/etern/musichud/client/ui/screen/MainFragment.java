@@ -6,13 +6,9 @@ import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
-import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
-import icyllis.modernui.text.SpannableString;
-import icyllis.modernui.text.Spanned;
-import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.util.DataSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.LayoutInflater;
@@ -26,7 +22,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.LoginService;
-import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
 import indi.etern.musichud.client.ui.pages.ConfigView;
@@ -35,7 +31,6 @@ import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.NonNull;
@@ -79,13 +74,15 @@ public class MainFragment extends Fragment {
     @Setter
     private int defaultSelectedIndex = 0;
     private ProgressBar progressBar;
-    private Button skipCurrentButton;
+    private VoteSkipButton skipCurrentButton;
     private TextView serverConnectStatus;
     private Button switchServerConnectButton;
     private PlayerHeadView pusherHeadView;
     private LinearLayout buttonsLayout;
     private TextView playedTimeText;
     private TextView totalTimeText;
+    private ToggleTrackLikeStateButton likeButton;
+    private ModifyPlaylistTrackModalButton addToPlaylistButton;
 
     public MainFragment() {
     }
@@ -124,6 +121,8 @@ public class MainFragment extends Fragment {
                 instance.playedTimeText.setText("");
                 instance.totalTimeText.setText("");
                 instance.buttonsLayout.setVisibility(View.GONE);
+                instance.likeButton.bindMusicList(null);
+                instance.addToPlaylistButton.bindMusicDetail(null);
             } else {
                 instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(240));
@@ -193,9 +192,10 @@ public class MainFragment extends Fragment {
                 });
                 instance.albumContainer.addView(albumButton);
 
-                instance.skipCurrentButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.voteForSkip"));
-                instance.skipCurrentButton.setEnabled(true);
+                instance.skipCurrentButton.reset();
                 instance.progressBar.setVisibility(View.VISIBLE);
+                instance.likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(musicDetail).currentUsersLikeList());
+                instance.addToPlaylistButton.bindMusicDetail(musicDetail);
                 instance.buttonsLayout.setVisibility(View.VISIBLE);
                 startProgressUpdater(musicDetail);
             }
@@ -390,75 +390,22 @@ public class MainFragment extends Fragment {
                 buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
 
                 ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                        .backgroundColor(Theme.GHOST_BUTTON_STATES)
                         .padding(new ButtonInsetBackgroundFactory.Padding(buttonsLayout.dp(2), buttonsLayout.dp(1), buttonsLayout.dp(2), buttonsLayout.dp(1)))
                         .cornerRadius(buttonsLayout.dp(4)).build();
                 {
-                    Button likeButton = new Button(context);
-                    likeButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                    likeButton.setGravity(Gravity.CENTER);
-                    String text = I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicLike");
-                    SpannableString iconLikeText = new SpannableString(text);
-                    Image likeImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/heart.png");
-                    if (likeImage != null) {
-                        ImageSpan span = ImageUtils.getIconSpan(likeImage);
-                        iconLikeText.setSpan(span, 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                        likeButton.setText(iconLikeText);
-                        likeButton.setTextSize(Theme.TEXT_SIZE_LARGE);
-                        likeButton.setTooltipText(text);
-                    } else {
-                        likeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                        likeButton.setText(text);
-                    }
+                    likeButton = new ToggleTrackLikeStateButton(context);
                     likeButton.setBackground(backgroundFactory.newBackgroundDrawable());
                     buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
                 }
                 {
-                    Button addToPlaylistButton = new Button(context);
-                    addToPlaylistButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                    addToPlaylistButton.setGravity(Gravity.CENTER);
-                    String text = I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicPlaylist");
-                    SpannableString iconLikeText = new SpannableString(text);
-                    Image likeImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_plus.png");
-                    if (likeImage != null) {
-                        ImageSpan span = ImageUtils.getIconSpan(likeImage);
-                        iconLikeText.setSpan(span, 0, text.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                        addToPlaylistButton.setText(iconLikeText);
-                        addToPlaylistButton.setTextSize(Theme.TEXT_SIZE_LARGE);
-                        addToPlaylistButton.setTooltipText(text);
-                    } else {
-                        addToPlaylistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                        addToPlaylistButton.setText(text);
-                    }
+                    addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
                     addToPlaylistButton.setBackground(backgroundFactory.newBackgroundDrawable());
                     buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
                 }
                 {
-                    skipCurrentButton = new Button(context);
-                    skipCurrentButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                    skipCurrentButton.setGravity(Gravity.CENTER);
-                    String skipText = I18n.get(MusicHud.MOD_ID + ".button.voteForSkip");
-                    SpannableString iconSkipText = new SpannableString(skipText);
-                    Image skipImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/skip_forward.png");
-                    if (skipImage != null) {
-                        ImageSpan span = ImageUtils.getIconSpan(skipImage);
-                        iconSkipText.setSpan(span, 0, skipText.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                        skipCurrentButton.setText(iconSkipText);
-                        skipCurrentButton.setTextSize(Theme.TEXT_SIZE_LARGE);
-                        skipCurrentButton.setTooltipText(skipText);
-                    } else {
-                        skipCurrentButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                        skipCurrentButton.setText(skipText);
-                    }
-
+                    skipCurrentButton = new VoteSkipButton(context);
                     skipCurrentButton.setBackground(backgroundFactory.newBackgroundDrawable());
-                    skipCurrentButton.setOnClickListener((v) -> {
-                        MusicService.getInstance().voteForSkipCurrent();
-                        MuiModApi.postToUiThread(() -> {
-                            skipCurrentButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                            skipCurrentButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".text.voted"));
-                            skipCurrentButton.setEnabled(false);
-                        });
-                    });
                     buttonsLayout.addView(skipCurrentButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
                 }
 

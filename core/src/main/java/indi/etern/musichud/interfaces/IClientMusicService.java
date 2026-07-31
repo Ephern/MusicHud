@@ -2,14 +2,15 @@ package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.platform.Environment;
 
 import java.time.ZonedDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public interface IClientMusicService {
@@ -63,11 +64,11 @@ public interface IClientMusicService {
 
     void updateAllIdlePlaySources(List<Playlist> playlistSources, List<Album> albumSources);
 
-    CompletableFuture<List<Playlist>> loadUserPlaylists();
+    CompletableFuture<UserCategoryPlaylists> loadUserPlaylists(boolean ignoreCache);
 
-    CompletableFuture<List<Album>> loadUserAlbums();
+    CompletableFuture<List<Album>> loadUserAlbums(boolean ignoreCache);
 
-    CompletableFuture<List<Artist>> loadUserArtists();
+    CompletableFuture<List<Artist>> loadUserArtists(boolean ignoreCache);
 
     CompletableFuture<Artist> loadArtistDetailAsync(Artist artist);
 
@@ -75,29 +76,32 @@ public interface IClientMusicService {
 
     CompletionStage<Collection<MusicDetail>> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache);
 
-    java.util.Set<MusicCollection> getLocalIdlePlaySources();
+    Set<MusicCollection> getLocalIdlePlaySources();
 
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getLocalIdlePlaySourceAddListeners();
+    Set<Consumer<MusicCollection>> getLocalIdlePlaySourceAddListeners();
 
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getLocalIdlePlaySourceRemoveListeners();
+    Set<Consumer<MusicCollection>> getLocalIdlePlaySourceRemoveListeners();
 
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getLocalIdlePlaySourceChangeListeners();
+    Set<Consumer<MusicCollection>> getLocalIdlePlaySourceChangeListeners();
 
-    java.util.Set<MusicCollection> getServerIdlePlaySources();
+    Set<MusicCollection> getServerIdlePlaySources();
 
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getServerIdlePlaySourceAddListeners();
+    Set<Consumer<MusicCollection>> getServerIdlePlaySourceAddListeners();
 
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getServerIdlePlaySourceRemoveListeners();
+    Set<Consumer<MusicCollection>> getServerIdlePlaySourceRemoveListeners();
 
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getServerIdlePlaySourceChangeListeners();
+    Set<Consumer<MusicCollection>> getServerIdlePlaySourceChangeListeners();
 
     Queue<MusicDetail> getMusicQueue();
 
-    java.util.Set<java.util.function.Consumer<Queue<MusicDetail>>> getMusicQueueRefreshListeners();
+    Set<Consumer<Queue<MusicDetail>>> getMusicQueueRefreshListeners();
 
-    java.util.Set<java.util.function.Consumer<MusicDetail>> getMusicQueuePushListeners();
+    Set<Consumer<MusicDetail>> getMusicQueuePushListeners();
 
-    java.util.Set<java.util.function.BiConsumer<Integer, MusicDetail>> getMusicQueueRemoveListeners();
+    Set<BiConsumer<Integer, MusicDetail>> getMusicQueueRemoveListeners();
 
     boolean isIdlePlaySourceLoaded();
+
+    IMusicTrackState getMusicTrackState(MusicDetail musicDetail);
+
 }

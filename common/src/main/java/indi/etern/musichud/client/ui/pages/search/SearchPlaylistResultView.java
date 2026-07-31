@@ -16,7 +16,7 @@ public class SearchPlaylistResultView extends WaterfallLayout {
     public SearchPlaylistResultView(Context context) {
         super(context);
         instance = this;
-        setRowMinWidth(dp(143));
+        setRowMinWidth(dp(174));
         refresh();
     }
 

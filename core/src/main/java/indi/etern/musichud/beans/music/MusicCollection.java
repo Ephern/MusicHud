@@ -7,6 +7,7 @@ public interface MusicCollection {
     String getName();
     String getNameI18nKey();
     String getImageThumbnailUrl(int size);
+    int getMusicTrackCount();
     PusherInfo getPusherInfo();
     Collection<MusicDetail> getMusicDetails();
     MusicCollection copyWithPusherInfo(PusherInfo pusherInfo);

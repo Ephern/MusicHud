@@ -773,7 +773,6 @@ public class ConfigView extends LinearLayout {
         content.setOrientation(LinearLayout.VERTICAL);
 
         TextView title = new TextView(context);
-        title.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.title"));
         title.setTextSize(Theme.TEXT_SIZE_LARGE);
 
         TextView description = new TextView(context);
@@ -916,14 +915,14 @@ public class ConfigView extends LinearLayout {
         progressLayout.addView(progressBar, progParams);
         progressLayout.addView(progressText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-        LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        params4.setMargins(0, 0, 0, dp(8));
+//        LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+//        params4.setMargins(0, 0, 0, dp(8));
         LayoutParams params5 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         params5.setMargins(0, dp(4), 0, dp(4));
 
         LinearLayout idlePage = new LinearLayout(context);
         idlePage.setOrientation(LinearLayout.VERTICAL);
-        idlePage.addView(title, params4);
+//        idlePage.addView(title, params4);
         idlePage.addView(description);
         idlePage.addView(descriptionUrl);
         idlePage.addView(directoryLayout, params5);
@@ -931,9 +930,9 @@ public class ConfigView extends LinearLayout {
         idlePage.addView(releaseInfoLayout);
         idlePage.addView(existingVersionWarning);
 
-        TextView dlTitle = new TextView(context);
-        dlTitle.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.title"));
-        dlTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+//        TextView dlTitle = new TextView(context);
+//        dlTitle.setText(baseTitle);
+//        dlTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
 
         TextView dlDesc = new TextView(context);
         dlDesc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.downloading.description"));
@@ -943,9 +942,9 @@ public class ConfigView extends LinearLayout {
         LinearLayout progressPage = new LinearLayout(context);
         progressPage.setOrientation(LinearLayout.VERTICAL);
         progressPage.setVisibility(GONE);
-        LayoutParams params6 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        params6.setMargins(0, 0, 0, dp(8));
-        progressPage.addView(dlTitle, params6);
+//        LayoutParams params6 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+//        params6.setMargins(0, 0, 0, dp(8));
+//        progressPage.addView(dlTitle, params6);
         progressPage.addView(dlDesc);
         progressPage.addView(progressLayout);
 
@@ -953,15 +952,12 @@ public class ConfigView extends LinearLayout {
         donePage.setOrientation(LinearLayout.VERTICAL);
         donePage.setVisibility(GONE);
 
-        TextView doneTitle = new TextView(context);
-        doneTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
-        doneTitle.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.title"));
+        String doneTitle = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.title");
 
         TextView doneDesc = new TextView(context);
         doneDesc.setTextSize(Theme.TEXT_SIZE_NORMAL);
         doneDesc.setTextColor(Theme.NORMAL_TEXT_COLOR);
 
-        donePage.addView(doneTitle, params4);
         donePage.addView(doneDesc);
 
         content.addView(idlePage);
@@ -976,12 +972,27 @@ public class ConfigView extends LinearLayout {
         final CompletableFuture<?>[] downloadFuture = {null};
         final AtomicBoolean cancelled = new AtomicBoolean(false);
 
+        String baseTitle = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.title");
         java.util.function.Consumer<Page> setPage = page -> {
             switch (page) {
-                case IDLE -> { idlePage.setVisibility(VISIBLE); progressPage.setVisibility(GONE); donePage.setVisibility(GONE); }
-                case DOWNLOADING -> { idlePage.setVisibility(GONE); progressPage.setVisibility(VISIBLE); donePage.setVisibility(GONE); }
-                case DONE -> { idlePage.setVisibility(GONE); progressPage.setVisibility(GONE); donePage.setVisibility(VISIBLE); }
-                case RESETTING -> { idlePage.setVisibility(VISIBLE); progressPage.setVisibility(GONE); donePage.setVisibility(GONE); }
+                case IDLE, RESETTING -> {
+                    title.setText(baseTitle);
+                    idlePage.setVisibility(VISIBLE);
+                    progressPage.setVisibility(GONE);
+                    donePage.setVisibility(GONE);
+                }
+                case DOWNLOADING -> {
+                    title.setText(baseTitle);
+                    idlePage.setVisibility(GONE);
+                    progressPage.setVisibility(VISIBLE);
+                    donePage.setVisibility(GONE);
+                }
+                case DONE -> {
+                    title.setText(doneTitle);
+                    idlePage.setVisibility(GONE);
+                    progressPage.setVisibility(GONE);
+                    donePage.setVisibility(VISIBLE);
+                }
             }
         };
 
@@ -1101,9 +1112,7 @@ public class ConfigView extends LinearLayout {
             }
         });
 
-        Modal dialog = new Modal(context, content,
-                confirmButton, cancelBtn
-        );
+        Modal dialog = new Modal(context, title, content, confirmButton, cancelBtn);
 
         dialog.setOnDismissListener(() -> {
             if (Page.RESETTING.equals(state[0])) {

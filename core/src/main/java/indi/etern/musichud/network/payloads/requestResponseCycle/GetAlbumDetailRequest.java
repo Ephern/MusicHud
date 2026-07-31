@@ -12,10 +12,12 @@ import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 
-public record GetAlbumDetailRequest(long id) implements C2SPayload {
+public record GetAlbumDetailRequest(long id, boolean ignoreCache) implements C2SPayload {
     public static final ByteBufCodec<GetAlbumDetailRequest> CODEC = ByteBufCodec.composite(
             Codecs.LONG,
             GetAlbumDetailRequest::id,
+            Codecs.BOOL,
+            GetAlbumDetailRequest::ignoreCache,
             GetAlbumDetailRequest::new
     );
 
@@ -25,7 +27,7 @@ public record GetAlbumDetailRequest(long id) implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetAlbumDetailRequest.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((playlistDetailRequest, player) -> {
-                        Album album = IMusicApiService.getInstance(ApiProvider.NCM).getAlbumInfoDetail(playlistDetailRequest.id, player.getUUID());
+                        Album album = IMusicApiService.getInstance(ApiProvider.NCM).getAlbumInfoDetail(playlistDetailRequest.id, playlistDetailRequest.ignoreCache, player.getUUID());
                         if (album != null) {
                             IServerNetworkService.getInstance().sendToPlayer(player,new GetAlbumDetailResponse(album));
                         }

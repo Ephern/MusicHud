@@ -41,7 +41,7 @@ public class Environment {
                 () -> load("indi.etern.musichud.platform.mod.fabric.registry.FabricKeyRegistryService", IKeyRegistryServiceDefinition.class),
                 () -> load("indi.etern.musichud.client.utils.ClientDistUtil", IClientDistUtil.class),
                 () -> load("indi.etern.musichud.client.services.LoginService", IClientLoginService.class),
-                () -> load("indi.etern.musichud.client.services.MusicService", IClientMusicService.class)),
+                () -> load("indi.etern.musichud.client.services.music.MusicService", IClientMusicService.class)),
         NEOFORGE(
                 () -> load("indi.etern.musichud.platform.mod.forgeConfig.config.ServerConfigDefinition", ServerConfig.class),
                 () -> load("indi.etern.musichud.platform.mod.neoforge.network.NeoForgeNetworkManager", INetworkRegister.class),
@@ -53,7 +53,7 @@ public class Environment {
                 () -> load("indi.etern.musichud.platform.mod.neoforge.registry.NeoForgeKeyRegistryService", IKeyRegistryServiceDefinition.class),
                 () -> load("indi.etern.musichud.client.utils.ClientDistUtil", IClientDistUtil.class),
                 () -> load("indi.etern.musichud.client.services.LoginService", IClientLoginService.class),
-                () -> load("indi.etern.musichud.client.services.MusicService", IClientMusicService.class)),
+                () -> load("indi.etern.musichud.client.services.music.MusicService", IClientMusicService.class)),
         PAPER(
                 () -> load("indi.etern.musichud.platform.plugin.paper.config.ServerConfigDefinition", ServerConfig.class),
                 () -> load("indi.etern.musichud.platform.plugin.paper.network.PaperNetworkManager", INetworkRegister.class),

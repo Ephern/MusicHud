@@ -1,5 +1,6 @@
 package indi.etern.musichud.beans.music;
 
+import com.google.gson.annotations.SerializedName;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -9,30 +10,22 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.util.List;
-import java.util.Objects;
+import java.util.*;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Playlist implements MusicCollection {
     public static final ByteBufCodec<Playlist> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
-            Playlist::getId,
-            Codecs.STRING_UTF8,
-            Playlist::getName,
-            Codecs.LONG,
-            Playlist::getCoverImgId,
-            Codecs.STRING_UTF8,
-            Playlist::getCoverImgId_str,
-            Codecs.STRING_UTF8,
-            Playlist::getCoverImgUrl,
-            Profile.CODEC,
-            Playlist::getCreator,
-            Codecs.ofEnum(Privacy.class),
-            Playlist::getPrivacy,
-            Codecs.ofList(() -> MusicDetail.CODEC),
-            Playlist::getTracks,
-            PusherInfo.CODEC,
-            Playlist::getPusherInfo,
+            Codecs.LONG, Playlist::getId,
+            Codecs.STRING_UTF8, Playlist::getName,
+            Codecs.LONG, Playlist::getCoverImgId,
+            Codecs.STRING_UTF8, Playlist::getCoverImgId_str,
+            Codecs.STRING_UTF8, Playlist::getCoverImgUrl,
+            Codecs.INT, Playlist::getMusicTrackCount,
+            Codecs.INT, Playlist::getPlayedCount,
+            Profile.CODEC, Playlist::getCreator,
+            Codecs.ofEnum(Privacy.class), Playlist::getPrivacy,
+            Codecs.ofCollection(LinkedHashSet::new, () -> MusicDetail.CODEC), Playlist::getTracks,
+            PusherInfo.CODEC, Playlist::getPusherInfo,
             Playlist::new
     );
 
@@ -43,16 +36,25 @@ public class Playlist implements MusicCollection {
     String name = "";
     @Getter
     long coverImgId = -1;
+    @SerializedName("trackCount")
+    @Getter
+    @Setter
+    int musicTrackCount;
+    @SerializedName("playCount")
+    @Getter
+    int playedCount;
     String coverImgId_str = "";
     String coverImgUrl = MusicHud.ICON_BASE64;
     Profile creator = Profile.ANONYMOUS;
     Privacy privacy = Privacy.PUBLIC;
     @Setter
-    List<MusicDetail> tracks = List.of();
+    SequencedSet<MusicDetail> tracks = new LinkedHashSet<>(0);
 
     // Not contained in the original API response, set separately
     @Getter
     PusherInfo pusherInfo = PusherInfo.EMPTY;
+
+    private boolean nullFiltered = false;
 
     protected Playlist(
             long id,
@@ -60,9 +62,11 @@ public class Playlist implements MusicCollection {
             long coverImgId,
             String coverImgId_str,
             String coverImgUrl,
+            int musicTrackCount,
+            int playedCount,
             Profile creator,
             Privacy privacy,
-            List<MusicDetail> tracks,
+            SequencedSet<MusicDetail> tracks,
             PusherInfo pusherInfo
     ) {
         this.id = id;
@@ -70,6 +74,8 @@ public class Playlist implements MusicCollection {
         this.coverImgId = coverImgId;
         this.coverImgId_str = coverImgId_str;
         this.coverImgUrl = coverImgUrl;
+        this.musicTrackCount = musicTrackCount;
+        this.playedCount = playedCount;
         this.creator = creator;
         this.privacy = privacy;
         this.tracks = tracks;
@@ -105,7 +111,7 @@ public class Playlist implements MusicCollection {
     }
 
     @Override
-    public List<MusicDetail> getMusicDetails() {
+    public SequencedSet<MusicDetail> getMusicDetails() {
         return getTracks();
     }
 
@@ -133,11 +139,20 @@ public class Playlist implements MusicCollection {
         return Objects.requireNonNullElse(privacy, Privacy.PUBLIC);
     }
 
-    public List<MusicDetail> getTracks() {
+    public SequencedSet<MusicDetail> getTracks() {
         if (tracks == null || tracks.isEmpty()) {
-            return List.of();
+            return new LinkedHashSet<>(0);
         }
-        return tracks.stream().filter(Objects::nonNull).toList();
+        if (!nullFiltered) {
+            filterTracksNullItem();
+            nullFiltered = true;
+        }
+        return tracks;
+    }
+
+    private void filterTracksNullItem() {
+        tracks = tracks.stream().filter(Objects::nonNull)
+                .collect(LinkedHashSet::new, Set::add, LinkedHashSet::addAll);
     }
 
     @Override
