@@ -3,42 +3,50 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.*;
-import indi.etern.musichud.network.payloads.C2SPayload;
-import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.network.RequestHandlerRegistry;
+import indi.etern.musichud.network.RequestResponseCodecs;
+import indi.etern.musichud.network.ResponseResult;
+import indi.etern.musichud.network.payloads.ApiRequestPayload;
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.IMusicApiService;
-import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-public record SearchRequest(String query, SearchType searchType, int offset) implements C2SPayload {
-    public static final ByteBufCodec<SearchRequest> CODEC = ByteBufCodec.composite(
-            Codecs.STRING_UTF8,
-            SearchRequest::query,
-            Codecs.ofEnum(SearchType.class),
-            SearchRequest::searchType,
-            Codecs.INT,
-            SearchRequest::offset,
-            SearchRequest::new
+@Getter
+@AllArgsConstructor
+public class SearchRequest extends ApiRequestPayload {
+    public static final ByteBufCodec<SearchRequest> CODEC = RequestResponseCodecs.withCycleId(
+            ByteBufCodec.composite(
+                    Codecs.STRING_UTF8,
+                    SearchRequest::getQuery,
+                    Codecs.ofEnum(SearchType.class),
+                    SearchRequest::getSearchType,
+                    Codecs.INT,
+                    SearchRequest::getOffset,
+                    SearchRequest::new
+            )
     );
+
+    private final String query;
+    private final SearchType searchType;
+    private final int offset;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
         @Override
         public void register() {
-            INetworkRegister.getInstance().autoRegisterPayload(SearchRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((message, player) -> {
-                        S2CPayload s2CPayload;
-                        IMusicApiService musicApiService = IMusicApiService.getInstance(ApiProvider.NCM);
-                        switch (message.searchType) {
-                            case ARTIST -> s2CPayload = new SearchArtistsResponse(message.offset, musicApiService.searchArtists(message.query, message.offset));
-                            case ALBUM -> s2CPayload = new SearchAlbumsResponse(message.offset, musicApiService.searchAlbums(message.query, message.offset));
-                            case MUSIC -> s2CPayload = new SearchMusicResponse(message.offset, musicApiService.searchMusic(message.query, message.offset));
-                            case PLAYLIST -> s2CPayload = new SearchPlaylistsResponse(message.offset, musicApiService.searchPlaylists(message.query, message.offset));
-                            default -> s2CPayload = new SearchMusicResponse(message.offset, musicApiService.searchMusic(message.query, message.offset));
-                        }
-                        indi.etern.musichud.network.IServerNetworkService.getInstance().sendToPlayer(player, s2CPayload);
-                    })
-            );
+            RequestHandlerRegistry.autoRegisterPayload(SearchRequest.class, CODEC, (message, player) -> {
+                IMusicApiService musicApiService = IMusicApiService.getInstance(ApiProvider.NCM);
+                return switch (message.getSearchType()) {
+                    case ARTIST -> ResponseResult.of(new SearchArtistsResponse(message.getOffset(), musicApiService.searchArtists(message.getQuery(), message.getOffset())));
+                    case ALBUM -> ResponseResult.of(new SearchAlbumsResponse(message.getOffset(), musicApiService.searchAlbums(message.getQuery(), message.getOffset())));
+                    case MUSIC -> ResponseResult.of(new SearchMusicResponse(message.getOffset(), musicApiService.searchMusic(message.getQuery(), message.getOffset())));
+                    case PLAYLIST -> ResponseResult.of(new SearchPlaylistsResponse(message.getOffset(), musicApiService.searchPlaylists(message.getQuery(), message.getOffset())));
+                    default -> ResponseResult.of(new SearchMusicResponse(message.getOffset(), musicApiService.searchMusic(message.getQuery(), message.getOffset())));
+                };
+            });
         }
     }
 }

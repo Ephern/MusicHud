@@ -4,40 +4,35 @@ import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.network.RequestResponseCodecs;
 import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.payloads.ApiResponsePayload;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-import java.util.function.Consumer;
-
-public record SendPhoneValidationCodeResponse(boolean success, int timeout) implements S2CPayload {
-    public static final ByteBufCodec<SendPhoneValidationCodeResponse> CODEC =
+@Getter
+@AllArgsConstructor
+public class SendPhoneValidationCodeResponse extends ApiResponsePayload {
+    public static final ByteBufCodec<SendPhoneValidationCodeResponse> CODEC = RequestResponseCodecs.withCycleId(
             ByteBufCodec.composite(
                     Codecs.BOOL,
-                    SendPhoneValidationCodeResponse::success,
+                    SendPhoneValidationCodeResponse::isSuccess,
                     Codecs.INT,
-                    SendPhoneValidationCodeResponse::timeout,
+                    SendPhoneValidationCodeResponse::getTimeout,
                     SendPhoneValidationCodeResponse::new
-            );
+            )
+    );
 
-    static Consumer<SendPhoneValidationCodeResponse> consumer;
-
-    public static void setReceiver(Consumer<SendPhoneValidationCodeResponse> receiver) {
-        if (consumer != null) {
-            consumer.accept(null);
-        }
-        consumer = receiver;
-    }
+    private final boolean success;
+    private final int timeout;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
         @Override
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(SendPhoneValidationCodeResponse.class, CODEC,
-                    (response, player) -> {
-                        if (consumer != null) {
-                            consumer.accept(response);
-                        }
-                    }
+                    (response, player) -> RequestResponseManager.complete(response)
             );
         }
     }

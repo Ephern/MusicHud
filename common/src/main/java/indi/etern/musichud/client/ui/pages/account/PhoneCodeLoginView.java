@@ -11,7 +11,8 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.network.IClientNetworkService;
-import indi.etern.musichud.network.payloads.requestResponseCycle.PhoneCodeLoginRequest;
+import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.PhoneCodeLoginMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeResponse;
 import net.minecraft.client.resources.language.I18n;
@@ -138,30 +139,38 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
                 }
                 lastSentCodeTime = ZonedDateTime.now();
                 setSendingButtonDisable();
-                SendPhoneValidationCodeResponse.setReceiver(response -> {
-                    if (response != null) {
-                        int timeout = response.timeout();
-                        if (!response.success()) {
-                            MuiModApi.postToUiThread(() -> {
-                                Toast toast = Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.failedToSendCode"), Toast.LENGTH_SHORT);
-                                ToastUtil.show(toast);
-                            });
-                        }
-                        scheduledRefreshTask = MusicHud.scheduleWithFixedDelay(() -> {
-                            MuiModApi.postToUiThread(() -> {
-                                long seconds = timeout - Duration.between(lastSentCodeTime, ZonedDateTime.now()).getSeconds();
-                                if (seconds <= 1) {
+                RequestResponseManager.send(
+                                new SendPhoneValidationCodeRequest(regionCode, phone),
+                                SendPhoneValidationCodeResponse.class,
+                                Duration.ofSeconds(10))
+                        .whenComplete((response, throwable) -> {
+                            if (throwable != null) {
+                                MuiModApi.postToUiThread(() -> {
                                     setSendingButtonEnable();
                                     sendCodeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.sendCode"));
-                                    scheduledRefreshTask.stop();
-                                } else {
-                                    sendCodeButton.setText(String.valueOf(seconds));
-                                }
-                            });
-                        }, Duration.ZERO, Duration.ofSeconds(1));
-                    }
-                });
-                IClientNetworkService.getInstance().sendToServer(new SendPhoneValidationCodeRequest(regionCode, phone));
+                                });
+                                return;
+                            }
+                            int timeout = response.getTimeout();
+                            if (!response.isSuccess()) {
+                                MuiModApi.postToUiThread(() -> {
+                                    Toast toast = Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.failedToSendCode"), Toast.LENGTH_SHORT);
+                                    ToastUtil.show(toast);
+                                });
+                            }
+                            scheduledRefreshTask = MusicHud.scheduleWithFixedDelay(() -> {
+                                MuiModApi.postToUiThread(() -> {
+                                    long seconds = timeout - Duration.between(lastSentCodeTime, ZonedDateTime.now()).getSeconds();
+                                    if (seconds <= 1) {
+                                        setSendingButtonEnable();
+                                        sendCodeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.sendCode"));
+                                        scheduledRefreshTask.stop();
+                                    } else {
+                                        sendCodeButton.setText(String.valueOf(seconds));
+                                    }
+                                });
+                            }, Duration.ZERO, Duration.ofSeconds(1));
+                        });
         });
         layout2.addView(sendCodeButton);
 
@@ -202,7 +211,7 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
                 return;
             }
 
-            IClientNetworkService.getInstance().sendToServer(new PhoneCodeLoginRequest(regionCode, phone, code));
+            IClientNetworkService.getInstance().sendToServer(new PhoneCodeLoginMessage(regionCode, phone, code));
         });
         var bf2 = ButtonInsetBackgroundFactory.builder()
                 .padding(new ButtonInsetBackgroundFactory.Padding(dp(16), dp(8), dp(16), dp(8)))

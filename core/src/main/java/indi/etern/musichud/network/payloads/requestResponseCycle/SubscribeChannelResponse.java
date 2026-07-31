@@ -11,28 +11,27 @@ import indi.etern.musichud.network.payloads.ApiResponsePayload;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.util.Set;
+
 @Getter
 @AllArgsConstructor
-public class ModifyPlaylistResponse extends ApiResponsePayload {
-    public static final ByteBufCodec<ModifyPlaylistResponse> CODEC = RequestResponseCodecs.withCycleId(
+public class SubscribeChannelResponse extends ApiResponsePayload {
+    public static final ByteBufCodec<SubscribeChannelResponse> CODEC = RequestResponseCodecs.withCycleId(
             ByteBufCodec.composite(
-                    Codecs.BOOL,
-                    ModifyPlaylistResponse::isSuccess,
-                    Codecs.STRING_UTF8,
-                    ModifyPlaylistResponse::getMessage,
-                    ModifyPlaylistResponse::new
+                    Codecs.ofSet(() -> Codecs.STRING_UTF8),
+                    SubscribeChannelResponse::getChannels,
+                    SubscribeChannelResponse::new
             )
     );
 
-    private final boolean success;
-    private final String message;
+    private final Set<String> channels;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
-        @Override
         public void register() {
-            INetworkRegister.getInstance().autoRegisterPayload(ModifyPlaylistResponse.class, CODEC,
-                    (response, playerClient) -> RequestResponseManager.complete(response)
+            INetworkRegister.getInstance().autoRegisterPayload(
+                    SubscribeChannelResponse.class, CODEC,
+                    (response, player) -> RequestResponseManager.complete(response)
             );
         }
     }

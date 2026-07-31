@@ -5,34 +5,41 @@ import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
-import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.network.payloads.C2SPayload;
+import indi.etern.musichud.network.RequestHandlerRegistry;
+import indi.etern.musichud.network.RequestResponseCodecs;
+import indi.etern.musichud.network.ResponseResult;
+import indi.etern.musichud.network.payloads.ApiRequestPayload;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
-import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-public record GetMusicResourceRequest(long id,Quality quality,String retryForUrl) implements C2SPayload {
-    public static final ByteBufCodec<GetMusicResourceRequest> CODEC =
+@Getter
+@AllArgsConstructor
+public class GetMusicResourceRequest extends ApiRequestPayload {
+    public static final ByteBufCodec<GetMusicResourceRequest> CODEC = RequestResponseCodecs.withCycleId(
             ByteBufCodec.composite(
                     Codecs.LONG,
-                    GetMusicResourceRequest::id,
+                    GetMusicResourceRequest::getId,
                     Codecs.ofEnum(Quality.class),
-                    GetMusicResourceRequest::quality,
+                    GetMusicResourceRequest::getQuality,
                     Codecs.STRING_UTF8,
-                    GetMusicResourceRequest::retryForUrl,
+                    GetMusicResourceRequest::getRetryForUrl,
                     GetMusicResourceRequest::new
-            );
+            )
+    );
+
+    private final long id;
+    private final Quality quality;
+    private final String retryForUrl;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
         public void register() {
-            INetworkRegister.getInstance().autoRegisterPayload(
-                    GetMusicResourceRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((request, player) -> {
-                        var currentMusicResourceInfo = MusicPlayerServerService.getInstance().getMusicResourceInfo(request.id, request.quality, request.retryForUrl, player.getUUID());
-                        IServerNetworkService.getInstance().sendToPlayer(player, new indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceResponse(currentMusicResourceInfo));
-                    })
-            );
+            RequestHandlerRegistry.autoRegisterPayload(GetMusicResourceRequest.class, CODEC, (request, player) -> {
+                var currentMusicResourceInfo = MusicPlayerServerService.getInstance()
+                        .getMusicResourceInfo(request.getId(), request.getQuality(), request.getRetryForUrl(), player.getUUID());
+                return ResponseResult.of(new GetMusicResourceResponse(currentMusicResourceInfo));
+            });
         }
     }
 }

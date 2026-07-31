@@ -317,7 +317,7 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void requestValidationCodeFor(int regionCode, long phone, IPlayerClient player) {
+    public SendPhoneValidationCodeResponse requestValidationCodeFor(int regionCode, long phone, IPlayerClient player) {
         SendValidationCodeResponse response = ApiClient.post(ServerApiMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null, true);
         ZonedDateTime lastSentTime = lastSentTimes.getIfPresent(player);
         ZonedDateTime now = ZonedDateTime.now();
@@ -333,10 +333,10 @@ public class LoginApiService implements ILoginApiService {
             } else {
                 logger.error("Failed to send code to player: {}", player.getName());
             }
-            serverNetworkService.sendToPlayer(player, new SendPhoneValidationCodeResponse(response.done, 30));
+            return new SendPhoneValidationCodeResponse(response.done, 30);
         } else {
             logger.warn("Refuse to send code to player: {}, as frequency limit", player.getName());
-            serverNetworkService.sendToPlayer(player, new SendPhoneValidationCodeResponse(response.done, 30 - (int) duration.getSeconds()));
+            return new SendPhoneValidationCodeResponse(response.done, 30 - (int) duration.getSeconds());
         }
     }
 

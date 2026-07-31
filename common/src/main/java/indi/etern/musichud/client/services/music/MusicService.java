@@ -23,9 +23,9 @@ import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.*;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
-import indi.etern.musichud.throwable.ApiException;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -35,15 +35,14 @@ import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
+import java.util.concurrent.TimeUnit;
 import java.time.ZonedDateTime;
-import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -60,9 +59,8 @@ public class MusicService implements IClientMusicService {
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private static final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
-    private final ConcurrentHashMap<Long, CompletableFuture<Playlist>> pendingPlaylistRequests = new ConcurrentHashMap<>();
-    private final ConcurrentHashMap<Long, CompletableFuture<Album>> pendingAlbumRequests = new ConcurrentHashMap<>();
     private static volatile MusicService instance;
+
     @Getter
     private final Set<MusicCollection> localIdlePlaySources = ConcurrentHashMap.newKeySet();
     @Getter
@@ -153,29 +151,15 @@ public class MusicService implements IClientMusicService {
                 return CompletableFuture.completedFuture(cachedPlaylist);
             }
         }
-        return pendingPlaylistRequests.computeIfAbsent(id, key -> {
-            Playlist cached = playlistCache.getIfPresent(key);
-            if (cached != null) {
-                return CompletableFuture.completedFuture(cached);
-            }
-            CompletableFuture<Playlist> future = new CompletableFuture<>();
-            GetPlaylistDetailResponse.setReceiver(key, playlist -> {
-                pendingPlaylistRequests.remove(key);
-                if (playlist != null) {
-                    playlistCache.put(key, playlist);
-                    future.complete(playlist);
-                } else {
-                    future.completeExceptionally(new RuntimeException());
-                }
-            });
-            clientNetworkService.sendToServer(new GetPlaylistDetailRequest(key, ignoreCache));
-            return future;
-        }).orTimeout(5, TimeUnit.SECONDS).whenComplete((playlist, throwable) -> {
-            if (throwable != null) {
-                GetPlaylistDetailResponse.removeReceiver(id);
-                pendingPlaylistRequests.remove(id);
-            }
-        });
+        return RequestResponseManager.send(
+                        new GetPlaylistDetailRequest(id, ignoreCache),
+                        GetPlaylistDetailResponse.class,
+                        Duration.ofSeconds(5))
+                .thenApply(response -> {
+                    Playlist playlist = response.getPlaylist();
+                    playlistCache.put(id, playlist);
+                    return playlist;
+                });
     }
 
     @Override
@@ -186,25 +170,15 @@ public class MusicService implements IClientMusicService {
                 return CompletableFuture.completedFuture(cachedAlbum);
             }
         }
-        return pendingAlbumRequests.computeIfAbsent(id, key -> {
-            Album cached = albumCache.getIfPresent(key);
-            if (cached != null) {
-                return CompletableFuture.completedFuture(cached);
-            }
-            CompletableFuture<Album> future = new CompletableFuture<>();
-            GetAlbumDetailResponse.setReceiver(key, album -> {
-                pendingAlbumRequests.remove(key);
-                albumCache.put(key, album);
-                future.complete(album);
-            });
-            clientNetworkService.sendToServer(new GetAlbumDetailRequest(key, ignoreCache));
-            return future;
-        }).orTimeout(5, TimeUnit.SECONDS).whenComplete((album, throwable) -> {
-            if (throwable != null) {
-                GetAlbumDetailResponse.removeReceiver(id);
-                pendingAlbumRequests.remove(id);
-            }
-        });
+        return RequestResponseManager.send(
+                        new GetAlbumDetailRequest(id, ignoreCache),
+                        GetAlbumDetailResponse.class,
+                        Duration.ofSeconds(5))
+                .thenApply(response -> {
+                    Album album = response.getAlbum();
+                    albumCache.put(id, album);
+                    return album;
+                });
     }
 
     @Override
@@ -351,19 +325,20 @@ public class MusicService implements IClientMusicService {
 
     @Override
     public CompletableFuture<Artist> loadArtist(long id) {
-        CompletableFuture<Artist> future = new CompletableFuture<>();
-        GetArtistDetailResponse.setReceiver(id, future::complete);
-        clientNetworkService.sendToServer(new indi.etern.musichud.network.payloads.requestResponseCycle.GetArtistDetailRequest(id));
-        return future;
+        return RequestResponseManager.send(
+                        new GetArtistDetailRequest(id),
+                        GetArtistDetailResponse.class,
+                        Duration.ofSeconds(5))
+                .thenApply(GetArtistDetailResponse::getArtist);
     }
 
     @Override
     public CompletableFuture<List<MusicDetail>> loadArtistMusic(long id, int offset) {
-        CompletableFuture<List<MusicDetail>> future = new CompletableFuture<>();
-        GetArtistMoreMusicResponse.RequestData requestData = new GetArtistMoreMusicResponse.RequestData(id, offset);
-        GetArtistMoreMusicResponse.setReceiver(requestData, future::complete);
-        clientNetworkService.sendToServer(new GetArtistMoreMusicRequest(id, offset));
-        return future;
+        return RequestResponseManager.send(
+                        new GetArtistMoreMusicRequest(id, offset),
+                        GetArtistMoreMusicResponse.class,
+                        Duration.ofSeconds(5))
+                .thenApply(GetArtistMoreMusicResponse::getMusicDetails);
     }
 
     @Override
@@ -433,71 +408,41 @@ public class MusicService implements IClientMusicService {
 
     @Override
     public CompletableFuture<UserCategoryPlaylists> loadUserPlaylists(boolean ignoreCache) {
-        CompletableFuture<UserCategoryPlaylists> completableFuture = new CompletableFuture<>();
-        if (LoginService.getInstance().isLogined()) {
-            MusicHud.EXECUTOR.execute(() -> {
-                Thread pendingThread = Thread.currentThread();
-                GetUserPlaylistResponse.setConsumer(value -> {
-                    completableFuture.complete(value);
-                    pendingThread.interrupt();
-                });
-                clientNetworkService.sendToServer(new GetUserPlaylistRequest(ignoreCache));
-                try {
-                    Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
-                    completableFuture.completeExceptionally(new ApiException());
-                } catch (InterruptedException ignored) {
-                }
-            });
-        } else {
-            completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserPlaylists when logined as anonymous"));
+        if (!LoginService.getInstance().isLogined()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Cannot call AccountService.loadUserPlaylists when logined as anonymous"));
         }
-        return completableFuture;
+        return RequestResponseManager.send(
+                        new GetUserPlaylistRequest(ignoreCache),
+                        GetUserPlaylistResponse.class,
+                        Duration.ofSeconds(5))
+                .thenApply(GetUserPlaylistResponse::getPlaylists);
     }
 
     @Override
     public CompletableFuture<List<Album>> loadUserAlbums(boolean ignoreCache) {
-        CompletableFuture<List<Album>> completableFuture = new CompletableFuture<>();
-        if (LoginService.getInstance().isLogined()) {
-            MusicHud.EXECUTOR.execute(() -> {
-                Thread pendingThread = Thread.currentThread();
-                GetUserAlbumsResponse.setConsumer(value -> {
-                    completableFuture.complete(value);
-                    pendingThread.interrupt();
-                });
-                clientNetworkService.sendToServer(new GetUserAlbumsRequest(ignoreCache));
-                try {
-                    Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
-                    completableFuture.completeExceptionally(new ApiException());
-                } catch (InterruptedException ignored) {
-                }
-            });
-        } else {
-            completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserAlbums when logined as anonymous"));
+        if (!LoginService.getInstance().isLogined()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Cannot call AccountService.loadUserAlbums when logined as anonymous"));
         }
-        return completableFuture;
+        return RequestResponseManager.send(
+                        new GetUserAlbumsRequest(ignoreCache),
+                        GetUserAlbumsResponse.class,
+                        Duration.ofSeconds(5))
+                .thenApply(GetUserAlbumsResponse::getAlbums);
     }
 
     @Override
     public CompletableFuture<List<Artist>> loadUserArtists(boolean ignoreCache) {
-        CompletableFuture<List<Artist>> completableFuture = new CompletableFuture<>();
-        if (LoginService.getInstance().isLogined()) {
-            MusicHud.EXECUTOR.execute(() -> {
-                Thread pendingThread = Thread.currentThread();
-                GetUserArtistsResponse.setConsumer(value -> {
-                    completableFuture.complete(value);
-                    pendingThread.interrupt();
-                });
-                clientNetworkService.sendToServer(new GetUserArtistsRequest(ignoreCache));
-                try {
-                    Thread.sleep(Duration.of(5, ChronoUnit.SECONDS));
-                    completableFuture.completeExceptionally(new ApiException());
-                } catch (InterruptedException ignored) {
-                }
-            });
-        } else {
-            completableFuture.completeExceptionally(new IllegalStateException("Cannot call AccountService.loadUserArtists when logined as anonymous"));
+        if (!LoginService.getInstance().isLogined()) {
+            return CompletableFuture.failedFuture(
+                    new IllegalStateException("Cannot call AccountService.loadUserArtists when logined as anonymous"));
         }
-        return completableFuture;
+        return RequestResponseManager.send(
+                        new GetUserArtistsRequest(ignoreCache),
+                        GetUserArtistsResponse.class,
+                        Duration.ofSeconds(5))
+                .thenApply(GetUserArtistsResponse::getArtists);
     }
 
     @Override

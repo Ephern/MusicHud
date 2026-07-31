@@ -1,4 +1,4 @@
-package indi.etern.musichud.network.payloads.requestResponseCycle;
+package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -10,16 +10,14 @@ import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 
-public record PhoneCodeLoginRequest(int regionCode, long phone, int code) implements C2SPayload {
-    public static final ByteBufCodec<PhoneCodeLoginRequest> CODEC =
+public record EmailPasswordLoginMessage(String email, String md5password) implements C2SPayload {
+    public static final ByteBufCodec<EmailPasswordLoginMessage> CODEC =
             ByteBufCodec.composite(
-                    Codecs.INT,
-                    PhoneCodeLoginRequest::regionCode,
-                    Codecs.LONG,
-                    PhoneCodeLoginRequest::phone,
-                    Codecs.INT,
-                    PhoneCodeLoginRequest::code,
-                    PhoneCodeLoginRequest::new
+                    Codecs.STRING_UTF8,
+                    EmailPasswordLoginMessage::email,
+                    Codecs.STRING_UTF8,
+                    EmailPasswordLoginMessage::md5password,
+                    EmailPasswordLoginMessage::new
             );
 
     @RegisterMark
@@ -27,9 +25,9 @@ public record PhoneCodeLoginRequest(int regionCode, long phone, int code) implem
         @Override
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
-                    PhoneCodeLoginRequest.class, CODEC,
+                    EmailPasswordLoginMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((request, player) -> {
-                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithPhoneAndCode(request.regionCode, request.phone, request.code,player);
+                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithEmailAndPassword(request.email,request.md5password,player);
                     })
             );
         }

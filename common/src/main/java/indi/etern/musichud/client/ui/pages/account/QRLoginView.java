@@ -8,22 +8,25 @@ import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.network.IClientNetworkService;
-import indi.etern.musichud.network.payloads.requestResponseCycle.CancelQRLoginRequest;
+import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.CancelQRLoginMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginRequest;
+import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse;
 import net.minecraft.client.resources.language.I18n;
+
+import java.time.Duration;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class QRLoginView extends LinearLayout implements ILoginView{
+public class QRLoginView extends LinearLayout implements ILoginView {
+    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private final Button loginButton;
     private final UrlImageView urlImageView;
     private final TextView messageTextView;
-    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
 
     public QRLoginView(Context context) {
         super(context);
@@ -66,7 +69,7 @@ public class QRLoginView extends LinearLayout implements ILoginView{
         messageTextView.setGravity(Gravity.CENTER_HORIZONTAL);
 
         var background = ButtonInsetBackgroundFactory.builder()
-                .padding(new ButtonInsetBackgroundFactory.Padding(0,0,0,0))
+                .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
                 .cornerRadius(dp(4)).inset(dp(1)).build().newBackgroundDrawable();
         loginButton.setBackground(background);
         LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -78,12 +81,15 @@ public class QRLoginView extends LinearLayout implements ILoginView{
                 messageTextView.setVisibility(GONE);
                 urlImageView.setLoading(true);
             });
-            LoginService.getInstance().setLoginResponseHandler((qrLoginResponse) -> {
-                MuiModApi.postToUiThread(() -> {
-                    urlImageView.loadUrl(qrLoginResponse.base64QRImg());
-                });
-            });
-            clientNetworkService.sendToServer(StartQRLoginRequest.REQUEST);
+            RequestResponseManager.send(
+                    StartQRLoginRequest.REQUEST,
+                    StartQRLoginResponse.class,
+                    Duration.ofSeconds(10)).whenComplete((response, e) -> {
+                        MuiModApi.postToUiThread(() -> {
+                            urlImageView.loadUrl(response.getBase64QRImg());
+                        });
+                    }
+            );
         });
 
         addView(textView);
@@ -94,12 +100,13 @@ public class QRLoginView extends LinearLayout implements ILoginView{
 
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
-            public void onViewAttachedToWindow(View v) {}
+            public void onViewAttachedToWindow(View v) {
+            }
 
             @Override
             public void onViewDetachedFromWindow(View v) {
                 if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
-                    clientNetworkService.sendToServer(CancelQRLoginRequest.REQUEST);
+                    clientNetworkService.sendToServer(CancelQRLoginMessage.REQUEST);
                 }
             }
         });

@@ -4,40 +4,32 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.RequestResponseCodecs;
 import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.payloads.ApiResponsePayload;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.Map;
-import java.util.function.Consumer;
-
-public record GetArtistDetailResponse(Artist artist) implements S2CPayload {
-    public static final ByteBufCodec<GetArtistDetailResponse> CODEC =
+@Getter
+@AllArgsConstructor
+public class GetArtistDetailResponse extends ApiResponsePayload {
+    public static final ByteBufCodec<GetArtistDetailResponse> CODEC = RequestResponseCodecs.withCycleId(
             ByteBufCodec.composite(
                     Artist.CODEC,
-                    GetArtistDetailResponse::artist,
+                    GetArtistDetailResponse::getArtist,
                     GetArtistDetailResponse::new
-            );
+            )
+    );
 
-    static final Map<Long, Consumer<Artist>> consumerMap = new ConcurrentHashMap<>();
-    public static void setReceiver(long id, Consumer<Artist> consumer) {
-        if (consumerMap.containsKey(id)) {
-            consumerMap.get(id).accept(null);
-        }
-        GetArtistDetailResponse.consumerMap.put(id, consumer);
-    }
+    private final Artist artist;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetArtistDetailResponse.class, CODEC,
-                    (response, player) -> {
-                        Consumer<Artist> consumer = consumerMap.remove(response.artist.getId());
-                        if (consumer != null) {
-                            consumer.accept(response.artist);
-                        }
-                    }
+                    (response, player) -> RequestResponseManager.complete(response)
             );
         }
     }

@@ -6,12 +6,13 @@ import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.actions.ModifyType;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.interfaces.Unregister;
-import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ModifyPlaylistRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ModifyPlaylistResponse;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 
+import java.time.Duration;
 import java.util.concurrent.*;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -108,11 +109,19 @@ public class MusicTrackState implements IMusicTrackState {
             notifyPlaylistModified(playlistId, musicDetail.getId(), true);
             loadPlaylist().thenAccept(playlist1 -> {
                 ModifyPlaylistRequest request = new ModifyPlaylistRequest(musicDetail.getId(), playlist1.getId(), ModifyType.ADD);
-                ModifyPlaylistResponse.setReceiver(request, (result) -> {
-                    playlist1.getMusicDetails().addFirst(musicDetail);
-                    future.complete(null);
-                });
-                IClientNetworkService.getInstance().sendToServer(request);
+                RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
+                        .whenComplete((response, throwable) -> {
+                            if (throwable != null) {
+                                future.completeExceptionally(throwable);
+                                return;
+                            }
+                            if (response.isSuccess()) {
+                                playlist1.getMusicDetails().addFirst(musicDetail);
+                                future.complete(null);
+                            } else {
+                                future.completeExceptionally(new RuntimeException(response.getMessage()));
+                            }
+                        });
             });
             return future;
         }
@@ -123,11 +132,19 @@ public class MusicTrackState implements IMusicTrackState {
             notifyPlaylistModified(playlistId, musicDetail.getId(), false);
             loadPlaylist().thenAccept(playlist1 -> {
                 ModifyPlaylistRequest request = new ModifyPlaylistRequest(musicDetail.getId(), playlist1.getId(), ModifyType.REMOVE);
-                ModifyPlaylistResponse.setReceiver(request, (result) -> {
-                    playlist1.getMusicDetails().remove(musicDetail);
-                    future.complete(null);
-                });
-                IClientNetworkService.getInstance().sendToServer(request);
+                RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
+                        .whenComplete((response, throwable) -> {
+                            if (throwable != null) {
+                                future.completeExceptionally(throwable);
+                                return;
+                            }
+                            if (response.isSuccess()) {
+                                playlist1.getMusicDetails().remove(musicDetail);
+                                future.complete(null);
+                            } else {
+                                future.completeExceptionally(new RuntimeException(response.getMessage()));
+                            }
+                        });
             });
             return future;
         }

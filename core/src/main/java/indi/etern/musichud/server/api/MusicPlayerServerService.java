@@ -15,6 +15,7 @@ import indi.etern.musichud.network.payloads.pushMessages.s2c.RefreshMusicQueueMe
 import indi.etern.musichud.network.payloads.pushMessages.s2c.SwitchMusicMessage;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.SyncCurrentPlayingMessage;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.UpdateAllIdlePlaySourcesMessage;
+import indi.etern.musichud.network.payloads.requestResponseCycle.GetInitialStateResponse;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.*;
 import org.apache.logging.log4j.Logger;
@@ -260,6 +261,16 @@ public class MusicPlayerServerService {
     }
 
     public void sendUpdateAllIdlePlaySourcesMessageTo(Collection<LoginApiService.PlayerLoginInfo> playerLoginInfos) {
+        for (LoginApiService.PlayerLoginInfo playerLoginInfo : playerLoginInfos) {
+            if (playerLoginInfo != null) {
+                IdleSourcesData idleSourcesData = buildIdleSourcesData(playerLoginInfo.getProfile());
+                serverNetworkService.sendToPlayer(playerLoginInfo.getPlayer(),
+                        new UpdateAllIdlePlaySourcesMessage(idleSourcesData.playlistSources(), idleSourcesData.albumSources()));
+            }
+        }
+    }
+
+    private IdleSourcesData buildIdleSourcesData(Profile playerProfile) {
         List<Playlist> publicPlaylists = new ArrayList<>();
         List<Playlist> privatePlaylists = new ArrayList<>();
         List<Album> albums = new ArrayList<>();
@@ -279,21 +290,32 @@ public class MusicPlayerServerService {
             }
         }
 
-        for (LoginApiService.PlayerLoginInfo playerLoginInfo : playerLoginInfos) {
-            if (playerLoginInfo != null) {
-                Profile playerProfile = playerLoginInfo.getProfile();
-                List<Playlist> processedPrivatePlaylists = new ArrayList<>();
-                for (Playlist playlist : privatePlaylists) {
-                    if (playlist.getCreator().equals(playerProfile)) {
-                        processedPrivatePlaylists.add(playlist);
-                    } else {
-                        processedPrivatePlaylists.add(playlist.copyWithSensitiveErased());
-                    }
-                }
-                processedPrivatePlaylists.addAll(publicPlaylists);
-                serverNetworkService.sendToPlayer(playerLoginInfo.getPlayer(), new UpdateAllIdlePlaySourcesMessage(processedPrivatePlaylists, albums));
+        List<Playlist> processedPrivatePlaylists = new ArrayList<>();
+        for (Playlist playlist : privatePlaylists) {
+            if (playlist.getCreator().equals(playerProfile)) {
+                processedPrivatePlaylists.add(playlist);
+            } else {
+                processedPrivatePlaylists.add(playlist.copyWithSensitiveErased());
             }
         }
+        processedPrivatePlaylists.addAll(publicPlaylists);
+        return new IdleSourcesData(processedPrivatePlaylists, albums);
+    }
+
+    private record IdleSourcesData(List<Playlist> playlistSources, List<Album> albumSources) {
+    }
+
+    public GetInitialStateResponse buildInitialStateFor(IPlayerClient player) {
+        LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayerUUID(player.getUUID());
+        IdleSourcesData idleSourcesData = buildIdleSourcesData(loginInfo != null ? loginInfo.getProfile() : Profile.ANONYMOUS);
+        return new GetInitialStateResponse(
+                currentMusicDetail,
+                nextIdleMusicDetail,
+                nowPlayingStartTime,
+                new ArrayDeque<>(musicQueue),
+                idleSourcesData.playlistSources(),
+                idleSourcesData.albumSources()
+        );
     }
 
     private void debouncedUpdateAllIdlePlaySources() {
