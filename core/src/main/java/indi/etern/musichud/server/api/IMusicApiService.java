@@ -2,9 +2,12 @@ package indi.etern.musichud.server.api;
 
 import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.music.actions.SubscribableType;
+import indi.etern.musichud.beans.music.actions.SubscribeAction;
 import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -42,13 +45,15 @@ public interface IMusicApiService {
 
     UserCategoryPlaylists getPlayersUserPlaylists(boolean ignoreCache, UUID playerUUID);
 
-    List<Album> getPlayersUserSubscribedAlbums(boolean ignoreCache, UUID playerUUID);
+    LinkedHashSet<Album> getPlayersUserSubscribedAlbums(boolean ignoreCache, UUID playerUUID);
 
-    List<Artist> getPlayersUserSubscribedArtists(boolean ignoreCache, UUID playerUUID);
+    LinkedHashSet<Artist> getPlayersUserSubscribedArtists(boolean ignoreCache, UUID playerUUID);
 
     LyricInfo getLyricInfo(MusicDetail musicDetail);
 
     void addToPlaylist(long playlistId, long musicId, UUID uuid);
 
     void removeFromPlaylist(long playlistId, long musicId, UUID uuid);
+
+    void userSubscribe(long id, SubscribableType subscribableType, SubscribeAction action, UUID playerUUID);
 }

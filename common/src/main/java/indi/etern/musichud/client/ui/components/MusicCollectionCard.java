@@ -132,7 +132,7 @@ public class MusicCollectionCard extends LinearLayout {
                 .build();
         {
             Button toggleSubscribeButton = new Button(context);
-            updateButton(toggleSubscribeButton);
+//            updateButton(toggleSubscribeButton);
             toggleSubscribeButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             toggleSubscribeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             SpannableString text = new SpannableString(" ");

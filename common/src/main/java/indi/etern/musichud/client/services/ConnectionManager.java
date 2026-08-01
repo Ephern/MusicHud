@@ -29,6 +29,7 @@ import java.time.Duration;
  * Previously the connected/isolated switching logic was scattered across LoginService,
  * MusicService and the ConnectResponse receiver, which repeatedly caused bugs.
  */
+@SuppressWarnings("unused")
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class ConnectionManager implements IConnectionManager {
     private static final Logger logger = MusicHud.getLogger(ConnectionManager.class);
@@ -37,6 +38,8 @@ public class ConnectionManager implements IConnectionManager {
     private static volatile ConnectionManager instance;
     @Getter
     private volatile ConnectionMode mode = ConnectionMode.DISCONNECTED;
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(1);
+    private final java.util.concurrent.atomic.AtomicInteger connectGeneration = new java.util.concurrent.atomic.AtomicInteger(0);
 
     public static ConnectionManager getInstance() {
         if (instance == null) {
@@ -50,16 +53,37 @@ public class ConnectionManager implements IConnectionManager {
     }
 
     @Override
-    public void connectToExternalServer() {
+    public synchronized void connectToExternalServer() {
         if (clientConfig.getEnable()) {
             mode = ConnectionMode.EXTERNAL;
             MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
             clientNetworkService.sendToServer(new ConnectRequest(Version.current));
+            scheduleConnectTimeoutFallback();
         }
     }
 
+    private void scheduleConnectTimeoutFallback() {
+        int generation = connectGeneration.incrementAndGet();
+        MusicHud.EXECUTOR.execute(() -> {
+            try {
+                Thread.sleep(CONNECT_TIMEOUT.toMillis());
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            synchronized (ConnectionManager.this) {
+                if (generation == connectGeneration.get()
+                        && mode == ConnectionMode.EXTERNAL
+                        && MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
+                    logger.warn("No ConnectResponse within {}, falling back to isolated mode", CONNECT_TIMEOUT);
+                    launchIsolated();
+                }
+            }
+        });
+    }
+
     @Override
-    public void launchIsolated() {
+    public synchronized void launchIsolated() {
         mode = ConnectionMode.ISOLATED;
         IClientLoginService.getInstance().loginToServer(IClientLoginService.ConnectionType.INTERNAL);
         MusicService.resetCurrentMusicStatus();
@@ -69,23 +93,24 @@ public class ConnectionManager implements IConnectionManager {
     }
 
     @Override
-    public void switchToIsolate() {
+    public synchronized void switchToIsolate() {
         disconnect();
         launchIsolated();
     }
 
     @Override
-    public void disconnect() {
+    public synchronized void disconnect() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         MusicService.resetCurrentMusicStatus();
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();
         MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
         mode = ConnectionMode.DISCONNECTED;
+        connectGeneration.incrementAndGet();
     }
 
     @Override
-    public void onConnectResponse(ConnectResponse payload) {
+    public synchronized void onConnectResponse(ConnectResponse payload) {
         IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
         IClientLoginService clientLoginService = IClientLoginService.getInstance();
         if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
@@ -97,6 +122,7 @@ public class ConnectionManager implements IConnectionManager {
                             && clientConfig.getEnableIsolatedMode()) {
                         clientLoginService.disconnectToExternalOrIntegratedServer();
                     }
+                    connectGeneration.incrementAndGet();
                     MusicHud.setConnectStatus(MusicHud.ConnectStatus.CONNECTED);
                     clientLoginService.loginToServer(IClientLoginService.ConnectionType.EXTERNAL);
                     requestInitialState();
@@ -115,12 +141,19 @@ public class ConnectionManager implements IConnectionManager {
     }
 
     private void requestInitialState() {
+        ConnectionMode requestedMode = mode;
         MusicHud.EXECUTOR.execute(() -> {
             RequestResponseManager.send(
                             new GetInitialStateRequest(),
                             GetInitialStateResponse.class,
                             Duration.ofSeconds(5))
                     .thenAccept(response -> {
+                        synchronized (ConnectionManager.this) {
+                            if (mode != requestedMode) {
+                                logger.debug("Initial state response ignored, mode changed from {} to {}", requestedMode, mode);
+                                return;
+                            }
+                        }
                         MusicService.getInstance().refreshQueue(response.getQueue());
                         if (response.getCurrentPlaying() != MusicDetail.NONE) {
                             MusicService.getInstance().switchMusic(

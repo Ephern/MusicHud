@@ -3,17 +3,17 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.state.IMusicTrackState;
+import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 
-public class ToggleTrackLikeStateButton extends ToggleIconButton {
-    protected IMusicTrackState.IPlaylistSubState playlistSubState;
+public class ToggleIdlePlaySourceButton<T> extends ToggleIconButton {
     @SuppressWarnings("FieldCanBeLocal")
     private Unregister unregister = null;
+    private ISubscribeState<T> subscribeState;
 
-    public ToggleTrackLikeStateButton(Context context) {
+    public ToggleIdlePlaySourceButton(Context context) {
         super(context, new Appearance(
                 () -> I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicLike.remove"),
                 () -> I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicLike.add"),
@@ -25,28 +25,28 @@ public class ToggleTrackLikeStateButton extends ToggleIconButton {
     @Override
     public boolean performClick() {
         boolean b = super.performClick();
-        if (playlistSubState != null) {
+        if (subscribeState != null) {
             if (isChecked()) {
-                playlistSubState.add();
+                subscribeState.subscribe();
             } else {
-                playlistSubState.remove();
+                subscribeState.unsubscribe();
             }
         }
         return b;
     }
 
-    public void bindMusicList(IMusicTrackState.IPlaylistSubState playlistSubState) {
-        if (playlistSubState == null) {
-            this.playlistSubState = null;
+    public void bindMusicList(ISubscribeState<T> subscribeState) {
+        if (subscribeState == null) {
+            this.subscribeState = null;
             if (unregister != null) {
                 unregister.unregister();
             }
         } else {
-            playlistSubState.isContained().thenApply((contains) -> {
+            subscribeState.isSubscribed().thenApply((contains) -> {
                 MuiModApi.postToUiThread(() -> {
                     setChecked(contains);
-                    this.playlistSubState = playlistSubState;
-                    unregister = playlistSubState.onOthersModify(checked -> {
+                    this.subscribeState = subscribeState;
+                    unregister = subscribeState.onOthersModify(checked -> {
                         MuiModApi.postToUiThread(() -> {
                             setChecked(checked);
                         });

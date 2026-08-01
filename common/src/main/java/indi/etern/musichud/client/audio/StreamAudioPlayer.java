@@ -151,10 +151,10 @@ public class StreamAudioPlayer {
     }
 
     public CompletableFuture<ZonedDateTime> playAsync(MusicDetail musicDetail, ZonedDateTime startTime) {
-        synchronized (StreamAudioPlayer.class) {
+//        synchronized (StreamAudioPlayer.class) {
             stopInternal();
             return playAsyncInternal(musicDetail, startTime);
-        }
+//        }
     }
 
     private @NotNull CompletableFuture<ZonedDateTime> playAsyncInternal(MusicDetail musicDetail, ZonedDateTime startTime) {
@@ -248,7 +248,7 @@ public class StreamAudioPlayer {
                 }
                 fullyRetryCurrent(startPlayingFuture);
             } else {
-                synchronized (StreamAudioPlayer.class) {
+//                synchronized (StreamAudioPlayer.class) {
                     if (!initialized.get() || source == 0) {
                         startPlayingFuture.completeExceptionally(new IllegalStateException("Audio player not initialized"));
                         finished = true;
@@ -278,12 +278,12 @@ public class StreamAudioPlayer {
                         checkALError("alSourcePlay-Pre");
                     }
 
-                }
+//                }
                 if (!finished) {// 主播放循环
                     this.serverStartTime = Objects.requireNonNullElseGet(serverStartTime, ZonedDateTime::now);
                     while (currentPlayingFuture != null && !currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture) {
                         try {
-                            synchronized (StreamAudioPlayer.class) {
+//                            synchronized (StreamAudioPlayer.class) {
                                 updateVolumeIfNecessary();
                                 if (!initialized.get() || source == 0) break;
 
@@ -344,7 +344,7 @@ public class StreamAudioPlayer {
                                     AL10.alSourcePlay(source);
                                     checkALError("alSourcePlay-Main");
                                 }
-                            }
+//                            }
                             Thread.sleep(40);
                         } catch (InterruptedException e) {
                             break;
@@ -582,7 +582,7 @@ public class StreamAudioPlayer {
     }
 
     private void cleanup() {
-        synchronized (StreamAudioPlayer.class) {
+//        synchronized (StreamAudioPlayer.class) {
             try {
                 // 停止播放并清除源相关资源
                 if (source != 0 && AL10.alIsSource(source)) {
@@ -669,7 +669,7 @@ public class StreamAudioPlayer {
                 // 确保 OpenAL 错误状态被清除，防止污染
                 AL10.alGetError();
             }
-        }
+//        }
     }
 
     public CompletableFuture<MusicResourceInfo> getCurrentMusicResourceInfo(Quality quality, MusicResourceInfo previous) {

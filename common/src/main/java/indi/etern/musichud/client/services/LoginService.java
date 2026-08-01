@@ -271,7 +271,6 @@ public class LoginService implements IClientLoginService {
                     ServerData currentServer = Minecraft.getInstance().getCurrentServer();
                     if (currentServer != null) {
                         boolean autoConnectToServer = clientConfig.getEnableAutoConnect();
-                        IConnectionManager.getInstance().launchIsolated();
                         if (autoConnectToServer) {
                             AutoConnectServerFilterType connectServerFilterType = clientConfig.getConnectServerFilterType();
                             if ((connectServerFilterType == AutoConnectServerFilterType.BLACK_LIST
@@ -279,10 +278,14 @@ public class LoginService implements IClientLoginService {
                                     || (connectServerFilterType == AutoConnectServerFilterType.WHITE_LIST
                                     && clientConfig.getWhiteList().stream().anyMatch(i -> Pattern.matches(i, currentServer.ip)))) {
                                 IConnectionManager.getInstance().connectToExternalServer();
+                            } else {
+                                IConnectionManager.getInstance().launchIsolated();
                             }
+                        } else {
+                            IConnectionManager.getInstance().launchIsolated();
                         }
                     } else {
-                        // Single Player
+                        // Single Player: try external first, fall back to isolated on timeout
                         IConnectionManager.getInstance().connectToExternalServer();
                     }
                 });

@@ -14,18 +14,21 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.Playlist;
+import indi.etern.musichud.beans.music.UserCategoryPlaylists;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.ui.components.ArtistCard;
+import indi.etern.musichud.client.ui.components.FlexWrapLayout;
+import indi.etern.musichud.client.ui.components.MusicCollectionCard;
+import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.LinkedHashSet;
-import java.util.concurrent.CompletableFuture;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -304,42 +307,29 @@ public class AccountView extends LinearLayout {
             }
 
             MusicService musicService = MusicService.getInstance();
-            CompletableFuture.allOf(
-                    musicService.loadUserPlaylists(ignoreCache).thenAcceptAsync(playlists -> {
-                        MuiModApi.postToUiThread(() -> {
-                            myPlaylistCards.addView(new MusicCollectionCard(context, playlists.getLikeList()));
-                            LinkedHashSet<Playlist> createdPlaylist = playlists.getCreatedPlaylist();
-                            for (Playlist playlist : createdPlaylist) {
-                                myPlaylistCards.addView(new MusicCollectionCard(context, playlist));
-                            }
-                            LinkedHashSet<Playlist> subscribedPlaylist = playlists.getSubscribedPlaylist();
-                            for (Playlist playlist : subscribedPlaylist) {
-                                mySubscribedPlaylistCards.addView(new MusicCollectionCard(context, playlist));
-                            }
-                            myPlaylistsContent.setVisibility(createdPlaylist.isEmpty() ? GONE : VISIBLE);
-                            mySubscribedPlaylistsContent.setVisibility(subscribedPlaylist.isEmpty() ? GONE : VISIBLE);
-                        });
-                    }, MusicHud.EXECUTOR),
-                    musicService.loadUserAlbums(ignoreCache).thenAcceptAsync(albums -> {
-                        MuiModApi.postToUiThread(() -> {
-                            for (Album playlist : albums) {
-                                albumCards.addView(new MusicCollectionCard(context, playlist));
-                            }
-                            mySubscribedAlbumsContent.setVisibility(albums.isEmpty() ? GONE : VISIBLE);
-                        });
-                    }),
-                    musicService.loadUserArtists(ignoreCache).thenAcceptAsync(artists -> {
-                        MuiModApi.postToUiThread(() -> {
-                            for (Artist artist : artists) {
-                                ArtistCard artistCard = new ArtistCard(context);
-                                artistCard.bindData(artist);
-                                artistCards.addView(artistCard);
-                            }
-                            mySubscribedArtistsContent.setVisibility(artists.isEmpty() ? GONE : VISIBLE);
-                        });
-                    })
-            ).thenAccept((v) -> {
+            musicService.loadUserCollections(ignoreCache).thenAccept(userCollections -> {
                 MuiModApi.postToUiThread(() -> {
+                    UserCategoryPlaylists categoryPlaylists = userCollections.getUserCategoryPlaylists();
+                    myPlaylistCards.addView(new MusicCollectionCard(context, categoryPlaylists.getLikeList()));
+                    LinkedHashSet<Playlist> createdPlaylist = categoryPlaylists.getCreatedPlaylist();
+                    createdPlaylist.forEach(playlist -> myPlaylistCards.addView(new MusicCollectionCard(context, playlist)));
+                    LinkedHashSet<Playlist> subscribedPlaylist = categoryPlaylists.getSubscribedPlaylist();
+                    subscribedPlaylist.forEach(playlist -> mySubscribedPlaylistCards.addView(new MusicCollectionCard(context, playlist)));
+                    myPlaylistsContent.setVisibility(createdPlaylist.isEmpty() ? GONE : VISIBLE);
+                    mySubscribedPlaylistsContent.setVisibility(subscribedPlaylist.isEmpty() ? GONE : VISIBLE);
+
+                    LinkedHashSet<Album> albums = userCollections.getSubscribedAlbums();
+                    albums.forEach(playlist -> albumCards.addView(new MusicCollectionCard(context, playlist)));
+                    mySubscribedAlbumsContent.setVisibility(albums.isEmpty() ? GONE : VISIBLE);
+
+                    LinkedHashSet<Artist> artists = userCollections.getSubscribedArtists();
+                    artists.forEach(artist -> {
+                        ArtistCard artistCard = new ArtistCard(context);
+                        artistCard.bindData(artist);
+                        artistCards.addView(artistCard);
+                    });
+                    mySubscribedArtistsContent.setVisibility(artists.isEmpty() ? GONE : VISIBLE);
+
                     progressBar.setVisibility(View.GONE);
                 });
             }).exceptionally((e) -> {

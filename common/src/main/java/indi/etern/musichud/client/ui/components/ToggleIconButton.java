@@ -6,7 +6,6 @@ import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.StateListDrawable;
 import icyllis.modernui.widget.CheckableImageButton;
 import icyllis.modernui.widget.ImageView;
-import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 
 import java.util.function.Supplier;
@@ -46,6 +45,4 @@ public class ToggleIconButton extends CheckableImageButton {
 
         setChecked(initialChecked);
     }
-
-    protected IMusicTrackState.IPlaylistSubState playlistSubState;
 }

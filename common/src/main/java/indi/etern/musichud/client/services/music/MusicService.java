@@ -10,11 +10,16 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.state.IMusicTrackState;
+import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.LoginService;
+import indi.etern.musichud.client.services.music.states.AlbumSubscribeState;
+import indi.etern.musichud.client.services.music.states.ArtistSubscribeState;
+import indi.etern.musichud.client.services.music.states.MusicTrackState;
+import indi.etern.musichud.client.services.music.states.PlaylistSubscribeState;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
@@ -26,23 +31,20 @@ import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.*;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
-import lombok.AccessLevel;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
-import java.util.concurrent.TimeUnit;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiConsumer;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -50,11 +52,19 @@ public class MusicService implements IClientMusicService {
     private static final Logger logger = MusicHud.getLogger(MusicService.class);
     private static final Cache<Long, Playlist> playlistCache = CacheBuilder.newBuilder()
             .expireAfterAccess(5, TimeUnit.MINUTES)
-            .maximumSize(20)
+            .maximumSize(50)
             .build();
     private static final Cache<Long, Album> albumCache = CacheBuilder.newBuilder()
             .expireAfterAccess(5, TimeUnit.MINUTES)
-            .maximumSize(20)
+            .maximumSize(50)
+            .build();
+    private static final Cache<Long, Artist> artistCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .maximumSize(50)
+            .build();
+    private static final Cache<Long, UserCollections> userCollectionsCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .maximumSize(5)
             .build();
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private static final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
@@ -86,9 +96,60 @@ public class MusicService implements IClientMusicService {
     @Getter
     private final Set<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = ConcurrentHashMap.newKeySet();
     long lastPressTime = 0;
-    private boolean initialSyncReceived = false;
     @Getter
     private boolean idlePlaySourceLoaded = false;
+    private UserCollections currentUserCollections;
+
+    @EqualsAndHashCode
+    @NoArgsConstructor(access = AccessLevel.PACKAGE)
+    public static class UserCollections implements IUserCollections {
+        @Setter
+        private UserCategoryPlaylists userCategoryPlaylists;
+        @Setter
+        private LinkedHashSet<Album> subscribedAlbums;
+        @Setter
+        private LinkedHashSet<Artist> subscribedArtists;
+        private volatile long lastReupdateCachesTimestamp = 0;
+
+        public UserCategoryPlaylists getUserCategoryPlaylists() {
+            reupdateCachesAsync();
+            return userCategoryPlaylists;
+        }
+
+        public LinkedHashSet<Album> getSubscribedAlbums() {
+            reupdateCachesAsync();
+            return subscribedAlbums;
+        }
+
+        public LinkedHashSet<Artist> getSubscribedArtists() {
+            reupdateCachesAsync();
+            return subscribedArtists;
+        }
+
+        private void reupdateCachesAsync() {
+            long currentTimeMillis = System.currentTimeMillis();
+            if (currentTimeMillis - lastReupdateCachesTimestamp >= 60000) {
+                lastReupdateCachesTimestamp = currentTimeMillis;
+                MusicHud.EXECUTOR.submit(() -> {
+                    if (userCategoryPlaylists != null) {
+                        Playlist likeList = userCategoryPlaylists.getLikeList();
+                        playlistCache.put(likeList.getId(), likeList);
+                        userCategoryPlaylists.getCreatedPlaylist()
+                                .forEach(playlist -> playlistCache.put(playlist.getId(), playlist));
+                        userCategoryPlaylists.getSubscribedPlaylist()
+                                .forEach(playlist -> playlistCache.put(playlist.getId(), playlist));
+                    }
+                    if (subscribedAlbums != null) {
+                        subscribedAlbums.forEach(album -> albumCache.put(album.getId(), album));
+                    }
+                    if (subscribedArtists != null) {
+                        subscribedArtists.forEach(artist -> artistCache.put(artist.getId(), artist));
+                    }
+                });
+            }
+        }
+    }
+
 
     public static MusicService getInstance() {
         if (instance == null) {
@@ -274,21 +335,7 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
-    public synchronized boolean checkAndResetInitialSync() {
-        if (initialSyncReceived) return false;
-        initialSyncReceived = true;
-        switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
-        idlePlaySourceLoaded = false;
-        musicQueue.clear();
-        if (HudRendererManager.isLoaded()) {
-            HudRendererManager.getInstance().reset();
-        }
-        return true;
-    }
-
-    @Override
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
-        initialSyncReceived = true;
         if (clientConfig.getEnable()) {
             if (!musicQueue.isEmpty()) {// preload image
                 MusicDetail peek = musicQueue.peek();
@@ -324,7 +371,13 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
-    public CompletableFuture<Artist> loadArtist(long id) {
+    public CompletableFuture<Artist> loadArtist(long id, boolean ignoreCache) {
+        if (!ignoreCache) {
+            Artist cachedArtist = artistCache.getIfPresent(id);
+            if (cachedArtist != null) {
+                return CompletableFuture.completedFuture(cachedArtist);
+            }
+        }
         return RequestResponseManager.send(
                         new GetArtistDetailRequest(id),
                         GetArtistDetailResponse.class,
@@ -420,7 +473,7 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
-    public CompletableFuture<List<Album>> loadUserAlbums(boolean ignoreCache) {
+    public CompletableFuture<LinkedHashSet<Album>> loadUserAlbums(boolean ignoreCache) {
         if (!LoginService.getInstance().isLogined()) {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("Cannot call AccountService.loadUserAlbums when logined as anonymous"));
@@ -433,7 +486,7 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
-    public CompletableFuture<List<Artist>> loadUserArtists(boolean ignoreCache) {
+    public CompletableFuture<LinkedHashSet<Artist>> loadUserArtists(boolean ignoreCache) {
         if (!LoginService.getInstance().isLogined()) {
             return CompletableFuture.failedFuture(
                     new IllegalStateException("Cannot call AccountService.loadUserArtists when logined as anonymous"));
@@ -449,29 +502,30 @@ public class MusicService implements IClientMusicService {
     public CompletableFuture<Artist> loadArtistDetailAsync(Artist artist) {
         List<MusicDetail> musicDetails = artist.getMusicDetails();
         if (musicDetails == null || musicDetails.isEmpty()) {
-            return loadArtist(artist.getId());
+            return loadArtist(artist.getId(), false);
         } else return CompletableFuture.completedFuture(artist);
     }
 
     @Override
-    public CompletableFuture<List<MusicDetail>> loadMoreMusicOfArtist(Artist artist) {
-        CompletableFuture<List<MusicDetail>> future = new CompletableFuture<>();
-        MusicService.getInstance().loadArtistMusic(artist.getId(), artist.getMusicDetails().size()).thenAccept(musicDetails1 -> {
-            artist.getMusicDetails().addAll(musicDetails1);
-            future.complete(musicDetails1);
-        });
-        return future;
+    public CompletableFuture<Collection<MusicDetail>> loadMoreMusicOfArtist(Artist artist) {
+        return MusicService.getInstance().loadArtistMusic(artist.getId(), artist.getMusicDetails().size())
+                .thenApply(musicDetails1 -> {
+                    artist.getMusicDetails().addAll(musicDetails1);
+                    return musicDetails1;
+                });
     }
 
     @Override
-    public CompletionStage<Collection<MusicDetail>> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache) {
-        CompletableFuture<Collection<MusicDetail>> future = new CompletableFuture<>();
+    public CompletableFuture<loadMusicCollectionMoreDataResult> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache) {
         if (musicCollection instanceof Album album) {
-            loadAlbumDetail(album.getId(), ignoreCache).thenAccept(albumInfo -> future.complete(albumInfo.getMusicDetails()));
+            return loadAlbumDetail(album.getId(), ignoreCache)
+                    .thenApply(albumInfo -> new loadMusicCollectionMoreDataResult(albumInfo, albumInfo.getMusicDetails()));
         } else if (musicCollection instanceof Playlist playlist) {
-            loadPlaylistDetail(playlist.getId(), ignoreCache).thenAccept(playlist1 -> future.complete(playlist1.getTracks()));
+            return loadPlaylistDetail(playlist.getId(), ignoreCache)
+                    .thenApply(playlist1 -> new loadMusicCollectionMoreDataResult(playlist1, playlist1.getTracks()));
+        } else {
+            return CompletableFuture.failedFuture(new IllegalStateException());
         }
-        return future;
     }
 
     @Override
@@ -480,6 +534,35 @@ public class MusicService implements IClientMusicService {
             return MusicTrackState.NONE;
         }
         return new MusicTrackState(musicDetail);
+    }
+
+    @Override
+    public ISubscribeState<Playlist> getPlaylistSubscribeState(Playlist playlist) {
+        return new PlaylistSubscribeState(playlist.getId());
+    }
+
+    @Override
+    public ISubscribeState<Album> getAlbumSubscribeState(Album album) {
+        return new AlbumSubscribeState(album.getId());
+    }
+
+    @Override
+    public ISubscribeState<Artist> getArtistSubscribedState(Artist artist) {
+        return new ArtistSubscribeState(artist.getId());
+    }
+
+    @Override
+    public CompletableFuture<UserCollections> loadUserCollections(boolean ignoreCache) {
+        if (currentUserCollections != null) {
+            return CompletableFuture.completedFuture(currentUserCollections);
+        } else {
+            currentUserCollections = new UserCollections();
+            return CompletableFuture.allOf(
+                            loadUserPlaylists(ignoreCache).thenAccept(currentUserCollections::setUserCategoryPlaylists),
+                            loadUserAlbums(ignoreCache).thenAccept(currentUserCollections::setSubscribedAlbums),
+                            loadUserArtists(ignoreCache).thenAccept(currentUserCollections::setSubscribedArtists)
+                    ).thenApply(v -> currentUserCollections);
+        }
     }
 
     @RegisterMark

@@ -3,12 +3,12 @@ package indi.etern.musichud.interfaces;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.state.IMusicTrackState;
+import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.platform.Environment;
 
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
@@ -29,6 +29,12 @@ public interface IClientMusicService {
         throw new UnsupportedOperationException();
     }
 
+    interface IUserCollections {
+        UserCategoryPlaylists getUserCategoryPlaylists();
+        SequencedCollection<Album> getSubscribedAlbums();
+        SequencedCollection<Artist> getSubscribedArtists();
+    }
+
     CompletableFuture<? extends MusicCollection> loadIdlePlaySource(Class<?> type, long id);
 
     CompletableFuture<Playlist> loadPlaylistDetail(long id, boolean ignoreCache);
@@ -45,16 +51,9 @@ public interface IClientMusicService {
 
     void sendRemoveMusicFromQueue(int index, MusicDetail musicDetail);
 
-    /**
-     * If a SyncCurrentPlayingMessage has already been processed for this connection,
-     * do nothing (the state is already correct). Otherwise, reset all state to NONE.
-     * Must be called from EXECUTOR (same threading context as switchMusic) for correct ordering.
-     */
-    boolean checkAndResetInitialSync();
-
     void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message);
 
-    CompletableFuture<Artist> loadArtist(long id);
+    CompletableFuture<Artist> loadArtist(long id, boolean ignoreCache);
 
     CompletableFuture<List<MusicDetail>> loadArtistMusic(long id, int offset);
 
@@ -66,15 +65,15 @@ public interface IClientMusicService {
 
     CompletableFuture<UserCategoryPlaylists> loadUserPlaylists(boolean ignoreCache);
 
-    CompletableFuture<List<Album>> loadUserAlbums(boolean ignoreCache);
+    CompletableFuture<LinkedHashSet<Album>> loadUserAlbums(boolean ignoreCache);
 
-    CompletableFuture<List<Artist>> loadUserArtists(boolean ignoreCache);
+    CompletableFuture<LinkedHashSet<Artist>> loadUserArtists(boolean ignoreCache);
 
     CompletableFuture<Artist> loadArtistDetailAsync(Artist artist);
 
-    CompletableFuture<List<MusicDetail>> loadMoreMusicOfArtist(Artist artist);
+    CompletableFuture<Collection<MusicDetail>> loadMoreMusicOfArtist(Artist artist);
 
-    CompletionStage<Collection<MusicDetail>> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache);
+    CompletableFuture<loadMusicCollectionMoreDataResult> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache);
 
     Set<MusicCollection> getLocalIdlePlaySources();
 
@@ -104,4 +103,13 @@ public interface IClientMusicService {
 
     IMusicTrackState getMusicTrackState(MusicDetail musicDetail);
 
+    ISubscribeState<Playlist> getPlaylistSubscribeState(Playlist musicDetail);
+
+    ISubscribeState<Album> getAlbumSubscribeState(Album musicDetail);
+
+    ISubscribeState<Artist> getArtistSubscribedState(Artist musicDetail);
+
+    CompletableFuture<? extends IUserCollections> loadUserCollections(boolean ignoreCache);
+
+    record loadMusicCollectionMoreDataResult(MusicCollection musicCollection, Collection<MusicDetail> musicDetails) {}
 }

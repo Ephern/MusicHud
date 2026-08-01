@@ -45,7 +45,7 @@ public interface IMusicTrackState {
             }
 
             @Override
-            public Unregister onExternalModify(Consumer<Boolean> listener) {
+            public Unregister onOthersModify(Consumer<Boolean> listener) {
                 throw new IllegalStateException();
             }
         };
@@ -58,7 +58,7 @@ public interface IMusicTrackState {
 
         CompletableFuture<Void> remove();
 
-        Unregister onExternalModify(Consumer<Boolean> listener);
+        Unregister onOthersModify(Consumer<Boolean> listener);
 
         default CompletableFuture<Boolean> toggle() {
             return isContained().thenCompose(contained ->

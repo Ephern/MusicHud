@@ -1,10 +1,11 @@
-package indi.etern.musichud.client.services.music;
+package indi.etern.musichud.client.services.music.states;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.actions.ModifyType;
 import indi.etern.musichud.beans.state.IMusicTrackState;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ModifyPlaylistRequest;
@@ -19,13 +20,13 @@ import java.util.function.Supplier;
 
 @AllArgsConstructor
 public class MusicTrackState implements IMusicTrackState {
-    record TrackPlaylistPair(long playlistId, long musicTrackId) {}
-
+    private static final ConcurrentHashMap<TrackPlaylistPair, CopyOnWriteArrayList<Consumer<Boolean>>>
+            modifyListeners = new ConcurrentHashMap<>();
     private final MusicService musicService = MusicService.getInstance();
     MusicDetail musicDetail;
 
-    private static final ConcurrentHashMap<TrackPlaylistPair, CopyOnWriteArrayList<Consumer<Boolean>>>
-            modifyListeners = new ConcurrentHashMap<>();
+    record TrackPlaylistPair(long playlistId, long musicTrackId) {
+    }
 
     static Unregister registerModifyListener(TrackPlaylistPair trackPlaylistPair, Consumer<Boolean> listener) {
         modifyListeners.computeIfAbsent(trackPlaylistPair, k -> new CopyOnWriteArrayList<>()).add(listener);
@@ -75,13 +76,17 @@ public class MusicTrackState implements IMusicTrackState {
         private CompletableFuture<Playlist> loadPlaylist() {
             CompletableFuture<Playlist> future = new CompletableFuture<>();
             if (playlist == null) {
-                try {
-                    playlist = playlistLazyLoader.get().get(10, TimeUnit.MILLISECONDS);
+                CompletableFuture<Playlist> completableFuture = playlistLazyLoader.get();
+                playlist = completableFuture.getNow(null);
+                if (playlist != null) {
                     future.complete(playlist);
-                } catch (TimeoutException e) {
+                } else if (completableFuture.state() == Future.State.SUCCESS) {
+                    playlist = completableFuture.get();
+                    future.complete(playlist);
+                } else {
                     MusicHud.EXECUTOR.submit(() -> {
                         try {
-                            playlist = playlistLazyLoader.get().get();
+                            playlist = completableFuture.get();
                             future.complete(playlist);
                         } catch (InterruptedException | ExecutionException e1) {
                             throw new RuntimeException(e1);
@@ -150,7 +155,7 @@ public class MusicTrackState implements IMusicTrackState {
         }
 
         @Override
-        public Unregister onExternalModify(Consumer<Boolean> listener) {
+        public Unregister onOthersModify(Consumer<Boolean> listener) {
             return registerModifyListener(new TrackPlaylistPair(playlistId, musicDetail.getId()), listener);
         }
     }

@@ -435,11 +435,12 @@ public class MainFragment extends Fragment {
 
                 LinearLayout serverConnectPanel = new LinearLayout(context);
                 serverConnectPanel.setOrientation(LinearLayout.VERTICAL);
+                serverConnectPanel.setGravity(Gravity.CENTER_VERTICAL);
 
                 serverConnectStatus = new TextView(context);
                 serverConnectStatus.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 serverConnectStatus.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                serverConnectPanel.addView(serverConnectStatus, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+                serverConnectPanel.addView(serverConnectStatus, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
                 switchServerConnectButton = new Button(context);
                 switchServerConnectButton.setTextSize(Theme.TEXT_SIZE_NORMAL);

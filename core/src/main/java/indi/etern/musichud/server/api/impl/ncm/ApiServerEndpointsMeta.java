@@ -8,7 +8,7 @@ import indi.etern.musichud.utils.http.ApiClient;
 import java.util.Set;
 
 @SuppressWarnings("SpellCheckingInspection")
-public class ServerApiMeta {
+public class ApiServerEndpointsMeta {
     public static final UrlMeta<String> BASE = new UrlMeta<>(
             "",
             null,
@@ -380,6 +380,16 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 MusicApiService.GetArtistMusicResponse.class);
+        public static final UrlMeta<String> MODIFY_SUBSCRIBE = new UrlMeta<>(
+                "/artist/sub",
+                Set.of("t"/*operation type: 1(subscribe)|2(unsubscribe)*/, "id"/*artistId*/),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class);
     }
 
     public static class Playlist {
@@ -463,6 +473,16 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 String.class);
+        public static final UrlMeta<String> MODIFY_SUBSCRIBE = new UrlMeta<>(
+                "/playlist/subscribe",
+                Set.of("t"/*operation type: 1(subscribe)|2(unsubscribe)*/, "id"/*playlistId*/),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class);
     }
 
     public static class Music {
@@ -538,6 +558,16 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 MusicApiService.GetAlbumDetailResult.class);
+        public static final UrlMeta<String> MODIFY_SUBSCRIBE = new UrlMeta<>(
+                "/album/sub",
+                Set.of("t"/*operation type: 1(subscribe)|2(unsubscribe)*/, "id"/*albumId*/),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class);
     }
 
     public static class Search {

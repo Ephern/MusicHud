@@ -12,7 +12,7 @@ import java.util.Objects;
 @Getter
 @AllArgsConstructor
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class Artist {
+public class Artist implements IdentifiedBeans {
     public static final ByteBufCodec<Artist> CODEC = ByteBufCodec.composite(
             Codecs.LONG, Artist::getId,
             Codecs.STRING_UTF8, Artist::getName,
