@@ -94,7 +94,7 @@ public class ClientConfigDefinition implements ClientConfig {
         hudBackgroundMixAlpha = builder
                 .comment("Hud Background Mix Alpha")
                 .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha")
-                .defineInRange("hudBackgroundMixAlpha", 0.5, 0, 1);
+                .defineInRange("hudBackgroundMixAlpha", 0.65, 0, 1);
         mixWithVanillaSoundVolume = builder
                 .comment("Mix Sound Volume with Vanilla Music Sound Volume")
                 .translation(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume")
