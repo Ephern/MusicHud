@@ -12,7 +12,8 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 
 public class RegistrationManager {
-    private static final String REGISTRIES_RESOURCE = "META-INF/musichud-registries.properties";
+    private static final String REGISTRIES_RESOURCE_PREFIX = "META-INF/musichud-registries";
+    private static final List<String> REGISTRY_MODULES = List.of("core", "common");
 
     private static final Set<Class<?>> registeredSet = new HashSet<>();
 
@@ -63,29 +64,32 @@ public class RegistrationManager {
 
     private static List<String> loadClassNames(String category) {
         List<String> classNames = new ArrayList<>();
-        try {
-            Enumeration<URL> resources = RegistrationManager.class.getClassLoader()
-                    .getResources(REGISTRIES_RESOURCE);
-            while (resources.hasMoreElements()) {
-                URL url = resources.nextElement();
-                try (BufferedReader reader = new BufferedReader(
-                        new InputStreamReader(url.openStream(), StandardCharsets.UTF_8))) {
-                    String line;
-                    while ((line = reader.readLine()) != null) {
-                        line = line.trim();
-                        if (line.isEmpty() || line.startsWith("#")) continue;
-                        int eqIdx = line.indexOf('=');
-                        if (eqIdx <= 0) continue;
-                        String lineCategory = line.substring(0, eqIdx);
-                        String className = line.substring(eqIdx + 1);
-                        if (category.equals(lineCategory)) {
-                            classNames.add(className);
+        ClassLoader classLoader = RegistrationManager.class.getClassLoader();
+        for (String module : REGISTRY_MODULES) {
+            String resource = REGISTRIES_RESOURCE_PREFIX + "." + module + ".properties";
+            try {
+                Enumeration<URL> resources = classLoader.getResources(resource);
+                while (resources.hasMoreElements()) {
+                    URL url = resources.nextElement();
+                    try (BufferedReader reader = new BufferedReader(
+                            new InputStreamReader(url.openStream(), StandardCharsets.UTF_8))) {
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            line = line.trim();
+                            if (line.isEmpty() || line.startsWith("#")) continue;
+                            int eqIdx = line.indexOf('=');
+                            if (eqIdx <= 0) continue;
+                            String lineCategory = line.substring(0, eqIdx);
+                            String className = line.substring(eqIdx + 1);
+                            if (category.equals(lineCategory)) {
+                                classNames.add(className);
+                            }
                         }
                     }
                 }
+            } catch (IOException e) {
+                MusicHud.LOGGER.error("Failed to load registries resource {}", resource, e);
             }
-        } catch (IOException e) {
-            MusicHud.LOGGER.error("Failed to load registries resource", e);
         }
         return classNames;
     }
