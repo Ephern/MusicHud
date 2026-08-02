@@ -122,6 +122,7 @@ public class SearchView extends LinearLayout {
             @Override
             public void onViewDetachedFromWindow(View v) {
                 instance = null;
+                searchMetas.clear();
             }
         });
     }

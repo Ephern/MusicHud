@@ -258,7 +258,6 @@ public class SearchResultTabPage extends FrameLayout {
                     if (listener != null) {
                         instance.getSearchRefreshListeners().remove(listener);
                     }
-                    instance.getSearchMetas().remove(searchType);
                 }
             }
         }

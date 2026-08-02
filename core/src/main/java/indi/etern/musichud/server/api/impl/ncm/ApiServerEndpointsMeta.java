@@ -387,7 +387,7 @@ public class ApiServerEndpointsMeta {
                 true,
                 false,
                 false,
-                true,
+                false,
                 Set.of(200),
                 String.class);
     }
@@ -480,7 +480,7 @@ public class ApiServerEndpointsMeta {
                 true,
                 false,
                 false,
-                true,
+                false,
                 Set.of(200),
                 String.class);
     }
@@ -565,7 +565,7 @@ public class ApiServerEndpointsMeta {
                 true,
                 false,
                 false,
-                true,
+                false,
                 Set.of(200),
                 String.class);
     }

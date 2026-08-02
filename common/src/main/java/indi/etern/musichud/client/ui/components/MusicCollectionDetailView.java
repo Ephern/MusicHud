@@ -13,15 +13,17 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.state.IIdlePlaySourceCollectionState;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
+import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.Collection;
-import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -48,16 +50,14 @@ public class MusicCollectionDetailView extends LinearLayout {
         LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         topBar.setLayoutParams(params);
 
-        Button backButton = new Button(context);//TODO
-        String s = I18n.get(MusicHud.MOD_ID + ".button.back");
-        SpannableString spannableString = new SpannableString(s);
+        ImageButton backButton = new ImageButton(context);
+        String tooltipText = I18n.get(MusicHud.MOD_ID + ".button.back");
         Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
         if (image != null) {
-            ImageSpan span = ImageUtils.getIconSpan(image);
-            spannableString.setSpan(span, 0, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), image, dp(16), dp(16)));
         }
-        backButton.setText(spannableString);
-        backButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        backButton.setTooltipText(tooltipText);
         backButton.setOnClickListener(view -> {
             RouterContainer.getInstance().popNavigate();
             backButton.setOnClickListener(null);
@@ -181,12 +181,13 @@ public class MusicCollectionDetailView extends LinearLayout {
                 .build().newBackgroundDrawable();
         addToIdleSourceListButton.setBackground(background1);
         addToIdleSourceListButton.setOnClickListener((v) -> {
-            if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
+            IIdlePlaySourceCollectionState collectionState = musicService.getIdlePlaySourceState().local().collection(musicCollection);
+            if (collectionState.isContained()) {
                 ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
-                musicService.removeFromIdlePlaySource(musicCollection);
+                collectionState.remove();
             } else {
                 ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
-                musicService.addToIdlePlaySource(musicCollection);
+                collectionState.add();
             }
         });
         LayoutParams addToIdleButtonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -217,21 +218,20 @@ public class MusicCollectionDetailView extends LinearLayout {
 
         refreshData(false);
 
-        Consumer<MusicCollection> listener = playlist1 -> {
-            if (playlist1.getId() == musicCollection.getId()) {
-                MuiModApi.postToUiThread(this::updateButton);
-            }
-        };
-
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+            private Unregister changeRegister;
+
             @Override
             public void onViewAttachedToWindow(View v) {
-                musicService.getLocalIdlePlaySourceChangeListeners().add(listener);
+                changeRegister = musicService.getIdlePlaySourceState().local().collection(musicCollection).onOthersModify(contained ->
+                        MuiModApi.postToUiThread(MusicCollectionDetailView.this::updateButton));
             }
 
             @Override
             public void onViewDetachedFromWindow(View v) {
-                musicService.getLocalIdlePlaySourceChangeListeners().remove(listener);
+                if (changeRegister != null) {
+                    changeRegister.unregister();
+                }
             }
         });
     }
@@ -240,6 +240,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         int musicTrackCount = Math.max(album.getMusicTrackCount(), album.getMusicDetails().size());
         if (musicTrackCount <= 0) {
             musicTrackCountView.setVisibility(GONE);
+            return;
         }
         musicTrackCountView.setVisibility(VISIBLE);
         SpannableString text = new SpannableString("  " + musicTrackCount);
@@ -307,7 +308,7 @@ public class MusicCollectionDetailView extends LinearLayout {
     }
 
     private void updateButton() {
-        if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
+        if (musicService.getIdlePlaySourceState().local().collection(musicCollection).isContained()) {
             addToIdleSourceListButton.setText(I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"));
         } else {
             addToIdleSourceListButton.setText(I18n.get(MusicHud.MOD_ID + ".button.addToIdlePlaySource"));

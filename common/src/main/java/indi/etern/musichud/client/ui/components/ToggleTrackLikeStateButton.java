@@ -15,8 +15,8 @@ public class ToggleTrackLikeStateButton extends ToggleIconButton {
 
     public ToggleTrackLikeStateButton(Context context) {
         super(context, new Appearance(
-                () -> I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicLike.remove"),
-                () -> I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicLike.add"),
+                () -> I18n.get(MusicHud.MOD_ID + ".button.toggleMusicLike.remove"),
+                () -> I18n.get(MusicHud.MOD_ID + ".button.toggleMusicLike.add"),
                 () -> ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/heart_filled.png"),
                 () -> ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/heart.png")
         ));

@@ -89,7 +89,7 @@ public class MusicTrackState implements IMusicTrackState {
                             playlist = completableFuture.get();
                             future.complete(playlist);
                         } catch (InterruptedException | ExecutionException e1) {
-                            throw new RuntimeException(e1);
+                            future.completeExceptionally(e1);
                         }
                     });
                 }
@@ -101,57 +101,46 @@ public class MusicTrackState implements IMusicTrackState {
 
         @Override
         public CompletableFuture<Boolean> isContained() {
-            CompletableFuture<Boolean> future = new CompletableFuture<>();
-            loadPlaylist().thenAccept(playlist1 -> {
-                future.complete(playlist1.getMusicDetails().contains(musicDetail));
-            });
-            return future;
+            return loadPlaylist().thenApply(playlist1 -> playlist1.getMusicDetails().contains(musicDetail));
         }
 
         @Override
         public CompletableFuture<Void> add() {
-            CompletableFuture<Void> future = new CompletableFuture<>();
             notifyPlaylistModified(playlistId, musicDetail.getId(), true);
-            loadPlaylist().thenAccept(playlist1 -> {
+            return loadPlaylist().thenCompose(playlist1 -> {
                 ModifyPlaylistRequest request = new ModifyPlaylistRequest(musicDetail.getId(), playlist1.getId(), ModifyType.ADD);
-                RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
+                return RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
                         .whenComplete((response, throwable) -> {
                             if (throwable != null) {
-                                future.completeExceptionally(throwable);
-                                return;
+                                throw new RuntimeException(throwable);
                             }
                             if (response.isSuccess()) {
                                 playlist1.getMusicDetails().addFirst(musicDetail);
-                                future.complete(null);
+                                return;
                             } else {
-                                future.completeExceptionally(new RuntimeException(response.getMessage()));
+                                throw new RuntimeException(response.getMessage());
                             }
-                        });
+                        }).thenApply(r -> null);
             });
-            return future;
         }
 
         @Override
         public CompletableFuture<Void> remove() {
-            CompletableFuture<Void> future = new CompletableFuture<>();
             notifyPlaylistModified(playlistId, musicDetail.getId(), false);
-            loadPlaylist().thenAccept(playlist1 -> {
+            return loadPlaylist().thenCompose(playlist1 -> {
                 ModifyPlaylistRequest request = new ModifyPlaylistRequest(musicDetail.getId(), playlist1.getId(), ModifyType.REMOVE);
-                RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
+                return RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
                         .whenComplete((response, throwable) -> {
                             if (throwable != null) {
-                                future.completeExceptionally(throwable);
-                                return;
+                                throw new RuntimeException(throwable);
                             }
                             if (response.isSuccess()) {
                                 playlist1.getMusicDetails().remove(musicDetail);
-                                future.complete(null);
                             } else {
-                                future.completeExceptionally(new RuntimeException(response.getMessage()));
+                                throw new RuntimeException(response.getMessage());
                             }
-                        });
+                        }).thenApply(r -> null);
             });
-            return future;
         }
 
         @Override

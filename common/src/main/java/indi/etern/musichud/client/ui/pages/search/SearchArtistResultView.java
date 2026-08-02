@@ -3,19 +3,19 @@ package indi.etern.musichud.client.ui.pages.search;
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.client.ui.components.ArtistCard;
-import indi.etern.musichud.client.ui.components.WaterfallLayout;
+import indi.etern.musichud.client.ui.components.FlexWrapLayout;
 import lombok.Getter;
 
 import java.util.List;
 
-public class SearchArtistResultView extends WaterfallLayout {
+public class SearchArtistResultView extends FlexWrapLayout {
     @Getter
     private static SearchArtistResultView instance;
     private static List<Artist> result;
 
     public SearchArtistResultView(Context context) {
         super(context);
-        setRowMinWidth(dp(120));
+//        setRowMinWidth(dp(128));
         instance = this;
         refresh();
     }

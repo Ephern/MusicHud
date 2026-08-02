@@ -9,48 +9,43 @@ import lombok.Setter;
 public class ScaledImageDrawable extends ImageDrawable {
     @Setter
     @Getter
-    private int padding;
-    @Setter
-    @Getter
     private int minHeight;
     @Setter
     @Getter
     private int maxHeight;
 
     public ScaledImageDrawable(Resources resources, Image image) {
-        this(resources, image, 0,0,0);
+        this(resources, image, 0,0);
     }
 
-    public ScaledImageDrawable(Resources resources, Image image, int padding) {
-        this(resources, image, padding, 0, 0);
-    }
-
-    public ScaledImageDrawable(Resources resources, Image image, int padding, int minHeight, int maxHeight) {
+    public ScaledImageDrawable(Resources resources, Image image, int minHeight, int maxHeight) {
         super(resources, image);
-        this.padding = padding;
         this.minHeight = minHeight;
         this.maxHeight = maxHeight;
     }
 
+    private int computeTargetHeight(int baseHeight) {
+        if (maxHeight <= 0 && minHeight <= 0) {
+            return baseHeight;
+        }
+        int lower = Math.max(minHeight, 0);
+        int upper = maxHeight > 0 ? maxHeight : Integer.MAX_VALUE;
+        return Math.max(Math.clamp(baseHeight, lower, upper), 0);
+    }
+
     @Override
     public int getIntrinsicWidth() {
-        if (maxHeight > 0 || minHeight > 0) {
-            int targetH = maxHeight > 0 ? maxHeight : minHeight;
-            int baseW = super.getIntrinsicWidth();
-            int baseH = super.getIntrinsicHeight();
-            if (baseW > 0 && baseH > 0) {
-                return Math.round((float) targetH * baseW / baseH);
-            }
-            return targetH;
+        int baseW = super.getIntrinsicWidth();
+        int baseH = super.getIntrinsicHeight();
+        int targetH = computeTargetHeight(baseH);
+        if (baseW > 0 && baseH > 0) {
+            return Math.round((float) targetH * baseW / baseH);
         }
-        return super.getIntrinsicWidth();
+        return targetH;
     }
 
     @Override
     public int getIntrinsicHeight() {
-        if (maxHeight > 0 || minHeight > 0) {
-            return maxHeight > 0 ? maxHeight : minHeight;
-        }
-        return super.getIntrinsicHeight();
+        return computeTargetHeight(super.getIntrinsicHeight());
     }
 }

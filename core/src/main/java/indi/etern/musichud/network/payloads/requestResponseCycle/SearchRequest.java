@@ -14,6 +14,8 @@ import indi.etern.musichud.server.api.IMusicApiService;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 
+import java.util.List;
+
 @Getter
 @AllArgsConstructor
 public class SearchRequest extends ApiRequestPayload {
@@ -39,13 +41,22 @@ public class SearchRequest extends ApiRequestPayload {
         public void register() {
             RequestHandlerRegistry.autoRegisterPayload(SearchRequest.class, CODEC, (message, player) -> {
                 IMusicApiService musicApiService = IMusicApiService.getInstance(ApiProvider.NCM);
-                return switch (message.getSearchType()) {
-                    case ARTIST -> ResponseResult.of(new SearchArtistsResponse(message.getOffset(), musicApiService.searchArtists(message.getQuery(), message.getOffset())));
-                    case ALBUM -> ResponseResult.of(new SearchAlbumsResponse(message.getOffset(), musicApiService.searchAlbums(message.getQuery(), message.getOffset())));
-                    case MUSIC -> ResponseResult.of(new SearchMusicResponse(message.getOffset(), musicApiService.searchMusic(message.getQuery(), message.getOffset())));
-                    case PLAYLIST -> ResponseResult.of(new SearchPlaylistsResponse(message.getOffset(), musicApiService.searchPlaylists(message.getQuery(), message.getOffset())));
-                    default -> ResponseResult.of(new SearchMusicResponse(message.getOffset(), musicApiService.searchMusic(message.getQuery(), message.getOffset())));
-                };
+                final int offset1 = message.getOffset();
+                try {
+                    return switch (message.getSearchType()) {
+                        case ARTIST -> ResponseResult.of(new SearchArtistsResponse(offset1, musicApiService.searchArtists(message.getQuery(), offset1)));
+                        case ALBUM -> ResponseResult.of(new SearchAlbumsResponse(offset1, musicApiService.searchAlbums(message.getQuery(), offset1)));
+                        case PLAYLIST -> ResponseResult.of(new SearchPlaylistsResponse(offset1, musicApiService.searchPlaylists(message.getQuery(), offset1)));
+                        default -> ResponseResult.of(new SearchMusicResponse(offset1, musicApiService.searchMusic(message.getQuery(), offset1)));
+                    };
+                } catch (Exception e) {
+                    return switch (message.getSearchType()) {
+                        case ARTIST -> ResponseResult.of(new SearchArtistsResponse(-1, List.of()));
+                        case ALBUM -> ResponseResult.of(new SearchAlbumsResponse(-1, List.of()));
+                        case PLAYLIST -> ResponseResult.of(new SearchPlaylistsResponse(-1, List.of()));
+                        default -> ResponseResult.of(new SearchMusicResponse(-1, List.of()));
+                    };
+                }
             });
         }
     }

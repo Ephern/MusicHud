@@ -91,6 +91,9 @@ public class Album implements MusicCollection{
         album.id = this.id;
         album.name = this.name;
         album.picUrl = this.picUrl;
+        album.musicTrackCount = this.musicTrackCount;
+        album.company = this.company;
+        album.type = this.type;
         return album;
     }
 

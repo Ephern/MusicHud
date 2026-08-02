@@ -7,9 +7,9 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SubscribeRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SubscribeResponse;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 
 import java.time.Duration;
-import java.util.LinkedHashSet;
 
 public class ArtistSubscribeState extends SubscribeState<Artist> {
     private static final MusicService musicService = MusicService.getInstance();
@@ -22,7 +22,7 @@ public class ArtistSubscribeState extends SubscribeState<Artist> {
                 ((artist, subscribed) -> {
                     musicService.loadUserCollections(false)
                             .thenAccept(userCollections -> {
-                                LinkedHashSet<Artist> subscribedAlbums = userCollections.getSubscribedArtists();
+                                ObservableSequencedSet<Artist> subscribedAlbums = userCollections.getSubscribedArtists();
                                 SubscribeAction action;
                                 if (subscribed) {
                                     action = SubscribeAction.SUBSCRIBE;

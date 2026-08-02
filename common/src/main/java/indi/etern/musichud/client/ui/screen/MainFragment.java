@@ -479,7 +479,7 @@ public class MainFragment extends Fragment {
                 switchMusic(currentlyPlayingMusicDetail, nextToPlayMusicDetail, playingInfo.getLyricLines());
             }
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT, 0);
-            params.setMargins(routerContainer.dp(80), 0, routerContainer.dp(64), 0);
+            params.setMargins(routerContainer.dp(80), 0, routerContainer.dp(48), 0);
             base.addView(routerContainer, params);
 
             return base;

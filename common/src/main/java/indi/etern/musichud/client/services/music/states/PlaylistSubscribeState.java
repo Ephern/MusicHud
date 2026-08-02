@@ -8,9 +8,9 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SubscribeRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SubscribeResponse;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 
 import java.time.Duration;
-import java.util.LinkedHashSet;
 
 public class PlaylistSubscribeState extends SubscribeState<Playlist> {
     private static final MusicService musicService = MusicService.getInstance();
@@ -29,7 +29,7 @@ public class PlaylistSubscribeState extends SubscribeState<Playlist> {
                                 if (categoryPlaylists == null) {
                                     return;
                                 }
-                                LinkedHashSet<Playlist> subscribedPlaylist = categoryPlaylists.getSubscribedPlaylist();
+                                ObservableSequencedSet<Playlist> subscribedPlaylist = categoryPlaylists.getSubscribedPlaylist();
                                 if (subscribedPlaylist == null) {
                                     return;
                                 }

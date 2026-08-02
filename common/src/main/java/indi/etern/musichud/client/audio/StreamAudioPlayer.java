@@ -60,7 +60,6 @@ public class StreamAudioPlayer {
     private MusicDetail currentMusicDetail;
     private AudioDecoder currentDecoder;
     private long playedBytes = 0;
-    //    private boolean isBuffering = false;
     private volatile ZonedDateTime serverStartTime;
     private Future<?> downloadThreadFuture;
     private Future<?> playThreadFuture;

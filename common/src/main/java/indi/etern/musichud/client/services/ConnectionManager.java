@@ -162,7 +162,7 @@ public class ConnectionManager implements IConnectionManager {
                             MusicService.getInstance().switchMusic(
                                     MusicDetail.NONE, response.getNextIdle(), response.getStartTime(), "");
                         }
-                        MusicService.getInstance().updateAllIdlePlaySources(
+                        MusicService.getInstance().getIdlePlaySourceState().external().updateAll(
                                 response.getPlaylistSources(), response.getAlbumSources());
                     })
                     .exceptionally(e -> {

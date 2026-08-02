@@ -3,8 +3,10 @@ package indi.etern.musichud.interfaces;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.state.IMusicTrackState;
+import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -31,19 +33,15 @@ public interface IClientMusicService {
 
     interface IUserCollections {
         UserCategoryPlaylists getUserCategoryPlaylists();
-        SequencedCollection<Album> getSubscribedAlbums();
-        SequencedCollection<Artist> getSubscribedArtists();
+        ObservableSequencedSet<Album> getSubscribedAlbums();
+        ObservableSequencedSet<Artist> getSubscribedArtists();
     }
 
-    CompletableFuture<? extends MusicCollection> loadIdlePlaySource(Class<?> type, long id);
+    IIdlePlaySourceState getIdlePlaySourceState();
 
     CompletableFuture<Playlist> loadPlaylistDetail(long id, boolean ignoreCache);
 
     CompletableFuture<Album> loadAlbumDetail(long id, boolean ignoreCache);
-
-    void addToIdlePlaySource(MusicCollection idlePlaySourceCollection);
-
-    void removeFromIdlePlaySource(MusicCollection collection);
 
     void refreshQueue(Queue<MusicDetail> queue);
 
@@ -61,8 +59,6 @@ public interface IClientMusicService {
 
     void keyBindsVoteSkipCurrent();
 
-    void updateAllIdlePlaySources(List<Playlist> playlistSources, List<Album> albumSources);
-
     CompletableFuture<UserCategoryPlaylists> loadUserPlaylists(boolean ignoreCache);
 
     CompletableFuture<LinkedHashSet<Album>> loadUserAlbums(boolean ignoreCache);
@@ -75,22 +71,6 @@ public interface IClientMusicService {
 
     CompletableFuture<loadMusicCollectionMoreDataResult> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache);
 
-    Set<MusicCollection> getLocalIdlePlaySources();
-
-    Set<Consumer<MusicCollection>> getLocalIdlePlaySourceAddListeners();
-
-    Set<Consumer<MusicCollection>> getLocalIdlePlaySourceRemoveListeners();
-
-    Set<Consumer<MusicCollection>> getLocalIdlePlaySourceChangeListeners();
-
-    Set<MusicCollection> getServerIdlePlaySources();
-
-    Set<Consumer<MusicCollection>> getServerIdlePlaySourceAddListeners();
-
-    Set<Consumer<MusicCollection>> getServerIdlePlaySourceRemoveListeners();
-
-    Set<Consumer<MusicCollection>> getServerIdlePlaySourceChangeListeners();
-
     Queue<MusicDetail> getMusicQueue();
 
     Set<Consumer<Queue<MusicDetail>>> getMusicQueueRefreshListeners();
@@ -98,8 +78,6 @@ public interface IClientMusicService {
     Set<Consumer<MusicDetail>> getMusicQueuePushListeners();
 
     Set<BiConsumer<Integer, MusicDetail>> getMusicQueueRemoveListeners();
-
-    boolean isIdlePlaySourceLoaded();
 
     IMusicTrackState getMusicTrackState(MusicDetail musicDetail);
 

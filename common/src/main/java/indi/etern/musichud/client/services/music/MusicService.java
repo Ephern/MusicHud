@@ -1,27 +1,22 @@
 package indi.etern.musichud.client.services.music;
 
-import com.google.common.cache.Cache;
-import com.google.common.cache.CacheBuilder;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.state.ISubscribeState;
-import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.LoginService;
-import indi.etern.musichud.client.services.music.states.AlbumSubscribeState;
-import indi.etern.musichud.client.services.music.states.ArtistSubscribeState;
-import indi.etern.musichud.client.services.music.states.MusicTrackState;
-import indi.etern.musichud.client.services.music.states.PlaylistSubscribeState;
+import indi.etern.musichud.client.services.music.states.*;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
@@ -29,64 +24,32 @@ import indi.etern.musichud.interfaces.IClientMusicService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
-import indi.etern.musichud.network.payloads.pushMessages.c2s.*;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientPushMusicToQueueMessage;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientRemoveMusicFromQueueMessage;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.VoteSkipCurrentMusicMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import lombok.*;
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.world.entity.player.Player;
-import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
+import static indi.etern.musichud.server.api.impl.ncm.CommonCaches.*;
+
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class MusicService implements IClientMusicService {
-    private static final Logger logger = MusicHud.getLogger(MusicService.class);
-    private static final Cache<Long, Playlist> playlistCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(5, TimeUnit.MINUTES)
-            .maximumSize(50)
-            .build();
-    private static final Cache<Long, Album> albumCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(5, TimeUnit.MINUTES)
-            .maximumSize(50)
-            .build();
-    private static final Cache<Long, Artist> artistCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(5, TimeUnit.MINUTES)
-            .maximumSize(50)
-            .build();
-    private static final Cache<Long, UserCollections> userCollectionsCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
-            .maximumSize(5)
-            .build();
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
-    private static final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static volatile MusicService instance;
 
-    @Getter
-    private final Set<MusicCollection> localIdlePlaySources = ConcurrentHashMap.newKeySet();
-    @Getter
-    private final Set<Consumer<MusicCollection>> localIdlePlaySourceAddListeners = ConcurrentHashMap.newKeySet();
-    @Getter
-    private final Set<Consumer<MusicCollection>> localIdlePlaySourceRemoveListeners = ConcurrentHashMap.newKeySet();
-    @Getter
-    private final Set<Consumer<MusicCollection>> localIdlePlaySourceChangeListeners = ConcurrentHashMap.newKeySet();
-    @Getter
-    private final Set<MusicCollection> serverIdlePlaySources = ConcurrentHashMap.newKeySet();
-    @Getter
-    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceAddListeners = ConcurrentHashMap.newKeySet();
-    @Getter
-    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceRemoveListeners = ConcurrentHashMap.newKeySet();
-    @Getter
-    private final Set<Consumer<MusicCollection>> serverIdlePlaySourceChangeListeners = ConcurrentHashMap.newKeySet();
+    @Getter(lazy = true)
+    private final IIdlePlaySourceState idlePlaySourceState = new IdlePlaySourceState();
     @Getter
     private final Queue<MusicDetail> musicQueue = new ArrayDeque<>();
     @Getter
@@ -96,8 +59,6 @@ public class MusicService implements IClientMusicService {
     @Getter
     private final Set<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = ConcurrentHashMap.newKeySet();
     long lastPressTime = 0;
-    @Getter
-    private boolean idlePlaySourceLoaded = false;
     private UserCollections currentUserCollections;
 
     @EqualsAndHashCode
@@ -106,9 +67,9 @@ public class MusicService implements IClientMusicService {
         @Setter
         private UserCategoryPlaylists userCategoryPlaylists;
         @Setter
-        private LinkedHashSet<Album> subscribedAlbums;
+        private ObservableSequencedSet<Album> subscribedAlbums;
         @Setter
-        private LinkedHashSet<Artist> subscribedArtists;
+        private ObservableSequencedSet<Artist> subscribedArtists;
         private volatile long lastReupdateCachesTimestamp = 0;
 
         public UserCategoryPlaylists getUserCategoryPlaylists() {
@@ -116,12 +77,12 @@ public class MusicService implements IClientMusicService {
             return userCategoryPlaylists;
         }
 
-        public LinkedHashSet<Album> getSubscribedAlbums() {
+        public ObservableSequencedSet<Album> getSubscribedAlbums() {
             reupdateCachesAsync();
             return subscribedAlbums;
         }
 
-        public LinkedHashSet<Artist> getSubscribedArtists() {
+        public ObservableSequencedSet<Artist> getSubscribedArtists() {
             reupdateCachesAsync();
             return subscribedArtists;
         }
@@ -133,17 +94,33 @@ public class MusicService implements IClientMusicService {
                 MusicHud.EXECUTOR.submit(() -> {
                     if (userCategoryPlaylists != null) {
                         Playlist likeList = userCategoryPlaylists.getLikeList();
-                        playlistCache.put(likeList.getId(), likeList);
+                        playlistsCache.put(likeList.getId(), likeList);
                         userCategoryPlaylists.getCreatedPlaylist()
-                                .forEach(playlist -> playlistCache.put(playlist.getId(), playlist));
+                                .forEach(playlist -> {
+                                    if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()) {
+                                        playlistsCache.put(playlist.getId(), playlist);
+                                    }
+                                });
                         userCategoryPlaylists.getSubscribedPlaylist()
-                                .forEach(playlist -> playlistCache.put(playlist.getId(), playlist));
+                                .forEach(playlist -> {
+                                    if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()) {
+                                        playlistsCache.put(playlist.getId(), playlist);
+                                    }
+                                });
                     }
                     if (subscribedAlbums != null) {
-                        subscribedAlbums.forEach(album -> albumCache.put(album.getId(), album));
+                        subscribedAlbums.forEach(album -> {
+                            if (album.getMusicDetails() != null && album.getMusicDetails().size() == album.getMusicTrackCount()) {
+                                albumsCache.put(album.getId(), album);
+                            }
+                        });
                     }
                     if (subscribedArtists != null) {
-                        subscribedArtists.forEach(artist -> artistCache.put(artist.getId(), artist));
+                        subscribedArtists.forEach(artist -> {
+                            if (artist.getMusicDetails() != null && !artist.getMusicDetails().isEmpty() && !artist.getDescription().isEmpty()) {
+                                artistsCache.put(artist.getId(), artist);
+                            }
+                        });
                     }
                 });
             }
@@ -165,7 +142,7 @@ public class MusicService implements IClientMusicService {
     public static void resetCurrentMusicStatus() {
         if (instance != null) {
             instance.switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
-            instance.idlePlaySourceLoaded = false;
+            instance.getIdlePlaySourceState().local().reset();
             instance.musicQueue.clear();
         }
         if (HudRendererManager.isLoaded()) {
@@ -173,42 +150,12 @@ public class MusicService implements IClientMusicService {
         }
     }
 
-    private void loadIdlePlaySourceFromConfig() {
-        if (!idlePlaySourceLoaded) {
-            idlePlaySourceLoaded = true;
-            Set<IdlePlaySource> idlePlaySources = profileConfigData.getIdlePlaySources();
-            if (!idlePlaySources.isEmpty()) {
-                MusicHud.EXECUTOR.execute(() -> {
-                    for (IdlePlaySource idlePlaySource : idlePlaySources) {
-                        try {
-                            loadIdlePlaySource(idlePlaySource.getType(), idlePlaySource.getId()).thenAcceptAsync(musicCollection -> {
-                                clientNetworkService.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
-                                getInstance().addToIdlePlaySource(musicCollection);
-                            }, MusicHud.EXECUTOR);
-                        } catch (Exception e) {
-                            logger.error("Failed to load idle play source playlist with idlePlaySource:{}", idlePlaySource, e);
-                        }
-                    }
-                });
-            }
-        }
-    }
-
-    @Override
-    public CompletableFuture<? extends MusicCollection> loadIdlePlaySource(Class<?> type, long id) {
-        if (type.equals(Album.class)) {
-            return loadAlbumDetail(id, false);
-        } else if (type.equals(Playlist.class)) {
-            return loadPlaylistDetail(id, false);
-        }
-        return null;
-    }
-
     @Override
     public CompletableFuture<Playlist> loadPlaylistDetail(long id, boolean ignoreCache) {
         if (!ignoreCache) {
-            Playlist cachedPlaylist = playlistCache.getIfPresent(id);
-            if (cachedPlaylist != null) {
+            Playlist cachedPlaylist = playlistsCache.getIfPresent(id);
+            if (cachedPlaylist != null && cachedPlaylist.getMusicDetails() != null
+                    && cachedPlaylist.getMusicDetails().size() == cachedPlaylist.getMusicTrackCount()) {
                 return CompletableFuture.completedFuture(cachedPlaylist);
             }
         }
@@ -218,7 +165,7 @@ public class MusicService implements IClientMusicService {
                         Duration.ofSeconds(5))
                 .thenApply(response -> {
                     Playlist playlist = response.getPlaylist();
-                    playlistCache.put(id, playlist);
+                    playlistsCache.put(id, playlist);
                     return playlist;
                 });
     }
@@ -226,8 +173,9 @@ public class MusicService implements IClientMusicService {
     @Override
     public CompletableFuture<Album> loadAlbumDetail(long id, boolean ignoreCache) {
         if (!ignoreCache) {
-            Album cachedAlbum = albumCache.getIfPresent(id);
-            if (cachedAlbum != null) {
+            Album cachedAlbum = albumsCache.getIfPresent(id);
+            if (cachedAlbum != null && cachedAlbum.getMusicDetails() != null
+                    && cachedAlbum.getMusicDetails().size() == cachedAlbum.getMusicTrackCount()) {
                 return CompletableFuture.completedFuture(cachedAlbum);
             }
         }
@@ -237,40 +185,9 @@ public class MusicService implements IClientMusicService {
                         Duration.ofSeconds(5))
                 .thenApply(response -> {
                     Album album = response.getAlbum();
-                    albumCache.put(id, album);
+                    albumsCache.put(id, album);
                     return album;
                 });
-    }
-
-    @Override
-    public void addToIdlePlaySource(MusicCollection idlePlaySourceCollection) {
-        PusherInfo pusherInfo = idlePlaySourceCollection.getPusherInfo();
-        MusicCollection collection;
-        if (pusherInfo != null && pusherInfo != PusherInfo.EMPTY) {
-            collection = idlePlaySourceCollection.copyWithPusherInfo(PusherInfo.EMPTY);
-        } else {
-            collection = idlePlaySourceCollection;
-        }
-        IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
-        if (localIdlePlaySources.stream().noneMatch(s -> s.equalsLoose(collection))) {
-            localIdlePlaySources.add(collection);
-            localIdlePlaySourceAddListeners.forEach(l -> l.accept(collection));
-            localIdlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
-            profileConfigData.getIdlePlaySources().add(idlePlaySource);
-            profileConfigData.saveToConfig();
-        }
-        clientNetworkService.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
-    }
-
-    @Override
-    public void removeFromIdlePlaySource(MusicCollection collection) {
-        localIdlePlaySources.removeIf(c -> c.getId() == collection.getId());
-        localIdlePlaySourceRemoveListeners.forEach(l -> l.accept(collection));
-        localIdlePlaySourceChangeListeners.forEach(l -> l.accept(collection));
-        IdlePlaySource idlePlaySource = new IdlePlaySource(collection.getId(), collection.getClass());
-        profileConfigData.getIdlePlaySources().remove(idlePlaySource);
-        profileConfigData.saveToConfig();
-        clientNetworkService.sendToServer(new RemoveFromIdlePlaySourceMessage(idlePlaySource));
     }
 
     @Override
@@ -373,8 +290,8 @@ public class MusicService implements IClientMusicService {
     @Override
     public CompletableFuture<Artist> loadArtist(long id, boolean ignoreCache) {
         if (!ignoreCache) {
-            Artist cachedArtist = artistCache.getIfPresent(id);
-            if (cachedArtist != null) {
+            Artist cachedArtist = artistsCache.getIfPresent(id);
+            if (cachedArtist != null && cachedArtist.getMusicDetails() != null) {
                 return CompletableFuture.completedFuture(cachedArtist);
             }
         }
@@ -423,40 +340,6 @@ public class MusicService implements IClientMusicService {
                 });
             }
         }
-    }
-
-    @Override
-    public synchronized void updateAllIdlePlaySources(List<Playlist> playlistSources, List<Album> albumSources) {
-        Set<MusicCollection> toRemove = new HashSet<>();
-        Set<MusicCollection> toAdd = new HashSet<>();
-        Set<MusicCollection> serverIdlePlaySources = Set.copyOf(this.serverIdlePlaySources);
-        for (MusicCollection musicCollection : serverIdlePlaySources) {
-            //noinspection SuspiciousMethodCalls
-            if (!playlistSources.contains(musicCollection) && !albumSources.contains(musicCollection)) {
-                toRemove.add(musicCollection);
-            }
-        }
-        Player player = Minecraft.getInstance().player;
-        for (MusicCollection musicCollection : playlistSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
-                toAdd.add(musicCollection);
-            }
-        }
-        for (MusicCollection musicCollection : albumSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
-                toAdd.add(musicCollection);
-            }
-        }
-        this.serverIdlePlaySources.removeAll(toRemove);
-        this.serverIdlePlaySources.addAll(toAdd);
-        toRemove.forEach(musicCollection -> {
-            serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
-            serverIdlePlaySourceRemoveListeners.forEach((listener) -> listener.accept(musicCollection));
-        });
-        toAdd.forEach(musicCollection -> {
-            serverIdlePlaySourceChangeListeners.forEach((listener) -> listener.accept(musicCollection));
-            serverIdlePlaySourceAddListeners.forEach((listener) -> listener.accept(musicCollection));
-        });
     }
 
     @Override
@@ -559,8 +442,12 @@ public class MusicService implements IClientMusicService {
             currentUserCollections = new UserCollections();
             return CompletableFuture.allOf(
                             loadUserPlaylists(ignoreCache).thenAccept(currentUserCollections::setUserCategoryPlaylists),
-                            loadUserAlbums(ignoreCache).thenAccept(currentUserCollections::setSubscribedAlbums),
-                            loadUserArtists(ignoreCache).thenAccept(currentUserCollections::setSubscribedArtists)
+                            loadUserAlbums(ignoreCache)
+                                    .thenAccept(subscribedAlbums ->
+                                            currentUserCollections.setSubscribedAlbums(new ObservableSequencedSet<>(subscribedAlbums))),
+                            loadUserArtists(ignoreCache)
+                                    .thenAccept(subscribedArtists ->
+                                            currentUserCollections.setSubscribedArtists(new ObservableSequencedSet<>(subscribedArtists)))
                     ).thenApply(v -> currentUserCollections);
         }
     }
@@ -570,7 +457,7 @@ public class MusicService implements IClientMusicService {
         @Override
         public void register() {
             LoginService.getInstance().getLoginCompleteListeners().add((loginCookieInfo) -> {
-                MusicService.getInstance().loadIdlePlaySourceFromConfig();
+                MusicService.getInstance().getIdlePlaySourceState().local().loadFromConfig();
             });
             IClientEventService.getInstance().registerClientPlayerQuit((player) -> {
                 MusicHud.EXECUTOR.execute(MusicService::resetCurrentMusicStatus);

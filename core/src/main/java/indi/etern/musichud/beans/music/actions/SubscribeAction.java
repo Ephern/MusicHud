@@ -4,7 +4,7 @@ import indi.etern.musichud.interfaces.IntegerCodeEnum;
 import lombok.Getter;
 
 public enum SubscribeAction implements IntegerCodeEnum {
-    SUBSCRIBE(1), UNSUBSCRIBE(0);
+    SUBSCRIBE(1), UNSUBSCRIBE(2);
 
     @Getter
     private final int code;

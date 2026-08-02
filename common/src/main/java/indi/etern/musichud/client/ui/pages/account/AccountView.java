@@ -25,10 +25,14 @@ import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
+import indi.etern.musichud.interfaces.Unregister;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 
-import java.util.LinkedHashSet;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -45,25 +49,108 @@ public class AccountView extends LinearLayout {
     private LinearLayout mySubscribedPlaylistsContent;
     private LinearLayout mySubscribedAlbumsContent;
     private LinearLayout mySubscribedArtistsContent;
+    private final Map<ElementKey, View> elementMap = new HashMap<>();
+    private final Consumer<Playlist> playlistCardCreator = playlist -> {
+        MuiModApi.postToUiThread(() -> {
+            if (!isAttachedToWindow()) {
+                return;
+            }
+            long id = playlist.getId();
+            elementMap.computeIfAbsent(new ElementKey(Playlist.class, id), (key) -> {
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist);
+                card.setTag(id);
+                mySubscribedPlaylistCards.addView(card);
+                return card;
+            });
+        });
+    };
+    private final Consumer<Album> albumCardCreator = album -> {
+        MuiModApi.postToUiThread(() -> {
+            if (!isAttachedToWindow()) {
+                return;
+            }
+            long id = album.getId();
+            elementMap.computeIfAbsent(new ElementKey(Album.class, id), (key) -> {
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), album);
+                card.setTag(id);
+                albumCards.addView(card);
+                return card;
+            });
+        });
+    };
+    private final Consumer<Artist> artistCardCreator = artist -> {
+        MuiModApi.postToUiThread(() -> {
+            if (!isAttachedToWindow()) {
+                return;
+            }
+            long id = artist.getId();
+            elementMap.computeIfAbsent(new ElementKey(Artist.class, id), (key) -> {
+                ArtistCard artistCard = new ArtistCard(getContext());
+                artistCard.setTag(artist.getId());
+                artistCard.bindData(artist);
+                artistCards.addView(artistCard);
+                return artistCard;
+            });
+        });
+    };
+    private Unregister playlistAddRegister;
+    private Unregister playlistRemoveRegister;
+    private Unregister albumAddRegister;
+    private Unregister albumRemoveRegister;
+    private Unregister artistAddRegister;
+    private Unregister artistRemoveRegister;
+
+    private record ElementKey(Class<?> clazz, long id) {}
 
     public AccountView(Context context) {
         super(context);
-        refresh(false);
+//        refresh(false);
         instance = this;
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
             public void onViewAttachedToWindow(View v) {
+                instance = AccountView.this;
+                refresh(false);
             }
 
             @Override
             public void onViewDetachedFromWindow(View v) {
+                unregisterCollectionListeners();
                 instance = null;
             }
         });
     }
 
+    private void unregisterCollectionListeners() {
+        if (playlistAddRegister != null) {
+            playlistAddRegister.unregister();
+            playlistAddRegister = null;
+        }
+        if (playlistRemoveRegister != null) {
+            playlistRemoveRegister.unregister();
+            playlistRemoveRegister = null;
+        }
+        if (albumAddRegister != null) {
+            albumAddRegister.unregister();
+            albumAddRegister = null;
+        }
+        if (albumRemoveRegister != null) {
+            albumRemoveRegister.unregister();
+            albumRemoveRegister = null;
+        }
+        if (artistAddRegister != null) {
+            artistAddRegister.unregister();
+            artistAddRegister = null;
+        }
+        if (artistRemoveRegister != null) {
+            artistRemoveRegister.unregister();
+            artistRemoveRegister = null;
+        }
+    }
+
     public void refresh(boolean ignoreCache) {
         removeAllViews();
+        elementMap.clear();
         setOrientation(LinearLayout.VERTICAL);
         setLayoutParams(new LayoutParams(MATCH_PARENT, MATCH_PARENT));
         Context context = getContext();
@@ -309,24 +396,60 @@ public class AccountView extends LinearLayout {
             MusicService musicService = MusicService.getInstance();
             musicService.loadUserCollections(ignoreCache).thenAccept(userCollections -> {
                 MuiModApi.postToUiThread(() -> {
+                    if (!isAttachedToWindow()) {
+                        return;
+                    }
+                    unregisterCollectionListeners();
                     UserCategoryPlaylists categoryPlaylists = userCollections.getUserCategoryPlaylists();
                     myPlaylistCards.addView(new MusicCollectionCard(context, categoryPlaylists.getLikeList()));
-                    LinkedHashSet<Playlist> createdPlaylist = categoryPlaylists.getCreatedPlaylist();
+                    ObservableSequencedSet<Playlist> createdPlaylist = categoryPlaylists.getCreatedPlaylist();
                     createdPlaylist.forEach(playlist -> myPlaylistCards.addView(new MusicCollectionCard(context, playlist)));
-                    LinkedHashSet<Playlist> subscribedPlaylist = categoryPlaylists.getSubscribedPlaylist();
-                    subscribedPlaylist.forEach(playlist -> mySubscribedPlaylistCards.addView(new MusicCollectionCard(context, playlist)));
+                    ObservableSequencedSet<Playlist> subscribedPlaylist = categoryPlaylists.getSubscribedPlaylist();
+                    subscribedPlaylist.forEach(playlistCardCreator);
+                    playlistAddRegister = subscribedPlaylist.registerOnAdd(playlistCardCreator);
+                    playlistRemoveRegister = subscribedPlaylist.registerOnRemove(playlist -> {
+                        MuiModApi.postToUiThread(() -> {
+                            if (!isAttachedToWindow()) {
+                                return;
+                            }
+                            View toRemove = elementMap.remove(new ElementKey(Playlist.class, playlist.getId()));
+                            if (toRemove != null) {
+                                mySubscribedPlaylistCards.removeView(toRemove);
+                            }
+                        });
+                    });
                     myPlaylistsContent.setVisibility(createdPlaylist.isEmpty() ? GONE : VISIBLE);
                     mySubscribedPlaylistsContent.setVisibility(subscribedPlaylist.isEmpty() ? GONE : VISIBLE);
 
-                    LinkedHashSet<Album> albums = userCollections.getSubscribedAlbums();
-                    albums.forEach(playlist -> albumCards.addView(new MusicCollectionCard(context, playlist)));
+                    ObservableSequencedSet<Album> albums = userCollections.getSubscribedAlbums();
+                    albums.forEach(albumCardCreator);
+                    albumAddRegister = albums.registerOnAdd(albumCardCreator);
+                    albumRemoveRegister = albums.registerOnRemove(album -> {
+                        MuiModApi.postToUiThread(() -> {
+                            if (!isAttachedToWindow()) {
+                                return;
+                            }
+                            View toRemove = elementMap.remove(new ElementKey(Album.class, album.getId()));
+                            if (toRemove != null) {
+                                albumCards.removeView(toRemove);
+                            }
+                        });
+                    });
                     mySubscribedAlbumsContent.setVisibility(albums.isEmpty() ? GONE : VISIBLE);
 
-                    LinkedHashSet<Artist> artists = userCollections.getSubscribedArtists();
-                    artists.forEach(artist -> {
-                        ArtistCard artistCard = new ArtistCard(context);
-                        artistCard.bindData(artist);
-                        artistCards.addView(artistCard);
+                    ObservableSequencedSet<Artist> artists = userCollections.getSubscribedArtists();
+                    artists.forEach(artistCardCreator);
+                    artistAddRegister = artists.registerOnAdd(artistCardCreator);
+                    artistRemoveRegister = artists.registerOnRemove(artist -> {
+                        MuiModApi.postToUiThread(() -> {
+                            if (!isAttachedToWindow()) {
+                                return;
+                            }
+                            View toRemove = elementMap.remove(new ElementKey(Artist.class, artist.getId()));
+                            if (toRemove != null) {
+                                artistCards.removeView(toRemove);
+                            }
+                        });
                     });
                     mySubscribedArtistsContent.setVisibility(artists.isEmpty() ? GONE : VISIBLE);
 
@@ -334,8 +457,10 @@ public class AccountView extends LinearLayout {
                 });
             }).exceptionally((e) -> {
                 MuiModApi.postToUiThread(() -> {
-                    progressBar.setVisibility(View.GONE);
-                    errorText.setVisibility(View.VISIBLE);
+                    if (isAttachedToWindow()) {
+                        progressBar.setVisibility(View.GONE);
+                        errorText.setVisibility(View.VISIBLE);
+                    }
                 });
                 return null;
             });

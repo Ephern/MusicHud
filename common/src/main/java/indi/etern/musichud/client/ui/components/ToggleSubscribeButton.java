@@ -8,15 +8,14 @@ import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 
-public class ToggleSubscribeStateButton<T> extends ToggleIconButton {
-    @SuppressWarnings("FieldCanBeLocal")
+public class ToggleSubscribeButton<T> extends ToggleIconButton {
+    private ISubscribeState<?> subscribeState;
     private Unregister unregister = null;
-    private ISubscribeState<T> subscribeState;
 
-    public ToggleSubscribeStateButton(Context context) {
+    public ToggleSubscribeButton(Context context) {
         super(context, new Appearance(
-                () -> I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicLike.remove"),
-                () -> I18n.get(MusicHud.MOD_ID + ".button.modifyCurrentMusicLike.add"),
+                () -> I18n.get(MusicHud.MOD_ID + ".button.unsubscribe"),
+                () -> I18n.get(MusicHud.MOD_ID + ".button.subscribe"),
                 () -> ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/heart_filled.png"),
                 () -> ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/heart.png")
         ));
@@ -35,25 +34,32 @@ public class ToggleSubscribeStateButton<T> extends ToggleIconButton {
         return b;
     }
 
-    public void bindMusicList(ISubscribeState<T> subscribeState) {
+    public void bindMusicList(ISubscribeState<?> subscribeState) {
         if (subscribeState == null) {
             this.subscribeState = null;
             if (unregister != null) {
                 unregister.unregister();
+                unregister = null;
             }
         } else {
-            subscribeState.isSubscribed().thenApply((contains) -> {
+            subscribeState.isSubscribed().thenApply(subscribed -> {
                 MuiModApi.postToUiThread(() -> {
-                    setChecked(contains);
+                    setChecked(subscribed);
                     this.subscribeState = subscribeState;
-                    unregister = subscribeState.onOthersModify(checked -> {
-                        MuiModApi.postToUiThread(() -> {
-                            setChecked(checked);
-                        });
-                    });
+                    unregister = subscribeState.onOthersModify(checked ->
+                            MuiModApi.postToUiThread(() -> setChecked(checked)));
                 });
                 return null;
             });
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (unregister != null) {
+            unregister.unregister();
+            unregister = null;
         }
     }
 }

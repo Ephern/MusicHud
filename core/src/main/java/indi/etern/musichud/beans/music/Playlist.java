@@ -5,6 +5,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -24,7 +25,7 @@ public class Playlist implements MusicCollection {
             Codecs.INT, Playlist::getPlayedCount,
             Profile.CODEC, Playlist::getCreator,
             Codecs.ofEnum(Privacy.class), Playlist::getPrivacy,
-            Codecs.ofCollection(LinkedHashSet::new, () -> MusicDetail.CODEC), Playlist::getTracks,
+            Codecs.ofCollection(ObservableSequencedSet::new, () -> MusicDetail.CODEC), Playlist::getTracks,
             PusherInfo.CODEC, Playlist::getPusherInfo,
             Playlist::new
     );
@@ -48,7 +49,7 @@ public class Playlist implements MusicCollection {
     Profile creator = Profile.ANONYMOUS;
     Privacy privacy = Privacy.PUBLIC;
     @Setter
-    SequencedSet<MusicDetail> tracks = new LinkedHashSet<>(0);
+    ObservableSequencedSet<MusicDetail> tracks = new ObservableSequencedSet<>(0);
 
     // Not contained in the original API response, set separately
     @Getter
@@ -66,7 +67,7 @@ public class Playlist implements MusicCollection {
             int playedCount,
             Profile creator,
             Privacy privacy,
-            SequencedSet<MusicDetail> tracks,
+            ObservableSequencedSet<MusicDetail> tracks,
             PusherInfo pusherInfo
     ) {
         this.id = id;
@@ -139,9 +140,9 @@ public class Playlist implements MusicCollection {
         return Objects.requireNonNullElse(privacy, Privacy.PUBLIC);
     }
 
-    public SequencedSet<MusicDetail> getTracks() {
+    public ObservableSequencedSet<MusicDetail> getTracks() {
         if (tracks == null || tracks.isEmpty()) {
-            return new LinkedHashSet<>(0);
+            return new ObservableSequencedSet<>(0);
         }
         if (!nullFiltered) {
             filterTracksNullItem();
@@ -152,7 +153,7 @@ public class Playlist implements MusicCollection {
 
     private void filterTracksNullItem() {
         tracks = tracks.stream().filter(Objects::nonNull)
-                .collect(LinkedHashSet::new, Set::add, LinkedHashSet::addAll);
+                .collect(ObservableSequencedSet::new, Set::add, ObservableSequencedSet::addAll);
     }
 
     @Override
@@ -185,6 +186,8 @@ public class Playlist implements MusicCollection {
         playlist.tracks = tracks;
         playlist.creator = creator;
         playlist.privacy = privacy;
+        playlist.musicTrackCount = musicTrackCount;
+        playlist.playedCount = playedCount;
         playlist.pusherInfo = pusherInfo;
         return playlist;
     }

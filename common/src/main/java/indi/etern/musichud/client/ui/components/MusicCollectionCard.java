@@ -3,22 +3,19 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
-import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
 import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
-import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
@@ -26,8 +23,6 @@ import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
-
-import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -126,34 +121,26 @@ public class MusicCollectionCard extends LinearLayout {
         }
         row1.addView(new View(context), new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 1));
         ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .inset(0)
                 .cornerRadius(dp(4))
                 .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
                 .build();
         {
-            Button toggleSubscribeButton = new Button(context);
-//            updateButton(toggleSubscribeButton);
-            toggleSubscribeButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            toggleSubscribeButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            SpannableString text = new SpannableString(" ");
-            Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/heart.png");
-            if (image != null) {
-                ImageSpan span = ImageUtils.getIconSpan(image);
-                text.setSpan(span, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
-            toggleSubscribeButton.setText(text);
-//            toggleSubscribeButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"));
+            ToggleSubscribeButton<?> toggleSubscribeButton = new ToggleSubscribeButton<>(context);
             toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
-            toggleSubscribeButton.setOnClickListener((v) -> {//TODO
-//                if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
-//                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
-//                    musicService.removeFromIdlePlaySource(musicCollection);
-//                } else {
-//                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
-//                    musicService.addToIdlePlaySource(musicCollection);
-//                }
-            });
             row1.addView(toggleSubscribeButton, new LayoutParams(row2.dp(22), row2.dp(22), 0));
+            if (musicCollection instanceof Playlist playlist) {
+                if (playlist.getCreator().getUserId() == Profile.getCurrent().getUserId()) {
+                    toggleSubscribeButton.setVisibility(GONE);
+                } else {
+                    var subscribeState = musicService.getPlaylistSubscribeState(playlist);
+                    toggleSubscribeButton.bindMusicList(subscribeState);
+                }
+            } else if (musicCollection instanceof Album album) {
+                var subscribeState = musicService.getAlbumSubscribeState(album);
+                toggleSubscribeButton.bindMusicList(subscribeState);
+            }
         }
 
         TextView name = new TextView(context);
@@ -179,41 +166,10 @@ public class MusicCollectionCard extends LinearLayout {
         LocalPlayer localPlayer = Minecraft.getInstance().player;
         if (pusherInfo == null || pusherInfo.equals(PusherInfo.EMPTY)
                 || (localPlayer != null && pusherInfo.getPlayerUUID().equals(localPlayer.getUUID()))) {
-            Button toggleIdleSourceButton = new Button(context);
-            updateButton(toggleIdleSourceButton);
-            toggleIdleSourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            toggleIdleSourceButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
             toggleIdleSourceButton.setBackground(backgroundFactory.newBackgroundDrawable());
-            toggleIdleSourceButton.setOnClickListener((v) -> {
-                if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
-                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
-                    musicService.removeFromIdlePlaySource(musicCollection);
-                } else {
-                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
-                    musicService.addToIdlePlaySource(musicCollection);
-                }
-            });
+            toggleIdleSourceButton.bindMusicList(musicService.getIdlePlaySourceState().local().collection(musicCollection));
             row1.addView(toggleIdleSourceButton, new LayoutParams(row2.dp(22), row2.dp(22), 0));
-
-            Consumer<MusicCollection> listener = collection -> {
-                if (collection.equals(musicCollection)) {
-                    MuiModApi.postToUiThread(() -> updateButton(toggleIdleSourceButton));
-                }
-            };
-
-            musicService.getLocalIdlePlaySourceChangeListeners().add(listener);
-            addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-                @Override
-                public void onViewAttachedToWindow(View v) {
-                    updateButton(toggleIdleSourceButton);
-                    musicService.getLocalIdlePlaySourceChangeListeners().add(listener);
-                }
-
-                @Override
-                public void onViewDetachedFromWindow(View v) {
-                    musicService.getLocalIdlePlaySourceChangeListeners().remove(listener);
-                }
-            });
         } else {
             LinearLayout pusherRow = new LinearLayout(context);
             pusherRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -279,27 +235,5 @@ public class MusicCollectionCard extends LinearLayout {
             case "精选集" -> I18n.get(MusicHud.MOD_ID + ".text.album.type.compilation");
             default -> type;
         };
-    }
-
-    private void updateButton(Button modifyIdleSourceButton) {
-        if (musicService.getLocalIdlePlaySources().stream().anyMatch(collection -> collection.getId() == musicCollection.getId())) {
-            SpannableString text = new SpannableString("★");
-            Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/star_filled.png");
-            if (image != null) {
-                ImageSpan span = ImageUtils.getIconSpan(image);
-                text.setSpan(span, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
-            modifyIdleSourceButton.setText(text);
-            modifyIdleSourceButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"));
-        } else {
-            SpannableString text = new SpannableString("☆");
-            Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/star.png");
-            if (image != null) {
-                ImageSpan span = ImageUtils.getIconSpan(image);
-                text.setSpan(span, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            }
-            modifyIdleSourceButton.setText(text);
-            modifyIdleSourceButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.addToIdlePlaySource"));
-        }
     }
 }

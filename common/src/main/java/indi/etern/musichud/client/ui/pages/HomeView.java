@@ -24,6 +24,7 @@ import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.Unregister;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -44,8 +45,8 @@ public class HomeView extends LinearLayout {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     @Getter
     private static HomeView instance;
-    private final Set<MusicCollection> serverIdlePlaySources = musicService.getServerIdlePlaySources();
-    private final Set<MusicCollection> clientIdlePlaySources = musicService.getLocalIdlePlaySources();
+    private final Set<MusicCollection> serverIdlePlaySources = musicService.getIdlePlaySourceState().external().getSources();
+    private final Set<MusicCollection> clientIdlePlaySources = musicService.getIdlePlaySourceState().local().getSources();
     private final Map<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new ConcurrentHashMap<>();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
@@ -85,6 +86,10 @@ public class HomeView extends LinearLayout {
     };
     private Consumer<MusicDetail> musicQueuePushListener;
     private BiConsumer<Integer, MusicDetail> musicQueueRemoveListener;
+    private Unregister localAddRegister;
+    private Unregister localRemoveRegister;
+    private Unregister serverAddRegister;
+    private Unregister serverRemoveRegister;
     private LocalPlayer localPlayer = Minecraft.getInstance().player;
     private final Consumer<MusicCollection> serverAddListener = collection -> {
         MuiModApi.postToUiThread(() -> {
@@ -251,10 +256,10 @@ public class HomeView extends LinearLayout {
 
             Queue<MusicDetail> queue = musicService.getMusicQueue();
 
-            musicService.getLocalIdlePlaySourceAddListeners().add(localAddListener);
-            musicService.getLocalIdlePlaySourceRemoveListeners().add(localRemoveListener);
-            musicService.getServerIdlePlaySourceAddListeners().add(serverAddListener);
-            musicService.getServerIdlePlaySourceRemoveListeners().add(serverRemoveListener);
+            localAddRegister = musicService.getIdlePlaySourceState().local().onAdd(localAddListener);
+            localRemoveRegister = musicService.getIdlePlaySourceState().local().onRemove(localRemoveListener);
+            serverAddRegister = musicService.getIdlePlaySourceState().external().onAdd(serverAddListener);
+            serverRemoveRegister = musicService.getIdlePlaySourceState().external().onRemove(serverRemoveListener);
 
             playQueueListView.removeAllViews();
 
@@ -286,10 +291,10 @@ public class HomeView extends LinearLayout {
 
                 @Override
                 public void onViewDetachedFromWindow(View v) {
-                    musicService.getLocalIdlePlaySourceAddListeners().remove(localAddListener);
-                    musicService.getLocalIdlePlaySourceRemoveListeners().remove(localRemoveListener);
-                    musicService.getServerIdlePlaySourceAddListeners().remove(serverAddListener);
-                    musicService.getServerIdlePlaySourceRemoveListeners().remove(serverRemoveListener);
+                    if (localAddRegister != null) localAddRegister.unregister();
+                    if (localRemoveRegister != null) localRemoveRegister.unregister();
+                    if (serverAddRegister != null) serverAddRegister.unregister();
+                    if (serverRemoveRegister != null) serverRemoveRegister.unregister();
                     musicService.getMusicQueuePushListeners().remove(musicQueuePushListener);
                     musicService.getMusicQueueRemoveListeners().remove(musicQueueRemoveListener);
                     instance = null;
@@ -328,7 +333,7 @@ public class HomeView extends LinearLayout {
     private void checkNextToPlay(MusicDetail nextIdle) {
         MusicService musicService = MusicService.getInstance();
         Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
-        boolean hasIdlePlaySources = !musicService.getLocalIdlePlaySources().isEmpty() || !musicService.getServerIdlePlaySources().isEmpty();
+        boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty() || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();
         MusicDetail next = hasIdlePlaySources ? nextIdle : null;
         if (musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE)) {
             nextToPlayTitle.setVisibility(VISIBLE);
@@ -350,8 +355,8 @@ public class HomeView extends LinearLayout {
         if (musicDetail.getPusherInfo().getPlayerUUID().equals(Minecraft.getInstance().player.getUUID())) {
             ImageButton removeButton = new ImageButton(getContext());
             Image removeIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/trash_2.png");
-            removeButton.setScaleType(ImageView.ScaleType.CENTER);
-            removeButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), removeIcon, dp(8), dp(16), dp(16)));
+            removeButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            removeButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), removeIcon, dp(16), dp(16)));
             Drawable background = ButtonInsetBackgroundFactory.builder()
                     .inset(dp(2))
                     .cornerRadius(dp(4))

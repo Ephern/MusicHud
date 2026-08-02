@@ -32,7 +32,7 @@ public record UpdateAllIdlePlaySourcesMessage(List<Playlist> playlistSources,
             NetworkReceiver<UpdateAllIdlePlaySourcesMessage> receiver = NetworkReceiver.noop();
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
                 receiver = (playSourcesMessage, packetContext) ->
-                        IClientMusicService.getInstance().updateAllIdlePlaySources(
+                        IClientMusicService.getInstance().getIdlePlaySourceState().external().updateAll(
                                 playSourcesMessage.playlistSources,
                                 playSourcesMessage.albumSources
                         );

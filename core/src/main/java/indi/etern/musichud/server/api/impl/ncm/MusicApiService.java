@@ -16,6 +16,7 @@ import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.utils.JsonUtil;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.AccessLevel;
 import lombok.NoArgsConstructor;
@@ -31,24 +32,14 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
 
+import static indi.etern.musichud.server.api.impl.ncm.CommonCaches.*;
+
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MusicApiService implements IMusicApiService {
     private static final Logger logger = MusicHud.getLogger(MusicApiService.class);
-    private static final Cache<Long, Playlist> playlistCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
-            .maximumSize(50)
-            .build();
     private static final Cache<Long, MusicDetail> musicDetailCache = CacheBuilder.newBuilder()
             .expireAfterAccess(10, TimeUnit.MINUTES)
             .maximumSize(400)
-            .build();
-    private static final Cache<Long, Artist> artistsCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
-            .maximumSize(50)
-            .build();
-    private static final Cache<Long, Album> albumsCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
-            .maximumSize(50)
             .build();
     private static final Cache<Long, UserCategoryPlaylists> userPlaylistCache = CacheBuilder.newBuilder()
             .expireAfterAccess(10, TimeUnit.MINUTES)
@@ -73,7 +64,7 @@ public class MusicApiService implements IMusicApiService {
     private static <K, T> T joinMerged(ConcurrentHashMap<K, CompletableFuture<T>> inFlight, K key, Supplier<T> loader) {
         CompletableFuture<T> future = inFlight.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(loader, MusicHud.EXECUTOR));
         try {
-            T result = future.get(10, TimeUnit.SECONDS);
+            T result = future.get(5, TimeUnit.SECONDS);
             inFlight.remove(key, future);
             return result;
         } catch (InterruptedException e) {
@@ -109,11 +100,11 @@ public class MusicApiService implements IMusicApiService {
         MusicHud.EXECUTOR.submit(() -> {
             LinkedHashSet<Playlist> playlists = loadUserCreatedPlaylists(userId, loginInfo);
             userCategoryPlaylists.setLikeList(playlists.removeFirst());
-            userCategoryPlaylists.setCreatedPlaylist(playlists);
+            userCategoryPlaylists.setCreatedPlaylist(new ObservableSequencedSet<>(playlists));
             createdPlaylistFuture.complete(null);
         });
         MusicHud.EXECUTOR.submit(() -> {
-            userCategoryPlaylists.setSubscribedPlaylist(loadUserSubscribedPlaylists(userId, loginInfo));
+            userCategoryPlaylists.setSubscribedPlaylist(new ObservableSequencedSet<>(loadUserSubscribedPlaylists(userId, loginInfo)));
             subscribedPlaylistFuture.complete(null);
         });
         totalComplete.get(5, TimeUnit.SECONDS);
@@ -179,7 +170,7 @@ public class MusicApiService implements IMusicApiService {
 
     @Override
     public Playlist getPlaylistDetail(long id, boolean ignoreCache, @Nullable UUID playerUUID) {
-        Playlist cached = ignoreCache ? null : playlistCache.getIfPresent(id);
+        Playlist cached = ignoreCache ? null : playlistsCache.getIfPresent(id);
         Playlist playlist;
         if (cached != null && !cached.getTracks().isEmpty()) {
             playlist = cached;
@@ -189,7 +180,7 @@ public class MusicApiService implements IMusicApiService {
                 PlaylistResponse playlistResponse = ApiClient.post(ApiServerEndpointsMeta.Playlist.DETAIL, new IdRequest(id), rawCookie, true);
                 if (playlistResponse.getCode() == 200) {
                     Playlist loaded = playlistResponse.getPlaylist();
-                    playlistCache.put(id, loaded);
+                    playlistsCache.put(id, loaded);
                     return loaded;
                 } else {
                     logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(playerUUID), playlistResponse.getCode());
@@ -530,7 +521,7 @@ public class MusicApiService implements IMusicApiService {
                 new ModifyTracksRequest(ModifyType.ADD.getApiOperationName(), playlistId, String.valueOf(musicId)),
                 loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
                 true);
-        Playlist playlist = playlistCache.getIfPresent(playlistId);
+        Playlist playlist = playlistsCache.getIfPresent(playlistId);
         if (playlist != null) {
             SequencedSet<MusicDetail> musicDetails = playlist.getMusicDetails();
             MusicDetail musicDetail = getMusicDetailByIds(List.of(musicId), playerUUID).getFirst();
@@ -548,7 +539,7 @@ public class MusicApiService implements IMusicApiService {
                 new ModifyTracksRequest(ModifyType.REMOVE.getApiOperationName(), playlistId, String.valueOf(musicId)),
                 loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
                 true);
-        Playlist playlist = playlistCache.getIfPresent(playlistId);
+        Playlist playlist = playlistsCache.getIfPresent(playlistId);
         if (playlist != null) {
             playlist.getMusicDetails().stream().filter(m -> m.getId() == playlistId).findFirst()
                     .ifPresent(musicDetail -> {
@@ -577,7 +568,7 @@ public class MusicApiService implements IMusicApiService {
             }
         };
         ApiClient.post(meta,
-                new ModifySubscriptionRequest(action.getCode(), id),
+                new ModifySubscriptionRequest(String.valueOf(action.getCode()), id),
                 loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
                 true);
         cache.invalidate(id);
@@ -701,7 +692,7 @@ public class MusicApiService implements IMusicApiService {
 
     public record ModifySubscriptionRequest(
             @SerializedName("t")
-            int operationType,
+            String operationType,
             @SerializedName("id")
             long beanId
     ) {
