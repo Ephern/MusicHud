@@ -19,7 +19,6 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.GetInitialState
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.*;
 import org.apache.logging.log4j.Logger;
-
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -340,65 +339,26 @@ public class MusicPlayerServerService {
         }
         MusicDetail musicDetail = musicDetailByIds.getFirst();
         musicDetail.setPusherInfo(pusherInfo);
-        musicQueue.add(musicDetail);
+        musicQueue.add(musicDetail.randomQueueUniqueIDCopy());
         serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
                 new RefreshMusicQueueMessage(musicQueue));
         updateContinuable(true);
     }
 
-    public void removeMusicDetailFromQueue(int index, long id, UUID playerUUID) {
-        ArrayList<MusicDetail> list = new ArrayList<>(musicQueue);
-        try {
-            MusicDetail musicDetail = list.get(index);
-            try {
-                if (musicDetail.getId() == id) {
-                    try {
-                        removeMusicInternal(index, musicDetail, playerUUID);
-                    } catch (IllegalAccessException ignored) {
-                        tryPreviousOne(index, id, playerUUID, list);
-                    }
+    public void removeMusicDetailFromQueue(int index, long id, UUID queueUniqueID, UUID playerUUID) {
+        for (MusicDetail musicDetail : musicQueue) {
+            if (musicDetail.getId() == id && musicDetail.getQueueUniqueID().equals(queueUniqueID)) {
+                if (musicDetail.getPusherInfo().getPlayerUUID().equals(playerUUID)) {
+                    musicQueue.remove(musicDetail);
+                    serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
+                            new RefreshMusicQueueMessage(musicQueue));
                 } else {
-                    tryPreviousOne(index, id, playerUUID, list);
+                    logger.warn("Player {} tried to remove music {} (id: {}) not pushed by them", playerUUID, musicDetail.getName(), id);
                 }
-            } catch (RuntimeException e) {
-                trySimplyRemove(musicDetail, playerUUID);
+                return;
             }
-        } catch (IndexOutOfBoundsException ignored) {
-            logger.warn("Failed to remove music from queue as index out of bounds");
         }
-    }
-
-    @SneakyThrows
-    private void tryPreviousOne(int index, long id, UUID playerUUID, ArrayList<MusicDetail> list) {
-        if (index > 1) {//in case the queue just pulled
-            MusicDetail musicDetail1 = list.get(index - 1);
-            if (musicDetail1.getId() == id) {
-                removeMusicInternal(index - 1, musicDetail1, playerUUID);
-            } else {
-                throw new RuntimeException("failed to remove music from queue");
-            }
-        } else {
-            throw new RuntimeException("failed to remove music from queue");
-        }
-    }
-
-    private void removeMusicInternal(int index, MusicDetail musicDetail, UUID playerUUID) throws IllegalAccessException {
-        if (musicDetail.getPusherInfo().getPlayerUUID().equals(playerUUID)) {
-            AtomicInteger index1 = new AtomicInteger(0);
-            musicQueue.removeIf(musicDetail1 -> index == index1.getAndIncrement() && musicDetail.equals(musicDetail1));
-            serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
-                    new RefreshMusicQueueMessage(musicQueue));
-        } else {
-            throw new IllegalAccessException();
-        }
-    }
-
-    private void trySimplyRemove(MusicDetail musicDetail, UUID playerUUID) {
-        if (musicDetail.getPusherInfo().getPlayerUUID().equals(playerUUID)) {
-            musicQueue.remove(musicDetail);
-            serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
-                    new RefreshMusicQueueMessage(musicQueue));
-        }
+        logger.warn("Failed to remove music from queue: id {} with queue unique id {} not found", id, queueUniqueID);
     }
 
     public void addIdlePlaySource(long id, Class<?> type, PusherInfo pusherInfo) {

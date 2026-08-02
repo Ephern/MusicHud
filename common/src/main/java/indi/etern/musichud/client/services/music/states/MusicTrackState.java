@@ -101,7 +101,9 @@ public class MusicTrackState implements IMusicTrackState {
 
         @Override
         public CompletableFuture<Boolean> isContained() {
-            return loadPlaylist().thenApply(playlist1 -> playlist1.getMusicDetails().contains(musicDetail));
+            return loadPlaylist().thenApply(playlist1 ->
+                    playlist1.getMusicDetails().stream().anyMatch(i -> i.getId() == musicDetail.getId())
+            );
         }
 
         @Override

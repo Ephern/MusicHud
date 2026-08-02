@@ -36,7 +36,6 @@ import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -192,53 +191,49 @@ public class MusicService implements IClientMusicService {
 
     @Override
     public synchronized void refreshQueue(Queue<MusicDetail> queue) {
-        Iterator<MusicDetail> originalIterator = musicQueue.iterator();
-        Iterator<MusicDetail> newIterator = queue.iterator();
-        int index = 0;
-        while (originalIterator.hasNext() || newIterator.hasNext()) {
-            if (originalIterator.hasNext() && newIterator.hasNext()) {
-                MusicDetail original = originalIterator.next();
-                MusicDetail news = newIterator.next();
-                if (original.getId() != news.getId()) {
-                    AtomicInteger atomicInt = new AtomicInteger(0);
-                    int finalIndex = index;
-                    musicQueue.removeIf((musicDetail) -> {
-                        int i = atomicInt.getAndIncrement();
-                        boolean remove = i == finalIndex && musicDetail.equals(original);
-                        if (remove) {
-                            musicQueueRemoveListeners.forEach(l -> {
-                                l.accept(i, musicDetail);
-                            });
-                        }
-                        return remove;
-                    });
-                }
-            } else if (newIterator.hasNext()) {
-                MusicDetail addedMusicDetail = newIterator.next();
-                musicQueue.add(addedMusicDetail);
-                musicQueuePushListeners.forEach(l -> {
-                    l.accept(addedMusicDetail);
-                });
+        List<MusicDetail> local = new ArrayList<>(musicQueue);
+        List<MusicDetail> fresh = new ArrayList<>(queue);
+        boolean useUniqueId = fresh.stream().anyMatch(md -> !MusicDetail.QUEUE_UNIQUE_ID_ZERO.equals(md.getQueueUniqueID()));
+        List<MusicDetail> toRemove = new ArrayList<>();
+        int i = 0, j = 0;
+        while (i < local.size() && j < fresh.size()) {
+            if (sameTrack(local.get(i), fresh.get(j), useUniqueId)) {
+                i++;
+                j++;
             } else {
-                AtomicInteger atomicInt = new AtomicInteger(0);
-                int finalIndex = index;
-                musicQueue.removeIf((removedMusicDetail) -> {
-                    int i = atomicInt.getAndIncrement();
-                    boolean remove = i >= finalIndex;
-                    if (remove) {
-                        musicQueueRemoveListeners.forEach(l -> {
-                            l.accept(i, removedMusicDetail);
-                        });
-                    }
-                    return remove;
-                });
-                break;
+                // relative order is preserved, so local[i] must have been removed
+                toRemove.add(local.get(i));
+                i++;
             }
-            index++;
         }
-        musicQueueRefreshListeners.forEach(l -> {
-            l.accept(queue);
-        });
+        while (i < local.size()) {
+            toRemove.add(local.get(i++));
+        }
+        for (int k = toRemove.size() - 1; k >= 0; k--) {
+            MusicDetail removed = toRemove.get(k);
+            int index = 0;
+            for (MusicDetail md : musicQueue) {
+                if (md == removed) {
+                    break;
+                }
+                index++;
+            }
+            musicQueue.remove(removed);
+            int finalIndex = index;
+            musicQueueRemoveListeners.forEach(l -> l.accept(finalIndex, removed));
+        }
+        for (; j < fresh.size(); j++) {
+            MusicDetail added = fresh.get(j);
+            musicQueue.add(added);
+            musicQueuePushListeners.forEach(l -> l.accept(added));
+        }
+        musicQueueRefreshListeners.forEach(l -> l.accept(queue));
+    }
+
+    private static boolean sameTrack(MusicDetail a, MusicDetail b, boolean useUniqueId) {
+        return useUniqueId
+                ? a.getQueueUniqueID().equals(b.getQueueUniqueID())
+                : a.getId() == b.getId();
     }
 
     @Override
@@ -248,7 +243,7 @@ public class MusicService implements IClientMusicService {
 
     @Override
     public void sendRemoveMusicFromQueue(int index, MusicDetail musicDetail) {
-        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(index, musicDetail.getId()));
+        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(index, musicDetail.getId(), musicDetail.getQueueUniqueID()));
     }
 
     @Override

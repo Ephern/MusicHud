@@ -142,6 +142,7 @@ public class MusicListItem extends LinearLayout {
         if (Objects.equals(this.musicDetail,musicDetail)) {
             return;
         }
+        setTag(musicDetail.getId() + "/" + musicDetail.getQueueUniqueID().toString());
         this.musicDetail = musicDetail;
         albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(dp(imageSize)));
 
