@@ -42,10 +42,10 @@ public final class IdlePlaySource {
         if (musicCollection == null) {
             if (type.equals(Album.class)) {
                 dataLoaded = true;
-                musicCollection = IMusicApiService.getInstance(ApiProvider.NCM).getAlbumInfoDetail(id, playerUUID);
+                musicCollection = IMusicApiService.getInstance(ApiProvider.NCM).getAlbumInfoDetail(id, true, playerUUID);
             } else if (type.equals(Playlist.class)) {
                 dataLoaded = true;
-                musicCollection = IMusicApiService.getInstance(ApiProvider.NCM).getPlaylistDetail(id, playerUUID);
+                musicCollection = IMusicApiService.getInstance(ApiProvider.NCM).getPlaylistDetail(id, true, playerUUID);
             }
         }
     }

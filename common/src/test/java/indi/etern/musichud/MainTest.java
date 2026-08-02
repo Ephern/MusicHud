@@ -49,7 +49,7 @@ public class MainTest {
     @Test
     public void testPlaylistDetail() {
         LOGGER.info("test get playlist detail");
-        Playlist detailByIds = musicApiService.getPlaylistDetail(975427390, null);
+        Playlist detailByIds = musicApiService.getPlaylistDetail(975427390, true, null);
         LOGGER.info(JsonUtil.gson.toJson(detailByIds));
         RegistryFriendlyByteBuf buf = new RegistryFriendlyByteBuf(Unpooled.buffer(), RegistryAccess.EMPTY);
         Playlist.CODEC.encode(buf, detailByIds);

@@ -170,7 +170,7 @@ public class ClientConfigDefinition implements ClientConfig {
         autoConnectWhiteList = builder
                 .comment("Auto connecting servers white list")
                 .translation(MusicHud.MOD_ID + ".config.autoConnectWhiteList")
-                .define("autoConnectBlackList", "[]");
+                .define("autoConnectWhiteList", "[]");
         instance = this;
     }
 

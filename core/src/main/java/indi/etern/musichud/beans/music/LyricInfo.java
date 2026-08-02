@@ -13,14 +13,10 @@ import java.util.Objects;
 @EqualsAndHashCode
 public class LyricInfo {
     public static final ByteBufCodec<LyricInfo> CODEC = ByteBufCodec.composite(
-            Lyric.CODEC,
-            LyricInfo::getLyric,
-            Lyric.CODEC,
-            LyricInfo::getTranslatedLyric,
-            Lyric.CODEC,
-            LyricInfo::getWordByWordLyric,
-            Lyric.CODEC,
-            LyricInfo::getWordByWordTranslatedLyric,
+            Lyric.CODEC, LyricInfo::getLyric,
+            Lyric.CODEC, LyricInfo::getTranslatedLyric,
+            Lyric.CODEC, LyricInfo::getWordByWordLyric,
+            Lyric.CODEC, LyricInfo::getWordByWordTranslatedLyric,
             LyricInfo::new
     );
     public static final LyricInfo NONE = new LyricInfo();

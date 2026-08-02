@@ -14,8 +14,7 @@ import java.util.Objects;
 @EqualsAndHashCode
 public class Lyric {
     public static final ByteBufCodec<Lyric> CODEC = ByteBufCodec.composite(
-            Codecs.STRING_UTF8,
-            Lyric::getLyric,
+            Codecs.STRING_UTF8, Lyric::getLyric,
             Lyric::new
     );
     public static final Lyric NONE = new Lyric("");

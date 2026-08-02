@@ -6,7 +6,6 @@ import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
-import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
@@ -14,11 +13,12 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.stream.Collectors;
@@ -44,16 +44,14 @@ public class ArtistDetailView extends LinearLayout {
         LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
         topBar.setLayoutParams(params);
 
-        Button backButton = new Button(context);
-        String s = I18n.get(MusicHud.MOD_ID + ".button.back");
-        SpannableString spannableString = new SpannableString(s);
+        ImageButton backButton = new ImageButton(context);
+        String tooltipText = I18n.get(MusicHud.MOD_ID + ".button.back");
         Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
         if (image != null) {
-            ImageSpan span = ImageUtils.getIconSpan(image);
-            spannableString.setSpan(span, 0, s.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), image, dp(16), dp(16)));
         }
-        backButton.setText(spannableString);
-        backButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        backButton.setTooltipText(tooltipText);
         backButton.setOnClickListener(view -> {
             RouterContainer.getInstance().popNavigate();
             backButton.setOnClickListener(null);
@@ -90,13 +88,13 @@ public class ArtistDetailView extends LinearLayout {
         name.setLayoutParams(nameParams);
         texts.addView(name);
 
-        TextView briefInfo = new TextView(context);
-        briefInfo.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        briefInfo.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        TextView productionCounts = new TextView(context);
+        productionCounts.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        productionCounts.setTextColor(Theme.NORMAL_TEXT_COLOR);
         LayoutParams infoParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         infoParams.setMargins(0, 0, 0, dp(4));
-        briefInfo.setLayoutParams(infoParams);
-        texts.addView(briefInfo);
+        productionCounts.setLayoutParams(infoParams);
+        texts.addView(productionCounts);
 
         ScrollView descriptionScrollView = new ScrollView(context);
         LayoutParams scrollParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -170,9 +168,38 @@ public class ArtistDetailView extends LinearLayout {
             if (artist1 != null) {
                 ArtistDetailView.this.artist = artist1;
                 MuiModApi.postToUiThread(() -> {
-                    briefInfo.setText(
-                            I18n.get(MusicHud.MOD_ID + ".text.artist.album").replace("{}", String.valueOf(artist1.getAlbumCount()))
-                                    + "  |  " + I18n.get(MusicHud.MOD_ID + ".text.artist.music").replace("{}", String.valueOf(artist1.getMusicCount())));
+                    int musicCount = artist.getMusicCount();
+                    String albumIcon = "\uD83D\uDDB8";
+                    String musicIcon = "♫";
+                    boolean showMusicCount = musicCount > 0;
+                    int albumCount = artist.getAlbumCount();
+                    boolean showAlbumCount = albumCount > 0;
+                    String string = albumIcon + " " + albumCount + (showMusicCount ? ("  " + musicIcon + " " + musicCount) : "");
+                    SpannableString countsString = new SpannableString(string);
+
+                    if (showAlbumCount) {
+                        Image albumIconImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/disc_album.png");
+                        if (albumIconImage != null) {
+                            int start = string.indexOf(albumIcon);
+                            if (start >= 0) {
+                                countsString.setSpan(ImageUtils.getIconSpan(albumIconImage), start, start + albumIcon.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            }
+                        }
+                    }
+                    if (showMusicCount) {
+                        Image listIconImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_music.png");
+                        if (listIconImage != null) {
+                            int start = string.indexOf(musicIcon);
+                            if (start >= 0) {
+                                countsString.setSpan(ImageUtils.getIconSpan(listIconImage), start, start + musicIcon.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                            }
+                        }
+                    }
+                    if (showAlbumCount || showMusicCount) {
+                        productionCounts.setText(countsString);
+                    } else {
+                        productionCounts.setVisibility(GONE);
+                    }
                     description.setText(artist1.getDescription());
                     avatarImageView.loadUrl(artist1.getAvatarThumbnailUrl(dp(128)));
                     removeView(progressBar);

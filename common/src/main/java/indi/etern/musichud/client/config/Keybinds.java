@@ -8,7 +8,7 @@ import icyllis.modernui.text.style.ImageSpan;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.interfaces.IKeyRegistryService;
 import indi.etern.musichud.client.services.LoginService;
-import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;

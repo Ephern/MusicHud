@@ -2,14 +2,17 @@ package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.state.IMusicTrackState;
+import indi.etern.musichud.beans.state.IIdlePlaySourceState;
+import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 
 import java.time.ZonedDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Queue;
+import java.util.*;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.function.Supplier;
 
 public interface IClientMusicService {
@@ -28,15 +31,17 @@ public interface IClientMusicService {
         throw new UnsupportedOperationException();
     }
 
-    CompletableFuture<? extends MusicCollection> loadIdlePlaySource(Class<?> type, long id);
+    interface IUserCollections {
+        UserCategoryPlaylists getUserCategoryPlaylists();
+        ObservableSequencedSet<Album> getSubscribedAlbums();
+        ObservableSequencedSet<Artist> getSubscribedArtists();
+    }
+
+    IIdlePlaySourceState getIdlePlaySourceState();
 
     CompletableFuture<Playlist> loadPlaylistDetail(long id, boolean ignoreCache);
 
     CompletableFuture<Album> loadAlbumDetail(long id, boolean ignoreCache);
-
-    void addToIdlePlaySource(MusicCollection idlePlaySourceCollection);
-
-    void removeFromIdlePlaySource(MusicCollection collection);
 
     void refreshQueue(Queue<MusicDetail> queue);
 
@@ -44,16 +49,9 @@ public interface IClientMusicService {
 
     void sendRemoveMusicFromQueue(int index, MusicDetail musicDetail);
 
-    /**
-     * If a SyncCurrentPlayingMessage has already been processed for this connection,
-     * do nothing (the state is already correct). Otherwise, reset all state to NONE.
-     * Must be called from EXECUTOR (same threading context as switchMusic) for correct ordering.
-     */
-    boolean checkAndResetInitialSync();
-
     void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message);
 
-    CompletableFuture<Artist> loadArtist(long id);
+    CompletableFuture<Artist> loadArtist(long id, boolean ignoreCache);
 
     CompletableFuture<List<MusicDetail>> loadArtistMusic(long id, int offset);
 
@@ -61,43 +59,35 @@ public interface IClientMusicService {
 
     void keyBindsVoteSkipCurrent();
 
-    void updateAllIdlePlaySources(List<Playlist> playlistSources, List<Album> albumSources);
+    CompletableFuture<UserCategoryPlaylists> loadUserPlaylists(boolean ignoreCache);
 
-    CompletableFuture<List<Playlist>> loadUserPlaylists();
+    CompletableFuture<LinkedHashSet<Album>> loadUserAlbums(boolean ignoreCache);
 
-    CompletableFuture<List<Album>> loadUserAlbums();
-
-    CompletableFuture<List<Artist>> loadUserArtists();
+    CompletableFuture<LinkedHashSet<Artist>> loadUserArtists(boolean ignoreCache);
 
     CompletableFuture<Artist> loadArtistDetailAsync(Artist artist);
 
-    CompletableFuture<List<MusicDetail>> loadMoreMusicOfArtist(Artist artist);
+    CompletableFuture<Collection<MusicDetail>> loadMoreMusicOfArtist(Artist artist);
 
-    CompletionStage<Collection<MusicDetail>> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache);
-
-    java.util.Set<MusicCollection> getLocalIdlePlaySources();
-
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getLocalIdlePlaySourceAddListeners();
-
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getLocalIdlePlaySourceRemoveListeners();
-
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getLocalIdlePlaySourceChangeListeners();
-
-    java.util.Set<MusicCollection> getServerIdlePlaySources();
-
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getServerIdlePlaySourceAddListeners();
-
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getServerIdlePlaySourceRemoveListeners();
-
-    java.util.Set<java.util.function.Consumer<MusicCollection>> getServerIdlePlaySourceChangeListeners();
+    CompletableFuture<loadMusicCollectionMoreDataResult> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache);
 
     Queue<MusicDetail> getMusicQueue();
 
-    java.util.Set<java.util.function.Consumer<Queue<MusicDetail>>> getMusicQueueRefreshListeners();
+    Set<Consumer<Queue<MusicDetail>>> getMusicQueueRefreshListeners();
 
-    java.util.Set<java.util.function.Consumer<MusicDetail>> getMusicQueuePushListeners();
+    Set<Consumer<MusicDetail>> getMusicQueuePushListeners();
 
-    java.util.Set<java.util.function.BiConsumer<Integer, MusicDetail>> getMusicQueueRemoveListeners();
+    Set<BiConsumer<Integer, MusicDetail>> getMusicQueueRemoveListeners();
 
-    boolean isIdlePlaySourceLoaded();
+    IMusicTrackState getMusicTrackState(MusicDetail musicDetail);
+
+    ISubscribeState<Playlist> getPlaylistSubscribeState(Playlist musicDetail);
+
+    ISubscribeState<Album> getAlbumSubscribeState(Album musicDetail);
+
+    ISubscribeState<Artist> getArtistSubscribedState(Artist musicDetail);
+
+    CompletableFuture<? extends IUserCollections> loadUserCollections(boolean ignoreCache);
+
+    record loadMusicCollectionMoreDataResult(MusicCollection musicCollection, Collection<MusicDetail> musicDetails) {}
 }

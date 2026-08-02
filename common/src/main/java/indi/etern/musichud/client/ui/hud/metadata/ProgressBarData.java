@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.hud.metadata;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
-import indi.etern.musichud.client.ui.utils.UniformDataUtils;
+import indi.etern.musichud.client.ui.utils.ui.UniformDataUtils;
 import lombok.Getter;
 import lombok.Setter;
 
