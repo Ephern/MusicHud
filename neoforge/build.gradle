@@ -102,7 +102,6 @@ shadowJar {
     configurations = [project.configurations.shadowBundle]
     archiveClassifier = 'dev-shadow'
     exclude 'org/slf4j/**'
-    append 'META-INF/musichud-registries.properties'
 }
 
 remapJar {
