@@ -4,89 +4,41 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.Register;
 import indi.etern.musichud.platform.Environment;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.net.URL;
+import java.nio.charset.StandardCharsets;
+import java.util.*;
 
 public class RegistrationManager {
-    private static final String[] CLIENT_REGISTRIES = new String[]{
-            "indi.etern.musichud.client.config.Keybinds",
-            "indi.etern.musichud.client.services.LoginService$RegisterImpl",
-            "indi.etern.musichud.client.services.MusicService$RegisterImpl"
-    };
-
-    private static final String[] SERVER_REGISTRIES = new String[]{
-            "indi.etern.musichud.server.api.ILoginApiService$Register",
-            "indi.etern.musichud.server.api.MusicPlayerServerService$Register",
-            "indi.etern.musichud.server.api.ApiServerManager",
-    };
-
-    private static final String[] COMMON_REGISTRIES = new String[]{
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetPlaylistDetailRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetPlaylistDetailResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserPlaylistRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserPlaylistResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserAlbumsRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserAlbumsResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserArtistsRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetUserArtistsResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.SearchRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.SearchAlbumsResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.SearchArtistsResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.SearchMusicResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.SearchPlaylistsResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.ConnectResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.CancelQRLoginRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.AnonymousLoginRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.CookieLoginRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetAlbumDetailRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetAlbumDetailResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetArtistDetailRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetArtistDetailResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetArtistMoreMusicRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetArtistMoreMusicResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.PhoneCodeLoginRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.PhonePasswordLoginRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.EmailPasswordLoginRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeRequest$RegisterImpl",
-            "indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeResponse$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.s2c.RefreshMusicQueueMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.s2c.SwitchMusicMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.s2c.SyncCurrentPlayingMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.s2c.UpdateAllIdlePlaySourcesMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.c2s.AddToIdlePlaySourceMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.c2s.RemoveFromIdlePlaySourceMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.c2s.ClientPushMusicToQueueMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.c2s.ClientRemoveMusicFromQueueMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.c2s.LogoutMessage$RegisterImpl",
-            "indi.etern.musichud.network.payloads.pushMessages.c2s.VoteSkipCurrentMusicMessage$RegisterImpl"
-    };
+    private static final String REGISTRIES_RESOURCE = "META-INF/musichud-registries.properties";
 
     private static final Set<Class<?>> registeredSet = new HashSet<>();
 
     public static void performCommonAutoRegistration() {
-        MusicHud.LOGGER.info("Starting explicit auto-registration for common");
-        registerClassesFromList(COMMON_REGISTRIES, "common");
+        MusicHud.LOGGER.info("Starting auto-registration for common");
+        registerFromResources("COMMON");
     }
 
     public static void performSideAutoRegistration() {
         Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
-        MusicHud.LOGGER.info("Starting explicit auto-registration in environment: {}", side.name());
+        MusicHud.LOGGER.info("Starting auto-registration in environment: {}", side.name());
 
-        // 根据环境注册特定接口
         if (side == Environment.Side.CLIENT) {
-            registerClassesFromList(CLIENT_REGISTRIES, "client");
+            registerFromResources("CLIENT");
         }
-        registerClassesFromList(SERVER_REGISTRIES, "server");
+        registerFromResources("SERVER");
     }
 
-    private static void registerClassesFromList(String[] classNames, String typeName) {
-        MusicHud.LOGGER.info("Registering {} {} registries", classNames.length, typeName);
+    private static void registerFromResources(String category) {
+        List<String> classNames = loadClassNames(category);
+        if (classNames.isEmpty()) {
+            MusicHud.LOGGER.warn("No {} registries found in resources", category);
+            return;
+        }
+
+        MusicHud.LOGGER.info("Registering {} {} registries from resources", classNames.size(), category);
         for (String className : classNames) {
             try {
                 Class<?> clazz = Class.forName(className);
@@ -108,5 +60,33 @@ public class RegistrationManager {
             }
         }
     }
-}
 
+    private static List<String> loadClassNames(String category) {
+        List<String> classNames = new ArrayList<>();
+        try {
+            Enumeration<URL> resources = RegistrationManager.class.getClassLoader()
+                    .getResources(REGISTRIES_RESOURCE);
+            while (resources.hasMoreElements()) {
+                URL url = resources.nextElement();
+                try (BufferedReader reader = new BufferedReader(
+                        new InputStreamReader(url.openStream(), StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        line = line.trim();
+                        if (line.isEmpty() || line.startsWith("#")) continue;
+                        int eqIdx = line.indexOf('=');
+                        if (eqIdx <= 0) continue;
+                        String lineCategory = line.substring(0, eqIdx);
+                        String className = line.substring(eqIdx + 1);
+                        if (category.equals(lineCategory)) {
+                            classNames.add(className);
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            MusicHud.LOGGER.error("Failed to load registries resource", e);
+        }
+        return classNames;
+    }
+}

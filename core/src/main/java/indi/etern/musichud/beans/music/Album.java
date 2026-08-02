@@ -6,26 +6,24 @@ import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import lombok.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.SequencedSet;
+import java.util.Set;
 
 @AllArgsConstructor(access = AccessLevel.PUBLIC)
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Album implements MusicCollection{
     public static final ByteBufCodec<Album> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
-            Album::getId,
-            Codecs.STRING_UTF8,
-            Album::getName,
-            Codecs.STRING_UTF8,
-            Album::getPicUrl,
-            Codecs.ofList(() -> MusicDetail.CODEC),
-            Album::getMusicDetails,
-            Codecs.ofList(() -> Artist.CODEC),
-            Album::getArtists,
-            PusherInfo.CODEC,
-            Album::getPusherInfo,
+            Codecs.LONG, Album::getId,
+            Codecs.STRING_UTF8, Album::getName,
+            Codecs.STRING_UTF8, Album::getPicUrl,
+            Codecs.STRING_UTF8, Album::getType,
+            Codecs.STRING_UTF8, Album::getCompany,
+            Codecs.INT, Album::getMusicTrackCount,
+            Codecs.ofCollection(LinkedHashSet::new, () -> MusicDetail.CODEC), Album::getMusicDetails,
+            Codecs.ofCollection(LinkedHashSet::new, () -> Artist.CODEC), Album::getArtists,
+            PusherInfo.CODEC, Album::getPusherInfo,
             Album::new
     );
     public static final Album NONE = new Album();
@@ -33,11 +31,15 @@ public class Album implements MusicCollection{
     long id;
     String name = "";
     String picUrl = "";
+    String type = "";
+    String company = "";
+    @SerializedName("size")
+    @Getter
+    int musicTrackCount;
     @SerializedName("songs")
     @Setter
-    List<MusicDetail> musicDetails = new ArrayList<>();
-    List<Artist> artists = new ArrayList<>();
-
+    SequencedSet<MusicDetail> musicDetails = new LinkedHashSet<>();
+    SequencedSet<Artist> artists = new LinkedHashSet<>();
     // Not contained in the original API response, set separately
     @Getter
     transient PusherInfo pusherInfo = PusherInfo.EMPTY;
@@ -58,11 +60,21 @@ public class Album implements MusicCollection{
     public String getPicUrl() {
         return Objects.requireNonNullElse(picUrl, "");
     }
+    public String getType() {
+        return Objects.requireNonNullElse(type, "");
+    }
+
+    public String getCompany() {
+        return Objects.requireNonNullElse(company, "");
+    }
 
     @Override
-    public List<MusicDetail> getMusicDetails() {
-        List<MusicDetail> musicDetails = Objects.requireNonNullElse(this.musicDetails, new ArrayList<>());
-        return musicDetails.stream().filter(Objects::nonNull).toList();
+    public SequencedSet<MusicDetail> getMusicDetails() {
+        if (musicDetails == null || musicDetails.isEmpty()) {
+            return new LinkedHashSet<>(0);
+        }
+        return musicDetails.stream().filter(Objects::nonNull)
+                .collect(LinkedHashSet::new, Set::add, LinkedHashSet::addAll);
     }
 
     @Override
@@ -70,8 +82,8 @@ public class Album implements MusicCollection{
         return getThumbnailPicUrl(size);
     }
 
-    public List<Artist> getArtists() {
-        return Objects.requireNonNullElse(artists, new ArrayList<>());
+    public SequencedSet<Artist> getArtists() {
+        return Objects.requireNonNullElse(artists, new LinkedHashSet<>());
     }
 
     public Album shallowCopyBriefInfo() {
@@ -79,6 +91,9 @@ public class Album implements MusicCollection{
         album.id = this.id;
         album.name = this.name;
         album.picUrl = this.picUrl;
+        album.musicTrackCount = this.musicTrackCount;
+        album.company = this.company;
+        album.type = this.type;
         return album;
     }
 

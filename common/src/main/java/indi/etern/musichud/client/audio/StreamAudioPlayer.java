@@ -6,10 +6,10 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.audio.decoder.*;
-import indi.etern.musichud.client.services.MusicService;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
 import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceResponse;
 import lombok.Getter;
@@ -20,8 +20,8 @@ import net.minecraft.sounds.SoundSource;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.AL;
+import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.SOFTDirectChannels;
 
 import java.io.BufferedInputStream;
@@ -60,7 +60,6 @@ public class StreamAudioPlayer {
     private MusicDetail currentMusicDetail;
     private AudioDecoder currentDecoder;
     private long playedBytes = 0;
-    //    private boolean isBuffering = false;
     private volatile ZonedDateTime serverStartTime;
     private Future<?> downloadThreadFuture;
     private Future<?> playThreadFuture;
@@ -151,10 +150,10 @@ public class StreamAudioPlayer {
     }
 
     public CompletableFuture<ZonedDateTime> playAsync(MusicDetail musicDetail, ZonedDateTime startTime) {
-        synchronized (StreamAudioPlayer.class) {
+//        synchronized (StreamAudioPlayer.class) {
             stopInternal();
             return playAsyncInternal(musicDetail, startTime);
-        }
+//        }
     }
 
     private @NotNull CompletableFuture<ZonedDateTime> playAsyncInternal(MusicDetail musicDetail, ZonedDateTime startTime) {
@@ -248,7 +247,7 @@ public class StreamAudioPlayer {
                 }
                 fullyRetryCurrent(startPlayingFuture);
             } else {
-                synchronized (StreamAudioPlayer.class) {
+//                synchronized (StreamAudioPlayer.class) {
                     if (!initialized.get() || source == 0) {
                         startPlayingFuture.completeExceptionally(new IllegalStateException("Audio player not initialized"));
                         finished = true;
@@ -278,12 +277,12 @@ public class StreamAudioPlayer {
                         checkALError("alSourcePlay-Pre");
                     }
 
-                }
+//                }
                 if (!finished) {// 主播放循环
                     this.serverStartTime = Objects.requireNonNullElseGet(serverStartTime, ZonedDateTime::now);
                     while (currentPlayingFuture != null && !currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture) {
                         try {
-                            synchronized (StreamAudioPlayer.class) {
+//                            synchronized (StreamAudioPlayer.class) {
                                 updateVolumeIfNecessary();
                                 if (!initialized.get() || source == 0) break;
 
@@ -344,7 +343,7 @@ public class StreamAudioPlayer {
                                     AL10.alSourcePlay(source);
                                     checkALError("alSourcePlay-Main");
                                 }
-                            }
+//                            }
                             Thread.sleep(40);
                         } catch (InterruptedException e) {
                             break;
@@ -447,6 +446,8 @@ public class StreamAudioPlayer {
                 if (e instanceof SocketException e1 && e1.getMessage().equals("Closed by interrupt")) break;
                 LOGGER.error("Download error (attempt {})\n{} : {}", localRetryCount + 1, e.getClass().getSimpleName(), e.getMessage());
 
+                localAudioBuffer.clear();
+                totalBufferedBytes.set(0);
                 playedBytes = 0;
                 forceSyncInternal = true;
                 localRetryCount++;
@@ -580,7 +581,7 @@ public class StreamAudioPlayer {
     }
 
     private void cleanup() {
-        synchronized (StreamAudioPlayer.class) {
+//        synchronized (StreamAudioPlayer.class) {
             try {
                 // 停止播放并清除源相关资源
                 if (source != 0 && AL10.alIsSource(source)) {
@@ -667,22 +668,24 @@ public class StreamAudioPlayer {
                 // 确保 OpenAL 错误状态被清除，防止污染
                 AL10.alGetError();
             }
-        }
+//        }
     }
 
     public CompletableFuture<MusicResourceInfo> getCurrentMusicResourceInfo(Quality quality, MusicResourceInfo previous) {
-        CompletableFuture<MusicResourceInfo> future = new CompletableFuture<>();
-        GetMusicResourceResponse.setReceiver(currentMusicDetail.getId(), value -> {
-            if (value == MusicResourceInfo.NONE) {
-                MusicService.getInstance().switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
-                setStatus(Status.ERROR);
-            } else {
-                future.complete(value);
-            }
-        });
         String url = previous == null || previous.getUrl() == null ? "" : previous.getUrl();
-        IClientNetworkService.getInstance().sendToServer(new GetMusicResourceRequest(currentMusicDetail.getId(), quality, url));
-        return future;
+        return RequestResponseManager.send(
+                        new GetMusicResourceRequest(currentMusicDetail.getId(), quality, url),
+                        GetMusicResourceResponse.class,
+                        Duration.ofSeconds(10))
+                .thenApply(GetMusicResourceResponse::getMusicResourceInfo)
+                .thenCompose(value -> {
+                    if (value == MusicResourceInfo.NONE) {
+                        MusicService.getInstance().switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
+                        setStatus(Status.ERROR);
+                        return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
+                    }
+                    return CompletableFuture.completedFuture(value);
+                });
     }
 
     public enum Status {

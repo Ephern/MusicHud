@@ -7,7 +7,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.server.api.UrlMeta;
-import indi.etern.musichud.server.api.impl.ncm.ServerApiMeta;
+import indi.etern.musichud.server.api.impl.ncm.ApiServerEndpointsMeta;
 import indi.etern.musichud.throwable.ApiException;
 import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.JsonUtil;
@@ -51,12 +51,12 @@ public class ApiClient {
 
     public static boolean checkAvailable() {
         try {
-            var response = post(ServerApiMeta.API_SERVER_VERSION, null, null, false);
+            var response = post(ApiServerEndpointsMeta.API_SERVER_VERSION, null, null, false);
             version = response.data.version;
             return true;
         } catch (Exception e) {
             try {
-                String response = get(ServerApiMeta.BASE, null, false);
+                String response = get(ApiServerEndpointsMeta.BASE, null, false);
                 if (response.contains("NCM API Rust Server")) {// especially adapt to ncm-api-rs due to /inner/version won't work on it
                     version = "ncm-rs-api";
                     return true;
@@ -96,8 +96,10 @@ public class ApiClient {
                         } else {
                             jsonObject.addProperty("noCookie", true);
                         }
+                        String payloadString = payload.toString();
+                        LOGGER.debug("POST \"{}\" with payload: \"{}\"", urlMeta.toURI().toString(), payloadString);
                         requestBuilder.POST(HttpRequest.BodyPublishers.ofString(
-                                        payload.toString(),
+                                        payloadString,
                                         StandardCharsets.UTF_8
                                 )
                         );
@@ -111,6 +113,7 @@ public class ApiClient {
                             requestBuilder.header("Cookie", cleanCookie);
                         }
                     }
+                    LOGGER.debug("POST \"{}\" without payload", urlMeta.toURI().toString());
                     requestBuilder.POST(HttpRequest.BodyPublishers.noBody());
                 }
                 HttpRequest request = requestBuilder
@@ -173,6 +176,7 @@ public class ApiClient {
                         requestBuilder.header("Cookie", cleanCookie);
                     }
                 }
+                LOGGER.debug("GET \"{}\" without payload", urlMeta.toURI().toString());
                 HttpRequest request = requestBuilder
                         .GET()
                         .build();

@@ -14,12 +14,9 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
     private static final Logger logger = MusicHud.getLogger(LoginCookieInfo.class);
     public static final ByteBufCodec<LoginCookieInfo> STREAM_CODEC =
             ByteBufCodec.composite(
-                    LoginType.PACKET_CODEC,
-                    LoginCookieInfo::type,
-                    Codecs.STRING_UTF8,
-                    LoginCookieInfo::rawCookie,
-                    Codecs.ZONED_DATE_TIME,
-                    LoginCookieInfo::generateTime,
+                    LoginType.PACKET_CODEC, LoginCookieInfo::type,
+                    Codecs.STRING_UTF8, LoginCookieInfo::rawCookie,
+                    Codecs.ZONED_DATE_TIME, LoginCookieInfo::generateTime,
                     LoginCookieInfo::new
             );
     public static final LoginCookieInfo UNLOGGED = new LoginCookieInfo(

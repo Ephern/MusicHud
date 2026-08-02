@@ -4,7 +4,6 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage;
-import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse;
 import indi.etern.musichud.platform.Environment;
 
 import java.util.List;
@@ -35,8 +34,6 @@ public interface IClientLoginService {
 
     void connectAsPrevious();
 
-    void connectToExternalServer();
-
     void loginToServer(ConnectionType type);
 
     void logout();
@@ -53,11 +50,7 @@ public interface IClientLoginService {
 
     List<Consumer<LoginCookieInfo>> getLoginCompleteListeners();
 
-    NetworkReceiver<StartQRLoginResponse> getQrLoginResponseReceiver();
-
     ConnectionType getConnectionType();
 
     NetworkReceiver<LoginResultMessage> getLoginResultReceiver();
-
-    void setLoginResponseHandler(Consumer<StartQRLoginResponse> loginResponseHandler);
 }

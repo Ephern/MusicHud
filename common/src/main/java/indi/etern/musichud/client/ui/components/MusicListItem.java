@@ -1,7 +1,6 @@
 package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
@@ -11,9 +10,10 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.PusherInfo;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -43,6 +43,11 @@ public class MusicListItem extends LinearLayout {
     @Getter
     private MusicDetail musicDetail;
     private PlayerHeadView pusherHeadView;
+    private ToggleTrackLikeStateButton likeButton;
+    private static final MusicService musicService = MusicService.getInstance();
+    @Getter
+    private LinearLayout buttonsLayout;
+    private ModifyPlaylistTrackModalButton addToPlaylistButton;
 
     public MusicListItem(Context context) {
         super(context);
@@ -112,6 +117,25 @@ public class MusicListItem extends LinearLayout {
         pusherRow.addView(pusherText, params5);
 
         linearLayout.addView(pusherRow, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+        buttonsLayout = new LinearLayout(context);
+        buttonsLayout.setOrientation(HORIZONTAL);
+        buttonsLayout.setGravity(Gravity.CENTER_VERTICAL);
+        LayoutParams buttonsLayoutParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0);
+        buttonsLayoutParams.setMargins(0, 0, dp(10), 0);
+        addView(buttonsLayout, buttonsLayoutParams);
+
+        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                .inset(dp(2))
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .cornerRadius(dp(4)).build();
+        addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
+        addToPlaylistButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
+
+        likeButton = new ToggleTrackLikeStateButton(context);
+        likeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
     }
 
     public void bindData(MusicDetail musicDetail) {
@@ -126,6 +150,11 @@ public class MusicListItem extends LinearLayout {
         musicArtistAndAlbum.removeAllViews();
         int index = 0;
         Context context = getContext();
+        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                .inset(0)
+                .cornerRadius(dp(2))
+                .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
+                .build();
         for (Artist artist : musicDetail.getArtists()) {
             if (index != 0) {
                 TextView split = new TextView(context);
@@ -136,14 +165,7 @@ public class MusicListItem extends LinearLayout {
             }
             index++;
             Button artistButton = new Button(context);
-            Drawable background = ButtonInsetBackgroundFactory.builder()
-                    .inset(0)
-                    .cornerRadius(dp(2))
-                    .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
-                    .build().newBackgroundDrawable();
-            artistButton.setBackground(background);
-            artistButton.setFocusable(true);
-            artistButton.setClickable(true);
+            artistButton.setBackground(backgroundFactory.newBackgroundDrawable());
             artistButton.setTextColor(Theme.PRIMARY_COLOR);
             artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             artistButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
@@ -164,14 +186,7 @@ public class MusicListItem extends LinearLayout {
         split.setText(" - ");
         musicArtistAndAlbum.addView(split);
         Button albumButton = new Button(context);
-        Drawable background = ButtonInsetBackgroundFactory.builder()
-                .inset(0)
-                .cornerRadius(dp(2))
-                .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
-                .build().newBackgroundDrawable();
-        albumButton.setBackground(background);
-        albumButton.setFocusable(true);
-        albumButton.setClickable(true);
+        albumButton.setBackground(backgroundFactory.newBackgroundDrawable());
         albumButton.setTextColor(Theme.PRIMARY_COLOR);
         albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         albumButton.setText(musicDetail.getAlbum().getName());
@@ -212,5 +227,8 @@ public class MusicListItem extends LinearLayout {
             pusherHeadView.setVisibility(View.GONE);
             pusherHeadView.setPlayerSkinSupplier(null);
         }
+
+        addToPlaylistButton.bindMusicDetail(musicDetail);
+        likeButton.bindMusicList(musicService.getMusicTrackState(musicDetail).currentUsersLikeList());
     }
 }

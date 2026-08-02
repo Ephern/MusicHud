@@ -12,7 +12,6 @@ import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ILoginApiService;
-import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 
 import java.util.List;
@@ -51,7 +50,7 @@ public record ConnectRequest(Version clientVersion) implements C2SPayload {
                         IServerNetworkService.getInstance().sendToPlayer(player, response);
                         if (compatible) {
                             instance.joinUnlogged(player);
-                            MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(player);
+//                            MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(player);
                         }
                     })
             );
