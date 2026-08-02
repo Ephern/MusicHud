@@ -46,6 +46,7 @@ java {
 
 tasks.withType(JavaCompile).configureEach {
     it.options.release = 21
+    it.options.compilerArgs += ['-Amusichud.module=' + project.name]
 }
 
 test {

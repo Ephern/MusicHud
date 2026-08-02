@@ -83,6 +83,7 @@ configure(subprojects.findAll { it.name != 'core' && it.name != 'processor' }) {
 
     tasks.withType(JavaCompile).configureEach {
         it.options.release = 21
+        it.options.compilerArgs += ['-Amusichud.module=' + project.name]
     }
 
     tasks.withType(JavaExec).configureEach {

@@ -19,7 +19,7 @@ import java.util.*;
 @SupportedSourceVersion(SourceVersion.RELEASE_21)
 public class RegisterMarkProcessor extends AbstractProcessor {
 
-    private static final String REGISTRIES_RESOURCE = "META-INF/musichud-registries.properties";
+    private static final String REGISTRIES_RESOURCE_PREFIX = "META-INF/musichud-registries";
 
     private static final String CLIENT_REGISTER = "indi.etern.musichud.interfaces.ClientRegister";
     private static final String SERVER_REGISTER = "indi.etern.musichud.interfaces.ServerRegister";
@@ -27,6 +27,13 @@ public class RegisterMarkProcessor extends AbstractProcessor {
     private static final String REGISTER = "indi.etern.musichud.interfaces.Register";
 
     private final Map<String, List<String>> registries = new LinkedHashMap<>();
+    private String moduleName = "default";
+
+    @Override
+    public synchronized void init(ProcessingEnvironment processingEnv) {
+        super.init(processingEnv);
+        moduleName = processingEnv.getOptions().getOrDefault("musichud.module", "default");
+    }
 
     @Override
     public boolean process(Set<? extends TypeElement> annotations, RoundEnvironment roundEnv) {
@@ -108,11 +115,12 @@ public class RegisterMarkProcessor extends AbstractProcessor {
             return;
         }
 
+        String registriesResource = REGISTRIES_RESOURCE_PREFIX + "." + moduleName + ".properties";
         try {
             FileObject fileObject = processingEnv.getFiler().createResource(
                     StandardLocation.CLASS_OUTPUT,
                     "",
-                    REGISTRIES_RESOURCE
+                    registriesResource
             );
 
             try (PrintWriter writer = new PrintWriter(fileObject.openWriter())) {
@@ -127,7 +135,7 @@ public class RegisterMarkProcessor extends AbstractProcessor {
             processingEnv.getMessager().printMessage(
                     Diagnostic.Kind.NOTE,
                     "RegisterMarkProcessor: wrote " + registries.values().stream().mapToInt(List::size).sum()
-                            + " registries to " + REGISTRIES_RESOURCE
+                            + " registries to " + registriesResource
             );
         } catch (IOException e) {
             processingEnv.getMessager().printMessage(
