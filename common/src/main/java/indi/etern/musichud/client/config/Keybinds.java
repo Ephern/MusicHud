@@ -21,6 +21,7 @@ import lombok.SneakyThrows;
 import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.resources.ResourceLocation;
 import org.lwjgl.glfw.GLFW;
 
 @RegisterMark
@@ -29,7 +30,7 @@ public class Keybinds implements ClientRegister {
     private static final IClientLoginService I_CLIENT_LOGIN_SERVICE = LoginService.getInstance();
 
     public void register() {
-        KeyMapping.Category category = KeyMapping.Category.register(MusicHud.location(MusicHud.MOD_ID));
+        KeyMapping.Category category = KeyMapping.Category.register(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, MusicHud.MOD_ID));
         var mainMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".open_main",
                 InputConstants.Type.KEYSYM,
