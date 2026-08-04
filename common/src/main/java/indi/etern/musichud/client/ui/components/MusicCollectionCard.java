@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.components;
 
+import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
@@ -19,6 +20,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.interfaces.Unregister;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
@@ -28,11 +30,12 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicCollectionCard extends LinearLayout {
-    private final MusicService musicService = MusicService.getInstance();
+    private static final MusicService musicService = MusicService.getInstance();
     @Getter
     MusicCollection musicCollection;
+    private Unregister onChangeUnregister;
 
-    public MusicCollectionCard(Context context, MusicCollection musicCollection) {//TODO
+    public MusicCollectionCard(Context context, MusicCollection musicCollection) {
         super(context);
         this.musicCollection = musicCollection;
 
@@ -48,6 +51,21 @@ public class MusicCollectionCard extends LinearLayout {
         imageView.setAspectRatio(1);
         addView(imageView, imageParams);
 
+        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View v) {
+                onChangeUnregister = musicCollection.getMusicDetails().registerOnChange(() -> {
+                    imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp160));
+                });
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View v) {
+                if (onChangeUnregister != null) {
+                    onChangeUnregister.unregister();
+                }
+            }
+        });
         imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp160));
         imageView.setCornerRadius(dp(8));
 
@@ -55,6 +73,9 @@ public class MusicCollectionCard extends LinearLayout {
         row1.setOrientation(HORIZONTAL);
         row1.setBaselineAligned(false);
         row1.setGravity(Gravity.CENTER_VERTICAL);
+        LayoutTransition transition = new LayoutTransition();
+        transition.enableTransitionType(LayoutTransition.CHANGING);
+        row1.setLayoutTransition(transition);
         addView(row1);
 
         LinearLayout row2 = new LinearLayout(context);
@@ -135,11 +156,11 @@ public class MusicCollectionCard extends LinearLayout {
                     toggleSubscribeButton.setVisibility(GONE);
                 } else {
                     var subscribeState = musicService.getPlaylistSubscribeState(playlist);
-                    toggleSubscribeButton.bindMusicList(subscribeState);
+                    toggleSubscribeButton.bindState(subscribeState);
                 }
             } else if (musicCollection instanceof Album album) {
                 var subscribeState = musicService.getAlbumSubscribeState(album);
-                toggleSubscribeButton.bindMusicList(subscribeState);
+                toggleSubscribeButton.bindState(subscribeState);
             }
         }
 

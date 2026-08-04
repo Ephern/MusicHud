@@ -8,6 +8,7 @@ import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.client.server.IntegratedServer;
 
 /**
  * To avoid loading client classes in server environment, which may causing class load exceptions.
@@ -42,6 +43,12 @@ public class ClientDistUtil implements IClientDistUtil {
 
     @Override
     public boolean inIntegratedServer() {
-        return Minecraft.getInstance().getCurrentServer() == null;
+        return Minecraft.getInstance().isLocalServer();
+    }
+
+    @Override
+    public boolean inSinglePlayer() {
+        IntegratedServer integratedServer = Minecraft.getInstance().getSingleplayerServer();
+        return integratedServer != null && !integratedServer.isPublished();
     }
 }

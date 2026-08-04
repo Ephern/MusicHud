@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.Objects;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class MusicDetail implements IdentifiedBeans{
+public class MusicDetail implements IdentifiedBeans {
     public static final ByteBufCodec<MusicDetail> CODEC = ByteBufCodec.composite(
             Codecs.LONG, MusicDetail::getId,
             Codecs.STRING_UTF8, MusicDetail::getName,
@@ -129,7 +129,7 @@ public class MusicDetail implements IdentifiedBeans{
 
     @Override
     public int hashCode() {
-        return Objects.hashCode(id);
+        return Long.hashCode(id);
     }
 
     public record ExtraInfo(

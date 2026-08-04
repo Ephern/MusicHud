@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
@@ -13,29 +14,36 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
-import indi.etern.musichud.beans.state.IIdlePlaySourceCollectionState;
+import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
-import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.Unregister;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import net.minecraft.client.resources.language.I18n;
 
-import java.util.Collection;
+import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
 import java.util.stream.Collectors;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicCollectionDetailView extends LinearLayout {
-    private final Button addToIdleSourceListButton;
-    private final MusicService musicService = MusicService.getInstance();
+    private static final MusicService musicService = MusicService.getInstance();
     private final ProgressBar progressBar;
     private final LinearLayout tracksListView;
+    private final ScrollView scrollView;
+    private final UrlImageView imageView;
     private TextView musicTrackCountView;
     private MusicCollection musicCollection;
+    private Unregister tracksSyncUnregister = null;
+    private final AtomicBoolean syncPending = new AtomicBoolean();
+    private String currentCoverUrl = null;
 
     public MusicCollectionDetailView(Context context, MusicCollection musicCollection) {
         super(context);
@@ -72,7 +80,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         backButtonParams.setMargins(0, 0, dp(4), 0);
         topBar.addView(backButton, backButtonParams);
 
-        UrlImageView imageView = new UrlImageView(context);
+        imageView = new UrlImageView(context);
         LayoutParams imageParams = new LayoutParams(dp(72), dp(72));
         topBar.addView(imageView, imageParams);
         imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp(72)));
@@ -105,13 +113,7 @@ public class MusicCollectionDetailView extends LinearLayout {
             {
                 musicTrackCountView = new TextView(context);
                 musicTrackCountView.setTextSize(Theme.TEXT_SIZE_LARGE);
-                SpannableString text = new SpannableString("  " + playlist.getMusicTrackCount());
-                Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_music.png");
-                if (icon != null) {
-                    ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
-                    text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                }
-                musicTrackCountView.setText(text);
+                updatePlaylistTrackCountView(playlist);
                 LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
                 params3.setMargins(0, 0, dp(12), 0);
                 row1.addView(musicTrackCountView, params3);
@@ -132,7 +134,7 @@ public class MusicCollectionDetailView extends LinearLayout {
             {
                 musicTrackCountView = new TextView(context);
                 musicTrackCountView.setTextSize(Theme.TEXT_SIZE_LARGE);
-                updateAlbumTrackTextView(album, musicTrackCountView);
+                updateAlbumTrackCountView(album);
                 LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
                 params3.setMargins(0, 0, dp(12), 0);
                 row1.addView(musicTrackCountView, params3);
@@ -152,49 +154,54 @@ public class MusicCollectionDetailView extends LinearLayout {
             }
         }
 
-
         TextView name = new TextView(context);
         name.setTextSize(Theme.TEXT_SIZE_LARGER);
         name.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         name.setText(musicCollection.getName());
         briefInfo.addView(name);
 
-        LinearLayout buttons = new LinearLayout(context);
-        buttons.setOrientation(HORIZONTAL);
+        briefInfo.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(8), 0));
 
-        Button refreshButton = new Button(context);
-        refreshButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
-        refreshButton.setTextColor(Theme.PRIMARY_COLOR);
-        refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        refreshButton.setOnClickListener((v) -> refreshData(true));
-        buttons.addView(refreshButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        row1.addView(new View(context), new LayoutParams(dp(16), MATCH_PARENT, 0));
 
-        addToIdleSourceListButton = new Button(context);
-        addToIdleSourceListButton.setVisibility(GONE);
-        updateButton();
-        addToIdleSourceListButton.setTextColor(Theme.PRIMARY_COLOR);
-        addToIdleSourceListButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        Drawable background1 = ButtonInsetBackgroundFactory.builder()
+        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .inset(0)
-                .cornerRadius(dp(8))
-                .padding(new ButtonInsetBackgroundFactory.Padding(0, dp(2), 0, dp(2)))
-                .build().newBackgroundDrawable();
-        addToIdleSourceListButton.setBackground(background1);
-        addToIdleSourceListButton.setOnClickListener((v) -> {
-            IIdlePlaySourceCollectionState collectionState = musicService.getIdlePlaySourceState().local().collection(musicCollection);
-            if (collectionState.isContained()) {
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.removedFromIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
-                collectionState.remove();
-            } else {
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.addedToIdlePlaySource") + "\n" + musicCollection.getName(), Toast.LENGTH_SHORT));
-                collectionState.add();
+                .cornerRadius(dp(4))
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
+                .build();
+        int dp28 = dp(28);
+        {
+            ImageButton refreshButton = new ImageButton(context);
+            refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            var resources = getContext().getResources();
+            Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
+            refreshButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(resources, image1, dp(12), dp(16)), dp(3)));
+            refreshButton.setOnClickListener((v) -> {
+                refreshData(true);
+            });
+            row1.addView(refreshButton, new LayoutParams(dp28, dp28));
+        }
+        {
+            ToggleSubscribeButton<?> toggleSubscribeButton = new ToggleSubscribeButton<>(context);
+            toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            row1.addView(toggleSubscribeButton, new LayoutParams(dp28, dp28, 0));
+            if (musicCollection instanceof Playlist playlist) {
+                if (playlist.getCreator().getUserId() == Profile.getCurrent().getUserId()) {
+                    toggleSubscribeButton.setVisibility(GONE);
+                } else {
+                    var subscribeState = musicService.getPlaylistSubscribeState(playlist);
+                    toggleSubscribeButton.bindState(subscribeState);
+                }
+            } else if (musicCollection instanceof Album album) {
+                var subscribeState = musicService.getAlbumSubscribeState(album);
+                toggleSubscribeButton.bindState(subscribeState);
             }
-        });
-        LayoutParams addToIdleButtonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        addToIdleButtonParams.setMargins(dp(16), 0, 0, 0);
-        buttons.addView(addToIdleSourceListButton, addToIdleButtonParams);
-
-        briefInfo.addView(buttons, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        }
+        ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
+        toggleIdleSourceButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        toggleIdleSourceButton.bindMusicList(musicService.getIdlePlaySourceState().local().collection(musicCollection));
+        row1.addView(toggleIdleSourceButton, new LayoutParams(dp28, dp28, 0));
 
         LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBarParams.setMargins(0, dp(24), 0, 0);
@@ -205,7 +212,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         progressParams.setMargins(0, dp(32), 0, 0);
         addView(progressBar, progressParams);
 
-        var scrollView = new ScrollView(context);
+        scrollView = new ScrollView(context);
         scrollView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
         scrollView.setFillViewport(true);
         LayoutParams tracksParams = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
@@ -217,26 +224,25 @@ public class MusicCollectionDetailView extends LinearLayout {
         scrollView.addView(tracksListView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
         refreshData(false);
-
-        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-            private Unregister changeRegister;
-
-            @Override
-            public void onViewAttachedToWindow(View v) {
-                changeRegister = musicService.getIdlePlaySourceState().local().collection(musicCollection).onOthersModify(contained ->
-                        MuiModApi.postToUiThread(MusicCollectionDetailView.this::updateButton));
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View v) {
-                if (changeRegister != null) {
-                    changeRegister.unregister();
-                }
-            }
-        });
     }
 
-    private static void updateAlbumTrackTextView(Album album, TextView musicTrackCountView) {
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        unregisterTracksSync();
+    }
+
+    private void updatePlaylistTrackCountView(Playlist playlist) {
+        SpannableString text = new SpannableString("  " + playlist.getMusicTrackCount());
+        Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_music.png");
+        if (icon != null) {
+            ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
+            text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        musicTrackCountView.setText(text);
+    }
+
+    private void updateAlbumTrackCountView(Album album) {
         int musicTrackCount = Math.max(album.getMusicTrackCount(), album.getMusicDetails().size());
         if (musicTrackCount <= 0) {
             musicTrackCountView.setVisibility(GONE);
@@ -255,29 +261,136 @@ public class MusicCollectionDetailView extends LinearLayout {
     private void refreshData(boolean ignoreCache) {
         Context context = getContext();
         tracksListView.removeAllViews();
+        syncPending.set(false);
         progressBar.setVisibility(View.VISIBLE);
         progressBar.setIndeterminate(true);
         MusicService.getInstance().loadMoreMusicOfCollection(musicCollection, ignoreCache)
                 .thenAcceptAsync(result -> {
             MuiModApi.postToUiThread(() -> {
                 Collection<MusicDetail> musicDetails = result.musicDetails();
-                if (!musicDetails.isEmpty()) {
-                    addToIdleSourceListButton.setVisibility(View.VISIBLE);
-                }
                 MusicCollection musicCollection1 = result.musicCollection();
                 this.musicCollection = musicCollection1;
-                if (musicCollection1 instanceof Album album && musicTrackCountView != null) {
-                    updateAlbumTrackTextView(album, musicTrackCountView);
+                currentCoverUrl = musicCollection1.getImageThumbnailUrl(dp(72));
+                this.imageView.loadUrl(currentCoverUrl);
+                if (musicTrackCountView != null) {
+                    if (musicCollection1 instanceof Album album) {
+                        updateAlbumTrackCountView(album);
+                    } else if (musicCollection1 instanceof Playlist playlist){
+                        updatePlaylistTrackCountView(playlist);
+                    }
                 }
                 progressBar.setVisibility(View.GONE);
+                tracksListView.removeAllViews();
                 for (MusicDetail musicDetail : musicDetails) {
-                    addItem(context, musicDetail);
+                    tracksListView.addView(createItem(context, musicDetail));
                 }
+                unregisterTracksSync();
+                registerTracksSync(musicCollection1);
             });
         }, MusicHud.EXECUTOR);
     }
 
-    private void addItem(Context context, MusicDetail musicDetail) {
+    private void unregisterTracksSync() {
+        if (tracksSyncUnregister != null) {
+            tracksSyncUnregister.unregister();
+            tracksSyncUnregister = null;
+        }
+    }
+
+    private void registerTracksSync(MusicCollection collection) {
+        SequencedSet<MusicDetail> musicDetails = collection.getMusicDetails();
+        if (!(musicDetails instanceof ObservableSequencedSet<MusicDetail> tracks)) {
+            return;
+        }
+        Consumer<MusicDetail> onChange = musicDetail -> scheduleTracksSync();
+        Unregister addUnregister = tracks.registerOnAdd(onChange);
+        Unregister removeUnregister = tracks.registerOnRemove(onChange);
+        tracksSyncUnregister = () -> {
+            addUnregister.unregister();
+            removeUnregister.unregister();
+        };
+    }
+
+    private void scheduleTracksSync() {
+        if (syncPending.compareAndSet(false, true)) {
+            MuiModApi.postToUiThread(() -> {
+                syncPending.set(false);
+                syncTracksView();
+            });
+        }
+    }
+
+    private void syncTracksView() {
+        MusicCollection collection = musicCollection;
+        if (collection == null) return;
+        SequencedSet<MusicDetail> musicDetails = collection.getMusicDetails();
+        if (musicDetails instanceof ObservableSequencedSet<MusicDetail> tracks) {
+            syncTracksList(tracks);
+        }
+        String newCoverUrl = collection.getImageThumbnailUrl(dp(72));
+        if (!Objects.equals(currentCoverUrl, newCoverUrl)) {
+            currentCoverUrl = newCoverUrl;
+            imageView.loadUrl(newCoverUrl);
+        }
+    }
+
+    private void syncTracksList(ObservableSequencedSet<MusicDetail> tracks) {
+        List<MusicDetail> ordered = new ArrayList<>(tracks);
+        int childCount = tracksListView.getChildCount();
+        boolean unchanged = childCount == ordered.size();
+        if (unchanged) {
+            for (int i = 0; i < childCount; i++) {
+                MusicListItem item = (MusicListItem) tracksListView.getChildAt(i);
+                if (item.getMusicDetail() != ordered.get(i)) {
+                    unchanged = false;
+                    break;
+                }
+            }
+        }
+        if (unchanged) return;
+
+        List<MusicListItem> current = new ArrayList<>(childCount);
+        for (int i = 0; i < childCount; i++) {
+            current.add((MusicListItem) tracksListView.getChildAt(i));
+        }
+        // remove items no longer present in the collection (backwards to keep indexes stable)
+        for (int i = current.size() - 1; i >= 0; i--) {
+            long id = current.get(i).getMusicDetail().getId();
+            boolean exists = ordered.stream().anyMatch(md -> md.getId() == id);
+            if (!exists) {
+                tracksListView.removeViewAt(i);
+                current.remove(i);
+            }
+        }
+        // align remaining items to the collection order: insert missing, move misplaced
+        for (int i = 0; i < ordered.size(); i++) {
+            MusicDetail md = ordered.get(i);
+            int j = -1;
+            for (int k = 0; k < current.size(); k++) {
+                if (current.get(k).getMusicDetail().getId() == md.getId()) {
+                    j = k;
+                    break;
+                }
+            }
+            if (j == -1) {
+                MusicListItem item = createItem(getContext(), md);
+                current.add(i, item);
+                tracksListView.addView(item, i);
+            } else if (j > i) {
+                MusicListItem item = current.remove(j);
+                current.add(i, item);
+                tracksListView.removeView(item);
+                tracksListView.addView(item, i);
+            } else {
+                MusicListItem item = current.get(i);
+                if (item.getMusicDetail() != md) {
+                    item.bindData(md);
+                }
+            }
+        }
+    }
+
+    private MusicListItem createItem(Context context, MusicDetail musicDetail) {
         var musicLayout = new MusicListItem(context);
         musicLayout.setShowPusherInfo(false);
         musicLayout.bindData(musicDetail);
@@ -294,7 +407,7 @@ public class MusicCollectionDetailView extends LinearLayout {
             MusicService.getInstance().sendPushMusicToQueue(musicDetail);
             ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
-        tracksListView.addView(musicLayout);
+        return musicLayout;
     }
 
     private String mappedAlbumType(String type) {
@@ -305,13 +418,5 @@ public class MusicCollectionDetailView extends LinearLayout {
             case "精选集" -> I18n.get(MusicHud.MOD_ID + ".text.album.type.compilation");
             default -> type;
         };
-    }
-
-    private void updateButton() {
-        if (musicService.getIdlePlaySourceState().local().collection(musicCollection).isContained()) {
-            addToIdleSourceListButton.setText(I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"));
-        } else {
-            addToIdleSourceListButton.setText(I18n.get(MusicHud.MOD_ID + ".button.addToIdlePlaySource"));
-        }
     }
 }

@@ -43,11 +43,11 @@ public interface IClientMusicService {
 
     CompletableFuture<Album> loadAlbumDetail(long id, boolean ignoreCache);
 
-    void refreshQueue(Queue<MusicDetail> queue);
+    void refreshQueue(Queue<QueueItem> queue);
 
     void sendPushMusicToQueue(MusicDetail musicDetail);
 
-    void sendRemoveMusicFromQueue(int index, MusicDetail musicDetail);
+    void sendRemoveMusicFromQueue(int index, QueueItem item);
 
     void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message);
 
@@ -71,13 +71,13 @@ public interface IClientMusicService {
 
     CompletableFuture<loadMusicCollectionMoreDataResult> loadMoreMusicOfCollection(MusicCollection musicCollection, boolean ignoreCache);
 
-    Queue<MusicDetail> getMusicQueue();
+    Queue<QueueItem> getMusicQueue();
 
-    Set<Consumer<Queue<MusicDetail>>> getMusicQueueRefreshListeners();
+    Set<Consumer<Queue<QueueItem>>> getMusicQueueRefreshListeners();
 
-    Set<Consumer<MusicDetail>> getMusicQueuePushListeners();
+    Set<Consumer<QueueItem>> getMusicQueuePushListeners();
 
-    Set<BiConsumer<Integer, MusicDetail>> getMusicQueueRemoveListeners();
+    Set<BiConsumer<Integer, QueueItem>> getMusicQueueRemoveListeners();
 
     IMusicTrackState getMusicTrackState(MusicDetail musicDetail);
 

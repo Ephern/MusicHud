@@ -33,4 +33,6 @@ public interface IClientDistUtil {
     void refreshMainGUI();
 
     boolean inIntegratedServer();
+
+    boolean inSinglePlayer();
 }

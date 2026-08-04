@@ -15,6 +15,7 @@ import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.server.api.UrlMeta;
+import indi.etern.musichud.throwable.MusicResourceLoadingException;
 import indi.etern.musichud.utils.JsonUtil;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import indi.etern.musichud.utils.http.ApiClient;
@@ -61,6 +62,7 @@ public class MusicApiService implements IMusicApiService {
     private final ConcurrentHashMap<SearchKey, CompletableFuture<Object>> searchInFlight = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, CompletableFuture<LyricInfo>> lyricInfoInFlight = new ConcurrentHashMap<>();
 
+    @SneakyThrows
     private static <K, T> T joinMerged(ConcurrentHashMap<K, CompletableFuture<T>> inFlight, K key, Supplier<T> loader) {
         CompletableFuture<T> future = inFlight.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(loader, MusicHud.EXECUTOR));
         try {
@@ -70,13 +72,10 @@ public class MusicApiService implements IMusicApiService {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             inFlight.remove(key, future);
-            throw new RuntimeException(e);
-        } catch (ExecutionException e) {
+            throw e;
+        } catch (Throwable e) {
             inFlight.remove(key, future);
-            throw new RuntimeException(e.getCause());
-        } catch (TimeoutException e) {
-            inFlight.remove(key, future);
-            throw new RuntimeException(e);
+            throw e;
         }
     }
 
@@ -164,9 +163,6 @@ public class MusicApiService implements IMusicApiService {
         artist.getMusicDetails().addAll(musicDetails);
         return musicDetails;
     }
-
-    record IdAndUUIDKey(long id, UUID uuid) {}
-    record StringAndUUIDKey(String string, UUID uuid) {}
 
     @Override
     public Playlist getPlaylistDetail(long id, boolean ignoreCache, @Nullable UUID playerUUID) {
@@ -325,7 +321,7 @@ public class MusicApiService implements IMusicApiService {
         post.songs.forEach(song -> {
             song.setAlbum(album.shallowCopyBriefInfo());// prevent loop reference
         });
-        album.setMusicDetails(post.songs);
+        album.setMusicDetails(new ObservableSequencedSet<>(post.songs));
         return album;
     }
 
@@ -349,73 +345,85 @@ public class MusicApiService implements IMusicApiService {
         return appendArtistMusic(offset, artist, playerUUID);
     }
 
+    @SneakyThrows
     @Override
     public MusicResourceInfo getResourceInfo(MusicDetail musicDetail, Quality quality, UUID playerUUID) {
-        if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
-            return MusicResourceInfo.NONE;
-        } else {
-            var loginInfo = loginApiService.getLoginInfoByPlayerUUID(playerUUID);
-            AtomicBoolean vipAccessible = new AtomicBoolean(true);
-            String cookie;
-            boolean isVip = loginInfo != null && loginInfo.getVipType() == VipType.VIP;
-            MusicDetail.ExtraInfo extraInfo = musicDetail.getExtraInfo();
-            if (isVip || extraInfo != null && extraInfo.cloudSource()) {
-                if (!isVip) {
-                    vipAccessible.set(false);
-                }
-                cookie = loginInfo == null ? loginApiService.getAnonymousCookie() : loginInfo.getLoginCookieInfo().rawCookie();
+        boolean usingSubstitute = false;
+        try {
+            if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
+                return MusicResourceInfo.NONE;
             } else {
-                cookie = loginApiService.randomVipCookieOrElse(() -> {
-                    vipAccessible.set(false);
-                    return loginInfo == null ? loginApiService.getAnonymousCookie() : loginInfo.getLoginCookieInfo().rawCookie();
-                });
-            }
-
-            MusicResourceInfo musicResourceInfo;
-            int retryCount = 0;
-            boolean available;
-            do {
-                if (retryCount >= 5) {
-                    logger.warn("Failed to load music resource for \"{}\"(id:{}), as resource url is not available", musicDetail.getName(), musicDetail.getId());
-                    try {
-                        musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
-                        if (musicResourceInfo != MusicResourceInfo.NONE && ApiClient.checkUrlAvailable(musicResourceInfo.getUrl(), 5000)) {
-                            completeLyricInfo(musicDetail);
-                            return musicResourceInfo;
-                        }
-                    } catch (Exception ignored) {
+                var loginInfo = loginApiService.getLoginInfoByPlayerUUID(playerUUID);
+                AtomicBoolean vipAccessible = new AtomicBoolean(true);
+                String cookie;
+                boolean isVip = loginInfo != null && loginInfo.getVipType() == VipType.VIP;
+                MusicDetail.ExtraInfo extraInfo = musicDetail.getExtraInfo();
+                if (isVip || extraInfo != null && extraInfo.cloudSource()) {
+                    if (!isVip) {
+                        vipAccessible.set(false);
                     }
-                    logger.error("Failed to get resource for music from substitute as last trial: {} (ID: {})", musicDetail.getName(), musicDetail.getId());
-                    return MusicResourceInfo.NONE;
-                }
-                var request = new GetDirectResourceUrlRequest(musicDetail.getId(), false, quality);
-                var response = ApiClient.post(ApiServerEndpointsMeta.Music.URL, request, cookie, true);
-                if (response.code == 200) {
-                    musicResourceInfo = response.data.getFirst();
-                    // 30 seconds trial or have no copyright
-                    if (((extraInfo == null || !extraInfo.cloudSource())
-                            && ((musicResourceInfo.getFee() == Fee.SEPARATELY_PURCHASE
-                            || (musicResourceInfo.getFee() == Fee.VIP && !vipAccessible.get()))
-                            || musicResourceInfo.getUrl() == null))
-                    ) {
-                        logger.warn("Failed to get resource for music: {} (ID: {}), trying substitute", musicDetail.getName(), musicDetail.getId());
-                        musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
-                    }
-                    completeLyricInfo(musicDetail);
+                    cookie = loginInfo == null ? loginApiService.getAnonymousCookie() : loginInfo.getLoginCookieInfo().rawCookie();
                 } else {
-                    logger.warn("Failed to get resource for music: {} (ID: {}), trying substitute", musicDetail.getName(), musicDetail.getId());
-                    try {
-                        musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
-                        completeLyricInfo(musicDetail);
-                    } catch (Exception e) {
-                        logger.error("Failed to get resource for music from substitute: {} (ID: {})", musicDetail.getName(), musicDetail.getId());
-                        musicResourceInfo = MusicResourceInfo.NONE;
-                    }
+                    cookie = loginApiService.randomVipCookieOrElse(() -> {
+                        vipAccessible.set(false);
+                        return loginInfo == null ? loginApiService.getAnonymousCookie() : loginInfo.getLoginCookieInfo().rawCookie();
+                    });
                 }
-                available = musicResourceInfo != MusicResourceInfo.NONE && ApiClient.checkUrlAvailable(musicResourceInfo.getUrl(), 5000);
-                retryCount++;
-            } while (!available);
-            return musicResourceInfo;
+
+                MusicResourceInfo musicResourceInfo;
+                int retryCount = 0;
+                boolean available;
+                do {
+                    if (retryCount >= 5) {
+                        logger.warn("Failed to load music resource for \"{}\"(id:{}), as resource url is not available", musicDetail.getName(), musicDetail.getId());
+                        try {
+                            usingSubstitute = true;
+                            musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
+                            if (musicResourceInfo != MusicResourceInfo.NONE && ApiClient.checkUrlAvailable(musicResourceInfo.getUrl(), 5000)) {
+                                completeLyricInfo(musicDetail);
+                                return musicResourceInfo;
+                            }
+                        } catch (Exception ignored) {
+                        }
+                        logger.error("Failed to get resource for music from substitute as last trial: {} (ID: {})", musicDetail.getName(), musicDetail.getId());
+                        return MusicResourceInfo.NONE;
+                    }
+                    var request = new GetDirectResourceUrlRequest(musicDetail.getId(), false, quality);
+                    var response = ApiClient.post(ApiServerEndpointsMeta.Music.URL, request, cookie, true);
+                    if (response.code == 200) {
+                        musicResourceInfo = response.data.getFirst();
+                        // 30 seconds trial or have no copyright
+                        if (((extraInfo == null || !extraInfo.cloudSource())
+                                && ((musicResourceInfo.getFee() == Fee.SEPARATELY_PURCHASE
+                                || (musicResourceInfo.getFee() == Fee.VIP && !vipAccessible.get()))
+                                || musicResourceInfo.getUrl() == null))
+                        ) {
+                            logger.warn("Failed to get resource for music: {} (ID: {}), trying substitute", musicDetail.getName(), musicDetail.getId());
+                            usingSubstitute = true;
+                            musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
+                        }
+                        completeLyricInfo(musicDetail);
+                    } else {
+                        logger.warn("Failed to get resource for music: {} (ID: {}), trying substitute", musicDetail.getName(), musicDetail.getId());
+                        try {
+                            usingSubstitute = true;
+                            musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
+                            completeLyricInfo(musicDetail);
+                        } catch (Exception e) {
+                            logger.error("Failed to get resource for music from substitute: {} (ID: {})", musicDetail.getName(), musicDetail.getId());
+                            musicResourceInfo = MusicResourceInfo.NONE;
+                        }
+                    }
+                    available = musicResourceInfo != MusicResourceInfo.NONE && ApiClient.checkUrlAvailable(musicResourceInfo.getUrl(), 5000);
+                    retryCount++;
+                } while (!available);
+                return musicResourceInfo;
+            }
+        } catch (Throwable e) {
+            if (e instanceof InterruptedException e1) {
+                throw e1;
+            }
+            throw new MusicResourceLoadingException(e, musicDetail, usingSubstitute);
         }
     }
 
@@ -541,12 +549,19 @@ public class MusicApiService implements IMusicApiService {
                 true);
         Playlist playlist = playlistsCache.getIfPresent(playlistId);
         if (playlist != null) {
-            playlist.getMusicDetails().stream().filter(m -> m.getId() == playlistId).findFirst()
-                    .ifPresent(musicDetail -> {
-                        playlist.getMusicDetails().remove(musicDetail);
-                        playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
-                    }
-            );
+            MusicDetail cached = musicDetailCache.getIfPresent(musicId);
+            if (cached != null) {
+                if (playlist.getMusicDetails().remove(cached)) {
+                    playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
+                }
+            } else {
+                playlist.getMusicDetails().stream().filter(m -> m.getId() == musicId).findFirst()
+                        .ifPresent(musicDetail -> {
+                                    playlist.getMusicDetails().remove(musicDetail);
+                                    playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
+                                }
+                        );
+            }
         }
     }
 
@@ -572,6 +587,12 @@ public class MusicApiService implements IMusicApiService {
                 loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
                 true);
         cache.invalidate(id);
+    }
+
+    record IdAndUUIDKey(long id, UUID uuid) {
+    }
+
+    record StringAndUUIDKey(String string, UUID uuid) {
     }
 
     record IdRequest(long id) {

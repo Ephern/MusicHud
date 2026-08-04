@@ -25,9 +25,6 @@ public class MusicTrackState implements IMusicTrackState {
     private final MusicService musicService = MusicService.getInstance();
     MusicDetail musicDetail;
 
-    record TrackPlaylistPair(long playlistId, long musicTrackId) {
-    }
-
     static Unregister registerModifyListener(TrackPlaylistPair trackPlaylistPair, Consumer<Boolean> listener) {
         modifyListeners.computeIfAbsent(trackPlaylistPair, k -> new CopyOnWriteArrayList<>()).add(listener);
         return () -> {
@@ -44,18 +41,22 @@ public class MusicTrackState implements IMusicTrackState {
         }
     }
 
+    @Override
     public IPlaylistSubState currentUsersLikeList() {
-        return new PlaylistSubState(() ->
+        return new PlaylistSubState(-1, () ->
                 musicService.loadUserPlaylists(false)
-                        .thenCompose(p ->
-                                musicService.loadPlaylistDetail(p.getLikeList().getId(), false)
+                        .thenCompose(p1 ->
+                                musicService.loadPlaylistDetail(p1.getLikeList().getId(), false)
                         )
         );
     }
 
     @Override
     public IPlaylistSubState playlist(long playlistId) {
-        return new PlaylistSubState(() -> musicService.loadPlaylistDetail(playlistId, false));
+        return new PlaylistSubState(playlistId, () -> musicService.loadPlaylistDetail(playlistId, false));
+    }
+
+    record TrackPlaylistPair(long playlistId, long musicTrackId) {
     }
 
     public class PlaylistSubState implements IPlaylistSubState {
@@ -63,7 +64,13 @@ public class MusicTrackState implements IMusicTrackState {
         Playlist playlist;
         Supplier<CompletableFuture<Playlist>> playlistLazyLoader;
 
+        PlaylistSubState(long playlistId, Supplier<CompletableFuture<Playlist>> playlistLazyLoader) {
+            this.playlistId = playlistId;
+            this.playlistLazyLoader = playlistLazyLoader;
+        }
+
         PlaylistSubState(Supplier<CompletableFuture<Playlist>> playlistLazyLoader) {
+            this.playlistId = -1;
             this.playlistLazyLoader = playlistLazyLoader;
         }
 
@@ -74,72 +81,111 @@ public class MusicTrackState implements IMusicTrackState {
 
         @SneakyThrows
         private CompletableFuture<Playlist> loadPlaylist() {
-            CompletableFuture<Playlist> future = new CompletableFuture<>();
-            if (playlist == null) {
-                CompletableFuture<Playlist> completableFuture = playlistLazyLoader.get();
-                playlist = completableFuture.getNow(null);
-                if (playlist != null) {
-                    future.complete(playlist);
-                } else if (completableFuture.state() == Future.State.SUCCESS) {
-                    playlist = completableFuture.get();
-                    future.complete(playlist);
-                } else {
-                    MusicHud.EXECUTOR.submit(() -> {
-                        try {
-                            playlist = completableFuture.get();
-                            future.complete(playlist);
-                        } catch (InterruptedException | ExecutionException e1) {
-                            future.completeExceptionally(e1);
-                        }
-                    });
+            if (playlist != null && playlistId != -1) {
+                // Follow the latest cached instance: the cache may have been replaced
+                // by a refresh or re-evicted, and optimistic edits must land on the
+                // same instance the UI listens to, otherwise they only get applied
+                // later via the server-side fallback.
+                Playlist latest = musicService.loadPlaylistDetail(playlistId, false).getNow(null);
+                if (latest != null && latest != playlist) {
+                    playlist = latest;
                 }
-            } else {
+                return CompletableFuture.completedFuture(playlist);
+            }
+            CompletableFuture<Playlist> future = new CompletableFuture<>();
+            CompletableFuture<Playlist> completableFuture = playlistLazyLoader.get();
+            playlist = completableFuture.getNow(null);
+            if (playlist != null) {
+                playlistId = playlist.getId();
                 future.complete(playlist);
+            } else if (completableFuture.state() == Future.State.SUCCESS) {
+                playlist = completableFuture.get();
+                playlistId = playlist.getId();
+                future.complete(playlist);
+            } else {
+                MusicHud.EXECUTOR.submit(() -> {
+                    try {
+                        playlist = completableFuture.get();
+                        playlistId = playlist.getId();
+                        future.complete(playlist);
+                    } catch (InterruptedException | ExecutionException e1) {
+                        future.completeExceptionally(e1);
+                    }
+                });
             }
             return future;
         }
 
         @Override
         public CompletableFuture<Boolean> isContained() {
-            return loadPlaylist().thenApply(playlist1 -> playlist1.getMusicDetails().contains(musicDetail));
+            return loadPlaylist().thenApply(playlist1 ->
+                    playlist1.getMusicDetails().stream().anyMatch(i -> i.getId() == musicDetail.getId())
+            );
         }
 
         @Override
         public CompletableFuture<Void> add() {
-            notifyPlaylistModified(playlistId, musicDetail.getId(), true);
+            boolean notifyLater;
+            if (playlistId != -1) {
+                notifyPlaylistModified(playlistId, musicDetail.getId(), true);
+                notifyLater = true;
+            } else {
+                notifyLater = false;
+            }
             return loadPlaylist().thenCompose(playlist1 -> {
+                if (notifyLater) {
+                    notifyPlaylistModified(playlist1.getId(), musicDetail.getId(), true);
+                }
+                var tracks = playlist1.getMusicDetails();
+                var edit = tracks.beginEdit();
+                tracks.addFirst(musicDetail);
                 ModifyPlaylistRequest request = new ModifyPlaylistRequest(musicDetail.getId(), playlist1.getId(), ModifyType.ADD);
                 return RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
-                        .whenComplete((response, throwable) -> {
+                        .handle((response, throwable) -> {
                             if (throwable != null) {
+                                edit.rollback();
                                 throw new RuntimeException(throwable);
                             }
-                            if (response.isSuccess()) {
-                                playlist1.getMusicDetails().addFirst(musicDetail);
-                                return;
-                            } else {
+                            if (!response.isSuccess()) {
+                                edit.rollback();
                                 throw new RuntimeException(response.getMessage());
                             }
-                        }).thenApply(r -> null);
+                            edit.commit();
+                            return null;
+                        });
             });
         }
 
         @Override
         public CompletableFuture<Void> remove() {
-            notifyPlaylistModified(playlistId, musicDetail.getId(), false);
+            boolean notifyLater;
+            if (playlistId != -1) {
+                notifyPlaylistModified(playlistId, musicDetail.getId(), false);
+                notifyLater = true;
+            } else {
+                notifyLater = false;
+            }
             return loadPlaylist().thenCompose(playlist1 -> {
+                if (notifyLater) {
+                    notifyPlaylistModified(playlist1.getId(), musicDetail.getId(), false);
+                }
+                var tracks = playlist1.getMusicDetails();
+                var edit = tracks.beginEdit();
+                tracks.remove(musicDetail);
                 ModifyPlaylistRequest request = new ModifyPlaylistRequest(musicDetail.getId(), playlist1.getId(), ModifyType.REMOVE);
                 return RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
-                        .whenComplete((response, throwable) -> {
+                        .handle((response, throwable) -> {
                             if (throwable != null) {
+                                edit.rollback();
                                 throw new RuntimeException(throwable);
                             }
-                            if (response.isSuccess()) {
-                                playlist1.getMusicDetails().remove(musicDetail);
-                            } else {
+                            if (!response.isSuccess()) {
+                                edit.rollback();
                                 throw new RuntimeException(response.getMessage());
                             }
-                        }).thenApply(r -> null);
+                            edit.commit();
+                            return null;
+                        });
             });
         }
 
