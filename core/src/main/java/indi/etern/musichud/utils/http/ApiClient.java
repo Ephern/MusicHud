@@ -142,7 +142,8 @@ public class ApiClient {
                     if (allowAlert) {
                         LOGGER.error("Please check Api server status | 请检查 Api 服务器状态");
                         if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
-                            IClientDistUtil.getInstance().getI18n(MusicHud.MOD_ID + ".error.apiServer");
+                            IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
+                            clientDistUtil.showToast(clientDistUtil.getI18n(MusicHud.MOD_ID + ".error.apiServer"));
                         }
                     }
                     throw e;

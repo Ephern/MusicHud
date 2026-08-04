@@ -22,12 +22,16 @@ public class ToggleIconButton extends CheckableImageButton {
         setScaleType(ImageView.ScaleType.CENTER_INSIDE);
 
         CharSequence tooltipOn = appearance.tooltipOn.get();
+        if (tooltipOn != null && !tooltipOn.isEmpty()) {
+            setTooltipTextOn(tooltipOn);
+        }
         Image imageOn = appearance.imageOn.get();
-        setTooltipTextOn(tooltipOn);
 
         CharSequence tooltipOff = appearance.tooltipOff.get();
+        if (tooltipOff != null && !tooltipOff.isEmpty()) {
+            setTooltipTextOff(tooltipOff);
+        }
         Image imageOff = appearance.imageOff.get();
-        setTooltipTextOff(tooltipOff);
 
         StateListDrawable selector = new StateListDrawable();
         var resources = getContext().getResources();

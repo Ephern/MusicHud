@@ -356,7 +356,7 @@ public class NowPlayingInfo {
 
     public MusicDetail getNextToPlayIdleMusicDetail() {
         if (!MusicService.getInstance().getMusicQueue().isEmpty()) {
-            return MusicService.getInstance().getMusicQueue().peek();
+            return MusicService.getInstance().getMusicQueue().peek().musicDetail();
         } else {
             return nextToPlayIdleMusicDetail;
         }

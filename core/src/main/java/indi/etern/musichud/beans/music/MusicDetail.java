@@ -10,7 +10,6 @@ import lombok.Setter;
 
 import java.util.List;
 import java.util.Objects;
-import java.util.UUID;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class MusicDetail implements IdentifiedBeans {
@@ -25,16 +24,12 @@ public class MusicDetail implements IdentifiedBeans {
             Codecs.ofList(() -> Artist.CODEC), MusicDetail::getArtists,
             PusherInfo.CODEC, MusicDetail::getPusherInfo,
             LyricInfo.CODEC, MusicDetail::getLyricInfo,
-            Codecs.UUID, MusicDetail::getQueueUniqueID,
             MusicDetail::new
     );
     public static final MusicDetail NONE = new MusicDetail();
-    public static final UUID QUEUE_UNIQUE_ID_ZERO = new UUID(0, 0);
     String name = "";
     @Getter
     long id;
-    @Setter
-    UUID queueUniqueID = QUEUE_UNIQUE_ID_ZERO;
     @SerializedName("ar")
     List<Artist> artists = List.of();
     @SerializedName("alia")
@@ -76,8 +71,7 @@ public class MusicDetail implements IdentifiedBeans {
             List<String> translations,
             List<Artist> artists,
             PusherInfo pusherInfo,
-            LyricInfo lyricInfo,
-            UUID queueUniqueID
+            LyricInfo lyricInfo
     ) {
         this.name = name;
         this.id = id;
@@ -89,15 +83,10 @@ public class MusicDetail implements IdentifiedBeans {
         this.translations = translations;
         this.pusherInfo = pusherInfo;
         this.lyricInfo = lyricInfo;
-        this.queueUniqueID = queueUniqueID;
     }
 
     public String getName() {
         return Objects.requireNonNullElse(name, "");
-    }
-
-    public UUID getQueueUniqueID() {
-        return Objects.requireNonNullElseGet(queueUniqueID, () -> QUEUE_UNIQUE_ID_ZERO);
     }
 
     public List<Artist> getArtists() {
@@ -135,22 +124,12 @@ public class MusicDetail implements IdentifiedBeans {
 
     @Override
     public boolean equals(Object obj) {
-        return this == obj || (obj instanceof MusicDetail other && this.id == other.id && this.queueUniqueID == other.queueUniqueID);
+        return this == obj || (obj instanceof MusicDetail other && this.id == other.id);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, queueUniqueID);
-    }
-
-    public MusicDetail randomQueueUniqueIDCopy() {
-        MusicDetail musicDetail = new MusicDetail(
-                id, name, durationMillis, fee, album, alias, translations, artists, pusherInfo, lyricInfo, UUID.randomUUID()
-        );
-        musicDetail.extraInfo = extraInfo;
-        musicDetail.pusherInfo = pusherInfo;
-        musicDetail.lyricInfo = lyricInfo;
-        return musicDetail;
+        return Long.hashCode(id);
     }
 
     public record ExtraInfo(

@@ -18,7 +18,7 @@ public class Profile {
                     Codecs.ofEnum(VipType.class), Profile::getVipType,
                     Profile::new
             );
-    public static final Profile ANONYMOUS = new Profile("anonymous", "", 0, VipType.NORMAL);
+    public static final Profile ANONYMOUS = new Profile("anonymous", "", -1, VipType.NORMAL);
     public static final Profile PRIVATE_MASK = new Profile("private_mask", "", 0, VipType.NORMAL);
     @Getter
     @Setter

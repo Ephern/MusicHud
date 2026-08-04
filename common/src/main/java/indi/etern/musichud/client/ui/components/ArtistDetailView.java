@@ -19,6 +19,7 @@ import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.interfaces.IClientMusicService;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.stream.Collectors;
@@ -30,6 +31,7 @@ public class ArtistDetailView extends LinearLayout {
     private final LinearLayout musicList;
     private final TextView noMoreResultText;
     private final ProgressBar loadingProgressRing;
+    private static final IClientMusicService musicService = MusicService.getInstance();
     Artist artist;
 
     public ArtistDetailView(Context context, Artist artist) {
@@ -72,29 +74,47 @@ public class ArtistDetailView extends LinearLayout {
         avatarImageView.setCircular(true);
         topBar.addView(avatarImageView, imageParams);
 
-        LinearLayout texts = new LinearLayout(context);
-        texts.setGravity(Gravity.LEFT | Gravity.TOP);
-        texts.setOrientation(VERTICAL);
+        LinearLayout artistInfoView = new LinearLayout(context);
+        artistInfoView.setGravity(Gravity.LEFT | Gravity.TOP);
+        artistInfoView.setOrientation(VERTICAL);
         LayoutParams params1 = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
         params1.setMargins(dp(16), 0, 0, 0);
-        topBar.addView(texts, params1);
+        topBar.addView(artistInfoView, params1);
+
+        LinearLayout row1 = new LinearLayout(context);
+        row1.setOrientation(HORIZONTAL);
+        row1.setGravity(Gravity.CENTER_VERTICAL);
+        LayoutParams row1Params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        row1Params.setMargins(0, 0, 0, dp(8));
+        artistInfoView.addView(row1, row1Params);
 
         TextView name = new TextView(context);
         name.setTextSize(Theme.TEXT_SIZE_LARGER);
         name.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         name.setText(artist.getName());
         LayoutParams nameParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        nameParams.setMargins(0, 0, 0, dp(4));
-        name.setLayoutParams(nameParams);
-        texts.addView(name);
+        nameParams.setMargins(0, 0, dp(16), 0);
+        row1.addView(name, nameParams);
 
         TextView productionCounts = new TextView(context);
-        productionCounts.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        productionCounts.setTextSize(Theme.TEXT_SIZE_LARGE);
         productionCounts.setTextColor(Theme.NORMAL_TEXT_COLOR);
-        LayoutParams infoParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        infoParams.setMargins(0, 0, 0, dp(4));
-        productionCounts.setLayoutParams(infoParams);
-        texts.addView(productionCounts);
+        productionCounts.setVisibility(GONE);
+        LayoutParams productionCountsParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        productionCountsParams.setMargins(0, 0, dp(16), 0);
+        row1.addView(productionCounts, productionCountsParams);
+
+        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .inset(0)
+                .cornerRadius(dp(4))
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
+                .build();
+        ToggleSubscribeButton<?> toggleSubscribeButton = new ToggleSubscribeButton<>(context);
+        toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        row1.addView(toggleSubscribeButton, new LayoutParams(dp(28), dp(28), 0));
+        var subscribeState = musicService.getArtistSubscribedState(artist);
+        toggleSubscribeButton.bindState(subscribeState);
 
         ScrollView descriptionScrollView = new ScrollView(context);
         LayoutParams scrollParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -107,7 +127,7 @@ public class ArtistDetailView extends LinearLayout {
         description.setLayoutParams(descriptionParams);
         descriptionScrollView.addView(description);
 
-        texts.addView(descriptionScrollView);
+        artistInfoView.addView(descriptionScrollView);
 
         LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBarParams.setMargins(0, dp(24), 0, 0);
@@ -197,6 +217,7 @@ public class ArtistDetailView extends LinearLayout {
                     }
                     if (showAlbumCount || showMusicCount) {
                         productionCounts.setText(countsString);
+                        productionCounts.setVisibility(VISIBLE);
                     } else {
                         productionCounts.setVisibility(GONE);
                     }

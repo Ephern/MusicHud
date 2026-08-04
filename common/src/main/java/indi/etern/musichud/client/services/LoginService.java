@@ -14,7 +14,6 @@ import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
-import indi.etern.musichud.client.ui.pages.account.AccountView;
 import indi.etern.musichud.client.ui.pages.account.LoginView;
 import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
@@ -34,8 +33,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.time.Period;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -47,8 +46,10 @@ public class LoginService implements IClientLoginService {
     private static final Logger logger = MusicHud.getLogger(LoginService.class);
     private static final Period refreshInterval = Period.of(0, 0, 1);
     private static volatile LoginService instance = null;
+    private final List<Consumer<LoginState>> loginStateListeners = new CopyOnWriteArrayList<>();
+    private volatile LoginState loginState = getLoginState();
     @Getter
-    private final List<Consumer<LoginCookieInfo>> loginCompleteListeners = new ArrayList<>();
+    private volatile String lastLoginErrorMessage;
     private double lastPressTime;
     private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 300;
     private final AtomicInteger toggleVersion = new AtomicInteger(0);
@@ -60,43 +61,35 @@ public class LoginService implements IClientLoginService {
             Thread.currentThread().setName("MHWorker-Login-V");
             LoginCookieInfo loginCookieInfo = loginResult.loginCookieInfo();
             LoginType type = loginCookieInfo.type();
+            Profile profile = loginResult.profile();
             if (type != LoginType.UNLOGGED && type != LoginType.ANONYMOUS && loginResult.success()) {
                 loginCookieInfo.setToClientCookie();
-                Profile.setCurrent(loginResult.profile());
-                loginCompleteListeners.forEach(c -> c.accept(loginCookieInfo));
-            } else if (type == LoginType.ANONYMOUS) {
+                Profile.setCurrent(profile);
+                lastLoginErrorMessage = null;
+            } else if (type == LoginType.ANONYMOUS && Profile.ANONYMOUS.equals(profile)) {
                 loginCookieInfo.setToClientCookie();
                 Profile.setCurrent(Profile.ANONYMOUS);
-                loginCompleteListeners.forEach(c -> c.accept(loginCookieInfo));
+                lastLoginErrorMessage = null;
             } else {
                 logger.warn("Login failed");
+                lastLoginErrorMessage = resolveLoginErrorMessage(loginResult.message());
             }
+            notifyLoginStateChanged();
             AccountBaseView accountBaseView = AccountBaseView.getInstance();
             if (accountBaseView != null) {
-                MuiModApi.postToUiThread(accountBaseView::refresh);
                 if (loginResult.success()) {
                     ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
-                    profileConfigData.setProfile(loginResult.profile());
+                    profileConfigData.setProfile(profile);
                     profileConfigData.saveToConfig();
-                    MuiModApi.postToUiThread(() -> {
-                        AccountView accountView = AccountView.getInstance();
-                        if (accountView != null) {
-                            accountView.refresh(false);
-                        }
-                    });
+                    MuiModApi.postToUiThread(accountBaseView::refresh);
                 } else {
                     MuiModApi.postToUiThread(() -> {
-                        AccountView accountView = AccountView.getInstance();
-                        if (accountView != null) {
-                            accountView.refresh(false);
-                        }
+                        accountBaseView.refresh();
+                        String message = resolveLoginErrorMessage(loginResult.message());
+                        accountBaseView.onLoginFailed(message);
                         LoginView loginView = LoginView.getInstance();
                         if (loginView != null) {
                             loginView.reset();
-                            String message = loginResult.message();
-                            if (message.startsWith(MusicHud.MOD_ID)) {
-                                message = I18n.get(message);
-                            }
                             loginView.errorText(message);
                         }
                     });
@@ -128,6 +121,51 @@ public class LoginService implements IClientLoginService {
 
     @Override
     public boolean isLogined() {
+        return getLoginState() == LoginState.LOGGED_IN;
+    }
+
+    @Override
+    public LoginState getLoginState() {
+        LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
+        LoginType type = loginCookieInfo.type();
+        Profile current = Profile.getCurrent();
+        boolean realCookie = type != LoginType.UNLOGGED && type != LoginType.ANONYMOUS;
+        boolean realProfile = current != null && !current.equals(Profile.ANONYMOUS);
+        if (realCookie && realProfile) {
+            return LoginState.LOGGED_IN;
+        }
+        if (type == LoginType.ANONYMOUS || Profile.ANONYMOUS.equals(current)) {
+            return LoginState.ANONYMOUS;
+        }
+        return LoginState.UNLOGGED;
+    }
+
+    @Override
+    public Unregister addLoginStateListener(Consumer<LoginState> listener) {
+        loginStateListeners.add(listener);
+        return () -> loginStateListeners.remove(listener);
+    }
+
+    private void notifyLoginStateChanged() {
+        LoginState state = getLoginState();
+        if (state == loginState) return;
+        loginState = state;
+        loginStateListeners.forEach(listener -> listener.accept(state));
+    }
+
+    private static String resolveLoginErrorMessage(String message) {
+        if (message != null && message.startsWith(MusicHud.MOD_ID)) {
+            return I18n.get(message);
+        }
+        return message;
+    }
+
+    public void clearLastLoginErrorMessage() {
+        lastLoginErrorMessage = null;
+    }
+
+    @Override
+    public boolean hasPreviousLoginInfo() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         return loginCookieInfo.type() != LoginType.UNLOGGED &&
                 loginCookieInfo.type() != LoginType.ANONYMOUS;
@@ -147,7 +185,7 @@ public class LoginService implements IClientLoginService {
         if (type != null) {
             connectionType = type;
         }
-        if (isLogined()) {
+        if (hasPreviousLoginInfo()) {
             logger.info("Previous cookie found");
             loginToServerByCookieWithRefreshCheck();
         } else {
@@ -166,9 +204,10 @@ public class LoginService implements IClientLoginService {
     }
 
     @Override
-    public void logout() {
+    public void logoutAndReloginAsAnonymous() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         Profile.setCurrent(Profile.ANONYMOUS);
+        notifyLoginStateChanged();
         loginAsAnonymousToServer();
     }
 

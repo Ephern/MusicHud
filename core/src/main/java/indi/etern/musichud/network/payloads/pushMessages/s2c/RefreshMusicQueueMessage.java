@@ -1,7 +1,7 @@
 package indi.etern.musichud.network.payloads.pushMessages.s2c;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -14,9 +14,9 @@ import indi.etern.musichud.platform.Environment;
 
 import java.util.Queue;
 
-public record RefreshMusicQueueMessage(Queue<MusicDetail> queue) implements S2CPayload {
+public record RefreshMusicQueueMessage(Queue<QueueItem> queue) implements S2CPayload {
     public static final ByteBufCodec<RefreshMusicQueueMessage> CODEC = ByteBufCodec.composite(
-            Codecs.ofQueue(() -> MusicDetail.CODEC),
+            Codecs.ofQueue(() -> QueueItem.CODEC),
             RefreshMusicQueueMessage::queue,
             RefreshMusicQueueMessage::new
     );

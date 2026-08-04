@@ -4,16 +4,15 @@ import com.google.gson.annotations.SerializedName;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import lombok.*;
 
 import java.util.LinkedHashSet;
 import java.util.Objects;
-import java.util.SequencedSet;
 import java.util.Set;
 
-@AllArgsConstructor(access = AccessLevel.PUBLIC)
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class Album implements MusicCollection{
+public class Album implements MusicCollection {
     public static final ByteBufCodec<Album> CODEC = ByteBufCodec.composite(
             Codecs.LONG, Album::getId,
             Codecs.STRING_UTF8, Album::getName,
@@ -21,7 +20,7 @@ public class Album implements MusicCollection{
             Codecs.STRING_UTF8, Album::getType,
             Codecs.STRING_UTF8, Album::getCompany,
             Codecs.INT, Album::getMusicTrackCount,
-            Codecs.ofCollection(LinkedHashSet::new, () -> MusicDetail.CODEC), Album::getMusicDetails,
+            Codecs.ofCollection(ObservableSequencedSet::new, () -> MusicDetail.CODEC), Album::getMusicDetails,
             Codecs.ofCollection(LinkedHashSet::new, () -> Artist.CODEC), Album::getArtists,
             PusherInfo.CODEC, Album::getPusherInfo,
             Album::new
@@ -38,11 +37,35 @@ public class Album implements MusicCollection{
     int musicTrackCount;
     @SerializedName("songs")
     @Setter
-    SequencedSet<MusicDetail> musicDetails = new LinkedHashSet<>();
-    SequencedSet<Artist> artists = new LinkedHashSet<>();
+    ObservableSequencedSet<MusicDetail> musicDetails = new ObservableSequencedSet<>(0);
+    LinkedHashSet<Artist> artists = new LinkedHashSet<>();
     // Not contained in the original API response, set separately
     @Getter
     transient PusherInfo pusherInfo = PusherInfo.EMPTY;
+
+    private boolean nullFiltered = false;
+
+    public Album(
+            long id,
+            String name,
+            String picUrl,
+            String type,
+            String company,
+            Integer musicTrackCount,
+            ObservableSequencedSet<MusicDetail> musicDetails,
+            LinkedHashSet<Artist> artists,
+            PusherInfo pusherInfo
+    ) {
+        this.id = id;
+        this.name = name;
+        this.picUrl = picUrl;
+        this.type = type;
+        this.company = company;
+        this.musicTrackCount = musicTrackCount;
+        this.musicDetails = musicDetails;
+        this.artists = artists;
+        this.pusherInfo = pusherInfo;
+    }
 
     public String getThumbnailPicUrl(int size) {
         return picUrl + "?param=" + size + "y" + size;
@@ -60,6 +83,7 @@ public class Album implements MusicCollection{
     public String getPicUrl() {
         return Objects.requireNonNullElse(picUrl, "");
     }
+
     public String getType() {
         return Objects.requireNonNullElse(type, "");
     }
@@ -69,12 +93,16 @@ public class Album implements MusicCollection{
     }
 
     @Override
-    public SequencedSet<MusicDetail> getMusicDetails() {
+    public ObservableSequencedSet<MusicDetail> getMusicDetails() {
         if (musicDetails == null || musicDetails.isEmpty()) {
-            return new LinkedHashSet<>(0);
+            return new ObservableSequencedSet<>(0);
         }
-        return musicDetails.stream().filter(Objects::nonNull)
-                .collect(LinkedHashSet::new, Set::add, LinkedHashSet::addAll);
+        if (!nullFiltered) {
+            musicDetails = musicDetails.stream().filter(Objects::nonNull)
+                    .collect(ObservableSequencedSet::new, Set::add, ObservableSequencedSet::addAll);
+            nullFiltered = true;
+        }
+        return musicDetails;
     }
 
     @Override
@@ -82,7 +110,7 @@ public class Album implements MusicCollection{
         return getThumbnailPicUrl(size);
     }
 
-    public SequencedSet<Artist> getArtists() {
+    public LinkedHashSet<Artist> getArtists() {
         return Objects.requireNonNullElse(artists, new LinkedHashSet<>());
     }
 

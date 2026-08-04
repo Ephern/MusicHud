@@ -3,6 +3,7 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
+import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -30,7 +31,7 @@ public class GetInitialStateResponse extends ApiResponsePayload {
                             GetInitialStateResponse::getNextIdle,
                             Codecs.ZONED_DATE_TIME,
                             GetInitialStateResponse::getStartTime,
-                            Codecs.ofQueue(() -> MusicDetail.CODEC),
+                            Codecs.ofQueue(() -> QueueItem.CODEC),
                             GetInitialStateResponse::getQueue,
                             Codecs.ofList(() -> Playlist.CODEC),
                             GetInitialStateResponse::getPlaylistSources,
@@ -43,7 +44,7 @@ public class GetInitialStateResponse extends ApiResponsePayload {
     private final MusicDetail currentPlaying;
     private final MusicDetail nextIdle;
     private final ZonedDateTime startTime;
-    private final Queue<MusicDetail> queue;
+    private final Queue<QueueItem> queue;
     private final List<Playlist> playlistSources;
     private final List<Album> albumSources;
 
