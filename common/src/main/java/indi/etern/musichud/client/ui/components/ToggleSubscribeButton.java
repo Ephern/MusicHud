@@ -34,7 +34,7 @@ public class ToggleSubscribeButton<T> extends ToggleIconButton {
         return b;
     }
 
-    public void bindMusicList(ISubscribeState<?> subscribeState) {
+    public void bindState(ISubscribeState<?> subscribeState) {
         if (subscribeState == null) {
             this.subscribeState = null;
             if (unregister != null) {

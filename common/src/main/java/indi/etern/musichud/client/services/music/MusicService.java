@@ -16,10 +16,12 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.states.*;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
+import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
@@ -36,7 +38,6 @@ import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 
@@ -51,13 +52,13 @@ public class MusicService implements IClientMusicService {
     @Getter(lazy = true)
     private final IIdlePlaySourceState idlePlaySourceState = new IdlePlaySourceState();
     @Getter
-    private final Queue<MusicDetail> musicQueue = new ArrayDeque<>();
+    private final Queue<QueueItem> musicQueue = new ArrayDeque<>();
     @Getter
-    private final Set<Consumer<Queue<MusicDetail>>> musicQueueRefreshListeners = ConcurrentHashMap.newKeySet();
+    private final Set<Consumer<Queue<QueueItem>>> musicQueueRefreshListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<Consumer<MusicDetail>> musicQueuePushListeners = ConcurrentHashMap.newKeySet();
+    private final Set<Consumer<QueueItem>> musicQueuePushListeners = ConcurrentHashMap.newKeySet();
     @Getter
-    private final Set<BiConsumer<Integer, MusicDetail>> musicQueueRemoveListeners = ConcurrentHashMap.newKeySet();
+    private final Set<BiConsumer<Integer, QueueItem>> musicQueueRemoveListeners = ConcurrentHashMap.newKeySet();
     long lastPressTime = 0;
     private UserCollections currentUserCollections;
 
@@ -70,6 +71,7 @@ public class MusicService implements IClientMusicService {
         private ObservableSequencedSet<Album> subscribedAlbums;
         @Setter
         private ObservableSequencedSet<Artist> subscribedArtists;
+        private boolean loaded = false;
         private volatile long lastReupdateCachesTimestamp = 0;
 
         public UserCategoryPlaylists getUserCategoryPlaylists() {
@@ -94,31 +96,31 @@ public class MusicService implements IClientMusicService {
                 MusicHud.EXECUTOR.submit(() -> {
                     if (userCategoryPlaylists != null) {
                         Playlist likeList = userCategoryPlaylists.getLikeList();
-                        playlistsCache.put(likeList.getId(), likeList);
+                        playlistsCache.asMap().putIfAbsent(likeList.getId(), likeList);
                         userCategoryPlaylists.getCreatedPlaylist()
                                 .forEach(playlist -> {
                                     if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()) {
-                                        playlistsCache.put(playlist.getId(), playlist);
+                                        playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist);
                                     }
                                 });
                         userCategoryPlaylists.getSubscribedPlaylist()
                                 .forEach(playlist -> {
                                     if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()) {
-                                        playlistsCache.put(playlist.getId(), playlist);
+                                        playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist);
                                     }
                                 });
                     }
                     if (subscribedAlbums != null) {
                         subscribedAlbums.forEach(album -> {
                             if (album.getMusicDetails() != null && album.getMusicDetails().size() == album.getMusicTrackCount()) {
-                                albumsCache.put(album.getId(), album);
+                                albumsCache.asMap().putIfAbsent(album.getId(), album);
                             }
                         });
                     }
                     if (subscribedArtists != null) {
                         subscribedArtists.forEach(artist -> {
                             if (artist.getMusicDetails() != null && !artist.getMusicDetails().isEmpty() && !artist.getDescription().isEmpty()) {
-                                artistsCache.put(artist.getId(), artist);
+                                artistsCache.asMap().putIfAbsent(artist.getId(), artist);
                             }
                         });
                     }
@@ -155,7 +157,7 @@ public class MusicService implements IClientMusicService {
         if (!ignoreCache) {
             Playlist cachedPlaylist = playlistsCache.getIfPresent(id);
             if (cachedPlaylist != null && cachedPlaylist.getMusicDetails() != null
-                    && cachedPlaylist.getMusicDetails().size() == cachedPlaylist.getMusicTrackCount()) {
+                    && !cachedPlaylist.getMusicDetails().isEmpty()) {
                 return CompletableFuture.completedFuture(cachedPlaylist);
             }
         }
@@ -175,7 +177,7 @@ public class MusicService implements IClientMusicService {
         if (!ignoreCache) {
             Album cachedAlbum = albumsCache.getIfPresent(id);
             if (cachedAlbum != null && cachedAlbum.getMusicDetails() != null
-                    && cachedAlbum.getMusicDetails().size() == cachedAlbum.getMusicTrackCount()) {
+                    && !cachedAlbum.getMusicDetails().isEmpty()) {
                 return CompletableFuture.completedFuture(cachedAlbum);
             }
         }
@@ -191,54 +193,47 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
-    public synchronized void refreshQueue(Queue<MusicDetail> queue) {
-        Iterator<MusicDetail> originalIterator = musicQueue.iterator();
-        Iterator<MusicDetail> newIterator = queue.iterator();
-        int index = 0;
-        while (originalIterator.hasNext() || newIterator.hasNext()) {
-            if (originalIterator.hasNext() && newIterator.hasNext()) {
-                MusicDetail original = originalIterator.next();
-                MusicDetail news = newIterator.next();
-                if (original.getId() != news.getId()) {
-                    AtomicInteger atomicInt = new AtomicInteger(0);
-                    int finalIndex = index;
-                    musicQueue.removeIf((musicDetail) -> {
-                        int i = atomicInt.getAndIncrement();
-                        boolean remove = i == finalIndex && musicDetail.equals(original);
-                        if (remove) {
-                            musicQueueRemoveListeners.forEach(l -> {
-                                l.accept(i, musicDetail);
-                            });
-                        }
-                        return remove;
-                    });
-                }
-            } else if (newIterator.hasNext()) {
-                MusicDetail addedMusicDetail = newIterator.next();
-                musicQueue.add(addedMusicDetail);
-                musicQueuePushListeners.forEach(l -> {
-                    l.accept(addedMusicDetail);
-                });
+    public synchronized void refreshQueue(Queue<QueueItem> queue) {
+        List<QueueItem> local = new ArrayList<>(musicQueue);
+        List<QueueItem> fresh = new ArrayList<>(queue);
+        List<QueueItem> toRemove = new ArrayList<>();
+        int i = 0, j = 0;
+        while (i < local.size() && j < fresh.size()) {
+            if (sameItem(local.get(i), fresh.get(j))) {
+                i++;
+                j++;
             } else {
-                AtomicInteger atomicInt = new AtomicInteger(0);
-                int finalIndex = index;
-                musicQueue.removeIf((removedMusicDetail) -> {
-                    int i = atomicInt.getAndIncrement();
-                    boolean remove = i >= finalIndex;
-                    if (remove) {
-                        musicQueueRemoveListeners.forEach(l -> {
-                            l.accept(i, removedMusicDetail);
-                        });
-                    }
-                    return remove;
-                });
-                break;
+                // relative order is preserved, so local[i] must have been removed
+                toRemove.add(local.get(i));
+                i++;
             }
-            index++;
         }
-        musicQueueRefreshListeners.forEach(l -> {
-            l.accept(queue);
-        });
+        while (i < local.size()) {
+            toRemove.add(local.get(i++));
+        }
+        for (int k = toRemove.size() - 1; k >= 0; k--) {
+            QueueItem removed = toRemove.get(k);
+            int index = 0;
+            for (QueueItem item : musicQueue) {
+                if (item == removed) {
+                    break;
+                }
+                index++;
+            }
+            musicQueue.remove(removed);
+            int finalIndex = index;
+            musicQueueRemoveListeners.forEach(l -> l.accept(finalIndex, removed));
+        }
+        for (; j < fresh.size(); j++) {
+            QueueItem added = fresh.get(j);
+            musicQueue.add(added);
+            musicQueuePushListeners.forEach(l -> l.accept(added));
+        }
+        musicQueueRefreshListeners.forEach(l -> l.accept(queue));
+    }
+
+    private static boolean sameItem(QueueItem a, QueueItem b) {
+        return a.queueUniqueID().equals(b.queueUniqueID());
     }
 
     @Override
@@ -247,15 +242,15 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
-    public void sendRemoveMusicFromQueue(int index, MusicDetail musicDetail) {
-        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(index, musicDetail.getId()));
+    public void sendRemoveMusicFromQueue(int index, QueueItem item) {
+        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(index, item.musicDetail().getId(), item.queueUniqueID()));
     }
 
     @Override
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         if (clientConfig.getEnable()) {
             if (!musicQueue.isEmpty()) {// preload image
-                MusicDetail peek = musicQueue.peek();
+                MusicDetail peek = musicQueue.peek().musicDetail();
                 ImageUtils.downloadAsync(peek.getAlbum().getThumbnailPicUrl(240));
                 HudRendererManager.getInstance().preloadAlbumImage(peek.getAlbum());
             } else if (nextIdleMusicDetail != null && !nextIdleMusicDetail.equals(MusicDetail.NONE)) {
@@ -329,14 +324,20 @@ public class MusicService implements IClientMusicService {
                 MuiModApi.postToUiThread(() -> {
                     //noinspection UnstableApiUsage
                     Context context = UIManager.getInstance().getDecorView().getContext();
-                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed"), Toast.LENGTH_SHORT));
+                    String s = IClientDistUtil.getInstance().inSinglePlayer()
+                            ? I18n.get(MusicHud.MOD_ID + ".text.skipConfirmed")
+                            : I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed");
+                    ToastUtil.show(Toast.makeText(context, s, Toast.LENGTH_SHORT));
                 });
             } else {
                 lastPressTime = currentTimeMillis;
                 MuiModApi.postToUiThread(() -> {
                     //noinspection UnstableApiUsage
                     Context context = UIManager.getInstance().getDecorView().getContext();
-                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip"), Toast.LENGTH_SHORT));
+                    String s = IClientDistUtil.getInstance().inSinglePlayer()
+                            ? I18n.get(MusicHud.MOD_ID + ".text.confirmSkip")
+                            : I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip");
+                    ToastUtil.show(Toast.makeText(context, s, Toast.LENGTH_SHORT));
                 });
             }
         }
@@ -436,7 +437,7 @@ public class MusicService implements IClientMusicService {
 
     @Override
     public CompletableFuture<UserCollections> loadUserCollections(boolean ignoreCache) {
-        if (currentUserCollections != null) {
+        if (currentUserCollections != null && currentUserCollections.loaded) {
             return CompletableFuture.completedFuture(currentUserCollections);
         } else {
             currentUserCollections = new UserCollections();
@@ -448,7 +449,10 @@ public class MusicService implements IClientMusicService {
                             loadUserArtists(ignoreCache)
                                     .thenAccept(subscribedArtists ->
                                             currentUserCollections.setSubscribedArtists(new ObservableSequencedSet<>(subscribedArtists)))
-                    ).thenApply(v -> currentUserCollections);
+                    ).thenApply(v -> {
+                        currentUserCollections.loaded = true;
+                        return currentUserCollections;
+                    });
         }
     }
 
@@ -456,8 +460,10 @@ public class MusicService implements IClientMusicService {
     public static class RegisterImpl implements ClientRegister {
         @Override
         public void register() {
-            LoginService.getInstance().getLoginCompleteListeners().add((loginCookieInfo) -> {
-                MusicService.getInstance().getIdlePlaySourceState().local().loadFromConfig();
+            LoginService.getInstance().addLoginStateListener(state -> {
+                if (state != IClientLoginService.LoginState.UNLOGGED) {
+                    MusicService.getInstance().getIdlePlaySourceState().local().loadFromConfig();
+                }
             });
             IClientEventService.getInstance().registerClientPlayerQuit((player) -> {
                 MusicHud.EXECUTOR.execute(MusicService::resetCurrentMusicStatus);

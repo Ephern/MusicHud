@@ -19,6 +19,7 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValida
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
+import indi.etern.musichud.throwable.ApiException;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.*;
 import org.apache.logging.log4j.Logger;
@@ -36,16 +37,16 @@ public class LoginApiService implements ILoginApiService {
     private static final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private static volatile LoginApiService loginApiService;
     final Map<IPlayerClient, Runnable> pollingMap = new HashMap<>();
-    @Getter
-    Map<UUID, PlayerLoginInfo> playerInfoMap = new HashMap<>();
-    @Getter
-    Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
-    volatile String anonymousCookie;
     final Cache<IPlayerClient, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
             .maximumSize(Long.MAX_VALUE)
             .softValues()
             .build();
+    @Getter
+    Map<UUID, PlayerLoginInfo> playerInfoMap = new HashMap<>();
+    @Getter
+    Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
+    volatile String anonymousCookie;
 
     public static LoginApiService getInstance() {
         if (LoginApiService.loginApiService == null) {
@@ -63,11 +64,7 @@ public class LoginApiService implements ILoginApiService {
         MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
     }
 
-    void sendLoginFailResult(IPlayerClient player, Exception e) {
-        logger.error(e);
-        String message;
-        String eMessage = e.getMessage();
-        message = e.getClass().getSimpleName() + (eMessage != null ? ":" + eMessage : "");
+    void sendLoginFailResult(IPlayerClient player, String message) {
         serverNetworkService.sendToPlayer(player,
                 new LoginResultMessage(
                         false,
@@ -132,22 +129,22 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public void loginAsAnonymous(IPlayerClient player, boolean sendFail) {
         try {
-            AnonymousLoginData response = ApiClient.post(
-                    ApiServerEndpointsMeta.Login.ANONYMOUS,
-                    null,
-                    null, true);
-            LoginCookieInfo loginCookieInfo;
-            if (response.code == 200) {
-                loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, response.cookie, ZonedDateTime.now());
-                Profile profile = loadUserProfile(player, loginCookieInfo);
-                sendSuccessLoginResultTo(player, loginCookieInfo, profile);
-            } else if (sendFail) {
-                sendLoginFailResult(player, new RuntimeException("login failed"));
-            }
-        } catch (Exception e){
+            LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, getAnonymousCookie(), ZonedDateTime.now());
+            Profile profile = loadUserProfile(player, loginCookieInfo);
+            sendSuccessLoginResultTo(player, loginCookieInfo, profile);
+        } catch (Exception e) {
+            logger.error(e);
             if (sendFail) {
-                sendLoginFailResult(player, new RuntimeException("login failed"));
+                handleLoginExceptions(player, e);
             }
+        }
+    }
+
+    private void handleLoginExceptions(IPlayerClient player, Exception e) {
+        if (e instanceof ApiException) {
+            sendLoginFailResult(player, MusicHud.MOD_ID + ".error.apiServer");
+        } else {
+            sendLoginFailResult(player, "");
         }
     }
 
@@ -202,7 +199,8 @@ public class LoginApiService implements ILoginApiService {
             startQRPollingVThread(player, response1.data.unikey);
             return response2;
         } catch (Exception e) {
-            sendLoginFailResult(player, e);
+            logger.error(e);
+            handleLoginExceptions(player, e);
             throw e;
         }
     }
@@ -253,7 +251,8 @@ public class LoginApiService implements ILoginApiService {
             } catch (InterruptedException e) {
                 logger.warn("Thread ({}) interrupted while polling for QR login status", Thread.currentThread().getName(), e);
             } catch (Exception e) {
-                sendLoginFailResult(player, e);
+                logger.error(e);
+                handleLoginExceptions(player, e);
             }
             logger.info("Polling v-thread finished for player {}", player.getName());
         };
@@ -412,13 +411,8 @@ public class LoginApiService implements ILoginApiService {
                         )
                 );
             } catch (Exception e) {
-                serverNetworkService.sendToPlayer(player,
-                        new LoginResultMessage(false,
-                                "",
-                                loginCookieInfo,
-                                Profile.ANONYMOUS
-                        )
-                );
+                logger.error(e);
+                handleLoginExceptions(player, e);
             }
         }
         MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(getLoginInfoByPlayerUUID(player.getUUID())));

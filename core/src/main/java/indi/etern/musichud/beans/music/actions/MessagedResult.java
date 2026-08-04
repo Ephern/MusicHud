@@ -4,13 +4,13 @@ import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 
 public record MessagedResult<T>(ActionResult actionResult, String message, T extraData) {
-    public static <T> ByteBufCodec<MessagedResult<T>> codec(ByteBufCodec<T> codec) {
+    public static <T> ByteBufCodec<MessagedResult<T>> codec(ByteBufCodec<T> tCodec) {
         return ByteBufCodec.composite(
                 Codecs.ofEnum(ActionResult.class),
                 MessagedResult::actionResult,
                 Codecs.STRING_UTF8,
                 MessagedResult::message,
-                codec,
+                tCodec,
                 MessagedResult::extraData,
                 MessagedResult::new
         );

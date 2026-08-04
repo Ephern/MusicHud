@@ -32,7 +32,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class SideMenu extends FrameLayout {
     private final RadioGroup navBarButtonGroup;
     private final RouterContainer routerContainer;
-//    final LinkedHashMap<String, NavigationMeta> pagesMap = new LinkedHashMap<>();
     final LinkedHashMap<RadioButton, NavigationMeta> pagesMap1 = new LinkedHashMap<>();
     private int defaultSelectedIndex = 0;
     private final

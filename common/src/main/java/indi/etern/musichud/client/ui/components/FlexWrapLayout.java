@@ -37,17 +37,24 @@ public class FlexWrapLayout extends LinearLayout {
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
             public void onViewAttachedToWindow(View v) {
-                reflowChildren();
                 post(() -> {
                     attached = true;
+                    reflowChildren();
                 });
             }
 
             @Override
             public void onViewDetachedFromWindow(View v) {
-                removeAllViews();
+                attached = false;
+                removeAllRowViews();
             }
         });
+    }
+
+    private void removeAllRowViews() {
+        rows.forEach(ViewGroup::removeAllViews);
+        rows.clear();
+        super.removeAllViews();
     }
 
     /**

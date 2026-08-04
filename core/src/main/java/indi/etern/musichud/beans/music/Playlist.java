@@ -112,7 +112,7 @@ public class Playlist implements MusicCollection {
     }
 
     @Override
-    public SequencedSet<MusicDetail> getMusicDetails() {
+    public ObservableSequencedSet<MusicDetail> getMusicDetails() {
         return getTracks();
     }
 

@@ -1,6 +1,6 @@
 package indi.etern.musichud.beans.music;
 
-import java.util.Collection;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 
 public interface MusicCollection extends IdentifiedBeans {
     long getId();
@@ -9,7 +9,7 @@ public interface MusicCollection extends IdentifiedBeans {
     String getImageThumbnailUrl(int size);
     int getMusicTrackCount();
     PusherInfo getPusherInfo();
-    Collection<MusicDetail> getMusicDetails();
+    ObservableSequencedSet<MusicDetail> getMusicDetails();
     MusicCollection copyWithPusherInfo(PusherInfo pusherInfo);
 
     boolean equalsLoose(Object obj);

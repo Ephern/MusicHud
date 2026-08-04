@@ -1,12 +1,10 @@
 package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage;
 import indi.etern.musichud.platform.Environment;
 
-import java.util.List;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -30,13 +28,25 @@ public interface IClientLoginService {
         EXTERNAL, INTERNAL
     }
 
+    enum LoginState {
+        UNLOGGED,
+        ANONYMOUS,
+        LOGGED_IN
+    }
+
     boolean isLogined();
+
+    LoginState getLoginState();
+
+    Unregister addLoginStateListener(Consumer<LoginState> listener);
+
+    boolean hasPreviousLoginInfo();
 
     void connectAsPrevious();
 
     void loginToServer(ConnectionType type);
 
-    void logout();
+    void logoutAndReloginAsAnonymous();
 
     void disconnectToExternalOrIntegratedServer();
 
@@ -47,8 +57,6 @@ public interface IClientLoginService {
     Boolean toggleConnection();
 
     void keyBindsToggleConnection();
-
-    List<Consumer<LoginCookieInfo>> getLoginCompleteListeners();
 
     ConnectionType getConnectionType();
 

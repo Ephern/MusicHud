@@ -7,10 +7,12 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public class ObservableSequencedSet<E> extends ForwardingSet<E> implements SequencedSet<E> {
     private final SequencedSet<E> delegate;
 
+    private final Set<Runnable> changeListeners = ConcurrentHashMap.newKeySet();
     private final Set<Consumer<E>> addListeners = ConcurrentHashMap.newKeySet();
     private final Set<Consumer<E>> removeListeners = ConcurrentHashMap.newKeySet();
 
@@ -101,20 +103,57 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
     }
 
     @Override
+    public boolean removeIf(@NotNull Predicate<? super E> filter) {
+        List<E> removed = stream().filter(filter).toList();
+        boolean changed = super.removeIf(filter);
+        if (changed) {
+            removed.forEach(e -> removeListeners.forEach(l -> l.accept(e)));
+        }
+        return changed;
+    }
+
+    @Override
     public void clear() {
         Set<E> copy = Set.copyOf(this);
         super.clear();
         removeListeners.forEach(copy::forEach);
     }
 
-    public Unregister registerOnAdd(Consumer<E> consumer) {
-        addListeners.add(consumer);
-        return () -> addListeners.remove(consumer);
+    public EditHandle<E> beginEdit() {
+        return new EditHandle<>(this);
     }
 
-    public Unregister registerOnRemove(Consumer<E> consumer) {
-        removeListeners.add(consumer);
-        return () -> removeListeners.remove(consumer);
+    public static class EditHandle<E> {
+        private final ObservableSequencedSet<E> set;
+        private final List<E> snapshot;
+
+        EditHandle(ObservableSequencedSet<E> set) {
+            this.set = set;
+            this.snapshot = List.copyOf(set);
+        }
+
+        public void rollback() {
+            set.clear();
+            set.addAll(snapshot);
+        }
+
+        public void commit() {
+        }
+    }
+
+    public Unregister registerOnChange(Runnable listener) {
+        changeListeners.add(listener);
+        return () -> changeListeners.remove(listener);
+    }
+
+    public Unregister registerOnAdd(Consumer<E> listener) {
+        addListeners.add(listener);
+        return () -> addListeners.remove(listener);
+    }
+
+    public Unregister registerOnRemove(Consumer<E> listener) {
+        removeListeners.add(listener);
+        return () -> removeListeners.remove(listener);
     }
 
     @Override

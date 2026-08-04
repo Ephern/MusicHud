@@ -127,7 +127,7 @@ public class ConnectionManager implements IConnectionManager {
                     clientLoginService.loginToServer(IClientLoginService.ConnectionType.EXTERNAL);
                     requestInitialState();
                 } else {
-                    clientLoginService.logout();
+                    clientLoginService.logoutAndReloginAsAnonymous();
                     MusicHud.setConnectStatus(MusicHud.ConnectStatus.INCOMPATIBLE);
                 }
             } else {

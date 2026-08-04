@@ -11,8 +11,17 @@ public class ApiException extends RuntimeException {
         super();
     }
 
+    public ApiException(String s) {
+        super(s);
+    }
+
     @Override
     public String getMessage() {
-        return "Unable to connect to API server | 无法连接到 API 服务器";
+        String message = super.getMessage();
+        if (message == null || message.isBlank()) {
+            return "Unable to connect to API server | 无法连接到 API 服务器";
+        } else {
+            return message;
+        }
     }
 }

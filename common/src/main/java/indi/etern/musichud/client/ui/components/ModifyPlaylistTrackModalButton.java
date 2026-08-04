@@ -23,12 +23,15 @@ import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.Privacy;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.user.ProfileConfigData;
+import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.client.ui.utils.ui.Easing;
+import indi.etern.musichud.interfaces.IClientLoginService;
+import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 
@@ -43,24 +46,48 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class ModifyPlaylistTrackModalButton extends ImageButton {
     private final Logger logger = MusicHud.getLogger(ModifyPlaylistTrackModalButton.class);
+    private final String normalTooltip;
     private MusicDetail musicDetail;
     private IMusicTrackState musicTrackState;
+    private Unregister loginStateUnregister;
 
     public ModifyPlaylistTrackModalButton(Context context) {
         super(context);
         setScaleType(ScaleType.CENTER);
-        String tooltip = I18n.get(MusicHud.MOD_ID + ".button.modifyMusicTrackPlaylist");
-        setTooltipText(tooltip);
+        normalTooltip = I18n.get(MusicHud.MOD_ID + ".button.modifyMusicTrackPlaylist");
+        setTooltipText(normalTooltip);
         Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_plus.png");
         if (icon != null) {
             var resources = getContext().getResources();
             setImageDrawable(new ScaledImageDrawable(resources, icon, dp(16), dp(16)));
         }
+        loginStateUnregister = LoginService.getInstance().addLoginStateListener(state ->
+                MuiModApi.postToUiThread(() -> updateLoginState(state == IClientLoginService.LoginState.LOGGED_IN)));
+        updateLoginState(LoginService.getInstance().isLogined());
         setOnClickListener(v -> {
             if (musicDetail != null && !musicDetail.equals(MusicDetail.NONE)) {
                 showModal();
             }
         });
+    }
+
+    private void updateLoginState(boolean loggedIn) {
+        if (loggedIn) {
+            setEnabled(true);
+            setTooltipText(normalTooltip);
+        } else {
+            setEnabled(false);
+            setTooltipText(I18n.get(MusicHud.MOD_ID + ".text.loginRequired"));
+        }
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        if (loginStateUnregister != null) {
+            loginStateUnregister.unregister();
+            loginStateUnregister = null;
+        }
     }
 
     public void bindMusicDetail(MusicDetail musicDetail) {
@@ -244,14 +271,12 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
         private final ShapeDrawable bgDrawable;
         private final TextView nameText;
         private final TextView countText;
-        private final Consumer<Boolean> onChange;
         private int currentBgColor = BG_COLOR_BLANK;
         private boolean checked;
         private ValueAnimator currentAnimation;
 
         PlaylistToggleRow(Context context, Playlist playlist, Consumer<Boolean> onChange) {
             super(context);
-            this.onChange = onChange;
 
             setOrientation(HORIZONTAL);
             setGravity(Gravity.CENTER_VERTICAL);

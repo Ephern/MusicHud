@@ -12,6 +12,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
@@ -84,8 +85,8 @@ public class HomeView extends LinearLayout {
             }
         });
     };
-    private Consumer<MusicDetail> musicQueuePushListener;
-    private BiConsumer<Integer, MusicDetail> musicQueueRemoveListener;
+    private Consumer<QueueItem> musicQueuePushListener;
+    private BiConsumer<Integer, QueueItem> musicQueueRemoveListener;
     private Unregister localAddRegister;
     private Unregister localRemoveRegister;
     private Unregister serverAddRegister;
@@ -254,7 +255,7 @@ public class HomeView extends LinearLayout {
             checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
             checkQueue(musicService.getMusicQueue());
 
-            Queue<MusicDetail> queue = musicService.getMusicQueue();
+            Queue<QueueItem> queue = musicService.getMusicQueue();
 
             localAddRegister = musicService.getIdlePlaySourceState().local().onAdd(localAddListener);
             localRemoveRegister = musicService.getIdlePlaySourceState().local().onRemove(localRemoveListener);
@@ -263,17 +264,17 @@ public class HomeView extends LinearLayout {
 
             playQueueListView.removeAllViews();
 
-            for (MusicDetail musicDetail : queue) {
-                addMusicQueueItem(musicDetail, playQueueListView);
+            for (QueueItem item : queue) {
+                addMusicQueueItem(item, playQueueListView);
             }
 
-            musicQueuePushListener = musicDetail -> {
+            musicQueuePushListener = item -> {
                 MuiModApi.postToUiThread(() -> {
-                    addMusicQueueItem(musicDetail, playQueueListView);
+                    addMusicQueueItem(item, playQueueListView);
                     checkQueue(queue);
                 });
             };
-            musicQueueRemoveListener = (removeIndex, musicDetail) -> {
+            musicQueueRemoveListener = (removeIndex, item) -> {
                 MuiModApi.postToUiThread(() -> {
                     if (removeIndex >= 0 && removeIndex < playQueueListView.getChildCount()) {
                         playQueueListView.removeViewAt(removeIndex);
@@ -309,7 +310,7 @@ public class HomeView extends LinearLayout {
         idlePlaySourceCardMap.put(idlePlaySource, child);
     }
 
-    private void checkQueue(Queue<MusicDetail> queue) {
+    private void checkQueue(Queue<QueueItem> queue) {
         if (queue.isEmpty()) {
             queueTitle.setVisibility(View.GONE);
             playQueueListView.setVisibility(View.GONE);
@@ -317,7 +318,7 @@ public class HomeView extends LinearLayout {
         } else {
             queueTitle.setVisibility(View.VISIBLE);
             playQueueListView.setVisibility(View.VISIBLE);
-            checkNextToPlay(queue.peek());
+            checkNextToPlay(queue.peek().musicDetail());
         }
     }
 
@@ -332,7 +333,7 @@ public class HomeView extends LinearLayout {
 
     private void checkNextToPlay(MusicDetail nextIdle) {
         MusicService musicService = MusicService.getInstance();
-        Queue<MusicDetail> musicQueue = musicService.getMusicQueue();
+        Queue<QueueItem> musicQueue = musicService.getMusicQueue();
         boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty() || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();
         MusicDetail next = hasIdlePlaySources ? nextIdle : null;
         if (musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE)) {
@@ -345,7 +346,8 @@ public class HomeView extends LinearLayout {
         }
     }
 
-    private void addMusicQueueItem(MusicDetail musicDetail, LinearLayout playQueueView) {
+    private void addMusicQueueItem(QueueItem item, LinearLayout playQueueView) {
+        MusicDetail musicDetail = item.musicDetail();
         var musicListItem = new MusicListItem(getContext());
         musicListItem.bindData(musicDetail);
         LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, WRAP_CONTENT);
@@ -363,7 +365,7 @@ public class HomeView extends LinearLayout {
                     .build().newBackgroundDrawable();
             removeButton.setBackground(background);
             removeButton.setOnClickListener(v -> {
-                MusicService.getInstance().sendRemoveMusicFromQueue(playQueueView.indexOfChild(musicListItem), musicDetail);
+                MusicService.getInstance().sendRemoveMusicFromQueue(playQueueView.indexOfChild(musicListItem), item);
             });
             musicListItem.getButtonsLayout().addView(removeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
         }

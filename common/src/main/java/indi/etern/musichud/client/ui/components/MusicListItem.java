@@ -7,7 +7,9 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
+import indi.etern.musichud.beans.music.Fee;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.client.services.music.MusicService;
@@ -18,6 +20,7 @@ import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
+import net.minecraft.client.resources.language.I18n;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -30,11 +33,13 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicListItem extends LinearLayout {
     public static final int imageSize = 56;
+    private static final MusicService musicService = MusicService.getInstance();
     private final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("mm:ss");
     private UrlImageView albumImage;
     private TextView musicName;
-    private FlexWrapLayout musicArtistAndAlbum;
+    private TextView feeLabel;
+    private FlexWrapLayout row2;
     private TextView durationText;
     private TextView pusherText;
     @Setter
@@ -44,7 +49,6 @@ public class MusicListItem extends LinearLayout {
     private MusicDetail musicDetail;
     private PlayerHeadView pusherHeadView;
     private ToggleTrackLikeStateButton likeButton;
-    private static final MusicService musicService = MusicService.getInstance();
     @Getter
     private LinearLayout buttonsLayout;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
@@ -72,32 +76,46 @@ public class MusicListItem extends LinearLayout {
         textsParams.setMargins(dp(12), 0, 0, 0);
         addView(musicTexts, textsParams);
 
+        LinearLayout row1 = new LinearLayout(context);
+        row1.setOrientation(HORIZONTAL);
+        row1.setGravity(Gravity.CENTER_VERTICAL);
+        musicTexts.addView(row1);
+
         musicName = new TextView(context);
         musicName.setSingleLine(true);
         musicName.setTextSize(Theme.TEXT_SIZE_LARGE);
         musicName.setTextColor(Theme.NORMAL_TEXT_COLOR);
-        musicTexts.addView(musicName);
+        row1.addView(musicName, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
-        musicArtistAndAlbum = new FlexWrapLayout(context);
-        musicTexts.addView(musicArtistAndAlbum);
+        row2 = new FlexWrapLayout(context);
+        musicTexts.addView(row2);
 
-        LinearLayout linearLayout = new LinearLayout(context);
-        linearLayout.setOrientation(HORIZONTAL);
-        linearLayout.setGravity(Gravity.CENTER_VERTICAL);
-        musicTexts.addView(linearLayout);
+        LinearLayout row3 = new LinearLayout(context);
+        row3.setOrientation(HORIZONTAL);
+        row3.setGravity(Gravity.CENTER_VERTICAL);
+        musicTexts.addView(row3);
 
         durationText = new TextView(context);
         durationText.setTextSize(Theme.TEXT_SIZE_NORMAL);
         durationText.setSingleLine(true);
         durationText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
 
-        LayoutParams params = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         params.setMargins(0, 0, dp(12), 0);
-        linearLayout.addView(durationText, params);
+        row3.addView(durationText, params);
 
-        LinearLayout pusherRow = new LinearLayout(context);
-        pusherRow.setOrientation(LinearLayout.HORIZONTAL);
-        pusherRow.setGravity(Gravity.CENTER_VERTICAL);
+        feeLabel = new TextView(context);
+        feeLabel.setSingleLine(true);
+        feeLabel.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        feeLabel.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        feeLabel.setVisibility(GONE);
+        LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        params1.setMargins(0, 0, dp(12), 0);
+        row3.addView(feeLabel, params1);
+
+        LinearLayout pusherInfo = new LinearLayout(context);
+        pusherInfo.setOrientation(LinearLayout.HORIZONTAL);
+        pusherInfo.setGravity(Gravity.CENTER_VERTICAL);
 
         pusherText = new TextView(context);
         pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
@@ -110,13 +128,13 @@ public class MusicListItem extends LinearLayout {
         pusherHeadView.setLayoutParams(new LinearLayout.LayoutParams(rowHeight, rowHeight));
         pusherHeadView.setVisibility(View.GONE);
 
-        pusherRow.addView(pusherHeadView);
+        pusherInfo.addView(pusherHeadView);
         LinearLayout.LayoutParams params5 = new LinearLayout.LayoutParams(WRAP_CONTENT, rowHeight);
         params5.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
         params5.setMargins(pusherText.dp(4), 0, 0, 0);
-        pusherRow.addView(pusherText, params5);
+        pusherInfo.addView(pusherText, params5);
 
-        linearLayout.addView(pusherRow, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        row3.addView(pusherInfo, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         buttonsLayout = new LinearLayout(context);
         buttonsLayout.setOrientation(HORIZONTAL);
@@ -139,15 +157,23 @@ public class MusicListItem extends LinearLayout {
     }
 
     public void bindData(MusicDetail musicDetail) {
-        if (Objects.equals(this.musicDetail,musicDetail)) {
+        if (Objects.equals(this.musicDetail, musicDetail)) {
             return;
         }
+        setTag(musicDetail.getId());
         this.musicDetail = musicDetail;
         albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(dp(imageSize)));
 
         musicName.setText(musicDetail.getName());
+        Fee fee1 = musicDetail.getFee();
+        if (fee1 == Fee.VIP || fee1 == Fee.SEPARATELY_PURCHASE) {
+            feeLabel.setText(I18n.get(MusicHud.MOD_ID + ".text.fee." + fee1.name()));
+            feeLabel.setVisibility(VISIBLE);
+        } else {
+            feeLabel.setVisibility(GONE);
+        }
 
-        musicArtistAndAlbum.removeAllViews();
+        row2.removeAllViews();
         int index = 0;
         Context context = getContext();
         ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
@@ -161,7 +187,7 @@ public class MusicListItem extends LinearLayout {
                 split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                 split.setTextSize(Theme.TEXT_SIZE_SMALL);
                 split.setText(" / ");
-                musicArtistAndAlbum.addView(split);
+                row2.addView(split);
             }
             index++;
             Button artistButton = new Button(context);
@@ -178,13 +204,13 @@ public class MusicListItem extends LinearLayout {
                     );
                 }
             });
-            musicArtistAndAlbum.addView(artistButton);
+            row2.addView(artistButton);
         }
         TextView split = new TextView(context);
         split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         split.setTextSize(Theme.TEXT_SIZE_SMALL);
         split.setText(" - ");
-        musicArtistAndAlbum.addView(split);
+        row2.addView(split);
         Button albumButton = new Button(context);
         albumButton.setBackground(backgroundFactory.newBackgroundDrawable());
         albumButton.setTextColor(Theme.PRIMARY_COLOR);
@@ -199,7 +225,7 @@ public class MusicListItem extends LinearLayout {
                 );
             }
         });
-        musicArtistAndAlbum.addView(albumButton);
+        row2.addView(albumButton);
 
         Duration duration = Duration.of(musicDetail.getDurationMillis(), ChronoUnit.MILLIS);
         DateTimeFormatter formatter = duration.toHoursPart() >= 1 ?
@@ -219,7 +245,8 @@ public class MusicListItem extends LinearLayout {
                 pusherHeadView.setPlayerSkinSupplier(() -> {
                     try {
                         return PlayerInfoUtil.getPlayerSkin(PlayerInfoUtil.getPlayerInfoByUUID(pusherInfo.getPlayerUUID()));
-                    } catch (Exception ignored) {}
+                    } catch (Exception ignored) {
+                    }
                     return null;
                 });
             }
