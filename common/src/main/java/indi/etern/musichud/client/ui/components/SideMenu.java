@@ -16,8 +16,8 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.RadioButton;
 import icyllis.modernui.widget.RadioGroup;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import lombok.Getter;
 import org.jetbrains.annotations.Nullable;
 

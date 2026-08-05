@@ -18,7 +18,7 @@ import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
 import indi.etern.musichud.interfaces.IClientLoginService;
@@ -30,6 +30,7 @@ import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientPushMusicToQu
 import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientRemoveMusicFromQueueMessage;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.VoteSkipCurrentMusicMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
+import indi.etern.musichud.utils.CollectionUpdateNotifier;
 import lombok.*;
 import net.minecraft.client.resources.language.I18n;
 
@@ -96,24 +97,29 @@ public class MusicService implements IClientMusicService {
                 MusicHud.EXECUTOR.submit(() -> {
                     if (userCategoryPlaylists != null) {
                         Playlist likeList = userCategoryPlaylists.getLikeList();
-                        playlistsCache.asMap().putIfAbsent(likeList.getId(), likeList);
+                        if (playlistsCache.asMap().putIfAbsent(likeList.getId(), likeList) == null) {
+                            CollectionUpdateNotifier.notifyPlaylistUpdated(likeList.getId());
+                        }
                         userCategoryPlaylists.getCreatedPlaylist()
                                 .forEach(playlist -> {
-                                    if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()) {
-                                        playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist);
+                                    if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
+                                            && playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist) == null) {
+                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId());
                                     }
                                 });
                         userCategoryPlaylists.getSubscribedPlaylist()
                                 .forEach(playlist -> {
-                                    if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()) {
-                                        playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist);
+                                    if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
+                                            && playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist) == null) {
+                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId());
                                     }
                                 });
                     }
                     if (subscribedAlbums != null) {
                         subscribedAlbums.forEach(album -> {
-                            if (album.getMusicDetails() != null && album.getMusicDetails().size() == album.getMusicTrackCount()) {
-                                albumsCache.asMap().putIfAbsent(album.getId(), album);
+                            if (album.getMusicDetails() != null && album.getMusicDetails().size() == album.getMusicTrackCount()
+                                    && albumsCache.asMap().putIfAbsent(album.getId(), album) == null) {
+                                CollectionUpdateNotifier.notifyAlbumUpdated(album.getId());
                             }
                         });
                     }
@@ -157,7 +163,7 @@ public class MusicService implements IClientMusicService {
         if (!ignoreCache) {
             Playlist cachedPlaylist = playlistsCache.getIfPresent(id);
             if (cachedPlaylist != null && cachedPlaylist.getMusicDetails() != null
-                    && !cachedPlaylist.getMusicDetails().isEmpty()) {
+                    && (!cachedPlaylist.getMusicDetails().isEmpty() || cachedPlaylist.getMusicTrackCount() == 0)) {
                 return CompletableFuture.completedFuture(cachedPlaylist);
             }
         }
@@ -177,7 +183,7 @@ public class MusicService implements IClientMusicService {
         if (!ignoreCache) {
             Album cachedAlbum = albumsCache.getIfPresent(id);
             if (cachedAlbum != null && cachedAlbum.getMusicDetails() != null
-                    && !cachedAlbum.getMusicDetails().isEmpty()) {
+                    && (!cachedAlbum.getMusicDetails().isEmpty() || cachedAlbum.getMusicTrackCount() == 0)) {
                 return CompletableFuture.completedFuture(cachedAlbum);
             }
         }
