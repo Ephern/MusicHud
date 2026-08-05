@@ -1,7 +1,7 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
-import indi.etern.musichud.client.ui.utils.UniformDataUtils;
+import indi.etern.musichud.client.ui.utils.ui.UniformDataUtils;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import org.jetbrains.annotations.Nullable;

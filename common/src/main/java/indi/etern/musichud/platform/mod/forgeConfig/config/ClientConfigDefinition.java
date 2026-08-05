@@ -94,7 +94,7 @@ public class ClientConfigDefinition implements ClientConfig {
         hudBackgroundMixAlpha = builder
                 .comment("Hud Background Mix Alpha")
                 .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha")
-                .defineInRange("hudBackgroundMixAlpha", 0.5, 0, 1);
+                .defineInRange("hudBackgroundMixAlpha", 0.65, 0, 1);
         mixWithVanillaSoundVolume = builder
                 .comment("Mix Sound Volume with Vanilla Music Sound Volume")
                 .translation(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume")
@@ -114,23 +114,23 @@ public class ClientConfigDefinition implements ClientConfig {
         hudVerticalPosition = builder
                 .comment("Vertical position (TOP|CENTER|BOTTOM)")
                 .translation(MusicHud.MOD_ID + ".config.layout.verticalAlign")
-                .define("verticalPosition", VerticalAlign.TOP.name());
+                .define("verticalPosition", VerticalAlign.BOTTOM.name());
         hudHorizontalPosition = builder
                 .comment("Horizontal position (LEFT|CENTER|RIGHT)")
                 .translation(MusicHud.MOD_ID + ".config.layout.horizontalAlign")
-                .define("horizontalPosition", HorizontalAlign.LEFT.name());
+                .define("horizontalPosition", HorizontalAlign.CENTER.name());
         hudOffsetX = builder
                 .comment("Hud offset x")
                 .translation(MusicHud.MOD_ID + ".config.layout.offsetX")
-                .define("hudOffsetX", 16);
+                .define("hudOffsetX", 0);
         hudOffsetY = builder
                 .comment("Hud offset y")
                 .translation(MusicHud.MOD_ID + ".config.layout.offsetY")
-                .define("hudOffsetY", 16);
+                .define("hudOffsetY", 68);
         hudWidth = builder
                 .comment("Hud width")
                 .translation(MusicHud.MOD_ID + ".config.layout.hudWidth")
-                .define("hudWidth", 152);
+                .define("hudWidth", 180);
         hudHeight = builder
                 .comment("Hud height")
                 .translation(MusicHud.MOD_ID + ".config.layout.hudHeight")
@@ -170,7 +170,7 @@ public class ClientConfigDefinition implements ClientConfig {
         autoConnectWhiteList = builder
                 .comment("Auto connecting servers white list")
                 .translation(MusicHud.MOD_ID + ".config.autoConnectWhiteList")
-                .define("autoConnectBlackList", "[]");
+                .define("autoConnectWhiteList", "[]");
         instance = this;
     }
 

@@ -2,20 +2,20 @@ package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.beans.music.Album;
-import indi.etern.musichud.client.ui.components.AutoFlowGridLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
+import indi.etern.musichud.client.ui.components.WaterfallLayout;
 import lombok.Getter;
 
 import java.util.List;
 
-public class SearchAlbumResultView extends AutoFlowGridLayout {
+public class SearchAlbumResultView extends WaterfallLayout {
     @Getter
     private static SearchAlbumResultView instance;
     private static List<Album> result;
 
     public SearchAlbumResultView(Context context) {
         super(context);
-        setRowMinWidth(dp(143));
+        setRowMinWidth(dp(174));
         instance = this;
         refresh();
     }

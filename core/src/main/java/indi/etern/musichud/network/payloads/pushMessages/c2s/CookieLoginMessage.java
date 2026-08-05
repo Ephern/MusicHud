@@ -1,0 +1,36 @@
+package indi.etern.musichud.network.payloads.pushMessages.c2s;
+
+import indi.etern.musichud.beans.login.LoginCookieInfo;
+import indi.etern.musichud.interfaces.CommonRegister;
+import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.network.ByteBufCodec;
+import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.network.INetworkRegister;
+import indi.etern.musichud.network.payloads.C2SPayload;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.ILoginApiService;
+import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
+
+public record CookieLoginMessage(LoginCookieInfo loginCookieInfo, boolean tryRefresh) implements C2SPayload {
+    public static final ByteBufCodec<CookieLoginMessage> CODEC =
+            ByteBufCodec.composite(
+                    LoginCookieInfo.STREAM_CODEC,
+                    CookieLoginMessage::loginCookieInfo,
+                    Codecs.BOOL,
+                    CookieLoginMessage::tryRefresh,
+                    CookieLoginMessage::new
+            );
+
+    @RegisterMark
+    public static class RegisterImpl implements CommonRegister {
+        public void register() {
+            INetworkRegister.getInstance().autoRegisterPayload(
+                    CookieLoginMessage.class, CODEC,
+                    ServerDataPacketVThreadExecutor.execute((loginRequest, player) -> {
+                        ILoginApiService.getInstance(ApiProvider.NCM).loginWithCookie(loginRequest.loginCookieInfo, loginRequest.tryRefresh, player);
+                    })
+            );
+        }
+
+    }
+}

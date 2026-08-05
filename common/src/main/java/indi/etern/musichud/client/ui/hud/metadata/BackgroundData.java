@@ -2,9 +2,9 @@ package indi.etern.musichud.client.ui.hud.metadata;
 
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
-import indi.etern.musichud.client.ui.utils.ColorExtractor;
-import indi.etern.musichud.client.ui.utils.Mixable;
-import indi.etern.musichud.client.ui.utils.UniformDataUtils;
+import indi.etern.musichud.client.ui.utils.ui.ColorExtractor;
+import indi.etern.musichud.client.ui.utils.ui.Mixable;
+import indi.etern.musichud.client.ui.utils.ui.UniformDataUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.EqualsAndHashCode;
 

@@ -19,6 +19,7 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValida
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
+import indi.etern.musichud.throwable.ApiException;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.*;
 import org.apache.logging.log4j.Logger;
@@ -36,16 +37,16 @@ public class LoginApiService implements ILoginApiService {
     private static final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private static volatile LoginApiService loginApiService;
     final Map<IPlayerClient, Runnable> pollingMap = new HashMap<>();
-    @Getter
-    Map<UUID, PlayerLoginInfo> playerInfoMap = new HashMap<>();
-    @Getter
-    Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
-    volatile String anonymousCookie;
     final Cache<IPlayerClient, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
             .maximumSize(Long.MAX_VALUE)
             .softValues()
             .build();
+    @Getter
+    Map<UUID, PlayerLoginInfo> playerInfoMap = new HashMap<>();
+    @Getter
+    Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
+    volatile String anonymousCookie;
 
     public static LoginApiService getInstance() {
         if (LoginApiService.loginApiService == null) {
@@ -63,11 +64,7 @@ public class LoginApiService implements ILoginApiService {
         MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
     }
 
-    void sendLoginFailResult(IPlayerClient player, Exception e) {
-        logger.error(e);
-        String message;
-        String eMessage = e.getMessage();
-        message = e.getClass().getSimpleName() + (eMessage != null ? ":" + eMessage : "");
+    void sendLoginFailResult(IPlayerClient player, String message) {
         serverNetworkService.sendToPlayer(player,
                 new LoginResultMessage(
                         false,
@@ -83,7 +80,7 @@ public class LoginApiService implements ILoginApiService {
             synchronized (LoginApiService.class) {
                 if (anonymousCookie == null) {
                     AnonymousLoginData response = ApiClient.post(
-                            ServerApiMeta.Login.ANONYMOUS,
+                            ApiServerEndpointsMeta.Login.ANONYMOUS,
                             null,
                             null, true);
                     if (response.code == 200) {
@@ -132,29 +129,29 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public void loginAsAnonymous(IPlayerClient player, boolean sendFail) {
         try {
-            AnonymousLoginData response = ApiClient.post(
-                    ServerApiMeta.Login.ANONYMOUS,
-                    null,
-                    null, true);
-            LoginCookieInfo loginCookieInfo;
-            if (response.code == 200) {
-                loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, response.cookie, ZonedDateTime.now());
-                Profile profile = loadUserProfile(player, loginCookieInfo);
-                sendSuccessLoginResultTo(player, loginCookieInfo, profile);
-            } else if (sendFail) {
-                sendLoginFailResult(player, new RuntimeException("login failed"));
-            }
-        } catch (Exception e){
+            LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, getAnonymousCookie(), ZonedDateTime.now());
+            Profile profile = loadUserProfile(player, loginCookieInfo);
+            sendSuccessLoginResultTo(player, loginCookieInfo, profile);
+        } catch (Exception e) {
+            logger.error(e);
             if (sendFail) {
-                sendLoginFailResult(player, new RuntimeException("login failed"));
+                handleLoginExceptions(player, e);
             }
+        }
+    }
+
+    private void handleLoginExceptions(IPlayerClient player, Exception e) {
+        if (e instanceof ApiException) {
+            sendLoginFailResult(player, MusicHud.MOD_ID + ".error.apiServer");
+        } else {
+            sendLoginFailResult(player, "");
         }
     }
 
     @SneakyThrows
     @Override
     public void refreshAndSend(IPlayerClient player, LoginCookieInfo loginCookieInfo) {
-        RefreshCookieResponse cookieResponse = ApiClient.post(ServerApiMeta.Login.REFRESH, null, loginCookieInfo.rawCookie(), true);
+        RefreshCookieResponse cookieResponse = ApiClient.post(ApiServerEndpointsMeta.Login.REFRESH, null, loginCookieInfo.rawCookie(), true);
         LoginCookieInfo refreshedLoginCookieInfo;
         if (cookieResponse.code == 200) {
             refreshedLoginCookieInfo = new LoginCookieInfo(loginCookieInfo.type(), cookieResponse.cookie != null ? cookieResponse.cookie : loginCookieInfo.rawCookie(), ZonedDateTime.now());
@@ -187,13 +184,13 @@ public class LoginApiService implements ILoginApiService {
         try {
             logger.debug("Start QR login by player: {}", player.getName());
             QRLoginResponseInfo response1 = ApiClient.get(
-                    ServerApiMeta.Login.QrCode.KEY,
+                    ApiServerEndpointsMeta.Login.QrCode.KEY,
                     null,
                     true);
             var requestBody = new QRLoginGenerateRequestInfo(response1.data.unikey, true);
             logger.debug("Got QR login key for player: {}", player.getName());
             QRLoginData response2 = ApiClient.post(
-                    ServerApiMeta.Login.QrCode.GENERATE,
+                    ApiServerEndpointsMeta.Login.QrCode.GENERATE,
                     requestBody,
                     null,
                     true);
@@ -202,7 +199,8 @@ public class LoginApiService implements ILoginApiService {
             startQRPollingVThread(player, response1.data.unikey);
             return response2;
         } catch (Exception e) {
-            sendLoginFailResult(player, e);
+            logger.error(e);
+            handleLoginExceptions(player, e);
             throw e;
         }
     }
@@ -227,7 +225,7 @@ public class LoginApiService implements ILoginApiService {
 
                     try {
                         qrLoginStatus = ApiClient.post(
-                                ServerApiMeta.Login.QrCode.CHECK,
+                                ApiServerEndpointsMeta.Login.QrCode.CHECK,
                                 params2,
                                 null,
                                 true);
@@ -253,7 +251,8 @@ public class LoginApiService implements ILoginApiService {
             } catch (InterruptedException e) {
                 logger.warn("Thread ({}) interrupted while polling for QR login status", Thread.currentThread().getName(), e);
             } catch (Exception e) {
-                sendLoginFailResult(player, e);
+                logger.error(e);
+                handleLoginExceptions(player, e);
             }
             logger.info("Polling v-thread finished for player {}", player.getName());
         };
@@ -266,7 +265,7 @@ public class LoginApiService implements ILoginApiService {
         if (loginCookieInfo.type() == LoginType.ANONYMOUS) {
             return Profile.ANONYMOUS;
         }
-        AccountDetail accountDetail = ApiClient.get(ServerApiMeta.User.ACCOUNT, loginCookieInfo.rawCookie(), true);
+        AccountDetail accountDetail = ApiClient.get(ApiServerEndpointsMeta.User.ACCOUNT, loginCookieInfo.rawCookie(), true);
         Profile profile = accountDetail.profile();
         return postProcessProfile(player, loginCookieInfo, profile, accountDetail.account);
     }
@@ -317,8 +316,8 @@ public class LoginApiService implements ILoginApiService {
     }
 
     @Override
-    public void requestValidationCodeFor(int regionCode, long phone, IPlayerClient player) {
-        SendValidationCodeResponse response = ApiClient.post(ServerApiMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null, true);
+    public SendPhoneValidationCodeResponse requestValidationCodeFor(int regionCode, long phone, IPlayerClient player) {
+        SendValidationCodeResponse response = ApiClient.post(ApiServerEndpointsMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null, true);
         ZonedDateTime lastSentTime = lastSentTimes.getIfPresent(player);
         ZonedDateTime now = ZonedDateTime.now();
 
@@ -333,17 +332,17 @@ public class LoginApiService implements ILoginApiService {
             } else {
                 logger.error("Failed to send code to player: {}", player.getName());
             }
-            serverNetworkService.sendToPlayer(player, new SendPhoneValidationCodeResponse(response.done, 30));
+            return new SendPhoneValidationCodeResponse(response.done, 30);
         } else {
             logger.warn("Refuse to send code to player: {}, as frequency limit", player.getName());
-            serverNetworkService.sendToPlayer(player, new SendPhoneValidationCodeResponse(response.done, 30 - (int) duration.getSeconds()));
+            return new SendPhoneValidationCodeResponse(response.done, 30 - (int) duration.getSeconds());
         }
     }
 
     @Override
     public void loginWithPhoneAndCode(int regionCode, long phone, int code, IPlayerClient player) {
         PhoneCodeLoginRequest requestBody = new PhoneCodeLoginRequest(regionCode, phone, code);
-        PhoneLoginResponse loginResponse = ApiClient.post(ServerApiMeta.Login.PHONE, requestBody, null, true);
+        PhoneLoginResponse loginResponse = ApiClient.post(ApiServerEndpointsMeta.Login.PHONE, requestBody, null, true);
         if (loginResponse.code == 200) {
             LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.DEVICE_CODE, loginResponse.cookie, ZonedDateTime.now());
             Profile profile = postProcessProfile(player, loginCookieInfo, loginResponse.profile, loginResponse.account);
@@ -412,13 +411,8 @@ public class LoginApiService implements ILoginApiService {
                         )
                 );
             } catch (Exception e) {
-                serverNetworkService.sendToPlayer(player,
-                        new LoginResultMessage(false,
-                                "",
-                                loginCookieInfo,
-                                Profile.ANONYMOUS
-                        )
-                );
+                logger.error(e);
+                handleLoginExceptions(player, e);
             }
         }
         MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(getLoginInfoByPlayerUUID(player.getUUID())));

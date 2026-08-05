@@ -4,7 +4,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
-import indi.etern.musichud.client.ui.utils.Transitionable;
+import indi.etern.musichud.client.ui.utils.ui.Transitionable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;

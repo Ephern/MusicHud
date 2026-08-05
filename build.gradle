@@ -13,7 +13,7 @@ allprojects {
     version = rootProject.mod_version + "+" + rootProject.minecraft_version_range
 }
 
-configure(subprojects.findAll { it.name != 'core' }) {
+configure(subprojects.findAll { it.name != 'core' && it.name != 'processor' }) {
     apply plugin: 'dev.architectury.loom'
     apply plugin: 'architectury-plugin'
     apply plugin: 'com.gradleup.shadow'
@@ -60,6 +60,7 @@ configure(subprojects.findAll { it.name != 'core' }) {
         mappings loom.officialMojangMappings()
         compileOnly "org.projectlombok:lombok:$rootProject.lombok_version" // Add Lombok for compilation
         annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version" // Enable annotation processing
+        annotationProcessor project(':processor')
         testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version" // For test sources
         testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
         testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
@@ -82,6 +83,7 @@ configure(subprojects.findAll { it.name != 'core' }) {
 
     tasks.withType(JavaCompile).configureEach {
         it.options.release = 21
+        it.options.compilerArgs += ['-Amusichud.module=' + project.name]
     }
 
     tasks.withType(JavaExec).configureEach {

@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.pages.search;
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.KeyEvent;
 import icyllis.modernui.view.View;
@@ -17,16 +18,18 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.network.IClientNetworkService;
+import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SearchRequest;
+import indi.etern.musichud.network.payloads.requestResponseCycle.SearchResultResponse;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.ToString;
 import net.minecraft.client.resources.language.I18n;
 
+import java.time.Duration;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -49,7 +52,6 @@ public class SearchView extends LinearLayout {
     private SearchResultTabPage searchResultTabPage;
     @Getter
     private String searchText;
-    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
 
     public SearchView(Context context) {
         super(context);
@@ -120,6 +122,7 @@ public class SearchView extends LinearLayout {
             @Override
             public void onViewDetachedFromWindow(View v) {
                 instance = null;
+                searchMetas.clear();
             }
         });
     }
@@ -139,7 +142,7 @@ public class SearchView extends LinearLayout {
             searchMeta1.pendingFuture = new CompletableFuture<>();
             searchMetas.put(searchType, searchMeta1);
             searchRefreshListeners.forEach(listener -> listener.accept(searchMeta1));
-            clientNetworkService.sendToServer(new SearchRequest(searchText, searchType, 0));
+            sendSearchRequest(searchText, searchType, 0);
         }
     }
 
@@ -153,7 +156,31 @@ public class SearchView extends LinearLayout {
             int offset = searchMeta.nextOffset;
             searchMeta.pendingFuture = new CompletableFuture<>();
             searchRefreshListeners.forEach(listener -> listener.accept(searchMeta));
-            clientNetworkService.sendToServer(new SearchRequest(text, searchType, offset));
+            sendSearchRequest(text, searchType, offset);
+        }
+    }
+
+    private void sendSearchRequest(String text, SearchType searchType, int offset) {
+        RequestResponseManager.send(
+                        new SearchRequest(text, searchType, offset),
+                        SearchResultResponse.class,
+                        Duration.ofSeconds(10))
+                .thenAccept(response -> MuiModApi.postToUiThread(() -> handleSearchResult(response)))
+                .exceptionally(e -> {
+                    MusicHud.getLogger(SearchView.class).warn("Failed to search {}: {}", searchType, text, e);
+                    return null;
+                });
+    }
+
+    @SuppressWarnings("unchecked")
+    private void handleSearchResult(SearchResultResponse response) {
+        switch (response.getSearchType()) {
+            case MUSIC -> setSearchMusicResult(response.getOffset(), (List<MusicDetail>) response.getResult());
+            case PLAYLIST -> setSearchPlaylistResult(response.getOffset(), (List<Playlist>) response.getResult());
+            case ALBUM -> setSearchAlbumResult(response.getOffset(), (List<Album>) response.getResult());
+            case ARTIST -> setSearchArtistResult(response.getOffset(), (List<Artist>) response.getResult());
+            default -> {
+            }
         }
     }
 

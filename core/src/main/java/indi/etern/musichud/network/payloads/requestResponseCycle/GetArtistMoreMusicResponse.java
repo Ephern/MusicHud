@@ -5,46 +5,40 @@ import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.network.RequestResponseCodecs;
 import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.payloads.S2CPayload;
+import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.payloads.ApiResponsePayload;
+import lombok.AllArgsConstructor;
+import lombok.Getter;
 
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.function.Consumer;
 
-public record GetArtistMoreMusicResponse(long artistId, int offset, List<MusicDetail> musicDetails) implements S2CPayload {
-    public static final ByteBufCodec<GetArtistMoreMusicResponse> CODEC =
+@Getter
+@AllArgsConstructor
+public class GetArtistMoreMusicResponse extends ApiResponsePayload {
+    public static final ByteBufCodec<GetArtistMoreMusicResponse> CODEC = RequestResponseCodecs.withCycleId(
             ByteBufCodec.composite(
                     Codecs.LONG,
-                    GetArtistMoreMusicResponse::artistId,
+                    GetArtistMoreMusicResponse::getArtistId,
                     Codecs.INT,
-                    GetArtistMoreMusicResponse::offset,
+                    GetArtistMoreMusicResponse::getOffset,
                     Codecs.ofList(() -> MusicDetail.CODEC),
-                    GetArtistMoreMusicResponse::musicDetails,
+                    GetArtistMoreMusicResponse::getMusicDetails,
                     GetArtistMoreMusicResponse::new
-            );
+            )
+    );
 
-    public record RequestData(long artistId, int offset){}
-    static final Map<RequestData, Consumer<List<MusicDetail>>> consumerMap = new HashMap<>();
-    public static void setReceiver(RequestData requestData, Consumer<List<MusicDetail>> consumer) {
-        if (consumerMap.containsKey(requestData)) {
-            consumerMap.get(requestData).accept(null);
-        }
-        GetArtistMoreMusicResponse.consumerMap.put(requestData, consumer);
-    }
+    private final long artistId;
+    private final int offset;
+    private final List<MusicDetail> musicDetails;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
                     GetArtistMoreMusicResponse.class, CODEC,
-                    (response, player) -> {
-                        Consumer<List<MusicDetail>> consumer = consumerMap.remove(new RequestData(response.artistId, response.offset));
-                        if (consumer != null) {
-                            consumer.accept(response.musicDetails);
-                        }
-                    }
+                    (response, player) -> RequestResponseManager.complete(response)
             );
         }
     }

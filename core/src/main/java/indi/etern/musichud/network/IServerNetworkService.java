@@ -29,6 +29,12 @@ public interface IServerNetworkService {
         }
     }
 
+    default void sendToChannel(String channel, S2CPayload payload) {
+        for (IPlayerClient player : ChannelManager.getSubscribers(channel)) {
+            sendToPlayer(player, payload);
+        }
+    }
+
     default void sendToPlayerInfos(Collection<LoginApiService.PlayerLoginInfo> playerLoginInfos, S2CPayload payload) {
         for (LoginApiService.PlayerLoginInfo playerLoginInfo : playerLoginInfos) {
             IPlayerClient player = playerLoginInfo.getPlayer();
