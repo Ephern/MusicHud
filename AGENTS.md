@@ -48,10 +48,37 @@ The `architectury_enabled_platforms` property in `gradle.properties` only lists 
 
 ## Frameworks & Dependencies
 
-- **ModernUI** (icyllis.modernui) — GUI framework, NOT vanilla MC widgets. Flat JARs in `libs/`.
+- **ModernUI** (icyllis.modernui) — GUI framework, NOT vanilla MC widgets. Resolved from Gradle caches / Loom remap cache (may have flat JARs in `libs/` in some branches). See `ModernUI Library JARs` below for exact sources-JAR paths.
 - **Lombok** heavily used — annotation processing is already configured.
 - **JLayer** (MP3) + **JFLAC** (FLAC) — audio decoders, shaded into output jars.
 - **Mojang mappings** — `loom.officialMojangMappings()`.
+
+## ModernUI Library JARs
+
+`idea_execute_tool read_file` can read files inside these sources JARs with `--file_path "<jar path>!/<entry>"`. `search_symbol` / `search_text` / `skill_search` do NOT index external libraries — never use them to locate classes inside these JARs; use the paths below directly.
+
+### Path stability rules
+
+- Hash directories in `Gradle home\caches\modules-2\files-2.1` are content SHA-1s: stable as long as the dependency version is unchanged; they change only when a version is upgraded.
+- `-c1c451a1` / `-b5e3e3a6` remap hashes under the project `.gradle\loom-cache` are computed by Loom from MC version + mappings + dependency versions — they can change after a re-build or upgrade. If a path below fails, re-locate with the command at the bottom of this section.
+- Path variables below: `{projectRoot}` = this repository root (where this AGENTS.md lives); `{gradleHome}` = `H:\Dev\.gradle` on this machine (default `~/.gradle` elsewhere). Substitute them before calling `read_file` — it needs an absolute path.
+
+Fabric module uses the Loom-remapped jars (`-c1c451a1` / `-b5e3e3a6` suffixes) under the project `.gradle\loom-cache`; NeoForge module uses the plain jars under `{gradleHome}\caches`.
+
+| Library | Sources JAR path template (use with `read_file --file_path "…!/path/to/Class.java"`) |
+|---|---|
+| modernui-core 3.13.0 (remapped, fabric) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\dev\icyllis\modernui-core-b5e3e3a6\3.13.0\modernui-core-b5e3e3a6-3.13.0-sources.jar` |
+| modernui-core 3.13.0 (plain) | `{gradleHome}\caches\modules-2\files-2.1\dev.icyllis\modernui-core\3.13.0\bced1daf870a3ede277593ea26a72e70e571c052\modernui-core-3.13.0-sources.jar` |
+| ModernUI-Fabric 1.21.8-3.13.0.3 (remapped, used by fabric) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Fabric-c1c451a1\1.21.8-3.13.0.3\ModernUI-Fabric-c1c451a1-1.21.8-3.13.0.3-sources.jar` |
+| ModernUI-NeoForge 1.21.8-3.13.0.3 (used by neoforge) | `{gradleHome}\caches\modules-2\files-2.1\icyllis.modernui\ModernUI-NeoForge\1.21.8-3.13.0.3\7a6e28682e8e33552076d37e3177ed513b22d309\ModernUI-NeoForge-1.21.8-3.13.0.3-sources.jar` |
+| ModernUI-Markflow 3.13.0 (remapped) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Markflow-b5e3e3a6\3.13.0\ModernUI-Markflow-b5e3e3a6-3.13.0-sources.jar` |
+| arc3d-* 2026.2.0 (compiler/core/engine/granite/opengl/sketch/vulkan) | Pattern: `{gradleHome}\caches\modules-2\files-2.1\dev.icyllis\arc3d-<artifact>\2026.2.0\<hash>\arc3d-<artifact>-2026.2.0-sources.jar` — locate `<hash>` with `Get-ChildItem -Recurse "{gradleHome}\caches\modules-2\files-2.1\dev.icyllis" -Filter "arc3d-*-sources.jar"` |
+
+Fallback if a path is missing (e.g. after re-build, upgrade, or in another working tree): locate the JAR first, then pass the full path to `read_file`. Do NOT extract JARs with PowerShell — `read_file` reads JAR entries directly.
+
+```powershell
+Get-ChildItem -Recurse "{gradleHome}\caches","{projectRoot}\.gradle\loom-cache" -Filter "*<library>*sources*"
+```
 
 ## External Dependencies
 

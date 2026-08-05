@@ -12,22 +12,14 @@ import java.util.Objects;
 @Setter
 public class MusicResourceInfo {
     public static final ByteBufCodec<MusicResourceInfo> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
-            MusicResourceInfo::getId,
-            Codecs.STRING_UTF8,
-            MusicResourceInfo::getUrl,
-            Codecs.INT,
-            MusicResourceInfo::getBitrate,
-            Codecs.LONG,
-            MusicResourceInfo::getSize,
-            Codecs.ofEnum(FormatType.class),
-            MusicResourceInfo::getType,
-            Codecs.STRING_UTF8,
-            MusicResourceInfo::getMd5,
-            Codecs.ofEnum(Fee.class),
-            MusicResourceInfo::getFee,
-            Codecs.INT,
-            MusicResourceInfo::getTime,
+            Codecs.LONG, MusicResourceInfo::getId,
+            Codecs.STRING_UTF8, MusicResourceInfo::getUrl,
+            Codecs.INT, MusicResourceInfo::getBitrate,
+            Codecs.LONG, MusicResourceInfo::getSize,
+            Codecs.ofEnum(FormatType.class), MusicResourceInfo::getType,
+            Codecs.STRING_UTF8, MusicResourceInfo::getMd5,
+            Codecs.ofEnum(Fee.class), MusicResourceInfo::getFee,
+            Codecs.INT, MusicResourceInfo::getTime,
             MusicResourceInfo::new
     );
     public static final MusicResourceInfo NONE = new MusicResourceInfo();

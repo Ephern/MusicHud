@@ -1,4 +1,4 @@
-package indi.etern.musichud.network.payloads.requestResponseCycle;
+package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -10,16 +10,16 @@ import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 
-public record PhoneCodeLoginRequest(int regionCode, long phone, int code) implements C2SPayload {
-    public static final ByteBufCodec<PhoneCodeLoginRequest> CODEC =
+public record PhoneCodeLoginMessage(int regionCode, long phone, int code) implements C2SPayload {
+    public static final ByteBufCodec<PhoneCodeLoginMessage> CODEC =
             ByteBufCodec.composite(
                     Codecs.INT,
-                    PhoneCodeLoginRequest::regionCode,
+                    PhoneCodeLoginMessage::regionCode,
                     Codecs.LONG,
-                    PhoneCodeLoginRequest::phone,
+                    PhoneCodeLoginMessage::phone,
                     Codecs.INT,
-                    PhoneCodeLoginRequest::code,
-                    PhoneCodeLoginRequest::new
+                    PhoneCodeLoginMessage::code,
+                    PhoneCodeLoginMessage::new
             );
 
     @RegisterMark
@@ -27,7 +27,7 @@ public record PhoneCodeLoginRequest(int regionCode, long phone, int code) implem
         @Override
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
-                    PhoneCodeLoginRequest.class, CODEC,
+                    PhoneCodeLoginMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((request, player) -> {
                         ILoginApiService.getInstance(ApiProvider.NCM).loginWithPhoneAndCode(request.regionCode, request.phone, request.code,player);
                     })

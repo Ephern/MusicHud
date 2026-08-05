@@ -1,4 +1,4 @@
-package indi.etern.musichud.network.payloads.requestResponseCycle;
+package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -11,17 +11,18 @@ import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode
-public class CancelQRLoginRequest implements C2SPayload {
-    public static final CancelQRLoginRequest REQUEST = new CancelQRLoginRequest();
-    public static final ByteBufCodec<CancelQRLoginRequest> CODEC = ByteBufCodec.unit(REQUEST);
+public class AnonymousLoginMessage implements C2SPayload {
+    public static final AnonymousLoginMessage REQUEST = new AnonymousLoginMessage();
+    public static final ByteBufCodec<AnonymousLoginMessage> CODEC = ByteBufCodec.unit(REQUEST);
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
+
         public void register() {
             INetworkRegister.getInstance().autoRegisterPayload(
-                    CancelQRLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((cancelQRLoginRequest, player) -> {
-                        ILoginApiService.getInstance(ApiProvider.NCM).cancelQRLoginByPlayer(player);
+                    AnonymousLoginMessage.class, CODEC,
+                    ServerDataPacketVThreadExecutor.execute((anonymousLoginMessage, player) -> {
+                        ILoginApiService.getInstance(ApiProvider.NCM).loginAsAnonymous(player, true);
                     })
             );
         }

@@ -8,7 +8,7 @@ import indi.etern.musichud.utils.http.ApiClient;
 import java.util.Set;
 
 @SuppressWarnings("SpellCheckingInspection")
-public class ServerApiMeta {
+public class ApiServerEndpointsMeta {
     public static final UrlMeta<String> BASE = new UrlMeta<>(
             "",
             null,
@@ -202,6 +202,26 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 MusicApiService.PlaylistsResponse.class);
+        public static final UrlMeta<MusicApiService.PlaylistsResponse> CREATED_PLAYLIST = new UrlMeta<>(
+                "/user/playlist/create",
+                Set.of("uid"),
+                Set.of("limit"/*default:100*/, "offset"),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                MusicApiService.PlaylistsResponse.class);
+        public static final UrlMeta<MusicApiService.PlaylistsResponse> SUBSCRIBED_PLAYLIST = new UrlMeta<>(
+                "/user/playlist/collect",
+                Set.of("uid"),
+                Set.of("limit"/*default:100*/, "offset"),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                MusicApiService.PlaylistsResponse.class);
         public static final UrlMeta<String> DJ = new UrlMeta<>(
                 "/user/dj",
                 Set.of("uid"),
@@ -273,6 +293,50 @@ public class ServerApiMeta {
                 Set.of(200),
                 String.class
         );
+        public static final UrlMeta<String> MODIFY_LIKE_LIST = new UrlMeta<>(
+                "/like",
+                Set.of("id"),
+                Set.of("like"),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class
+        );
+        public static final UrlMeta<String> MODIFY_LIKE_LIST_V1 = new UrlMeta<>(
+                "/like",
+                Set.of("id", "uid", "like"),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class
+        );
+        public static final UrlMeta<String> GAIN_30MIN_FREE_LISTEN = new UrlMeta<>(
+                "/ad/listening/rights/gain",
+                null,
+                Set.of("reqUid"),
+                true,
+                false,
+                false,
+                false,
+                Set.of(200),
+                String.class
+        );
+        public static final UrlMeta<String> FREE_LISTEN_REMAIN_TIME = new UrlMeta<>(
+                "/ad/listening/rights",
+                null,
+                null,
+                true,
+                false,
+                false,
+                false,
+                Set.of(200),
+                String.class
+        );
     }
 
     public static class Artist {
@@ -316,6 +380,16 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 MusicApiService.GetArtistMusicResponse.class);
+        public static final UrlMeta<String> MODIFY_SUBSCRIBE = new UrlMeta<>(
+                "/artist/sub",
+                Set.of("t"/*operation type: 1(subscribe)|2(unsubscribe)*/, "id"/*artistId*/),
+                null,
+                true,
+                false,
+                false,
+                false,
+                Set.of(200),
+                String.class);
     }
 
     public static class Playlist {
@@ -389,6 +463,26 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 MusicApiService.PlaylistTracksResponse.class);
+        public static final UrlMeta<String> MODIFY_TRACKS = new UrlMeta<>(
+                "/playlist/tracks",
+                Set.of("op"/*add|del*/, "pid"/*playlistId*/, "tracks"/*musicIds*/),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class);
+        public static final UrlMeta<String> MODIFY_SUBSCRIBE = new UrlMeta<>(
+                "/playlist/subscribe",
+                Set.of("t"/*operation type: 1(subscribe)|2(unsubscribe)*/, "id"/*playlistId*/),
+                null,
+                true,
+                false,
+                false,
+                false,
+                Set.of(200),
+                String.class);
     }
 
     public static class Music {
@@ -464,6 +558,16 @@ public class ServerApiMeta {
                 true,
                 Set.of(200),
                 MusicApiService.GetAlbumDetailResult.class);
+        public static final UrlMeta<String> MODIFY_SUBSCRIBE = new UrlMeta<>(
+                "/album/sub",
+                Set.of("t"/*operation type: 1(subscribe)|2(unsubscribe)*/, "id"/*albumId*/),
+                null,
+                true,
+                false,
+                false,
+                false,
+                Set.of(200),
+                String.class);
     }
 
     public static class Search {

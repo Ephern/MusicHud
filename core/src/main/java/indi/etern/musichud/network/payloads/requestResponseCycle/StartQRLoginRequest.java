@@ -3,28 +3,27 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
-import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.IServerNetworkService;
-import indi.etern.musichud.network.payloads.C2SPayload;
+import indi.etern.musichud.network.RequestHandlerRegistry;
+import indi.etern.musichud.network.ResponseResult;
+import indi.etern.musichud.network.payloads.ApiRequestPayload;
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ILoginApiService;
-import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 import lombok.EqualsAndHashCode;
 
-@EqualsAndHashCode
-public class StartQRLoginRequest implements C2SPayload {
+@EqualsAndHashCode(callSuper = true)
+public class StartQRLoginRequest extends ApiRequestPayload {
     public static final StartQRLoginRequest REQUEST = new StartQRLoginRequest();
     public static final ByteBufCodec<StartQRLoginRequest> CODEC = ByteBufCodec.unit(REQUEST);
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
         public void register() {
-            INetworkRegister.getInstance().autoRegisterPayload(
+            RequestHandlerRegistry.autoRegisterPayload(
                     StartQRLoginRequest.class, CODEC,
-                    ServerDataPacketVThreadExecutor.execute((startQRLoginRequest, player) -> {
+                    (request, player) -> {
                         var qrLoginInfo = ILoginApiService.getInstance(ApiProvider.NCM).startQRLoginByPlayer(player);
-                        IServerNetworkService.getInstance().sendToPlayer(player,new StartQRLoginResponse(qrLoginInfo.data().qrimg()));
-                    })
+                        return ResponseResult.of(new StartQRLoginResponse(qrLoginInfo.data().qrimg()));
+                    }
             );
         }
     }

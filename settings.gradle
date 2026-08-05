@@ -16,5 +16,6 @@ dependencyResolutionManagement {
 
 rootProject.name = 'music_hud'
 
+include 'processor'
 include 'core'
 include 'paper'
