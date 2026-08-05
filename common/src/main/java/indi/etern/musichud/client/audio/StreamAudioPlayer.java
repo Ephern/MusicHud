@@ -22,8 +22,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
-import org.lwjgl.openal.EXTOffset;
-import org.lwjgl.openal.SOFTBufferSamples;
 import org.lwjgl.openal.SOFTDirectChannels;
 
 import java.io.BufferedInputStream;
@@ -33,11 +31,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
@@ -47,15 +41,15 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 public class StreamAudioPlayer {
-    private static final int BUFFER_COUNT = 4;
+    private static final int BUFFER_COUNT = 8;
     private static final int BUFFER_SIZE = 65536;
-    private static final long RESYNC_THRESHOLD_MS = 150;
-    private static final long RESYNC_COOLDOWN_MS = 1500;
-    private static final long STALL_DETECT_MS = 300;
-    private static final boolean DEBUG_VERIFY_POSITION = true;
-    private int debugPositionCounter = 0;
-    private long debugLastNanos = 0;
-    private long debugLastOffsetSamples = -1;
+    private static final int AUDIO_BUFFER_CAPACITY = 60;
+    private static final long STALE_DROP_MARGIN_MS = 500;// 内容落后墙钟超过该值才丢弃
+    private static final long PLAYBACK_STALL_LOG_MS = 500;// 播放线程迭代间隔超过该值记录停滞
+    private static final long PLAY_LOOP_SLEEP_MS = 40;// 主循环轮询间隔
+    private static final long INITIAL_BUFFER_WAIT_SLEEP_MS = 50;// 初始缓冲等待轮询间隔
+    private static final long FULLY_RETRY_SLEEP_MS = 1000;// 全量重试前的等待
+    private static final long PLAY_INIT_RETRY_SLEEP_MS = 500;// 播放初始化失败后的重试等待
     private static final Logger LOGGER = MusicHud.getLogger(StreamAudioPlayer.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static volatile StreamAudioPlayer instance = null;
@@ -65,10 +59,7 @@ public class StreamAudioPlayer {
     @Getter
     private final Set<Consumer<Status>> statusChangeListener = new HashSet<>();
     private final AtomicLong totalBufferedBytes = new AtomicLong(0);
-    private final ArrayDeque<Integer> queuedSizes = new ArrayDeque<>();
-    private final ArrayDeque<byte[]> queuedData = new ArrayDeque<>();
-    private final ArrayDeque<Integer> queuedBufferIds = new ArrayDeque<>();
-    private volatile BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(30); // 最大30个数据块的缓冲区
+    private volatile BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(AUDIO_BUFFER_CAPACITY);
     private int source = 0;
     private float lastVolume;
     private volatile CompletableFuture<?> playingFuture;
@@ -77,16 +68,12 @@ public class StreamAudioPlayer {
     private AudioDecoder currentDecoder;
     private long playedBytes = 0;
     private long fedBytes = 0;
-    private long queuedBytes = 0;
-    private long lastRepairAt = 0;
-    private boolean pendingRestart = false;
     private int lastDecoderFormat = -1;
     private int lastDecoderSampleRate = -1;
-    private long watchdogLastPosition = -1;
-    private long watchdogLastTime = 0;
     private volatile ZonedDateTime serverStartTime;
     private Future<?> downloadThreadFuture;
     private Future<?> playThreadFuture;
+    private long lastStaleDropLogTime = 0;
 
     public static StreamAudioPlayer getInstance() {
         if (instance == null) {
@@ -157,7 +144,7 @@ public class StreamAudioPlayer {
         ZonedDateTime serverStartTime1 = serverStartTime;
         stopInternal();
         try {
-            Thread.sleep(1000);
+            Thread.sleep(FULLY_RETRY_SLEEP_MS);
         } catch (InterruptedException ignored) {
         } finally {
             LOGGER.info("Fully retrying");
@@ -205,7 +192,7 @@ public class StreamAudioPlayer {
         } catch (Exception e) {
             stopInternal();
             try {
-                Thread.sleep(500);
+                Thread.sleep(PLAY_INIT_RETRY_SLEEP_MS);
             } catch (Exception ignored) {
             }
             return playAsyncInternal(musicDetail, startTime);
@@ -258,7 +245,7 @@ public class StreamAudioPlayer {
         try {
             // 等待一些数据缓冲
             while (currentPlayingFuture != null && !currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture && totalBufferedBytes.get() < BUFFER_SIZE * BUFFER_COUNT) {
-                Thread.sleep(50);
+                Thread.sleep(INITIAL_BUFFER_WAIT_SLEEP_MS);
             }
 
             if (totalBufferedBytes.get() == 0) {
@@ -268,14 +255,28 @@ public class StreamAudioPlayer {
                 }
                 fullyRetryCurrent(startPlayingFuture);
             } else {
-//                synchronized (StreamAudioPlayer.class) {
                 if (!initialized.get() || source == 0) {
                     startPlayingFuture.completeExceptionally(new IllegalStateException("Audio player not initialized"));
                     finished = true;
                 } else {// 从缓冲区填充初始数据
+                    boolean firstChunk = true;
                     for (int i = 0; i < BUFFER_COUNT; i++) {
                         byte[] audioData = playBuffer.poll(0, TimeUnit.SECONDS);
                         if (audioData == null) break;
+
+                        if (firstChunk) {
+                            firstChunk = false;
+                            // 锚定内容绝对位置：服务器同步时下载线程已把解码器跳到
+                            // 墙钟 - 初始缓冲补偿，fedBytes 从这里开始累计，之后
+                            // 与 expectedBytes（墙钟绝对位置）基准一致
+                            if (serverStartTime != null && currentDecoder != null) {
+                                long bytesPerSecond = (long) currentDecoder.getSampleRate()
+                                        * getBytesPerSample(currentDecoder.getFormat());
+                                fedBytes = Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000
+                                        - (long) BUFFER_SIZE * BUFFER_COUNT / 2;
+                                fedBytes = Math.max(0, fedBytes);
+                            }
+                        }
 
                         ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
                         directBuffer.put(audioData);
@@ -289,12 +290,7 @@ public class StreamAudioPlayer {
                         AL10.alSourceQueueBuffers(source, buffers[i]);
                         checkALError("alSourceQueueBuffers-Pre");
 
-                        queuedSizes.add(audioData.length);
-                        queuedData.add(audioData);
-                        queuedBufferIds.add(buffers[i]);
                         fedBytes += audioData.length;
-                        queuedBytes += audioData.length;
-
                         totalBufferedBytes.addAndGet(-audioData.length);
                     }
                     if (clientConfig.getDisableVanillaMusic())
@@ -305,162 +301,112 @@ public class StreamAudioPlayer {
                 }
 
                 if (!finished) {
-                    this.serverStartTime = Objects.requireNonNullElseGet(serverStartTime, ZonedDateTime::now);
+                    ZonedDateTime wallStart = Objects.requireNonNullElseGet(serverStartTime, ZonedDateTime::now);
+                    this.serverStartTime = wallStart;
+                    long lastIterationNanos = -1;
                     while (currentPlayingFuture != null && !currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture) {
                         try {
+                            long iterationNow = System.nanoTime();
+                            if (lastIterationNanos > 0) {
+                                long stallMs = (iterationNow - lastIterationNanos) / 1_000_000;
+                                if (stallMs > PLAYBACK_STALL_LOG_MS) {
+                                    // GC STW / 调度暂停：本地线程被冻结，恢复后第一轮间隔 = 冻结时长
+                                    int bytesPerSample = currentDecoder != null ? getBytesPerSample(currentDecoder.getFormat()) : 4;
+                                    long bytesPerSecond = (long) (currentDecoder != null ? currentDecoder.getSampleRate() : 44100) * bytesPerSample;
+                                    long expected = Duration.between(wallStart, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
+                                    LOGGER.info("Playback thread stalled for {} ms (GC STW / scheduling pause?)" +
+                                                    " [content={} ms expected={} ms bufferedChunks={} processed={} state={}]",
+                                            stallMs,
+                                            fedBytes * 1000L / bytesPerSecond, expected * 1000L / bytesPerSecond,
+                                            audioBuffer.size(),
+                                            AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED),
+                                            AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE));
+                                    // 注意：这里不要清空 audioBuffer 或重置 fedBytes——那会破坏内容连续性
+                                    // （下载线程的解码器头不会回退），导致后续排队的内容与墙钟脱节。
+                                    // refill 的陈旧判定会自然丢弃 [内容位置, 墙钟-余量) 的过期内容，
+                                    // 剩余内容按序播放，与墙钟的偏差保持在余量之内。
+                                }
+                            }
+                            lastIterationNanos = iterationNow;
+
                             updateVolumeIfNecessary();
                             if (!initialized.get() || source == 0) break;
 
                             checkDecoderChangeAndFlush();
 
-//                            debugVerifyPosition();
+                            int processed = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
+                            //noinspection SpellCheckingInspection
+                            checkALError("alGetSourcei-Processed");
 
-                            boolean repaired = checkAndRepairLag(playBuffer);
+                            startPlayingFuture.complete(wallStart);
 
-                                int processed = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
+                            int bytesPerSample = currentDecoder != null ? getBytesPerSample(currentDecoder.getFormat()) : 4;
+                            long bytesPerSecond = (long) (currentDecoder != null ? currentDecoder.getSampleRate() : 44100) * bytesPerSample;
+                            long expectedBytes = Duration.between(wallStart, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
+                            long staleDropMarginBytes = STALE_DROP_MARGIN_MS * bytesPerSecond / 1000;
+
+                            while (processed-- > 0) {
+                                int[] buffer = new int[1];
+                                AL10.alSourceUnqueueBuffers(source, buffer);
                                 //noinspection SpellCheckingInspection
-                                checkALError("alGetSourcei-Processed");
+                                checkALError("alSourceUnqueueBuffers-Main");
 
-                                startPlayingFuture.complete(serverStartTime == null ? ZonedDateTime.now() : serverStartTime);
-
-                                boolean refilled = false;
-                                if (!repaired) {
-                                    while (processed-- > 0) {
-                                        int[] buffer = new int[1];
-                                        AL10.alSourceUnqueueBuffers(source, buffer);
-                                        //noinspection SpellCheckingInspection
-                                        checkALError("alSourceUnqueueBuffers-Main");
-
-                                        queuedBytes -= queuedSizes.poll();
-                                        queuedData.poll();
-                                        queuedBufferIds.poll();
-
-                                        byte[] audioData = playBuffer.poll(0, TimeUnit.MILLISECONDS);
-
-                                        if (audioData == null) {
-                                            if (playBuffer.isEmpty() && NowPlayingInfo.getInstance().isCompleted()) {
-                                                // 播放已完成且缓冲区为空，结束播放
-                                                LOGGER.debug("No more audio data available");
-                                                currentPlayingFuture.complete(null);
-                                                setStatus(Status.PLAYING);
-                                                break;
-                                            } else if (!currentDownloadFuture.isDone()) {
-                                                audioData = new byte[BUFFER_SIZE];
-                                                if (status.get() != Status.ERROR && status.get() != Status.RETRYING) {
-                                                    setStatus(Status.BUFFERING);
-                                                }
-                                            } else {
-                                                audioData = new byte[BUFFER_SIZE];
-                                            }
-                                        } else {
-                                            setStatus(Status.PLAYING);
-                                        }
-
-                                        ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
-                                        directBuffer.put(audioData);
-                                        directBuffer.flip();
-
-                                        int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-                                        int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
-
-                                        AL10.alBufferData(buffer[0], format, directBuffer, sampleRate);
-                                        checkALError("alBufferData-Main");
-                                        AL10.alSourceQueueBuffers(source, buffer[0]);
-                                        checkALError("alSourceQueueBuffers-Main");
-
-                                        queuedSizes.add(audioData.length);
-                                        queuedData.add(audioData);
-                                        queuedBufferIds.add(buffer[0]);
-                                        fedBytes += audioData.length;
-                                        queuedBytes += audioData.length;
-                                        refilled = true;
-
-                                        if (audioData.length == BUFFER_SIZE) { // 不是静音数据
-                                            totalBufferedBytes.addAndGet(-audioData.length);
-                                        }
-                                    }
-                                }
-
-                                // Top up the queue to BUFFER_COUNT when data is
-                                // available, so the source does not underrun and
-                                // restart at every buffer boundary (after a
-                                // repair/recycle the queue depth may be low).
-                                int queuedNow = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-                                while (queuedNow < BUFFER_COUNT) {
-                                    byte[] audioData = playBuffer.poll(0, TimeUnit.MILLISECONDS);
-                                    if (audioData == null) break;
-                                    int freeId = 0;
-                                    for (int id : buffers) {
-                                        if (!queuedBufferIds.contains(id)) {
-                                            freeId = id;
-                                            break;
-                                        }
-                                    }
-                                    if (freeId == 0) break;
-
-                                    ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
-                                    directBuffer.put(audioData);
-                                    directBuffer.flip();
-
-                                    int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-                                    int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
-
-                                    AL10.alBufferData(freeId, format, directBuffer, sampleRate);
-                                    checkALError("alBufferData-TopUp");
-                                    AL10.alSourceQueueBuffers(source, freeId);
-                                    checkALError("alSourceQueueBuffers-TopUp");
-
-                                    queuedSizes.add(audioData.length);
-                                    queuedData.add(audioData);
-                                    queuedBufferIds.add(freeId);
+                                byte[] audioData = playBuffer.poll(0, TimeUnit.MILLISECONDS);
+                                while (audioData != null && fedBytes < expectedBytes - staleDropMarginBytes) {
+                                    // 陈旧内容：落后墙钟超过余量，丢弃而不是排入 OpenAL 源。
+                                    // 下载线程的 syncPlaying 保证解码器头 ≥ 墙钟，新鲜内容随后到达。
+                                    totalBufferedBytes.addAndGet(-audioData.length);
                                     fedBytes += audioData.length;
-                                    queuedBytes += audioData.length;
-                                    refilled = true;
-                                    queuedNow++;
+                                    logStaleDrop(audioData.length, bytesPerSecond);
+                                    audioData = playBuffer.poll(0, TimeUnit.MILLISECONDS);
                                 }
 
-                                if (repaired) {
-                                    // Defer the restart after a repair: alSourceStop is processed
-                                    // asynchronously by the mixer, and an immediate alSourcePlay
-                                    // could get its voice killed by the pending stop, leaving the
-                                    // source stuck on an unfinished buffer.
-                                    pendingRestart = true;
-                                } else if (pendingRestart) {
-                                    // The async alSourceStop from a previous repair/recycle has
-                                    // settled by now; the freshly queued buffers can be played.
-                                    pendingRestart = false;
-                                    AL10.alSourcePlay(source);
-                                    checkALError("alSourcePlay-Main");
-                                    watchdogLastPosition = -1;
-                                } else if (refilled) {
-                                    // The regular refill just queued data and no stop is pending;
-                                    // restart right away.
-                                    int state = AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE);
-                                    if (state != AL10.AL_PLAYING) {
-                                        AL10.alSourcePlay(source);
-                                        checkALError("alSourcePlay-Main");
+                                if (audioData == null) {
+                                    if (playBuffer.isEmpty() && NowPlayingInfo.getInstance().isCompleted()) {
+                                        // 播放已完成且缓冲区为空，结束播放
+                                        LOGGER.debug("No more audio data available");
+                                        currentPlayingFuture.complete(null);
+                                        setStatus(Status.PLAYING);
+                                        break;
+                                    } else if (!currentDownloadFuture.isDone()) {
+                                        audioData = new byte[BUFFER_SIZE];
+                                        if (status.get() != Status.ERROR && status.get() != Status.RETRYING) {
+                                            setStatus(Status.BUFFERING);
+                                        }
+                                    } else {
+                                        audioData = new byte[BUFFER_SIZE];
                                     }
-                                    watchdogLastPosition = -1;
-                                } else if (!currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture) {
-                                    // Position watchdog: AL_SOURCE_STATE can be stale (a voice may
-                                    // keep playing while the state reads STOPPED, left over from an
-                                    // earlier alSourceStop), so the source must NOT be stopped or
-                                    // recycled while the playback position is advancing. Only when
-                                    // the position is genuinely frozen do we recycle the source.
-                                    int bytesPerSample = getBytesPerSample(currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16);
-                                    int sampleOffset = AL10.alGetSourcei(source, EXTOffset.AL_SAMPLE_OFFSET);
-                                    long positionNow = fedBytes - queuedBytes + (long) sampleOffset * bytesPerSample;
-                                    long now = System.currentTimeMillis();
-                                    if (positionNow != watchdogLastPosition) {
-                                        watchdogLastPosition = positionNow;
-                                        watchdogLastTime = now;
-                                    } else if (now - watchdogLastTime >= STALL_DETECT_MS) {
-                                        recycleSource(playBuffer);
-                                        watchdogLastPosition = positionNow;
-                                        watchdogLastTime = now;
-                                    }
+                                } else {
+                                    setStatus(Status.PLAYING);
                                 }
-                            Thread.sleep(40);
+
+                                ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
+                                directBuffer.put(audioData);
+                                directBuffer.flip();
+
+                                int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
+                                int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
+
+                                AL10.alBufferData(buffer[0], format, directBuffer, sampleRate);
+                                checkALError("alBufferData-Main");
+                                AL10.alSourceQueueBuffers(source, buffer[0]);
+                                checkALError("alSourceQueueBuffers-Main");
+
+                                // 静音垫占用的时间也计入位置，避免恢复后的新内容被误判为陈旧
+                                fedBytes += audioData.length;
+                                if (audioData.length == BUFFER_SIZE) { // 不是静音数据
+                                    totalBufferedBytes.addAndGet(-audioData.length);
+                                }
+                            }
+
+                            int state = AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE);
+                            //noinspection SpellCheckingInspection
+                            checkALError("alGetSourcei-SourceState");
+                            if (state != AL10.AL_PLAYING && !currentPlayingFuture.isDone() && currentPlayingFuture == playingFuture) {
+                                AL10.alSourcePlay(source);
+                                checkALError("alSourcePlay-Main");
+                            }
+                            Thread.sleep(PLAY_LOOP_SLEEP_MS);
                         } catch (InterruptedException e) {
                             break;
                         } catch (Exception e) {
@@ -484,6 +430,18 @@ public class StreamAudioPlayer {
                 currentPlayingFuture.complete(null);
             }
             LOGGER.debug("Play task finished");
+        }
+    }
+
+    private void logStaleDrop(long droppedBytes, long bytesPerSecond) {
+        long now = System.currentTimeMillis();
+        if (now - lastStaleDropLogTime > 1000) {
+            lastStaleDropLogTime = now;
+            long expected = serverStartTime == null ? 0
+                    : Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
+            LOGGER.info("Dropped {} ms of stale audio [content now at {} ms, expected {} ms]",
+                    droppedBytes * 1000L / bytesPerSecond,
+                    fedBytes * 1000L / bytesPerSecond, expected * 1000L / bytesPerSecond);
         }
     }
 
@@ -532,9 +490,7 @@ public class StreamAudioPlayer {
                 }
 
                 while (!currentDownloadFuture.isDone() && currentDownloadFuture == downloadFuture) {
-                    // Keep the decoder head aligned with the wall clock at all
-                    // times, not only when the download buffer runs low (which
-                    // may never happen while the player keeps up).
+                    // 保持解码器头与墙钟对齐（无论下载缓冲是否充足）
                     syncPlaying(currentDownloadFuture);
 
                     byte[] audioData = decoder.readChunk(BUFFER_SIZE);
@@ -642,367 +598,26 @@ public class StreamAudioPlayer {
                     checkALError("alSourceUnqueueBuffers-Flush");
                 }
             }
-            queuedSizes.clear();
-            queuedData.clear();
-            queuedBufferIds.clear();
             fedBytes = 0;
-            queuedBytes = 0;
             audioBuffer.clear();
             totalBufferedBytes.set(0);
-        }
-    }
+            // 用新格式的数据重新填充源队列（下载线程的 sync 会重新对齐内容位置）
+            for (int i = 0; i < BUFFER_COUNT; i++) {
+                byte[] audioData = audioBuffer.poll();
+                if (audioData == null) break;
 
-    /**
-     * The playback position has been frozen for a while, so the voice is
-     * genuinely dead. Unqueue everything (after a stop so even unprocessed
-     * buffers can be reclaimed), refill from the download buffer and defer the
-     * restart until the async stop has settled.
-     */
-    private void recycleSource(BlockingQueue<byte[]> playBuffer) throws InterruptedException {
-        LOGGER.warn("Playback position frozen, recycling source");
-        AL10.alSourceStop(source);
-        checkALError("alSourceStop-Recycle");
-        int queuedCount = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-        checkALError("alGetSourcei-Queued-Recycle");
-        for (int i = 0; i < queuedCount; i++) {
-            int[] buffer = new int[1];
-            AL10.alSourceUnqueueBuffers(source, buffer);
-            checkALError("alSourceUnqueueBuffers-Recycle");
-            queuedBytes -= queuedSizes.poll();
-            queuedData.poll();
-            queuedBufferIds.poll();
-        }
-
-        int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-        int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
-        for (int i = 0; i < BUFFER_COUNT; i++) {
-            byte[] audioData = playBuffer.poll(0, TimeUnit.MILLISECONDS);
-            if (audioData == null) break;
-
-            ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
-            directBuffer.put(audioData);
-            directBuffer.flip();
-            AL10.alBufferData(buffers[i], format, directBuffer, sampleRate);
-            checkALError("alBufferData-Recycle");
-            AL10.alSourceQueueBuffers(source, buffers[i]);
-            checkALError("alSourceQueueBuffers-Recycle");
-            queuedSizes.add(audioData.length);
-            queuedData.add(audioData);
-            queuedBufferIds.add(buffers[i]);
-            fedBytes += audioData.length;
-            queuedBytes += audioData.length;
-        }
-        if (AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED) == 0) {
-            // Nothing to play yet; queue a silence filler so the deferred
-            // restart has something to play.
-            byte[] silence = new byte[BUFFER_SIZE];
-            ByteBuffer directBuffer = ByteBuffer.allocateDirect(silence.length);
-            directBuffer.put(silence);
-            directBuffer.flip();
-            AL10.alBufferData(buffers[0], format, directBuffer, sampleRate);
-            checkALError("alBufferData-Recycle-Silence");
-            AL10.alSourceQueueBuffers(source, buffers[0]);
-            checkALError("alSourceQueueBuffers-Recycle-Silence");
-            queuedSizes.add(silence.length);
-            queuedData.add(silence);
-            queuedBufferIds.add(buffers[0]);
-            fedBytes += silence.length;
-            queuedBytes += silence.length;
-        }
-        pendingRestart = true;
-    }
-
-    /**
-     * DEBUG ONLY: verifies that the playback position can be computed from AL
-     * queries. Logs raw AL values plus the bookkeeping-based interpretation
-     * every ~500ms. Key verdict: while PLAYING, AL_SAMPLE_OFFSET must advance
-     * at about the decoder sample rate (rate/sampleRate ≈ 1). If it does, AL
-     * position tracking is feasible and any remaining discrepancy comes from
-     * the fedBytes/queuedBytes bookkeeping.
-     */
-    private void debugVerifyPosition() {
-        if (!DEBUG_VERIFY_POSITION || currentDecoder == null) return;
-        if (++debugPositionCounter % 12 != 0) return;
-
-        int state = AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE);
-        int sampleOffset = AL10.alGetSourcei(source, EXTOffset.AL_SAMPLE_OFFSET);
-        int queueLenSamples = AL10.alGetSourcei(source, SOFTBufferSamples.AL_SAMPLE_LENGTH_SOFT);
-        int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-        int processed = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
-
-        long now = System.nanoTime();
-        double rateHz = Double.NaN;
-        if (debugLastOffsetSamples >= 0 && state == AL10.AL_PLAYING) {
-            double dtSec = (now - debugLastNanos) / 1e9;
-            if (dtSec > 0.01) {
-                rateHz = (sampleOffset - debugLastOffsetSamples) / dtSec;
+                ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
+                directBuffer.put(audioData);
+                directBuffer.flip();
+                AL10.alBufferData(buffers[i], format, directBuffer, sampleRate);
+                checkALError("alBufferData-Flush");
+                AL10.alSourceQueueBuffers(source, buffers[i]);
+                checkALError("alSourceQueueBuffers-Flush");
+                fedBytes += audioData.length;
             }
+            AL10.alSourcePlay(source);
+            checkALError("alSourcePlay-Flush");
         }
-        debugLastOffsetSamples = sampleOffset;
-        debugLastNanos = now;
-
-        int bytesPerSample = getBytesPerSample(currentDecoder.getFormat());
-        long bytesPerSecond = (long) currentDecoder.getSampleRate() * bytesPerSample;
-        long offsetBytes = (long) sampleOffset * bytesPerSample;
-        long queueStartBytes = fedBytes - queuedBytes;   // bookkeeping anchor: content position of the queue head
-        long actualF1 = queueStartBytes + offsetBytes;   // bookkeeping-based actual
-        long expectedBytes = serverStartTime == null ? 0
-                : Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
-        long expectedInQueueSamples = (expectedBytes - queueStartBytes) / bytesPerSample;
-        long offsetErrorSamples = sampleOffset - expectedInQueueSamples;
-        long expectedRateHz = currentDecoder.getSampleRate();
-
-        String rateStr = Double.isNaN(rateHz) ? "n/a" : String.format("%.0f", rateHz);
-        String ratioStr = "n/a";
-        if (!Double.isNaN(rateHz)) {
-            double ratio = rateHz / expectedRateHz;
-            ratioStr = String.format("%.3f (%s)", ratio, ratio > 0.9 && ratio < 1.1 ? "OK" : (ratio < 0.9 ? "STALLED" : "FAST"));
-        }
-        LOGGER.info("POSDBG state={} offset={}smp({}ms) queueLen={}smp queued={} processed={} rate={}Hz ratio={} | " +
-                        "queueStart={}ms expectedInQueue={}smp offsetError={}smp | fed={} queuedBytes={} actualF1={}ms expected={}ms | " +
-                        "decoder={}/{}/{}Hz bufSize={} downloadDone={} status={}",
-                state, sampleOffset, offsetBytes * 1000L / bytesPerSecond,
-                queueLenSamples, queued, processed, rateStr, ratioStr,
-                queueStartBytes * 1000L / bytesPerSecond, expectedInQueueSamples, offsetErrorSamples,
-                fedBytes, queuedBytes, actualF1 * 1000L / bytesPerSecond, expectedBytes * 1000L / bytesPerSecond,
-                currentDecoder.getFormat(), currentDecoder.getSampleRate(), expectedRateHz,
-                audioBuffer.size(), downloadFuture != null && downloadFuture.isDone(), status.get());
-    }
-
-    /**
-     * Detects playback falling behind the expected (wall clock) progress and
-     * repairs it in place by discarding the stale audio that has already been
-     * queued, so that playback resumes at the expected position.
-     *
-     * @return true if a repair was performed
-     */
-    private boolean checkAndRepairLag(BlockingQueue<byte[]> playBuffer) {
-        ZonedDateTime startTime = serverStartTime;
-        if (startTime == null || currentDecoder == null) return false;
-        long now = System.currentTimeMillis();
-        if (now - lastRepairAt < RESYNC_COOLDOWN_MS) return false;
-        long millis = Duration.between(startTime, ZonedDateTime.now()).toMillis();
-        if (millis <= 0) return false;
-
-        int bytesPerSample = getBytesPerSample(currentDecoder.getFormat());
-        int bytesPerSecond = currentDecoder.getSampleRate() * bytesPerSample;
-        long expectedBytes = millis * bytesPerSecond / 1000;
-
-        int sampleOffset = AL10.alGetSourcei(source, EXTOffset.AL_SAMPLE_OFFSET);
-        checkALError("alGetSourcei-SampleOffset");
-        long offsetBytes = (long) sampleOffset * bytesPerSample;
-        long actualBytes = fedBytes - queuedBytes + offsetBytes;
-        long lagBytes = expectedBytes - actualBytes;
-
-        if (AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE) != AL10.AL_PLAYING) return false;
-        long positionError = expectedBytes - actualBytes;
-        long thresholdBytes = RESYNC_THRESHOLD_MS * (long) bytesPerSecond / 1000L;
-        if (positionError > 0) {
-            // Behind: only skip stale data when the pipeline already contains
-            // data at or after the wall clock position. If the downloader is
-            // still behind (fedBytes < expected), a skip would just drain
-            // everything the downloader has produced; its own sync will align
-            // the content once the data flows.
-            if (expectedBytes > fedBytes) return false;
-            if (positionError <= thresholdBytes) return false;
-            LOGGER.info("Audio playback lagged behind expected progress by {} ms, resyncing" +
-                            " [state={} queued={} processed={} fed={} queuedBytes={} offsetBytes={} actual={}ms expected={}ms]",
-                    positionError * 1000L / bytesPerSecond,
-                    AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE),
-                    AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED),
-                    AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED),
-                    fedBytes, queuedBytes, offsetBytes,
-                    actualBytes * 1000L / bytesPerSecond, expectedBytes * 1000L / bytesPerSecond);
-            repairLag(positionError, actualBytes, offsetBytes, bytesPerSecond, playBuffer);
-        } else {
-            // Ahead: the content is running ahead of the wall clock. Insert a
-            // delay silence in front of the queued content so it starts
-            // exactly at the expected position.
-            if (-positionError <= thresholdBytes) return false;
-            LOGGER.info("Audio playback ahead of expected progress by {} ms, inserting delay silence",
-                    -positionError * 1000L / bytesPerSecond);
-            delayPlayback(-positionError);
-        }
-        return true;
-    }
-
-    /**
-     * Drops the stale audio between the actual playback position and the
-     * expected position, then restarts the source at the expected position.
-     * Buffers already queued in OpenAL are trimmed precisely; chunks still in
-     * the download buffer are discarded at chunk granularity (overshoot of at
-     * most one chunk self-corrects as the wall clock catches up).
-     */
-    private void repairLag(long lagBytes, long actualBytes, long offsetBytes, int bytesPerSecond, BlockingQueue<byte[]> playBuffer) {
-        lastRepairAt = System.currentTimeMillis();
-        long targetBytes = actualBytes + lagBytes;
-
-        AL10.alSourceStop(source);
-        checkALError("alSourceStop-Repair");
-        int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-        checkALError("alGetSourcei-Queued-Repair");
-
-        List<Integer> keepBufferIds = new ArrayList<>();
-        List<byte[]> keepData = new ArrayList<>();
-        long cursor = actualBytes - offsetBytes;
-        int bytesPerSample = getBytesPerSample(currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16);
-        for (int i = 0; i < queued; i++) {
-            int[] buffer = new int[1];
-            AL10.alSourceUnqueueBuffers(source, buffer);
-            checkALError("alSourceUnqueueBuffers-Repair");
-            int size = queuedSizes.poll();
-            byte[] data = queuedData.poll();
-            queuedBufferIds.poll();
-            long end = cursor + size;
-            if (end > targetBytes) {
-                // Sample-align the trim so the PCM stream keeps its frame
-                // boundaries; cutting mid-sample would corrupt the audio.
-                int from = (int) Math.max(0, targetBytes - cursor);
-                from = (int) ((long) from / bytesPerSample * bytesPerSample);
-                from = Math.min(from, size);
-                byte[] kept = from == 0 ? data : Arrays.copyOfRange(data, from, size);
-                keepBufferIds.add(buffer[0]);
-                keepData.add(kept);
-            }
-            cursor = end;
-        }
-
-        // Discard stale chunks still sitting in the download buffer
-        int drainedChunks = 0;
-        while (cursor < targetBytes) {
-            byte[] chunk = playBuffer.poll();
-            if (chunk == null) break;
-            totalBufferedBytes.addAndGet(-chunk.length);
-            cursor += chunk.length;
-            drainedChunks++;
-        }
-
-        int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-        int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
-        queuedSizes.clear();
-        queuedData.clear();
-        queuedBufferIds.clear();
-        long keptBytes = 0;
-        for (int i = 0; i < keepBufferIds.size(); i++) {
-            byte[] data = keepData.get(i);
-            ByteBuffer directBuffer = ByteBuffer.allocateDirect(data.length);
-            directBuffer.put(data);
-            directBuffer.flip();
-            AL10.alBufferData(keepBufferIds.get(i), format, directBuffer, sampleRate);
-            checkALError("alBufferData-Repair");
-            AL10.alSourceQueueBuffers(source, keepBufferIds.get(i));
-            checkALError("alSourceQueueBuffers-Repair");
-            queuedSizes.add(data.length);
-            queuedData.add(data);
-            queuedBufferIds.add(keepBufferIds.get(i));
-            keptBytes += data.length;
-        }
-        if (keepBufferIds.isEmpty()) {
-            // Nothing playable left yet; queue a silence filler so the source
-            // can restart. Its length is the drain overshoot (cursor - target),
-            // so the following content starts exactly at the expected position
-            // instead of jumping ahead of the wall clock.
-            long silenceBytes = Math.max(0, cursor - targetBytes);
-            silenceBytes = silenceBytes / bytesPerSample * bytesPerSample;
-            int silenceLength = (int) Math.max(bytesPerSample, silenceBytes);
-            byte[] silence = new byte[silenceLength];
-            ByteBuffer directBuffer = ByteBuffer.allocateDirect(silence.length);
-            directBuffer.put(silence);
-            directBuffer.flip();
-            AL10.alBufferData(buffers[0], format, directBuffer, sampleRate);
-            checkALError("alBufferData-Repair-Silence");
-            AL10.alSourceQueueBuffers(source, buffers[0]);
-            checkALError("alSourceQueueBuffers-Repair-Silence");
-            queuedSizes.add(silence.length);
-            queuedData.add(silence);
-            queuedBufferIds.add(buffers[0]);
-            keptBytes = silence.length;
-        }
-        fedBytes = keptBytes;
-        queuedBytes = keptBytes;
-        LOGGER.info("Audio lag repaired, skipped {} ms of stale audio" +
-                        " [droppedBuffers={} kept={} drainedChunks={} silence={} postQueued={} postState={}]",
-                lagBytes * 1000L / bytesPerSecond,
-                queued - keepBufferIds.size(), keepBufferIds.size(), drainedChunks, keepBufferIds.isEmpty(),
-                AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED),
-                AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE));
-    }
-
-    /**
-     * The playback content is running ahead of the wall clock. Stop the source,
-     * prepend a silence of exactly the excess duration to the first queued
-     * buffer, re-queue everything and defer the restart, so the content starts
-     * exactly at the expected position.
-     */
-    private void delayPlayback(long delayBytes) {
-        lastRepairAt = System.currentTimeMillis();
-        int bytesPerSample = getBytesPerSample(currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16);
-        long delayAligned = delayBytes / bytesPerSample * bytesPerSample;
-        int silenceLength = (int) Math.max(bytesPerSample, delayAligned);
-
-        AL10.alSourceStop(source);
-        checkALError("alSourceStop-Delay");
-        int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-        checkALError("alGetSourcei-Queued-Delay");
-
-        int[] collectedIds = new int[queued];
-        byte[][] collectedData = new byte[queued][];
-        for (int i = 0; i < queued; i++) {
-            int[] buffer = new int[1];
-            AL10.alSourceUnqueueBuffers(source, buffer);
-            checkALError("alSourceUnqueueBuffers-Delay");
-            collectedIds[i] = buffer[0];
-            collectedData[i] = queuedData.poll();
-            queuedSizes.poll();
-            queuedBufferIds.poll();
-        }
-
-        int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-        int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
-        queuedSizes.clear();
-        queuedData.clear();
-        queuedBufferIds.clear();
-        long keptBytes = 0;
-        if (queued == 0) {
-            // Defensive: nothing to delay; queue the silence alone.
-            byte[] silence = new byte[silenceLength];
-            ByteBuffer directBuffer = ByteBuffer.allocateDirect(silence.length);
-            directBuffer.put(silence);
-            directBuffer.flip();
-            AL10.alBufferData(buffers[0], format, directBuffer, sampleRate);
-            checkALError("alBufferData-Delay-Silence");
-            AL10.alSourceQueueBuffers(source, buffers[0]);
-            checkALError("alSourceQueueBuffers-Delay-Silence");
-            queuedSizes.add(silence.length);
-            queuedData.add(silence);
-            queuedBufferIds.add(buffers[0]);
-            keptBytes = silence.length;
-        }
-        for (int i = 0; i < collectedIds.length; i++) {
-            byte[] data = collectedData[i];
-            if (i == 0) {
-                // Prepend the delay silence to the first buffer so no extra
-                // buffer id is needed; the content then starts exactly at the
-                // expected position.
-                byte[] delayed = new byte[silenceLength + data.length];
-                System.arraycopy(data, 0, delayed, silenceLength, data.length);
-                data = delayed;
-            }
-            ByteBuffer directBuffer = ByteBuffer.allocateDirect(data.length);
-            directBuffer.put(data);
-            directBuffer.flip();
-            AL10.alBufferData(collectedIds[i], format, directBuffer, sampleRate);
-            checkALError("alBufferData-Delay");
-            AL10.alSourceQueueBuffers(source, collectedIds[i]);
-            checkALError("alSourceQueueBuffers-Delay");
-            queuedSizes.add(data.length);
-            queuedData.add(data);
-            queuedBufferIds.add(collectedIds[i]);
-            keptBytes += data.length;
-        }
-        fedBytes = keptBytes;
-        queuedBytes = keptBytes;
-        pendingRestart = true;
     }
 
     private void updateVolumeIfNecessary() {
@@ -1149,21 +764,13 @@ public class StreamAudioPlayer {
 
             initialized.set(false);
             lastVolume = 1;
-            audioBuffer = new LinkedBlockingQueue<>(30);
+            audioBuffer = new LinkedBlockingQueue<>(AUDIO_BUFFER_CAPACITY);
             totalBufferedBytes.set(0);
             playedBytes = 0;
             fedBytes = 0;
-            queuedBytes = 0;
-                queuedSizes.clear();
-                queuedData.clear();
-                queuedBufferIds.clear();
-                lastRepairAt = 0;
-                pendingRestart = false;
-                lastDecoderFormat = -1;
-                lastDecoderSampleRate = -1;
-                watchdogLastPosition = -1;
-                watchdogLastTime = 0;
-                serverStartTime = null;
+            lastDecoderFormat = -1;
+            lastDecoderSampleRate = -1;
+            serverStartTime = null;
             if (currentDecoder != null) {
                 try {
                     currentDecoder.close();

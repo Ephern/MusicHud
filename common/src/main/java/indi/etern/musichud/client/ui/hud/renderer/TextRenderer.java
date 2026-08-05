@@ -4,7 +4,7 @@ import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
-import indi.etern.musichud.client.ui.utils.ui.Easing;
+import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;

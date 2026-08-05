@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.music.MusicService;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ClientDistUtil;
 import net.minecraft.client.resources.language.I18n;
 

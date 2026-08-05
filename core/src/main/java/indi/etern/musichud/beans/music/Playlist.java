@@ -141,8 +141,9 @@ public class Playlist implements MusicCollection {
     }
 
     public ObservableSequencedSet<MusicDetail> getTracks() {
-        if (tracks == null || tracks.isEmpty()) {
-            return new ObservableSequencedSet<>(0);
+        if (tracks == null) {
+            tracks = new ObservableSequencedSet<>(0);
+            return tracks;
         }
         if (!nullFiltered) {
             filterTracksNullItem();

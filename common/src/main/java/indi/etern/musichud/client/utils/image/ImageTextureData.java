@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.utils.image;
+package indi.etern.musichud.client.utils.image;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import icyllis.modernui.graphics.Bitmap;

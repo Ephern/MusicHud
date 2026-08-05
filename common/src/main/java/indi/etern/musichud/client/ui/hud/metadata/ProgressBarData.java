@@ -2,7 +2,7 @@ package indi.etern.musichud.client.ui.hud.metadata;
 
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
-import indi.etern.musichud.client.ui.utils.ui.UniformDataUtils;
+import indi.etern.musichud.client.utils.ui.UniformDataUtils;
 import lombok.Getter;
 import lombok.Setter;
 

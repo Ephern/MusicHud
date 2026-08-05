@@ -1,86 +1,69 @@
-package indi.etern.musichud.client.ui.utils.lyrics;
+package indi.etern.musichud.client.utils.lyrics;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricInfo;
 import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.ui.dto.MetaInfoLine;
-import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
-import java.time.format.DateTimeFormatterBuilder;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-public class FullLineLyricParser {
-    private static final Pattern mainPattern = Pattern.compile("\\[[0-9:.]+].*");
-    private static final DateTimeFormatter TIME_FORMATTER = new DateTimeFormatterBuilder()
-            .appendPattern("HH:mm:ss")
-            .appendFraction(java.time.temporal.ChronoField.MILLI_OF_SECOND, 1, 3, true)
-            .toFormatter();
+public class WordByWordLyricParser {
+    private static final Pattern mainPattern = Pattern.compile("\\[([0-9]+),([0-9]+)](.*)");
+    private static final Pattern phrasePattern = Pattern.compile("\\((\\d+),(\\d+),(\\d+)\\)([\\s\\S]*?)(?=\\(\\d+,\\d+,(\\d+)\\)|$)");
     private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(5);
     private static final Logger logger = MusicHud.getLogger(FullLineLyricParser.class);
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     public static ArrayDeque<LyricLine> parse(MusicDetail musicDetail) {
         LyricInfo lyricInfo = musicDetail.getLyricInfo();
-        String lyric = lyricInfo.getLyric().getLyric();
-        String translatedLyric = lyricInfo.getTranslatedLyric().getLyric();
+        String lyric = lyricInfo.getWordByWordLyric().getLyric();
+        String translatedLyric = lyricInfo.getWordByWordTranslatedLyric().getLyric();
         LinkedHashMap<Duration, LyricLine> map = new LinkedHashMap<>();
         List<LyricLine> lyricLinesWithoutValidTimestamp = new ArrayList<>(0);
         matchLine(lyric, (metaData) -> {
             Duration startTime = metaData.startTime;
             LyricLine lyricLine = map.get(startTime);
-            String lyricString = metaData.lyric == null ? "" : metaData.lyric.replace('\u00A0', ' ').replace('\n', ' ').trim();
+            String lyricString = metaData.lyric == null ? "" : metaData.lyric;
             lyricString = lyricString.replace('\n', ' ').trim();
             if (lyricLine == null) {
+                // Remove duration for smooth transition between lines
                 lyricLine = LyricLine.builder()
                         .startTime(startTime)
                         .text(lyricString)
-                        .type(metaData.type)
-                        .build();
-                if (startTime != null) {
-                    map.put(startTime, lyricLine);
-                } else if (lyricLine.getText() != null && !lyricLine.getText().startsWith("}")) {
+                        .type(metaData.type).build();
+                if (startTime == null && lyricLine.getText() != null && !lyricLine.getText().startsWith("}")) {
                     lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
             } else if (!lyricString.isEmpty()) {
                 lyricLine.setText(lyricLine.getText() + "\n" + lyricString);
             }
+            if (metaData.phraseEndingOffsetMap != null) {
+                lyricLine.getPhraseEndingOffsetMap().putAll(metaData.phraseEndingOffsetMap);
+                lyricLine.setWordByWord(true);
+            }
+            map.put(startTime, lyricLine);
         });
-        matchLine(translatedLyric, (metaData) -> {
-            Duration startTime = metaData.startTime;
+        FullLineLyricParser.matchLine(translatedLyric, (metaData) -> {
+            Duration startTime = metaData.startTime();
             LyricLine lyricLine = map.get(startTime);
             if (lyricLine == null) {
-                lyricLine = LyricLine.builder()
-                        .startTime(startTime)
-                        .build();
+                lyricLine = LyricLine.builder().startTime(startTime).build();
                 if (startTime != null) {
                     map.put(startTime, lyricLine);
                 } else {
                     lyricLinesWithoutValidTimestamp.add(lyricLine);
                 }
             }
-            String s = metaData.lyric;
-            String lyricLineTranslatedText = lyricLine.getTranslatedText();
-            if (s != null && !s.isEmpty()) {
-                s = s.replace('\n', ' ').replace('\u00A0', ' ').trim();
-                if (lyricLineTranslatedText == null || lyricLineTranslatedText.isEmpty()) {
-                    lyricLine.setTranslatedText(s);
-                } else {
-                    lyricLine.setTranslatedText(lyricLineTranslatedText + "\n" + s);
-                }
+            String lyric1 = metaData.lyric();
+            if (lyric1 != null) {
+                lyricLine.setTranslatedText(lyric1.replace('\u00A0', ' ').trim());
             } else {
-                if (lyricLineTranslatedText == null || lyricLineTranslatedText.isEmpty()) {
-                    lyricLine.setTranslatedText("");
-                } else {
-                    lyricLine.setTranslatedText(lyricLineTranslatedText);
-                }
+                lyricLine.setTranslatedText("");
             }
         });
         ArrayDeque<LyricLine> lyricLines = new ArrayDeque<>(lyricLinesWithoutValidTimestamp);
@@ -113,7 +96,9 @@ public class FullLineLyricParser {
                 }
             }
             if (lastLyricLine != null) {
-                lastLyricLine.setDuration(lyricLine.getStartTime().minus(lastLyricLine.getStartTime()));
+                if (lastLyricLine.getDuration() == null) {
+                    lastLyricLine.setDuration(lyricLine.getStartTime().minus(lastLyricLine.getStartTime()));
+                }
                 lastLyricLine.setNext(lyricLine);
                 lyricLine.setPrevious(lastLyricLine);
             }
@@ -146,66 +131,52 @@ public class FullLineLyricParser {
         return lyricLines;
     }
 
-    static Duration parseToDuration(String timeString) {
-        try {
-            String normalizedTime = timeString;
-            String[] parts = timeString.split(":");
-
-            if (parts.length == 2) {
-                normalizedTime = "00:" + timeString;
-            } else if (parts.length != 3) {
-                throw new IllegalArgumentException("Invalid time format: " + timeString);
-            }
-            LocalTime localTime = LocalTime.parse(normalizedTime, TIME_FORMATTER);
-            return Duration.between(LocalTime.MIDNIGHT, localTime);
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid time format: " + timeString, e);
-        }
-    }
-
     static void matchLine(String lyric, Consumer<LyricLineMetaData> matchedConsumer) {
         List<MetaInfoLine> metaInfoLines = RegexJsonExtractor.extractJsonObjectsSafely(lyric, MetaInfoLine.class);
         metaInfoLines.forEach(metaInfoLine -> {
-            matchedConsumer.accept(new LyricLineMetaData(metaInfoLine.getTimestampDuration(), metaInfoLine.getText(), LyricLine.Type.META_DATA));
+            matchedConsumer.accept(new LyricLineMetaData(metaInfoLine.getTimestampDuration(), null, metaInfoLine.getText(), LyricLine.Type.META_DATA, null));
         });
-        Matcher matcher = mainPattern.matcher(lyric);
-        while (matcher.find()) {
-            String item = matcher.group();
-            try {
-                if (!item.contains(".")) {
-                    int colonCount = Math.toIntExact(item.chars().filter(c -> c == ':').count());
-                    int i = item.lastIndexOf(":");
-                    StringBuilder stringBuilder = new StringBuilder(item);
-                    if (colonCount == 2) {
-                        stringBuilder.setCharAt(i, '.');
-                    } else if (colonCount == 1) {
-                        stringBuilder.insert(i + 3, ".000");
-                    }
-                    item = stringBuilder.toString();
-                } else {
-                    int i = item.indexOf(']');
-                    int millisDigit = i - item.indexOf('.') - 1;
-                    if (millisDigit < 3) {
-                        StringBuilder stringBuilder = new StringBuilder(item);
-                        stringBuilder.insert(i, "0".repeat(3 - millisDigit));
-                        item = stringBuilder.toString();
-                    }
-                }
-                String[] split = item.split("]", 2);
-                String timestamp = split[0];
-                String lyricLineContent = split[1];
-                try {
-                    Duration duration = parseToDuration(timestamp.substring(1, timestamp.length() - 1));
-                    matchedConsumer.accept(new LyricLineMetaData(duration, lyricLineContent, LyricLine.Type.NORMAL));
-                } catch (Exception ignored) {
-                    matchedConsumer.accept(new LyricLineMetaData(null, lyricLineContent, LyricLine.Type.NORMAL));
-                }
-            } catch (Exception e) {
-                logger.debug("failed to parse line \"{}\"", item);
+        Matcher lineMatcher = mainPattern.matcher(lyric);
+        Duration lastLineEnd = Duration.ZERO;
+        while (lineMatcher.find()) {
+            Map<Duration, Integer> phrases = new LinkedHashMap<>();
+            String lineStartTimestamp = lineMatcher.group(1);
+            String lineDurationString = lineMatcher.group(2);
+            String lineRawText = lineMatcher.group(3);
+            Duration lineStart = Duration.ofMillis(Long.parseLong(lineStartTimestamp));
+
+            Duration interval = lineStart.minus(lastLineEnd);
+            if (interval.compareTo(emptyLineIgnoreDuration) > 0) {
+                matchedConsumer.accept(new LyricLineMetaData(lastLineEnd, interval, "", LyricLine.Type.RHYTHM, null));
             }
+
+            Duration nextPhraseStart = lineStart;
+            Matcher phraseMatcher = phrasePattern.matcher(lineRawText);
+            StringBuilder lineText = new StringBuilder();
+            int charIndex = 0;
+            while (phraseMatcher.find()) {
+//                String phraseStartTimestamp = phraseMatcher.group(1);
+                String phraseDurationMillis = phraseMatcher.group(2);
+//                String unknown = phraseMatcher.group(3);
+                String phraseText = phraseMatcher.group(4);
+                String suffix = phraseText.endsWith(" ") ? " " : "";
+                phraseText = phraseText.replace('\u00A0', ' ').replace("\n", "").trim() + suffix;
+                lineText.append(phraseText);
+                charIndex += phraseText.length();
+                nextPhraseStart = nextPhraseStart.plusMillis(Long.parseLong(phraseDurationMillis));
+                phrases.put(nextPhraseStart, charIndex);
+            }
+            Duration lineDuration = Duration.ofMillis(Long.parseLong(lineDurationString));
+            Duration allPhraseDuration = nextPhraseStart.minus(lineStart);
+            if (allPhraseDuration.compareTo(lineDuration) < 0) {
+                lineDuration = allPhraseDuration;
+            }
+            matchedConsumer.accept(new LyricLineMetaData(lineStart, lineDuration, lineText.toString(), LyricLine.Type.NORMAL, phrases));
+            lastLineEnd = lineStart.plus(lineDuration);
         }
     }
 
-    record LyricLineMetaData(Duration startTime, String lyric, LyricLine.Type type) {
+    record LyricLineMetaData(Duration startTime, Duration lineDuration, String lyric, LyricLine.Type type,
+                             Map<Duration, Integer> phraseEndingOffsetMap) {
     }
 }
