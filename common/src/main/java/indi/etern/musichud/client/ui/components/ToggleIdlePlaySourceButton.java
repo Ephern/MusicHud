@@ -4,11 +4,15 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.state.IIdlePlaySourceCollectionState;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class ToggleIdlePlaySourceButton extends ToggleIconButton {
+    private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 800;
+    private final AtomicInteger toggleVersion = new AtomicInteger(0);
     private IIdlePlaySourceCollectionState collectionState;
     private Unregister unregister = null;
 
@@ -23,13 +27,26 @@ public class ToggleIdlePlaySourceButton extends ToggleIconButton {
 
     @Override
     public boolean performClick() {
+        boolean initialChecked = isChecked();
         boolean b = super.performClick();
         if (collectionState != null) {
-            if (isChecked()) {
-                collectionState.add();
-            } else {
-                collectionState.remove();
-            }
+            final boolean targetState = isChecked();
+            final int version = toggleVersion.incrementAndGet();
+            MusicHud.EXECUTOR.execute(() -> {
+                try {
+                    Thread.sleep(TOGGLE_DEBOUNCE_DELAY_MILLIS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (toggleVersion.get() != version) return;
+                if (targetState == initialChecked) return;
+                if (targetState) {
+                    collectionState.add();
+                } else {
+                    collectionState.remove();
+                }
+            });
         }
         return b;
     }

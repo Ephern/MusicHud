@@ -24,10 +24,6 @@ public interface IClientLoginService {
         throw new UnsupportedOperationException();
     }
 
-    enum ConnectionType {
-        EXTERNAL, INTERNAL
-    }
-
     enum LoginState {
         UNLOGGED,
         ANONYMOUS,
@@ -42,23 +38,9 @@ public interface IClientLoginService {
 
     boolean hasPreviousLoginInfo();
 
-    void connectAsPrevious();
-
-    void loginToServer(ConnectionType type);
+    void loginToServer();
 
     void logoutAndReloginAsAnonymous();
-
-    void disconnectToExternalOrIntegratedServer();
-
-    void switchToIsolate();
-
-    void switchToServer();
-
-    Boolean toggleConnection();
-
-    void keyBindsToggleConnection();
-
-    ConnectionType getConnectionType();
 
     NetworkReceiver<LoginResultMessage> getLoginResultReceiver();
 }

@@ -41,6 +41,13 @@ public interface IConnectionManager {
 
     void disconnect();
 
+    Boolean toggleConnection();
+
+    void keyBindsToggleConnection();
+
+
+    void connectAsPrevious();
+
     /**
      * Handles a ConnectResponse from the server: drives the connection state machine.
      */
