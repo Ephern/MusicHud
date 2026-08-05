@@ -46,7 +46,7 @@ public record ConnectRequest(Version clientVersion) implements C2SPayload {
                             }
                             return;
                         }
-                        indi.etern.musichud.network.payloads.requestResponseCycle.ConnectResponse response = new ConnectResponse(compatible, Version.current, List.of(ApiProvider.NCM));
+                        ConnectResponse response = new ConnectResponse(compatible, Version.current, List.of(ApiProvider.NCM));
                         IServerNetworkService.getInstance().sendToPlayer(player, response);
                         if (compatible) {
                             instance.joinUnlogged(player);
