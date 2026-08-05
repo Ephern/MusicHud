@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.utils;
+package indi.etern.musichud.client.utils;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.ClientConfig;

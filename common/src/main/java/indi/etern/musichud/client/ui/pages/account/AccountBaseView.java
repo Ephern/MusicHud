@@ -8,7 +8,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
@@ -134,7 +134,7 @@ public class AccountBaseView extends LinearLayout {
             retryButton.setVisibility(GONE);
             loadingRing.setVisibility(VISIBLE);
             LoginService.getInstance().clearLastLoginErrorMessage();
-            LoginService.getInstance().loginToServer(null);
+            LoginService.getInstance().loginToServer();
         });
         buttons.addView(retryButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 

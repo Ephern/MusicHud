@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.utils.lyrics;
+package indi.etern.musichud.client.utils.lyrics;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricInfo;

@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
+import indi.etern.musichud.client.utils.image.ImageTextureData;
 import lombok.EqualsAndHashCode;
 
 @EqualsAndHashCode
