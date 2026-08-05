@@ -6,8 +6,8 @@ import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
-import indi.etern.musichud.client.ui.utils.EasingInterpolator;
-import indi.etern.musichud.client.ui.utils.Easing;
+import indi.etern.musichud.client.ui.utils.ui.EasingInterpolator;
+import indi.etern.musichud.client.ui.utils.ui.Easing;
 import lombok.Getter;
 import lombok.Setter;
 
@@ -33,13 +33,10 @@ public class RouterContainer extends FrameLayout {
     private AnimatorSet currentAnimation = null;
     private OnPageChangeListener pageChangeListener;
 
-    // 路由栈:存储页面的 key 的引用
     private final Stack<String> routeStack = new Stack<>();
 
-    // 动态 View 的计数器,用于生成唯一 key
     private int dynamicViewCounter = 0;
 
-    // 存储动态 View 的映射
     private final Map<String, View> dynamicViews = new HashMap<>();
 
     private boolean isTransitioning = false;
@@ -201,7 +198,7 @@ public class RouterContainer extends FrameLayout {
          * @param interpolator 缓动函数
          * @return 动画列表
          */
-        public abstract List<Animator> createAnimators(View fromPage, View toPage,
+        public abstract List<Animator> createAnimators(@ Nullable View fromPage, View toPage,
                                                        int duration, TimeInterpolator interpolator);
     }
 
@@ -229,13 +226,13 @@ public class RouterContainer extends FrameLayout {
     public void registerPage(@NonNull String key, @NonNull Function<Context, View> factory) {
         pageFactories.put(key, factory);
 
-        if (!pageCache.containsKey(key)) {
-            View page = factory.apply(getContext());
-            page.setVisibility(GONE);
-            page.setAlpha(0f);
-            pageCache.put(key, page);
-            addView(page, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-        }
+//        if (!pageCache.containsKey(key)) {
+//            View page = factory.apply(getContext());
+//            page.setVisibility(GONE);
+//            page.setAlpha(0f);
+//            pageCache.put(key, page);
+//            addView(page, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+//        }
     }
 
     public void navigateToRoot(@NonNull String key) {
@@ -243,7 +240,7 @@ public class RouterContainer extends FrameLayout {
     }
 
     public void navigateToRoot(@NonNull String key, @Nullable TransitionType transitionType) {
-        if (key.equals(currentPageKey) && !isTransitioning) {
+        if (key.equals(currentPageKey) && routeStack.size() == 1 && !isTransitioning) {
             return;
         }
 

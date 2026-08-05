@@ -20,12 +20,12 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.beans.LyricLine;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.utils.Easing;
-import indi.etern.musichud.client.ui.utils.SpringInterpolator;
+import indi.etern.musichud.client.ui.utils.ui.Easing;
+import indi.etern.musichud.client.ui.utils.ui.SpringInterpolator;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
@@ -57,7 +57,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private final Paint fadeEdgePaint = new Paint();
     Runnable staggeringEndListener = null;
-    boolean firstStagger = true;
     boolean scrollFinished = false;
     @Getter
     private volatile ScrollStatus scrollStatus = ScrollStatus.FOLLOW_LYRICS;
@@ -155,7 +154,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 slideOut.addListener(new AnimatorListener() {
                     @Override
                     public void onAnimationEnd(@NonNull Animator animation) {
-                        firstStagger = true;
                         justHighlightedLyricLine = null;
                         lastHighlightedLyricLine = null;
                         animatingLyricViews.clear();
@@ -498,7 +496,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 ? baseOffset - baseOffsetAtRedirect
                 : baseOffset;
 
-        firstStagger = false;
         for (int i = 0; i < lyricLineViewList.size(); i++) {
             LyricLineView line = lyricLineViewList.get(i);
             float delay = delayMillis == null ? 0 : delayMillis[i >= delayMillis.length ? delayMillis.length - 1 : i];

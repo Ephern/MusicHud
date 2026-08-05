@@ -1,13 +1,8 @@
 package indi.etern.musichud.utils;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.Album;
-import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.platform.Environment;
 
-import java.util.List;
 import java.util.function.Supplier;
 
 /**
@@ -39,11 +34,5 @@ public interface IClientDistUtil {
 
     boolean inIntegratedServer();
 
-    void setSearchViewAlbumsResult(int offset, List<Album> result);
-
-    void setSearchViewArtistsResult(int offset, List<Artist> result);
-
-    void setSearchViewMusicsResult(int offset, List<MusicDetail> result);
-
-    void setSearchViewPlaylistsResult(int offset, List<Playlist> result);
+    boolean inSinglePlayer();
 }

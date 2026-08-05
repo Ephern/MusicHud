@@ -3,7 +3,11 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.animation.MotionEasingUtils;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.OneShotPreDrawListener;
 import icyllis.modernui.view.View;
@@ -12,8 +16,10 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.RadioButton;
 import icyllis.modernui.widget.RadioGroup;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.ui.utils.image.ImageUtils;
 import lombok.Getter;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashMap;
 import java.util.Objects;
@@ -26,7 +32,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class SideMenu extends FrameLayout {
     private final RadioGroup navBarButtonGroup;
     private final RouterContainer routerContainer;
-    final LinkedHashMap<String, NavigationMeta> pagesMap = new LinkedHashMap<>();
     final LinkedHashMap<RadioButton, NavigationMeta> pagesMap1 = new LinkedHashMap<>();
     private int defaultSelectedIndex = 0;
     private final
@@ -47,17 +52,17 @@ public class SideMenu extends FrameLayout {
         indicator.setBackground(indicatorShape);
 
         navBarButtonGroup = new RadioGroup(getContext());
-        navBarButtonGroup.setOrientation(LinearLayout.VERTICAL);  // 竖向按钮组
+        navBarButtonGroup.setOrientation(LinearLayout.VERTICAL);
         navBarButtonGroup.setGravity(Gravity.TOP);
 
         Runnable initIndicator = () -> {
-            Optional<NavigationMeta> optionalNavigationMeta = pagesMap.values().stream().skip(defaultSelectedIndex).findFirst();
+            Optional<NavigationMeta> optionalNavigationMeta = pagesMap1.values().stream().skip(defaultSelectedIndex).findFirst();
             optionalNavigationMeta.ifPresent((navigationMeta) -> {
                 RadioButton button = navigationMeta.button;
                 indicator.setTranslationY(button.getY() / 2 + (float) button.getHeight() / 4 - (float) indicator.getHeight() / 4);
                 button.setSelected(true);
                 navBarButtonGroup.check(button.getId());
-                routerContainer.navigateToRoot(navigationMeta.name, null);
+                routerContainer.navigateToRoot(navigationMeta.key, null);
             });
 
             navBarButtonGroup.setOnCheckedChangeListener((group, checkedId) -> {
@@ -73,7 +78,7 @@ public class SideMenu extends FrameLayout {
                     animator.setInterpolator(MotionEasingUtils.MOTION_EASING_EMPHASIZED);
                     animator.start();
                     animator.addUpdateListener(animation -> indicator.invalidate());
-                    routerContainer.navigateToRoot(pagesMap1.get(radioButton).name, null);
+                    routerContainer.navigateToRoot(pagesMap1.get(radioButton).key, null);
                 }
             });
         };
@@ -89,13 +94,13 @@ public class SideMenu extends FrameLayout {
 
     @Getter
     public class NavigationMeta {
-        private final String name;
+        private final String key;
         private final Function<Context, View> factory;
         private final RadioButton button;
         private final int index;
 
-        public NavigationMeta(String name, Function<Context, View> factory, RadioButton button, int index) {
-            this.name = name;
+        public NavigationMeta(String key, Function<Context, View> factory, RadioButton button, int index) {
+            this.key = key;
             this.factory = factory;
             this.button = button;
             this.index = index;
@@ -104,43 +109,46 @@ public class SideMenu extends FrameLayout {
         public void select() {
             navBarButtonGroup.check(button.getId());
             defaultSelectedIndex = index;
-            routerContainer.navigateToRoot(name);
+            routerContainer.navigateToRoot(key);
         }
     }
 
     private int indexCounter = 0;
 
-    public NavigationMeta createNavigationPage(String name, Function<Context, View> factory) {
+    public NavigationMeta createNavigationPage(String key, @Nullable String iconResource, String buttonText, Function<Context, View> factory) {
         synchronized (this) {
-            routerContainer.registerPage(name, factory);
-            RadioButton button = createNavButton(pagesMap.size() + 1, name);
+            routerContainer.registerPage(key, factory);
+
+            SpannableString text = new SpannableString("      " + buttonText);
+            Image image = ImageUtils.getImageFromResource(iconResource);
+            if (image != null) {
+                ImageSpan span = ImageUtils.getIconSpan(image);
+                text.setSpan(span, 3, 4, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+
+            var button = new RadioButton(Objects.requireNonNull(getContext()), null, null, null);
+            button.setId(pagesMap1.size() + 1);
+            button.setText(text);
+            button.setClickable(true);
+            button.setFocusable(true);
+            button.setTextSize(Theme.TEXT_SIZE_LARGE);
+            button.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            button.setGravity(Gravity.CENTER_VERTICAL);
+
+            button.setHeight(button.dp(40));
+
+            var background = ButtonInsetBackgroundFactory.builder()
+                    .padding(new ButtonInsetBackgroundFactory.Padding(button.dp(2), button.dp(1), button.dp(2), button.dp(1)))
+                    .cornerRadius(button.dp(4)).inset(dp(1)).build().newBackgroundDrawable();
+            button.setBackground(background);
+            button.setLayoutParams(buttonParams);
+
             navBarButtonGroup.addView(button);
-            NavigationMeta navigationMeta = new NavigationMeta(name, factory, button, indexCounter++);
-            pagesMap.put(name, navigationMeta);
+            NavigationMeta navigationMeta = new NavigationMeta(key, factory, button, indexCounter++);
+//            pagesMap.put(key, navigationMeta);
             pagesMap1.put(button, navigationMeta);
             return navigationMeta;
         }
-    }
-
-    private RadioButton createNavButton(int id, String text) {
-        var button = new RadioButton(Objects.requireNonNull(getContext()), null, null, null);
-        button.setFocusable(true);
-        button.setClickable(true);
-        button.setId(id);
-        button.setText("   " + text);
-        button.setTextSize(Theme.TEXT_SIZE_LARGE);
-        button.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-        button.setGravity(Gravity.CENTER_VERTICAL);
-
-        button.setHeight(button.dp(40));
-
-        var background = ButtonInsetBackgroundFactory.builder()
-                .padding(new ButtonInsetBackgroundFactory.Padding(button.dp(2),button.dp(1),button.dp(2),button.dp(1)))
-                .cornerRadius(button.dp(4)).inset(dp(1)).build().newBackgroundDrawable();
-        button.setBackground(background);
-        button.setLayoutParams(buttonParams);
-
-        return button;
     }
 
 }

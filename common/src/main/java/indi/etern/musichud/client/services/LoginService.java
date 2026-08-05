@@ -5,38 +5,27 @@ import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.Version;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.ProfileConfigData;
-import indi.etern.musichud.client.audio.NowPlayingInfo;
-import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
-import indi.etern.musichud.client.ui.pages.account.AccountView;
 import indi.etern.musichud.client.ui.pages.account.LoginView;
-import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.interfaces.ClientRegister;
-import indi.etern.musichud.interfaces.IClientLoginService;
-import indi.etern.musichud.interfaces.RegisterMark;
+import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.AnonymousLoginMessage;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.CookieLoginMessage;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.LogoutMessage;
 import indi.etern.musichud.network.payloads.pushMessages.s2c.LoginResultMessage;
-import indi.etern.musichud.network.payloads.requestResponseCycle.AnonymousLoginRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.CookieLoginRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.StartQRLoginResponse;
-import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.client.resources.language.I18n;
@@ -44,8 +33,8 @@ import org.apache.logging.log4j.Logger;
 
 import java.time.Period;
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
@@ -57,15 +46,10 @@ public class LoginService implements IClientLoginService {
     private static final Logger logger = MusicHud.getLogger(LoginService.class);
     private static final Period refreshInterval = Period.of(0, 0, 1);
     private static volatile LoginService instance = null;
+    private final List<Consumer<LoginState>> loginStateListeners = new CopyOnWriteArrayList<>();
+    private volatile LoginState loginState = getLoginState();
     @Getter
-    private final List<Consumer<LoginCookieInfo>> loginCompleteListeners = new ArrayList<>();
-    @Setter
-    private Consumer<StartQRLoginResponse> loginResponseHandler;
-    @Getter
-    NetworkReceiver<StartQRLoginResponse> qrLoginResponseReceiver = (qrLoginResponse, player) -> {
-        if (loginResponseHandler != null)
-            loginResponseHandler.accept(qrLoginResponse);
-    };
+    private volatile String lastLoginErrorMessage;
     private double lastPressTime;
     private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 300;
     private final AtomicInteger toggleVersion = new AtomicInteger(0);
@@ -77,43 +61,35 @@ public class LoginService implements IClientLoginService {
             Thread.currentThread().setName("MHWorker-Login-V");
             LoginCookieInfo loginCookieInfo = loginResult.loginCookieInfo();
             LoginType type = loginCookieInfo.type();
+            Profile profile = loginResult.profile();
             if (type != LoginType.UNLOGGED && type != LoginType.ANONYMOUS && loginResult.success()) {
                 loginCookieInfo.setToClientCookie();
-                Profile.setCurrent(loginResult.profile());
-                loginCompleteListeners.forEach(c -> c.accept(loginCookieInfo));
-            } else if (type == LoginType.ANONYMOUS) {
+                Profile.setCurrent(profile);
+                lastLoginErrorMessage = null;
+            } else if (type == LoginType.ANONYMOUS && Profile.ANONYMOUS.equals(profile)) {
                 loginCookieInfo.setToClientCookie();
                 Profile.setCurrent(Profile.ANONYMOUS);
-                loginCompleteListeners.forEach(c -> c.accept(loginCookieInfo));
+                lastLoginErrorMessage = null;
             } else {
                 logger.warn("Login failed");
+                lastLoginErrorMessage = resolveLoginErrorMessage(loginResult.message());
             }
+            notifyLoginStateChanged();
             AccountBaseView accountBaseView = AccountBaseView.getInstance();
             if (accountBaseView != null) {
-                MuiModApi.postToUiThread(accountBaseView::refresh);
                 if (loginResult.success()) {
                     ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
-                    profileConfigData.setProfile(loginResult.profile());
+                    profileConfigData.setProfile(profile);
                     profileConfigData.saveToConfig();
-                    MuiModApi.postToUiThread(() -> {
-                        AccountView accountView = AccountView.getInstance();
-                        if (accountView != null) {
-                            accountView.refresh();
-                        }
-                    });
+                    MuiModApi.postToUiThread(accountBaseView::refresh);
                 } else {
                     MuiModApi.postToUiThread(() -> {
-                        AccountView accountView = AccountView.getInstance();
-                        if (accountView != null) {
-                            accountView.refresh();
-                        }
+                        accountBaseView.refresh();
+                        String message = resolveLoginErrorMessage(loginResult.message());
+                        accountBaseView.onLoginFailed(message);
                         LoginView loginView = LoginView.getInstance();
                         if (loginView != null) {
                             loginView.reset();
-                            String message = loginResult.message();
-                            if (message.startsWith(MusicHud.MOD_ID)) {
-                                message = I18n.get(message);
-                            }
                             loginView.errorText(message);
                         }
                     });
@@ -137,14 +113,59 @@ public class LoginService implements IClientLoginService {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         if (loginCookieInfo.generateTime().plus(refreshInterval).isBefore(ZonedDateTime.now())) {
             logger.info("Refreshing Login Cookie");
-            IClientNetworkService.getInstance().sendToServer(new CookieLoginRequest(loginCookieInfo, true));
+            IClientNetworkService.getInstance().sendToServer(new CookieLoginMessage(loginCookieInfo, true));
         } else {
-            IClientNetworkService.getInstance().sendToServer(new CookieLoginRequest(loginCookieInfo, false));
+            IClientNetworkService.getInstance().sendToServer(new CookieLoginMessage(loginCookieInfo, false));
         }
     }
 
     @Override
     public boolean isLogined() {
+        return getLoginState() == LoginState.LOGGED_IN;
+    }
+
+    @Override
+    public LoginState getLoginState() {
+        LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
+        LoginType type = loginCookieInfo.type();
+        Profile current = Profile.getCurrent();
+        boolean realCookie = type != LoginType.UNLOGGED && type != LoginType.ANONYMOUS;
+        boolean realProfile = current != null && !current.equals(Profile.ANONYMOUS);
+        if (realCookie && realProfile) {
+            return LoginState.LOGGED_IN;
+        }
+        if (type == LoginType.ANONYMOUS || Profile.ANONYMOUS.equals(current)) {
+            return LoginState.ANONYMOUS;
+        }
+        return LoginState.UNLOGGED;
+    }
+
+    @Override
+    public Unregister addLoginStateListener(Consumer<LoginState> listener) {
+        loginStateListeners.add(listener);
+        return () -> loginStateListeners.remove(listener);
+    }
+
+    private void notifyLoginStateChanged() {
+        LoginState state = getLoginState();
+        if (state == loginState) return;
+        loginState = state;
+        loginStateListeners.forEach(listener -> listener.accept(state));
+    }
+
+    private static String resolveLoginErrorMessage(String message) {
+        if (message != null && message.startsWith(MusicHud.MOD_ID)) {
+            return I18n.get(message);
+        }
+        return message;
+    }
+
+    public void clearLastLoginErrorMessage() {
+        lastLoginErrorMessage = null;
+    }
+
+    @Override
+    public boolean hasPreviousLoginInfo() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         return loginCookieInfo.type() != LoginType.UNLOGGED &&
                 loginCookieInfo.type() != LoginType.ANONYMOUS;
@@ -153,16 +174,9 @@ public class LoginService implements IClientLoginService {
     @Override
     public void connectAsPrevious() {
         if (connectionType == ConnectionType.EXTERNAL) {
-            connectToExternalServer();
+            IConnectionManager.getInstance().connectToExternalServer();
         } else {
-            launchIsolated();
-        }
-    }
-
-    @Override
-    public void connectToExternalServer() {
-        if (clientConfig.getEnable()) {
-            clientNetworkService.sendToServer(new ConnectRequest(Version.current));
+            IConnectionManager.getInstance().launchIsolated();
         }
     }
 
@@ -171,7 +185,7 @@ public class LoginService implements IClientLoginService {
         if (type != null) {
             connectionType = type;
         }
-        if (isLogined()) {
+        if (hasPreviousLoginInfo()) {
             logger.info("Previous cookie found");
             loginToServerByCookieWithRefreshCheck();
         } else {
@@ -183,47 +197,33 @@ public class LoginService implements IClientLoginService {
     private void loginAsAnonymousToServer() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         if (loginCookieInfo.type() == LoginType.ANONYMOUS) {
-            clientNetworkService.sendToServer(new CookieLoginRequest(loginCookieInfo, false));
+            clientNetworkService.sendToServer(new CookieLoginMessage(loginCookieInfo, false));
         } else {
-            clientNetworkService.sendToServer(AnonymousLoginRequest.REQUEST);
+            clientNetworkService.sendToServer(AnonymousLoginMessage.REQUEST);
         }
     }
 
     @Override
-    public void logout() {
+    public void logoutAndReloginAsAnonymous() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         Profile.setCurrent(Profile.ANONYMOUS);
+        notifyLoginStateChanged();
         loginAsAnonymousToServer();
     }
 
     @Override
     public void disconnectToExternalOrIntegratedServer() {
-        clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
-        MusicService.resetCurrentMusicStatus();
-        NowPlayingInfo.getInstance().stop();
-        StreamAudioPlayer.getInstance().stop();
-
-        MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
-//        Profile.setCurrent(Profile.ANONYMOUS);
+        IConnectionManager.getInstance().disconnect();
     }
 
     @Override
     public void switchToIsolate() {
-        disconnectToExternalOrIntegratedServer();
-        launchIsolated();
-    }
-
-    private void launchIsolated() {
-        loginToServer(ConnectionType.INTERNAL);
-        MusicService.resetCurrentMusicStatus();
-        NowPlayingInfo.getInstance().stop();
-        StreamAudioPlayer.getInstance().stop();
-        MusicPlayerServerService.getInstance().sendSyncPlayingStatusToPlayer(VanillaPlayerProxy.ofPlayer(Minecraft.getInstance().player));
+        IConnectionManager.getInstance().switchToIsolate();
     }
 
     @Override
     public void switchToServer() {
-        connectToExternalServer();
+        IConnectionManager.getInstance().connectToExternalServer();
     }
 
     @Override
@@ -316,16 +316,16 @@ public class LoginService implements IClientLoginService {
                                     && clientConfig.getBlackList().stream().noneMatch(i -> Pattern.matches(i, currentServer.ip)))
                                     || (connectServerFilterType == AutoConnectServerFilterType.WHITE_LIST
                                     && clientConfig.getWhiteList().stream().anyMatch(i -> Pattern.matches(i, currentServer.ip)))) {
-                                getInstance().connectToExternalServer();
+                                IConnectionManager.getInstance().connectToExternalServer();
                             } else {
-                                getInstance().launchIsolated();
+                                IConnectionManager.getInstance().launchIsolated();
                             }
                         } else {
-                            getInstance().launchIsolated();
+                            IConnectionManager.getInstance().launchIsolated();
                         }
                     } else {
-                        // Single Player
-                        getInstance().connectToExternalServer();
+                        // Single Player: try external first, fall back to isolated on timeout
+                        IConnectionManager.getInstance().connectToExternalServer();
                     }
                 });
             });

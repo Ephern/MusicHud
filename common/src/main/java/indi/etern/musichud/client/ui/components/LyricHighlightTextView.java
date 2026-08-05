@@ -9,10 +9,10 @@ import icyllis.modernui.graphics.Shader;
 import icyllis.modernui.text.Layout;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.widget.TextView;
-import indi.etern.musichud.client.ui.beans.LyricLine;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.Easing;
+import indi.etern.musichud.client.ui.utils.ui.Easing;
 import lombok.NonNull;
 import lombok.Setter;
 
