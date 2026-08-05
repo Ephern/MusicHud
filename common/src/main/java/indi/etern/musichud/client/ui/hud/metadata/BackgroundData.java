@@ -3,9 +3,9 @@ package indi.etern.musichud.client.ui.hud.metadata;
 import com.mojang.blaze3d.buffers.Std140Builder;
 import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
-import indi.etern.musichud.client.ui.utils.ui.ColorExtractor;
-import indi.etern.musichud.client.ui.utils.ui.Mixable;
-import indi.etern.musichud.client.ui.utils.ui.UniformDataUtils;
+import indi.etern.musichud.client.utils.ui.ColorExtractor;
+import indi.etern.musichud.client.utils.ui.Mixable;
+import indi.etern.musichud.client.utils.ui.UniformDataUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.EqualsAndHashCode;
 
@@ -17,7 +17,7 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
     private final ThemedColors themedColors;
     private ThemedColors mixedColors;
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
-    private float mixAlpha = -1;
+    private float mixAlpha;
     public static final BackgroundData NONE = new BackgroundData(null, ColorExtractor.getDefaultColors());
 
     public BackgroundData(

@@ -17,8 +17,8 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
-import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import net.minecraft.client.resources.language.I18n;
 
@@ -110,7 +110,7 @@ public class ArtistDetailView extends LinearLayout {
                 .cornerRadius(dp(4))
                 .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
                 .build();
-        ToggleSubscribeButton<?> toggleSubscribeButton = new ToggleSubscribeButton<>(context);
+        ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
         toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
         row1.addView(toggleSubscribeButton, new LayoutParams(dp(28), dp(28), 0));
         var subscribeState = musicService.getArtistSubscribedState(artist);

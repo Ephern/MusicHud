@@ -17,22 +17,21 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
-import indi.etern.musichud.client.services.LoginService;
+import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
-import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
-import indi.etern.musichud.client.ui.utils.PlayerInfoUtil;
+import indi.etern.musichud.client.utils.PlayerInfoUtil;
+import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.interfaces.IClientLoginService;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -52,7 +51,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MainFragment extends Fragment {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
-    private static final IClientLoginService I_CLIENT_LOGIN_SERVICE = LoginService.getInstance();
+    private static final ConnectionManager connectionManager = ConnectionManager.getInstance();
     private static volatile MainFragment instance = null;
 
     static {
@@ -454,7 +453,7 @@ public class MainFragment extends Fragment {
                         .build().newBackgroundDrawable();
                 switchServerConnectButton.setBackground(background1);
                 switchServerConnectButton.setOnClickListener(b -> {
-                    MusicHud.EXECUTOR.execute(I_CLIENT_LOGIN_SERVICE::toggleConnection);
+                    MusicHud.EXECUTOR.execute(connectionManager::toggleConnection);
                 });
                 serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(40)));
                 refreshServerConnectStatus();

@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.hud.pipelines;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
-import indi.etern.musichud.client.ui.utils.ui.UniformDataUtils;
+import indi.etern.musichud.client.utils.ui.UniformDataUtils;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;

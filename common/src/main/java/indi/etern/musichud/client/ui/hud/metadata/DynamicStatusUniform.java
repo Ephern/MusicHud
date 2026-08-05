@@ -5,7 +5,7 @@ import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
-import indi.etern.musichud.client.ui.utils.ui.Transitionable;
+import indi.etern.musichud.client.utils.ui.Transitionable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;

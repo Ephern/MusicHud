@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.utils.ui;
+package indi.etern.musichud.client.utils.ui;
 
 import lombok.Getter;
 import lombok.Setter;

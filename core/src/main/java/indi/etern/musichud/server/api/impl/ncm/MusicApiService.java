@@ -66,7 +66,7 @@ public class MusicApiService implements IMusicApiService {
     private static <K, T> T joinMerged(ConcurrentHashMap<K, CompletableFuture<T>> inFlight, K key, Supplier<T> loader) {
         CompletableFuture<T> future = inFlight.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(loader, MusicHud.EXECUTOR));
         try {
-            T result = future.get(5, TimeUnit.SECONDS);
+            T result = future.get(10, TimeUnit.SECONDS);
             inFlight.remove(key, future);
             return result;
         } catch (InterruptedException e) {
@@ -307,9 +307,13 @@ public class MusicApiService implements IMusicApiService {
             albumsCache.put(id, album);
             return album;
         } else {
-            return albumsCache.get(id,
-                    () -> loadAlbumInfoDetail(id, playerUUID)
-            );
+            Album cached = albumsCache.getIfPresent(id);
+            if (cached != null) {
+                return cached;
+            }
+            Album album = loadAlbumInfoDetail(id, playerUUID);
+            albumsCache.put(id, album);
+            return album;
         }
     }
 
@@ -525,13 +529,11 @@ public class MusicApiService implements IMusicApiService {
 
     @Override
     public void addToPlaylist(long playlistId, long musicId, UUID playerUUID) {
-        ApiClient.post(ApiServerEndpointsMeta.Playlist.MODIFY_TRACKS,
-                new ModifyTracksRequest(ModifyType.ADD.getApiOperationName(), playlistId, String.valueOf(musicId)),
-                loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
-                true);
         Playlist playlist = playlistsCache.getIfPresent(playlistId);
+        ObservableSequencedSet.EditHandle<MusicDetail> musicDetailEditHandle = null;
         if (playlist != null) {
-            SequencedSet<MusicDetail> musicDetails = playlist.getMusicDetails();
+            ObservableSequencedSet<MusicDetail> musicDetails = playlist.getMusicDetails();
+            musicDetailEditHandle = musicDetails.beginEdit();
             MusicDetail musicDetail = getMusicDetailByIds(List.of(musicId), playerUUID).getFirst();
             boolean contains = musicDetails.contains(musicDetail);
             if (!contains) {
@@ -539,29 +541,56 @@ public class MusicApiService implements IMusicApiService {
                 playlist.setMusicTrackCount(playlist.getMusicTrackCount() + 1);
             }
         }
+        try {
+            ApiClient.post(ApiServerEndpointsMeta.Playlist.MODIFY_TRACKS,
+                    new ModifyTracksRequest(ModifyType.ADD.getApiOperationName(), playlistId, String.valueOf(musicId)),
+                    loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
+                    true);
+            if (musicDetailEditHandle != null) {
+                musicDetailEditHandle.commit();
+            }
+        } catch (Exception e) {
+            if (musicDetailEditHandle != null) {
+                musicDetailEditHandle.rollback();
+            }
+            throw e;
+        }
     }
 
     @Override
     public void removeFromPlaylist(long playlistId, long musicId, UUID playerUUID) {
-        ApiClient.post(ApiServerEndpointsMeta.Playlist.MODIFY_TRACKS,
-                new ModifyTracksRequest(ModifyType.REMOVE.getApiOperationName(), playlistId, String.valueOf(musicId)),
-                loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
-                true);
         Playlist playlist = playlistsCache.getIfPresent(playlistId);
+        ObservableSequencedSet.EditHandle<MusicDetail> musicDetailEditHandle = null;
         if (playlist != null) {
             MusicDetail cached = musicDetailCache.getIfPresent(musicId);
+            ObservableSequencedSet<MusicDetail> musicDetails = playlist.getMusicDetails();
+            musicDetailEditHandle = musicDetails.beginEdit();
             if (cached != null) {
-                if (playlist.getMusicDetails().remove(cached)) {
+                if (musicDetails.remove(cached)) {
                     playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
                 }
             } else {
-                playlist.getMusicDetails().stream().filter(m -> m.getId() == musicId).findFirst()
+                musicDetails.stream().filter(m -> m.getId() == musicId).findFirst()
                         .ifPresent(musicDetail -> {
-                                    playlist.getMusicDetails().remove(musicDetail);
-                                    playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
+                            musicDetails.remove(musicDetail);
+                            playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
                                 }
                         );
             }
+        }
+        try {
+            ApiClient.post(ApiServerEndpointsMeta.Playlist.MODIFY_TRACKS,
+                    new ModifyTracksRequest(ModifyType.REMOVE.getApiOperationName(), playlistId, String.valueOf(musicId)),
+                    loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
+                    true);
+            if (musicDetailEditHandle != null) {
+                musicDetailEditHandle.commit();
+            }
+        } catch (Exception e) {
+            if (musicDetailEditHandle != null) {
+                musicDetailEditHandle.rollback();
+            }
+            throw e;
         }
     }
 
