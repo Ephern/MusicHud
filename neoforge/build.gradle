@@ -107,6 +107,7 @@ dependencies {
     shadowBundle(project(path: ':core')) { transitive = false }
 
     compileOnly "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
+    compileOnly(project(path: ":processor"))
 
     implementation("icyllis.modernui:ModernUI-NeoForge:26.2-${rootProject.modernui_version}.+")
     implementation("dev.icyllis:modernui-core:$rootProject.modernui_version") {
