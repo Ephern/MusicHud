@@ -4,28 +4,25 @@ import com.google.gson.annotations.SerializedName;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import lombok.*;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedHashSet;
 import java.util.Objects;
+import java.util.Set;
 
-@AllArgsConstructor(access = AccessLevel.PUBLIC)
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
-public class Album implements MusicCollection{
+public class Album implements MusicCollection {
     public static final ByteBufCodec<Album> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
-            Album::getId,
-            Codecs.STRING_UTF8,
-            Album::getName,
-            Codecs.STRING_UTF8,
-            Album::getPicUrl,
-            Codecs.ofList(() -> MusicDetail.CODEC),
-            Album::getMusicDetails,
-            Codecs.ofList(() -> Artist.CODEC),
-            Album::getArtists,
-            PusherInfo.CODEC,
-            Album::getPusherInfo,
+            Codecs.LONG, Album::getId,
+            Codecs.STRING_UTF8, Album::getName,
+            Codecs.STRING_UTF8, Album::getPicUrl,
+            Codecs.STRING_UTF8, Album::getType,
+            Codecs.STRING_UTF8, Album::getCompany,
+            Codecs.INT, Album::getMusicTrackCount,
+            Codecs.ofCollection(ObservableSequencedSet::new, () -> MusicDetail.CODEC), Album::getMusicDetails,
+            Codecs.ofCollection(LinkedHashSet::new, () -> Artist.CODEC), Album::getArtists,
+            PusherInfo.CODEC, Album::getPusherInfo,
             Album::new
     );
     public static final Album NONE = new Album();
@@ -33,14 +30,42 @@ public class Album implements MusicCollection{
     long id;
     String name = "";
     String picUrl = "";
+    String type = "";
+    String company = "";
+    @SerializedName("size")
+    @Getter
+    int musicTrackCount;
     @SerializedName("songs")
     @Setter
-    List<MusicDetail> musicDetails = new ArrayList<>();
-    List<Artist> artists = new ArrayList<>();
-
+    ObservableSequencedSet<MusicDetail> musicDetails = new ObservableSequencedSet<>(0);
+    LinkedHashSet<Artist> artists = new LinkedHashSet<>();
     // Not contained in the original API response, set separately
     @Getter
     transient PusherInfo pusherInfo = PusherInfo.EMPTY;
+
+    private boolean nullFiltered = false;
+
+    public Album(
+            long id,
+            String name,
+            String picUrl,
+            String type,
+            String company,
+            Integer musicTrackCount,
+            ObservableSequencedSet<MusicDetail> musicDetails,
+            LinkedHashSet<Artist> artists,
+            PusherInfo pusherInfo
+    ) {
+        this.id = id;
+        this.name = name;
+        this.picUrl = picUrl;
+        this.type = type;
+        this.company = company;
+        this.musicTrackCount = musicTrackCount;
+        this.musicDetails = musicDetails;
+        this.artists = artists;
+        this.pusherInfo = pusherInfo;
+    }
 
     public String getThumbnailPicUrl(int size) {
         return picUrl + "?param=" + size + "y" + size;
@@ -59,10 +84,25 @@ public class Album implements MusicCollection{
         return Objects.requireNonNullElse(picUrl, "");
     }
 
+    public String getType() {
+        return Objects.requireNonNullElse(type, "");
+    }
+
+    public String getCompany() {
+        return Objects.requireNonNullElse(company, "");
+    }
+
     @Override
-    public List<MusicDetail> getMusicDetails() {
-        List<MusicDetail> musicDetails = Objects.requireNonNullElse(this.musicDetails, new ArrayList<>());
-        return musicDetails.stream().filter(Objects::nonNull).toList();
+    public ObservableSequencedSet<MusicDetail> getMusicDetails() {
+        if (musicDetails == null || musicDetails.isEmpty()) {
+            return new ObservableSequencedSet<>(0);
+        }
+        if (!nullFiltered) {
+            musicDetails = musicDetails.stream().filter(Objects::nonNull)
+                    .collect(ObservableSequencedSet::new, Set::add, ObservableSequencedSet::addAll);
+            nullFiltered = true;
+        }
+        return musicDetails;
     }
 
     @Override
@@ -70,8 +110,8 @@ public class Album implements MusicCollection{
         return getThumbnailPicUrl(size);
     }
 
-    public List<Artist> getArtists() {
-        return Objects.requireNonNullElse(artists, new ArrayList<>());
+    public LinkedHashSet<Artist> getArtists() {
+        return Objects.requireNonNullElse(artists, new LinkedHashSet<>());
     }
 
     public Album shallowCopyBriefInfo() {
@@ -79,6 +119,9 @@ public class Album implements MusicCollection{
         album.id = this.id;
         album.name = this.name;
         album.picUrl = this.picUrl;
+        album.musicTrackCount = this.musicTrackCount;
+        album.company = this.company;
+        album.type = this.type;
         return album;
     }
 

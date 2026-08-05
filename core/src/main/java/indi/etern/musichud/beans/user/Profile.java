@@ -12,15 +12,13 @@ import java.util.Objects;
 public class Profile {
     public static final ByteBufCodec<Profile> CODEC =
             ByteBufCodec.composite(
-                    Codecs.STRING_UTF8,
-                    Profile::getNickname,
-                    Codecs.STRING_UTF8,
-                    Profile::getAvatarUrl,
-                    Codecs.LONG,
-                    Profile::getUserId,
+                    Codecs.STRING_UTF8, Profile::getNickname,
+                    Codecs.STRING_UTF8, Profile::getAvatarUrl,
+                    Codecs.LONG, Profile::getUserId,
+                    Codecs.ofEnum(VipType.class), Profile::getVipType,
                     Profile::new
             );
-    public static final Profile ANONYMOUS = new Profile("anonymous", "", 0, VipType.NORMAL);
+    public static final Profile ANONYMOUS = new Profile("anonymous", "", -1, VipType.NORMAL);
     public static final Profile PRIVATE_MASK = new Profile("private_mask", "", 0, VipType.NORMAL);
     @Getter
     @Setter
@@ -30,13 +28,6 @@ public class Profile {
     long userId;
     @Setter
     VipType vipType;
-
-    public Profile(String nickname, String avatarUrl, Long userId) {
-        this.nickname = nickname;
-        this.avatarUrl = avatarUrl;
-        this.userId = userId;
-        vipType = VipType.NORMAL;
-    }
 
     public String getNickname() {
         return Objects.requireNonNullElse(nickname, "");

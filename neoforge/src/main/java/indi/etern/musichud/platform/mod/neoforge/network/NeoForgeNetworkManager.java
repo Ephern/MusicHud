@@ -109,7 +109,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, VanillaServerNe
     }
 
     public void onRegisterPayloadHandlers(final RegisterPayloadHandlersEvent event) {
-        registrar = event.registrar(MusicHud.MOD_ID).versioned(Version.leastCapable.toString()).optional();
+        registrar = event.registrar(MusicHud.MOD_ID).versioned(Version.leastCompatible.toString()).optional();
         for (RegistrationInfo<?> info : pendingRegistrations) {
             registerPayloadInternal(info);
         }

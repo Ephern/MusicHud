@@ -21,6 +21,7 @@ rootProject.name = 'music_hud'
 def active = providers.gradleProperty('activePlatform').getOrElse('all')
 def profiles = active.split(',').collect { it.trim().toLowerCase() } as Set
 
+include 'processor'
 include 'core'
 include 'common'
 

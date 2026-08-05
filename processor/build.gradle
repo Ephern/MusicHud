@@ -1,0 +1,27 @@
+plugins {
+    id 'java-library'
+}
+
+base {
+    archivesName = "$rootProject.archives_name-$project.name"
+}
+
+dependencies {
+    testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
+    testRuntimeOnly "org.junit.platform:junit-platform-launcher"
+}
+
+java {
+    withSourcesJar()
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType(JavaCompile).configureEach {
+    it.options.release = 21
+}
+
+test {
+    useJUnitPlatform()
+    enabled = false
+}

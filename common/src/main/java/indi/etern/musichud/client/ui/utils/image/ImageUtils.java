@@ -15,6 +15,7 @@ import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.text.FontMetricsInt;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.text.TextPaint;
+import icyllis.modernui.text.style.DynamicDrawableSpan;
 import icyllis.modernui.text.style.ImageSpan;
 import indi.etern.musichud.MusicHud;
 import lombok.AccessLevel;
@@ -303,7 +304,7 @@ public class ImageUtils {
     public static @NotNull ImageSpan getIconSpan(Image image) {
         //noinspection UnstableApiUsage
         Context context = UIManager.getInstance().getDecorView().getContext();
-        return new ImageSpan(context, image) {
+        return new ImageSpan(context, image, DynamicDrawableSpan.ALIGN_CENTER) {
             @Override
             public int getSize(@NonNull TextPaint paint, CharSequence text,
                                int start, int end, @Nullable FontMetricsInt fm) {
@@ -313,14 +314,14 @@ public class ImageUtils {
                 if (origW <= 0 || origH <= 0) return 0;
 
                 FontMetricsInt pFm = paint.getFontMetricsInt();
-                int textHeight = -pFm.ascent;
+                int iconHeight = -pFm.ascent;
 
-                int newWidth = Math.round((float) textHeight * origW / origH);
+                int newWidth = Math.max(1, Math.round((float) iconHeight * origW / origH));
 
-                d.setBounds(0, 0, newWidth, textHeight);
+                d.setBounds(0, 0, newWidth, iconHeight);
 
                 if (fm != null) {
-                    fm.ascent = -textHeight;
+                    fm.ascent = -iconHeight;
                     fm.descent = 0;
                 }
                 return newWidth;

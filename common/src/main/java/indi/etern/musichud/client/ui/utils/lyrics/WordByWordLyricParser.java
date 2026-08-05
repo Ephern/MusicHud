@@ -2,9 +2,9 @@ package indi.etern.musichud.client.ui.utils.lyrics;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricInfo;
-import indi.etern.musichud.client.ui.beans.LyricLine;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.client.ui.utils.lyrics.beans.MetaInfoLine;
+import indi.etern.musichud.client.ui.dto.MetaInfoLine;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
