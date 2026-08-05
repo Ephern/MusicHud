@@ -17,7 +17,7 @@ dependencies {
     compileOnly "org.jetbrains:annotations:26.0.2"
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     annotationProcessor project(':processor')
-    api project(':processor')
+    compileOnly project(':processor')
     testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     testImplementation "org.junit.jupiter:junit-jupiter:$rootProject.junit_version"
