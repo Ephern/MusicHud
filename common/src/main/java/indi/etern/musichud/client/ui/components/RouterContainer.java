@@ -6,8 +6,8 @@ import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
-import indi.etern.musichud.client.ui.utils.ui.EasingInterpolator;
-import indi.etern.musichud.client.ui.utils.ui.Easing;
+import indi.etern.musichud.client.utils.ui.EasingInterpolator;
+import indi.etern.musichud.client.utils.ui.Easing;
 import lombok.Getter;
 import lombok.Setter;
 

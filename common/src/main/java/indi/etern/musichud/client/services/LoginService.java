@@ -1,9 +1,6 @@
 package indi.etern.musichud.client.services;
 
-import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.mc.UIManager;
-import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
@@ -12,7 +9,6 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
-import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.account.LoginView;
 import indi.etern.musichud.interfaces.*;
@@ -35,7 +31,6 @@ import java.time.Period;
 import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 
@@ -50,11 +45,6 @@ public class LoginService implements IClientLoginService {
     private volatile LoginState loginState = getLoginState();
     @Getter
     private volatile String lastLoginErrorMessage;
-    private double lastPressTime;
-    private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 300;
-    private final AtomicInteger toggleVersion = new AtomicInteger(0);
-    @Getter
-    private ConnectionType connectionType;
     @Getter
     NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, player) -> {
         MusicHud.EXECUTOR.submit(() -> {
@@ -172,19 +162,7 @@ public class LoginService implements IClientLoginService {
     }
 
     @Override
-    public void connectAsPrevious() {
-        if (connectionType == ConnectionType.EXTERNAL) {
-            IConnectionManager.getInstance().connectToExternalServer();
-        } else {
-            IConnectionManager.getInstance().launchIsolated();
-        }
-    }
-
-    @Override
-    public void loginToServer(ConnectionType type) {
-        if (type != null) {
-            connectionType = type;
-        }
+    public void loginToServer() {
         if (hasPreviousLoginInfo()) {
             logger.info("Previous cookie found");
             loginToServerByCookieWithRefreshCheck();
@@ -209,95 +187,6 @@ public class LoginService implements IClientLoginService {
         Profile.setCurrent(Profile.ANONYMOUS);
         notifyLoginStateChanged();
         loginAsAnonymousToServer();
-    }
-
-    @Override
-    public void disconnectToExternalOrIntegratedServer() {
-        IConnectionManager.getInstance().disconnect();
-    }
-
-    @Override
-    public void switchToIsolate() {
-        IConnectionManager.getInstance().switchToIsolate();
-    }
-
-    @Override
-    public void switchToServer() {
-        IConnectionManager.getInstance().connectToExternalServer();
-    }
-
-    @Override
-    public Boolean toggleConnection() {
-        MusicHud.ConnectStatus connectStatus = MusicHud.getConnectStatus();
-        if (connectStatus == MusicHud.ConnectStatus.CONNECTED) {
-            final int version = toggleVersion.incrementAndGet();
-            MusicHud.EXECUTOR.execute(() -> {
-                try {
-                    Thread.sleep(TOGGLE_DEBOUNCE_DELAY_MILLIS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-                if (toggleVersion.get() != version) return;
-                if (clientConfig.getEnableIsolatedMode()) {
-                    switchToIsolate();
-                } else {
-                    disconnectToExternalOrIntegratedServer();
-                }
-            });
-            return true;
-        } else if (connectStatus == MusicHud.ConnectStatus.NOT_CONNECTED) {
-            final int version = toggleVersion.incrementAndGet();
-            MusicHud.EXECUTOR.execute(() -> {
-                try {
-                    Thread.sleep(TOGGLE_DEBOUNCE_DELAY_MILLIS);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    return;
-                }
-                if (toggleVersion.get() != version) return;
-                switchToServer();
-            });
-            return false;
-        } else {
-            return null;
-        }
-    }
-
-    @Override
-    public void keyBindsToggleConnection() {
-        boolean integratedServer = Minecraft.getInstance().getCurrentServer() == null;
-        if (!integratedServer) {
-            long currentTimeMillis = System.currentTimeMillis();
-            if (currentTimeMillis - lastPressTime <= 3000) {
-                lastPressTime = 0;
-                Boolean connected = toggleConnection();
-                if (connected != null) {
-                    MuiModApi.postToUiThread(() -> {
-                        //noinspection UnstableApiUsage
-                        Context context = UIManager.getInstance().getDecorView().getContext();
-                        if (connected) {
-                            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.disconnecting"), Toast.LENGTH_SHORT));
-                        } else {
-                            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.connecting"), Toast.LENGTH_SHORT));
-                        }
-                    });
-                }
-            } else {
-                lastPressTime = currentTimeMillis;
-                MuiModApi.postToUiThread(() -> {
-                    //noinspection UnstableApiUsage
-                    Context context = UIManager.getInstance().getDecorView().getContext();
-                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.confirmSwitchConnection"), Toast.LENGTH_SHORT));
-                });
-            }
-        } else {
-            MuiModApi.postToUiThread(() -> {
-                //noinspection UnstableApiUsage
-                Context context = UIManager.getInstance().getDecorView().getContext();
-                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.switchConnectionUnavailableInIntegratedServer"), Toast.LENGTH_SHORT));
-            });
-        }
     }
 
     @RegisterMark

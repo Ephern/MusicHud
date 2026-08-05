@@ -39,6 +39,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
         boolean changed = super.add(element);
         if (changed) {
             addListeners.forEach(l -> l.accept(element));
+            changeListeners.forEach(Runnable::run);
         }
         return changed;
     }
@@ -47,18 +48,21 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
     public void addFirst(E e) {
         delegate.addFirst(e);
         addListeners.forEach(l -> l.accept(e));
+        changeListeners.forEach(Runnable::run);
     }
 
     @Override
     public void addLast(E e) {
         delegate.addLast(e);
         addListeners.forEach(l -> l.accept(e));
+        changeListeners.forEach(Runnable::run);
     }
 
     @Override
     public E removeFirst() {
         E e = delegate.removeFirst();
         removeListeners.forEach(l -> l.accept(e));
+        changeListeners.forEach(Runnable::run);
         return e;
     }
 
@@ -66,6 +70,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
     public E removeLast() {
         E e = delegate.removeLast();
         removeListeners.forEach(l -> l.accept(e));
+        changeListeners.forEach(Runnable::run);
         return e;
     }
 
@@ -75,6 +80,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
         if (changed) {
             //noinspection unchecked
             removeListeners.forEach(l -> l.accept((E) object));
+            changeListeners.forEach(Runnable::run);
         }
         return changed;
     }
@@ -87,6 +93,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
             actuallyAdded.forEach(e -> {
                 addListeners.forEach(actuallyAdded::forEach);
             });
+            changeListeners.forEach(Runnable::run);
         }
         return changed;
     }
@@ -98,6 +105,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
         if (changed) {
             //noinspection unchecked
             removeListeners.forEach(l -> actuallyRemoved.forEach(i -> l.accept((E) i)));
+            changeListeners.forEach(Runnable::run);
         }
         return changed;
     }
@@ -108,6 +116,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
         boolean changed = super.removeIf(filter);
         if (changed) {
             removed.forEach(e -> removeListeners.forEach(l -> l.accept(e)));
+            changeListeners.forEach(Runnable::run);
         }
         return changed;
     }
@@ -117,6 +126,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
         Set<E> copy = Set.copyOf(this);
         super.clear();
         removeListeners.forEach(copy::forEach);
+        changeListeners.forEach(Runnable::run);
     }
 
     public EditHandle<E> beginEdit() {

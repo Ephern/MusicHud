@@ -4,11 +4,11 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.state.ISubscribeState;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 
-public class ToggleSubscribeButton<T> extends ToggleIconButton {
+public class ToggleSubscribeButton extends ToggleIconButton {
     private ISubscribeState<?> subscribeState;
     private Unregister unregister = null;
 

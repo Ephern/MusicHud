@@ -21,7 +21,7 @@ import indi.etern.musichud.client.ui.components.ArtistCard;
 import indi.etern.musichud.client.ui.components.FlexWrapLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.UrlImageView;
-import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;

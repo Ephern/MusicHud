@@ -16,11 +16,14 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 /**
  * 一个支持自动换行的弹性布局容器,类似于 CSS flexbox 的 flex-wrap: wrap
  * 使用多个水平 LinearLayout 来实现多行布局
+ * Rows are (re)built synchronously in onMeasure where the parent-provided
+ * width is already known, so the first layout pass renders correctly and no
+ * deferred reflow (post) is needed.
  */
 public class FlexWrapLayout extends LinearLayout {
     final List<View> allChildren = new ArrayList<>();
     private final List<LinearLayout> rows = new ArrayList<>();
-    boolean attached = false;
+    private boolean rowsDirty = true;
 
     public FlexWrapLayout(Context context) {
         super(context);
@@ -31,64 +34,73 @@ public class FlexWrapLayout extends LinearLayout {
             int oldWidth = oldRight - oldLeft;
 
             if (newWidth != oldWidth && newWidth > 0) {
-                post(FlexWrapLayout.this::reflowChildren);
-            }
-        });
-        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View v) {
-                post(() -> {
-                    attached = true;
-                    reflowChildren();
-                });
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View v) {
-                attached = false;
-                removeAllRowViews();
+                rowsDirty = true;
+                requestLayout();
             }
         });
     }
 
-    private void removeAllRowViews() {
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int width = MeasureSpec.getSize(widthMeasureSpec);
+        if (rowsDirty && width > 0) {
+            rowsDirty = false;
+            rebuildRows(width);
+        }
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
         rows.forEach(ViewGroup::removeAllViews);
         rows.clear();
         super.removeAllViews();
+        rowsDirty = true;
     }
 
     /**
      * 添加子 View 到布局中
-     * 这个方法会自动处理换行逻辑
+     * 实际的行分配延迟到下一次 onMeasure 时按真实宽度执行
      */
     @Override
     public void addView(@NotNull View view) {
-        // 测量子 View 的宽度
         allChildren.add(view);
-        addViewInternal(view);
+        rowsDirty = true;
+        requestLayout();
     }
 
-    private void addViewInternal(View view) {
-        view.measure(
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-        );
-        int childWidth = view.getMeasuredWidth();
-        if (attached && view.getParent() == null) {
+    private void rebuildRows(int width) {
+        rows.forEach(ViewGroup::removeAllViews);
+        List<View> children = List.copyOf(allChildren);
+        for (View child : children) {
+            child.measure(
+                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+            );
+            int childWidth = child.getMeasuredWidth();
             // 查找可以容纳这个子 View 的行
-            LinearLayout targetRow = findOrCreateRowForChild(childWidth);
-            targetRow.addView(view);
+            LinearLayout targetRow = findOrCreateRowForChild(width, childWidth);
+            targetRow.addView(child);
         }
+        List<LinearLayout> rowsToRemove = new ArrayList<>();
+        for (LinearLayout row : rows) {
+            if (row.getChildCount() == 0) {
+                rowsToRemove.add(row);
+                super.removeView(row);
+            }
+        }
+        rows.removeAll(rowsToRemove);
     }
 
     /**
      * 查找或创建一个可以容纳指定宽度子 View 的行
      */
-    private LinearLayout findOrCreateRowForChild(int childWidth) {
+    private LinearLayout findOrCreateRowForChild(int width, int childWidth) {
         // 尝试在现有行中找到空间
         for (LinearLayout row : rows) {
             int currentRowWidth = calculateRowWidth(row);
-            int availableWidth = getWidth() - currentRowWidth;
+            int availableWidth = width - currentRowWidth;
             if (availableWidth >= childWidth) {
                 return row;
             }
@@ -134,22 +146,7 @@ public class FlexWrapLayout extends LinearLayout {
         rows.clear();
         allChildren.clear();
         super.removeAllViews();
-    }
-
-    public void reflowChildren() {
-        rows.forEach(ViewGroup::removeAllViews);
-        List<View> allChildren1 = List.copyOf(allChildren);
-        for (View child : allChildren1) {
-            addViewInternal(child);
-        }
-        List<LinearLayout> rowsToRemove = new ArrayList<>();
-        for (LinearLayout row : rows) {
-            if (row.getChildCount() == 0) {
-                rowsToRemove.add(row);
-                super.removeView(row);
-            }
-        }
-        rows.removeAll(rowsToRemove);
+        rowsDirty = true;
     }
 
     @Override
@@ -158,6 +155,7 @@ public class FlexWrapLayout extends LinearLayout {
         rows.forEach(row -> {
             row.removeView(view);
         });
-        reflowChildren();
+        rowsDirty = true;
+        requestLayout();
     }
 }

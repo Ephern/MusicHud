@@ -9,7 +9,7 @@ import icyllis.modernui.view.ViewTreeObserver;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.ImageView;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;

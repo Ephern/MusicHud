@@ -10,8 +10,8 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
-import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
 
 public class ArtistCard extends LinearLayout {//TODO
     public static final int imageSize = 100;

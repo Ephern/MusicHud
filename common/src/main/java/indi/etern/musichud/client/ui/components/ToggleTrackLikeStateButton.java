@@ -5,11 +5,15 @@ import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.client.services.LoginService;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 
+import java.util.concurrent.atomic.AtomicInteger;
+
 public class ToggleTrackLikeStateButton extends ToggleIconButton {
+    private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 800;
+    private final AtomicInteger toggleVersion = new AtomicInteger(0);
     protected IMusicTrackState.IPlaylistSubState playlistSubState;
     private Unregister unregister = null;
     private Unregister loginStateUnregister;
@@ -27,13 +31,27 @@ public class ToggleTrackLikeStateButton extends ToggleIconButton {
 
     @Override
     public boolean performClick() {
+        boolean initialChecked = isChecked();
         boolean b = super.performClick();
-        if (playlistSubState != null) {
-            if (isChecked()) {
-                playlistSubState.add();
-            } else {
-                playlistSubState.remove();
-            }
+        IMusicTrackState.IPlaylistSubState ps = playlistSubState;
+        if (ps != null) {
+            final boolean targetState = isChecked();
+            final int version = toggleVersion.incrementAndGet();
+            MusicHud.EXECUTOR.execute(() -> {
+                try {
+                    Thread.sleep(TOGGLE_DEBOUNCE_DELAY_MILLIS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (toggleVersion.get() != version) return;
+                if (targetState == initialChecked) return;
+                if (targetState) {
+                    ps.add();
+                } else {
+                    ps.remove();
+                }
+            });
         }
         return b;
     }

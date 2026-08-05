@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.animation.PropertyValuesHolder;
 import icyllis.modernui.animation.ValueAnimator;
 import icyllis.modernui.view.View;
-import indi.etern.musichud.client.ui.utils.ui.Easing;
+import indi.etern.musichud.client.utils.ui.Easing;
 
 /**
  * Unified RHYTHM lyric animation. The breathing scale uses a phase-shifted cosine

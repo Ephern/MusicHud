@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.utils.image;
+package indi.etern.musichud.client.utils.image;
 
 import com.google.common.cache.Cache;
 import com.google.common.cache.CacheBuilder;

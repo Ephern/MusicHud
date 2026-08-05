@@ -14,6 +14,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.music.Quality;
+import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
@@ -26,7 +27,7 @@ import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;
-import indi.etern.musichud.client.ui.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.ServerConfig;
@@ -59,7 +60,8 @@ public class ConfigView extends LinearLayout {
     private static final ServerConfig serverConfig = ServerConfig.getInstance();
     @Getter
     static volatile ConfigView instance;
-    private final IClientLoginService IClientLoginService = LoginService.getInstance();
+    private final IClientLoginService clientLoginService = LoginService.getInstance();
+    private final ConnectionManager connectionManager = ConnectionManager.getInstance();
 
     public ConfigView(Context context) {
         super(context);
@@ -92,9 +94,9 @@ public class ConfigView extends LinearLayout {
             booleanOption.setOnChanged(() -> {
                 MuiModApi.postToUiThread(MainFragment::refresh);
                 if (clientConfig.getEnable()) {
-                    IClientLoginService.connectAsPrevious();
+                    connectionManager.connectAsPrevious();
                 } else {
-                    IClientLoginService.disconnectToExternalOrIntegratedServer();
+                    connectionManager.disconnect();
                 }
             });
             PreferencesFragment.BooleanOption translatedLyricOption = new PreferencesFragment.BooleanOption(context,
@@ -295,9 +297,9 @@ public class ConfigView extends LinearLayout {
             enableIsolatedMode.setOnChanged(() -> {
                 if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED) {
                     if (clientConfig.getEnableIsolatedMode()) {
-                        IClientLoginService.switchToIsolate();
+                        connectionManager.switchToIsolate();
                     } else {
-                        IClientLoginService.disconnectToExternalOrIntegratedServer();
+                        connectionManager.disconnect();
                     }
                     MainFragment.refresh();
                 }
@@ -791,7 +793,15 @@ public class ConfigView extends LinearLayout {
         descriptionUrl.setTextSize(Theme.TEXT_SIZE_NORMAL);
         descriptionUrl.setOnClickListener(v -> Util.getPlatform().openUri(latestReleaseUrl));
 
-        final Path[] targetDir = {Paths.get("music-hud")};
+        Path path = Paths.get(serverConfig.getServerApiBinaryExecutablePath());
+        while (!Files.isDirectory(path)) {
+            path = path.getParent();
+            if (path == null) {
+                path = Paths.get("music-hud");
+                break;
+            }
+        }
+        final Path[] targetDir = {path};
         final ApiServerFetcher.ReleaseSummary[] latestRelease = {null};
 
         LinearLayout directoryLayout = new LinearLayout(context);
