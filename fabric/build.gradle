@@ -90,14 +90,14 @@ loom {
             setRunDirectory file("run/client")
             jvmArguments.addAll(
                     "-Dmusichud.log.level=DEBUG",
-                    "-Dfabric.dli.config=${rootProject.rootDir}/.gradle/loom-cache/projects/${project.name}/launch.cfg"
+                    "-Dfabric.dli.config=${rootProject.rootDir}/.gradle/loom-cache/projects/fabric/launch.cfg"
             )
         }
         server {
             setRunDirectory file("run/server")
             jvmArguments.addAll(
                     "-Dmusichud.log.level=DEBUG",
-                    "-Dfabric.dli.config=${rootProject.rootDir}/.gradle/loom-cache/projects/${project.name}/launch.cfg"
+                    "-Dfabric.dli.config=${rootProject.rootDir}/.gradle/loom-cache/projects/fabric/launch.cfg"
             )
         }
     }

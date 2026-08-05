@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
+import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.Mixable;
 import indi.etern.musichud.client.utils.ui.UniformDataUtils;

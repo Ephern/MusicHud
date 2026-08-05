@@ -7,12 +7,9 @@ import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
-import indi.etern.musichud.client.ui.utils.image.ImageTextureData;
-import indi.etern.musichud.client.ui.utils.image.ImageUtils;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.texture.AbstractTexture;
+import indi.etern.musichud.client.utils.image.ImageTextureData;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import org.jetbrains.annotations.NotNull;
 
 public class AlbumImageRenderer implements HudRenderer {
     private static volatile AlbumImageRenderer instance;
