@@ -1,11 +1,16 @@
 package indi.etern.musichud.client.services;
 
+import icyllis.modernui.core.Context;
+import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.mc.UIManager;
+import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.music.MusicService;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.IConnectionManager;
@@ -20,9 +25,12 @@ import indi.etern.musichud.utils.IClientDistUtil;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import net.minecraft.client.Minecraft;
+import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Centralized connection mode control.
@@ -35,11 +43,14 @@ public class ConnectionManager implements IConnectionManager {
     private static final Logger logger = MusicHud.getLogger(ConnectionManager.class);
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 300;
+    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(1);
     private static volatile ConnectionManager instance;
+    private final AtomicInteger toggleVersion = new AtomicInteger(0);
+    private final java.util.concurrent.atomic.AtomicInteger connectGeneration = new java.util.concurrent.atomic.AtomicInteger(0);
+    private double lastPressTime;
     @Getter
     private volatile ConnectionMode mode = ConnectionMode.DISCONNECTED;
-    private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(1);
-    private final java.util.concurrent.atomic.AtomicInteger connectGeneration = new java.util.concurrent.atomic.AtomicInteger(0);
 
     public static ConnectionManager getInstance() {
         if (instance == null) {
@@ -85,7 +96,7 @@ public class ConnectionManager implements IConnectionManager {
     @Override
     public synchronized void launchIsolated() {
         mode = ConnectionMode.ISOLATED;
-        IClientLoginService.getInstance().loginToServer(IClientLoginService.ConnectionType.INTERNAL);
+        IClientLoginService.getInstance().loginToServer();
         MusicService.resetCurrentMusicStatus();
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();
@@ -110,6 +121,89 @@ public class ConnectionManager implements IConnectionManager {
     }
 
     @Override
+    public Boolean toggleConnection() {
+        MusicHud.ConnectStatus connectStatus = MusicHud.getConnectStatus();
+        if (connectStatus == MusicHud.ConnectStatus.CONNECTED) {
+            final int version = toggleVersion.incrementAndGet();
+            MusicHud.EXECUTOR.execute(() -> {
+                try {
+                    Thread.sleep(TOGGLE_DEBOUNCE_DELAY_MILLIS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (toggleVersion.get() != version) return;
+                if (clientConfig.getEnableIsolatedMode()) {
+                    switchToIsolate();
+                } else {
+                    disconnect();
+                }
+            });
+            return true;
+        } else if (connectStatus == MusicHud.ConnectStatus.NOT_CONNECTED) {
+            final int version = toggleVersion.incrementAndGet();
+            MusicHud.EXECUTOR.execute(() -> {
+                try {
+                    Thread.sleep(TOGGLE_DEBOUNCE_DELAY_MILLIS);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                if (toggleVersion.get() != version) return;
+                connectToExternalServer();
+            });
+            return false;
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public void keyBindsToggleConnection() {
+        boolean integratedServer = Minecraft.getInstance().getCurrentServer() == null;
+        if (!integratedServer) {
+            long currentTimeMillis = System.currentTimeMillis();
+            if (currentTimeMillis - lastPressTime <= 3000) {
+                lastPressTime = 0;
+                Boolean connected = toggleConnection();
+                if (connected != null) {
+                    MuiModApi.postToUiThread(() -> {
+                        //noinspection UnstableApiUsage
+                        Context context = UIManager.getInstance().getDecorView().getContext();
+                        if (connected) {
+                            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.disconnecting"), Toast.LENGTH_SHORT));
+                        } else {
+                            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.connecting"), Toast.LENGTH_SHORT));
+                        }
+                    });
+                }
+            } else {
+                lastPressTime = currentTimeMillis;
+                MuiModApi.postToUiThread(() -> {
+                    //noinspection UnstableApiUsage
+                    Context context = UIManager.getInstance().getDecorView().getContext();
+                    ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.confirmSwitchConnection"), Toast.LENGTH_SHORT));
+                });
+            }
+        } else {
+            MuiModApi.postToUiThread(() -> {
+                //noinspection UnstableApiUsage
+                Context context = UIManager.getInstance().getDecorView().getContext();
+                ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.switchConnectionUnavailableInIntegratedServer"), Toast.LENGTH_SHORT));
+            });
+        }
+    }
+
+    @Override
+    public void connectAsPrevious() {
+        if (mode == ConnectionMode.EXTERNAL) {
+            IConnectionManager.getInstance().connectToExternalServer();
+        } else {
+            IConnectionManager.getInstance().launchIsolated();
+        }
+    }
+
+    @Override
     public synchronized void onConnectResponse(ConnectResponse payload) {
         IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
         IClientLoginService clientLoginService = IClientLoginService.getInstance();
@@ -120,11 +214,11 @@ public class ConnectionManager implements IConnectionManager {
                     if (!clientDistUtil.inIntegratedServer()
                             && MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED
                             && clientConfig.getEnableIsolatedMode()) {
-                        clientLoginService.disconnectToExternalOrIntegratedServer();
+                        disconnect();
                     }
                     connectGeneration.incrementAndGet();
                     MusicHud.setConnectStatus(MusicHud.ConnectStatus.CONNECTED);
-                    clientLoginService.loginToServer(IClientLoginService.ConnectionType.EXTERNAL);
+                    clientLoginService.loginToServer();
                     requestInitialState();
                 } else {
                     clientLoginService.logoutAndReloginAsAnonymous();
@@ -135,7 +229,7 @@ public class ConnectionManager implements IConnectionManager {
             }
         } else if (!payload.accepted()) {
             logger.info("Disconnected");
-            clientLoginService.disconnectToExternalOrIntegratedServer();
+            disconnect();
         }
         clientDistUtil.refreshMainGUI();
     }
