@@ -7,7 +7,6 @@ import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.state.IIdlePlaySourceLayerState;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
@@ -114,11 +113,6 @@ public class ConnectionManager implements IConnectionManager {
         }
         lastMode = LastMode.ISOLATED;
         IClientLoginService.getInstance().loginToServer();
-        // Re-sync the local idle play sources with the (possibly new) server-side component,
-        // after the login so the local component is ready to receive them.
-        IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
-        localState.reset();
-        localState.loadFromConfig();
         requestInitialState();
     }
 

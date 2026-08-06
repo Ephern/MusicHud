@@ -54,7 +54,6 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
             if (throwable != null) {
                 scheduleRetry(idlePlaySource, attemptsLeft, throwable);
             } else if (musicCollection != null) {
-                clientNetworkService.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
                 add(musicCollection);
             }
         });
