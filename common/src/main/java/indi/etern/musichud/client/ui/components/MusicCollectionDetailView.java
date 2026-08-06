@@ -208,7 +208,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         }
         ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
         toggleIdleSourceButton.setBackground(backgroundFactory.newBackgroundDrawable());
-        toggleIdleSourceButton.bindMusicList(musicService.getIdlePlaySourceState().local().collection(musicCollection));
+        toggleIdleSourceButton.bindState(musicService.getIdlePlaySourceState().local().collection(musicCollection));
         row1.addView(toggleIdleSourceButton, new LayoutParams(dp28, dp28, 0));
 
         LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);

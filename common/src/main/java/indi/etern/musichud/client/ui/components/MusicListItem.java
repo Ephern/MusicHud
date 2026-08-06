@@ -88,7 +88,7 @@ public class MusicListItem extends LinearLayout {
         row1.addView(musicName, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         row2 = new FlexWrapLayout(context);
-        musicTexts.addView(row2);
+        musicTexts.addView(row2, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         LinearLayout row3 = new LinearLayout(context);
         row3.setOrientation(HORIZONTAL);
@@ -187,6 +187,7 @@ public class MusicListItem extends LinearLayout {
                 split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                 split.setTextSize(Theme.TEXT_SIZE_SMALL);
                 split.setText(" / ");
+                split.setSingleLine();
                 row2.addView(split);
             }
             index++;
@@ -196,6 +197,7 @@ public class MusicListItem extends LinearLayout {
             artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             artistButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
             artistButton.setText(artist.getName());
+            artistButton.setSingleLine();
             artistButton.setOnClickListener(button -> {
                 RouterContainer routerContainer = RouterContainer.getInstance();
                 if (routerContainer != null) {
@@ -210,12 +212,14 @@ public class MusicListItem extends LinearLayout {
         split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         split.setTextSize(Theme.TEXT_SIZE_SMALL);
         split.setText(" - ");
+        split.setSingleLine();
         row2.addView(split);
         Button albumButton = new Button(context);
         albumButton.setBackground(backgroundFactory.newBackgroundDrawable());
         albumButton.setTextColor(Theme.PRIMARY_COLOR);
         albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         albumButton.setText(musicDetail.getAlbum().getName());
+        albumButton.setSingleLine();
         albumButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
         albumButton.setOnClickListener(button -> {
             RouterContainer routerContainer = RouterContainer.getInstance();

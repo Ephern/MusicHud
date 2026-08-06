@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
@@ -16,6 +17,7 @@ public class PlayingStatusRenderer implements HudRenderer {
     public static final ResourceLocation PLAYING_CONNECTED_ICON_LOCATION;
     public static final ResourceLocation PLAYING_ISOLATED_LOCATION;
     public static final ResourceLocation MUTED_LOCATION;
+    private static volatile PlayingStatusRenderer instance;
 
     static {
         LOADING_ICON_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/loader_circle.png");
@@ -26,7 +28,6 @@ public class PlayingStatusRenderer implements HudRenderer {
         MUTED_LOCATION = ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "textures/gui/icons/volume_x.png");
     }
 
-    private static volatile PlayingStatusRenderer instance;
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     StreamAudioPlayer.Status status;
     @Getter
@@ -60,12 +61,10 @@ public class PlayingStatusRenderer implements HudRenderer {
             default -> {
                 if (clientConfig.getMuted()) {
                     yield MUTED_LOCATION;
-                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
+                } else if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
                     yield PLAYING_CONNECTED_ICON_LOCATION;
-                } else if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
-                    yield PLAYING_ISOLATED_LOCATION;
                 } else {
-                    yield null;
+                    yield PLAYING_ISOLATED_LOCATION;
                 }
             }
         };

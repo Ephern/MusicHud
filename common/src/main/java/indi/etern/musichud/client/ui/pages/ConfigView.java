@@ -28,6 +28,7 @@ import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.ServerConfig;
@@ -295,7 +296,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setEnableIsolatedMode)
                     .setDefaultValue(true);
             enableIsolatedMode.setOnChanged(() -> {
-                if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED) {
+                if (ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED) {
                     if (clientConfig.getEnableIsolatedMode()) {
                         connectionManager.switchToIsolate();
                     } else {
@@ -983,7 +984,7 @@ public class ConfigView extends LinearLayout {
         final AtomicBoolean cancelled = new AtomicBoolean(false);
 
         String baseTitle = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.title");
-        java.util.function.Consumer<Page> setPage = page -> {
+        Consumer<Page> setPage = page -> {
             switch (page) {
                 case IDLE, RESETTING -> {
                     title.setText(baseTitle);

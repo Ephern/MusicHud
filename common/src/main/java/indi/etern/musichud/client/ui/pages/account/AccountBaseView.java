@@ -9,6 +9,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
@@ -46,7 +47,8 @@ public class AccountBaseView extends LinearLayout {
         boolean enabled = clientConfig.getEnable();
 
         Status status1;
-        if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
+        if (ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED
+                && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
             status1 = Status.UNAVAILABLE;
         } else if (LoginService.getInstance().isLogined()) {
             status1 = Status.LOGGED;

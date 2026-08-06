@@ -178,7 +178,7 @@ public class MusicCollectionCard extends LinearLayout {
                 || (localPlayer != null && pusherInfo.getPlayerUUID().equals(localPlayer.getUUID()))) {
             ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
             toggleIdleSourceButton.setBackground(backgroundFactory.newBackgroundDrawable());
-            toggleIdleSourceButton.bindMusicList(musicService.getIdlePlaySourceState().local().collection(musicCollection));
+            toggleIdleSourceButton.bindState(musicService.getIdlePlaySourceState().local().collection(musicCollection));
             row1.addView(toggleIdleSourceButton, new LayoutParams(row2.dp(22), row2.dp(22), 0));
         } else {
             LinearLayout pusherRow = new LinearLayout(context);

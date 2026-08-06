@@ -32,17 +32,47 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
             if (!idlePlaySources.isEmpty()) {
                 MusicHud.EXECUTOR.execute(() -> {
                     for (IdlePlaySource idlePlaySource : idlePlaySources) {
-                        try {
-                            load(idlePlaySource.getType(), idlePlaySource.getId()).thenAcceptAsync(musicCollection -> {
-                                clientNetworkService.sendToServer(new AddToIdlePlaySourceMessage(idlePlaySource));
-                                add(musicCollection);
-                            }, MusicHud.EXECUTOR);
-                        } catch (Exception e) {
-                            logger.error("Failed to load idle play source playlist with idlePlaySource:{}", idlePlaySource, e);
-                        }
+                        loadWithRetry(idlePlaySource, 3);
                     }
                 });
             }
+        }
+    }
+
+    private void loadWithRetry(IdlePlaySource idlePlaySource, int attemptsLeft) {
+        CompletableFuture<? extends MusicCollection> future;
+        try {
+            future = load(idlePlaySource.getType(), idlePlaySource.getId());
+        } catch (Exception e) {
+            future = null;
+        }
+        if (future == null) {
+            scheduleRetry(idlePlaySource, attemptsLeft, "load returned null");
+            return;
+        }
+        future.whenComplete((musicCollection, throwable) -> {
+            if (throwable != null) {
+                scheduleRetry(idlePlaySource, attemptsLeft, throwable);
+            } else if (musicCollection != null) {
+                add(musicCollection);
+            }
+        });
+    }
+
+    private void scheduleRetry(IdlePlaySource idlePlaySource, int attemptsLeft, Object reason) {
+        if (attemptsLeft > 0) {
+            MusicHud.EXECUTOR.execute(() -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    return;
+                }
+                loadWithRetry(idlePlaySource, attemptsLeft - 1);
+            });
+        } else {
+            logger.error("Failed to load idle play source {} ({}) after retries: {}",
+                    idlePlaySource.getType().getSimpleName(), idlePlaySource.getId(), reason);
         }
     }
 

@@ -15,6 +15,7 @@ import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
@@ -104,7 +105,7 @@ public class HudRendererManager {
 
                     updateStatus(StreamAudioPlayer.Status.IDLE);
                     StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
-                    MusicHud.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
+                    ConnectionStateMachine.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
                     loaded = true;
                 }
             }
