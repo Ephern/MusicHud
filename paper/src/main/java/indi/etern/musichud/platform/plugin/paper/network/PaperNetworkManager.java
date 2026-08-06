@@ -140,7 +140,7 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
     private static String getChannelId(Class<?> clazz) {
         String[] words = clazz.getSimpleName().split("(?<!(^|[A-Z]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
         String name = String.join("_", words).toLowerCase();
-        return "musichud:" + name;
+        return "music_hud:" + name;
     }
 
     private void ensureIncomingChannelRegistered(String channel) {

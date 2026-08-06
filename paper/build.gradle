@@ -67,7 +67,7 @@ tasks.processResources {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 
     inputs.property('version', project.version)
-    inputs.property('apiVersion', rootProject.minecraft_version)
+    inputs.property('apiVersion', rootProject.minecraft_api_version)
     filesMatching('paper-plugin.yml') {
         expand(
                 version: project.version,
@@ -91,22 +91,8 @@ tasks.assemble {
     dependsOn tasks.shadowJar
 }
 
-def paperServerJar = layout.buildDirectory.file("paper-server.jar")
-
-tasks.register('downloadPaperServer') {
-    outputs.file(paperServerJar)
-    onlyIf { !paperServerJar.get().asFile.exists() }
-    doLast {
-        def url = 'https://fill-data.papermc.io/v1/objects/39bd8c00b9e18de91dcabd3cc3dcfa5328685a53b7187a2f63280c22e2d287b9/paper-1.21.1-133.jar'
-        paperServerJar.get().asFile.parentFile.mkdirs()
-        ant.get(src: url, dest: paperServerJar.get().asFile)
-    }
-}
-
 tasks.runServer {
-    dependsOn tasks.downloadPaperServer
     minecraftVersion("${rootProject.minecraft_version}")
-    serverJar(paperServerJar)
 }
 
 publishing {
