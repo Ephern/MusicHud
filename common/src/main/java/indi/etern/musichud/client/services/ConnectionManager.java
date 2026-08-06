@@ -7,8 +7,10 @@ import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.state.IIdlePlaySourceLayerState;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
+import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.connection.ConnectAttemptResult;
@@ -26,12 +28,15 @@ import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectResponse;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetInitialStateRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetInitialStateResponse;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.utils.IClientDistUtil;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
@@ -52,7 +57,7 @@ public class ConnectionManager implements IConnectionManager {
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
     private static volatile ConnectionManager instance;
     private final AtomicInteger toggleVersion = new AtomicInteger(0);
-    private final java.util.concurrent.atomic.AtomicInteger connectGeneration = new java.util.concurrent.atomic.AtomicInteger(0);
+    private final AtomicInteger connectGeneration = new AtomicInteger(0);
     private double lastPressTime;
     private volatile LastMode lastMode = LastMode.NONE;
     @Getter
@@ -109,22 +114,34 @@ public class ConnectionManager implements IConnectionManager {
         }
         lastMode = LastMode.ISOLATED;
         IClientLoginService.getInstance().loginToServer();
-        MusicService.resetCurrentMusicStatus();
-        NowPlayingInfo.getInstance().stop();
-        StreamAudioPlayer.getInstance().stop();
+        // Re-sync the local idle play sources with the (possibly new) server-side component,
+        // after the login so the local component is ready to receive them.
+        IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
+        localState.reset();
+        localState.loadFromConfig();
         requestInitialState();
     }
 
     @Override
     public synchronized void switchToIsolate() {
-        disconnect();
+        // Send LogoutMessage before switching state: while still CONNECTED the message goes
+        // over the network channel and the remote server session can actually be cleaned up.
+        // Skip for integrated servers / pending connections: the local server component's
+        // playback state must be preserved for the isolated session to resume from it.
+        if (ConnectionStateMachine.getState() == ConnectionState.CONNECTED
+                && !IClientDistUtil.getInstance().inIntegratedServer()) {
+            clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
+        }
+        ConnectionStateMachine.enterDisconnected();
         launchIsolated();
     }
 
     @Override
     public synchronized void disconnect() {
-        ConnectionStateMachine.enterDisconnected();
+        // Send before switching the state so the network channel is still used in multiplayer
+        // (after the transition the payload would fall back to the local loopback branch).
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
+        ConnectionStateMachine.enterDisconnected();
         MusicService.resetCurrentMusicStatus();
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();
@@ -229,6 +246,15 @@ public class ConnectionManager implements IConnectionManager {
         if (ConnectionStateMachine.getState() == ConnectionState.CONNECTING
                 && payload.accepted() && Version.compatibleWith(payload.serverVersion())) {
             logger.info("Connecting accepted, server version: {}", payload.serverVersion());
+            if (!clientDistUtil.inIntegratedServer()) {
+                // Leave the local server component session (entered while in isolated mode)
+                // so its pushes (SwitchMusicMessage, idle source updates, ...) stop reaching
+                // this client once connected to the external server.
+                Player localPlayer = Minecraft.getInstance().player;
+                if (localPlayer != null) {
+                    ILoginApiService.getInstance(ApiProvider.NCM).logout(VanillaPlayerProxy.ofPlayer(localPlayer));
+                }
+            }
             if (!clientDistUtil.inIntegratedServer()
                     && clientConfig.getEnableIsolatedMode()) {
                 // Stop leftover isolated-mode playback before switching to server tracks.
@@ -271,6 +297,10 @@ public class ConnectionManager implements IConnectionManager {
                             }
                         }
                         MusicService.getInstance().refreshQueue(response.getQueue());
+                        MusicService.getInstance().getIdlePlaySourceState().external().updateAll(
+                                response.getPlaylistSources(), response.getAlbumSources());
+                        // Always apply the fetched state; switchMusic itself skips restarting
+                        // the audio stream when the same track is still playing.
                         if (response.getCurrentPlaying() != MusicDetail.NONE) {
                             MusicService.getInstance().switchMusic(
                                     response.getCurrentPlaying(), response.getNextIdle(), response.getStartTime(), "");
@@ -278,8 +308,6 @@ public class ConnectionManager implements IConnectionManager {
                             MusicService.getInstance().switchMusic(
                                     MusicDetail.NONE, response.getNextIdle(), response.getStartTime(), "");
                         }
-                        MusicService.getInstance().getIdlePlaySourceState().external().updateAll(
-                                response.getPlaylistSources(), response.getAlbumSources());
                     })
                     .exceptionally(e -> {
                         logger.warn("Failed to get initial state", e);

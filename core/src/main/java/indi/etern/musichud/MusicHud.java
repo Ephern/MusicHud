@@ -10,14 +10,11 @@ import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 
 import java.time.Duration;
-import java.util.HashSet;
 import java.util.Random;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.function.Consumer;
 
 public final class MusicHud {
     public static final String MOD_ID = "music_hud";
@@ -26,7 +23,6 @@ public final class MusicHud {
     public static final String LOGGER_BASE_NAME = "MusicHud";
     public static final Logger LOGGER = LogManager.getLogger(LOGGER_BASE_NAME);
     public static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
-    private static final Set<Consumer<ConnectStatus>> connectStatusListeners = new HashSet<>();
     @Getter
     @Setter
     private static Environment currentEnvironment;
@@ -95,26 +91,5 @@ public final class MusicHud {
     @FunctionalInterface
     public interface ScheduledTask {
         void stop();
-    }
-
-    /**
-     * Coarse connection status exposed to the UI, derived from the authoritative
-     * {@link indi.etern.musichud.connection.ConnectionStateMachine}.
-     */
-    public static ConnectStatus getConnectStatus() {
-        return indi.etern.musichud.connection.ConnectionStateMachine.getConnectStatus();
-    }
-
-    /**
-     * Internally used by {@link indi.etern.musichud.connection.ConnectionStateMachine} to publish
-     * the coarse status to UI listeners. Prefer driving state via the state machine instead of
-     * calling this directly.
-     */
-    public static void setConnectStatus(ConnectStatus status) {
-        connectStatusListeners.forEach(l -> l.accept(status));
-    }
-
-    public static Set<Consumer<ConnectStatus>> getConnectStatusListeners() {
-        return connectStatusListeners;
     }
 }

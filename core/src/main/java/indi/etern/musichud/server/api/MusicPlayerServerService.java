@@ -149,6 +149,12 @@ public class MusicPlayerServerService {
             pusherThread = null;
             pusherThreadRunning = false;
             MusicPlayerServerService.this.stopSendingMusic();
+            // A source/queue added during the shutdown window (between the loop break and
+            // pusherThreadRunning = false) would have missed the updateContinuable(true)
+            // restart; pick it up here so the pusher does not stay dead.
+            if (!musicQueue.isEmpty() || !idlePlaySources.isEmpty()) {
+                updateContinuable(true);
+            }
         }
 
         private Optional<MusicDetail> getRandomMusicFromIdleSources() {
@@ -485,9 +491,11 @@ public class MusicPlayerServerService {
                 IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
                 if (clientDistUtil.inSinglePlayer()) {
                     pusherThread.interrupt();
+                    logger.info("Skip current music in singleplayer");
+                    return;
                 }
-                logger.info("Skip current music in singleplayer");
-            } else if (!votedPlayers.contains(playerUUID) && musicDetail.getId() == id) {
+            }
+            if (!votedPlayers.contains(playerUUID) && musicDetail.getId() == id) {
                 votedPlayers.add(playerUUID);
                 voteRate += 1.0f / loginApiService.getPlayerInfoMap().size();
                 if (musicDetail.getPusherInfo().getPlayerUUID().equals(playerUUID)) {

@@ -1,10 +1,10 @@
 package indi.etern.musichud.connection;
 
 import indi.etern.musichud.MusicHud;
+import lombok.Getter;
 
-import java.util.EnumSet;
-import java.util.EnumMap;
-import java.util.Map;
+import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Single source of truth for the client's connection state.
@@ -20,6 +20,8 @@ import java.util.Map;
  */
 public final class ConnectionStateMachine {
     private static final Map<ConnectionState, EnumSet<ConnectionState>> ALLOWED = new EnumMap<>(ConnectionState.class);
+    @Getter
+    public static final Set<Consumer<MusicHud.ConnectStatus>> connectStatusListeners = new HashSet<>();
 
     static {
         ALLOWED.put(ConnectionState.DISCONNECTED, EnumSet.of(
@@ -34,7 +36,14 @@ public final class ConnectionStateMachine {
                 ConnectionState.ISOLATED, ConnectionState.CONNECTING, ConnectionState.DISCONNECTED));
     }
 
+    @Getter
     private static volatile ConnectionState state = ConnectionState.DISCONNECTED;
+    /**
+     * -- GETTER --
+     * Result of the last connection attempt,
+     *  if none is relevant.
+     */
+    @Getter
     private static volatile ConnectAttemptResult lastConnectResult;
 
     private ConnectionStateMachine() {
@@ -51,15 +60,6 @@ public final class ConnectionStateMachine {
         ISOLATED
     }
 
-    public static ConnectionState getState() {
-        return state;
-    }
-
-    /** Result of the last connection attempt, {@code null} if none is relevant. */
-    public static ConnectAttemptResult getLastConnectResult() {
-        return lastConnectResult;
-    }
-
     /**
      * Records the outcome of the last connection attempt. Only kept while in
      * {@link ConnectionState#ISOLATED}; re-publishes the coarse status since the state
@@ -67,7 +67,8 @@ public final class ConnectionStateMachine {
      */
     public static synchronized void recordResult(ConnectAttemptResult result) {
         lastConnectResult = result;
-        MusicHud.setConnectStatus(getConnectStatus());
+        MusicHud.ConnectStatus status = getConnectStatus();
+        connectStatusListeners.forEach(l -> l.accept(status));
     }
 
     /** Coarse status exposed to the UI. */
@@ -95,7 +96,8 @@ public final class ConnectionStateMachine {
         }
         if (state != target) {
             state = target;
-            MusicHud.setConnectStatus(getConnectStatus());
+            MusicHud.ConnectStatus status = getConnectStatus();
+            connectStatusListeners.forEach(l -> l.accept(status));
         }
         return true;
     }
