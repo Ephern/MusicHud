@@ -31,6 +31,7 @@ import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import lombok.Setter;
@@ -44,6 +45,7 @@ import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Queue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -55,7 +57,7 @@ public class MainFragment extends Fragment {
     private static volatile MainFragment instance = null;
 
     static {
-        MusicHud.getConnectStatusListeners().add(status -> {
+        ConnectionStateMachine.getConnectStatusListeners().add(status -> {
             if (instance != null) {
                 MuiModApi.postToUiThread(() -> {
                     instance.refreshServerConnectStatus();
@@ -87,7 +89,6 @@ public class MainFragment extends Fragment {
     }
 
     public static void refresh() {
-        switchMusic(null, null, null);
         HomeView homeView = HomeView.getInstance();
         if (homeView != null) {
             homeView.refresh();
@@ -101,28 +102,50 @@ public class MainFragment extends Fragment {
             accountBaseView.refresh();
         }
         if (instance != null && instance.titleText != null) {
-            instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
+            // Restore the current playback instead of blanking it to "idle": a failed connect
+            // attempt no longer stops the ongoing playback, so a blanket clear would wrongly
+            // wipe the GUI while the HUD keeps playing.
+            NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+            MusicDetail current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+            MusicDetail nextToPlay = nowPlayingInfo.getNextToPlayIdleMusicDetail();
+            Queue<LyricLine> lyricLines = nowPlayingInfo.getLyricLines();
+            displayMusicInfo(current, nextToPlay, lyricLines);
+            if (homeView != null) {
+                homeView.switchMusic(current, nextToPlay, lyricLines);
+            }
             instance.refreshServerConnectStatus();
         }
     }
 
     public static void switchMusic(MusicDetail musicDetail, MusicDetail nextToPlay, Queue<LyricLine> lyricLines) {
         if (instance != null) {
-            if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
-                instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
-                instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
-                instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                instance.artists.removeAllViews();
-                instance.albumContainer.removeAllViews();
-                instance.pusherHeadView.setVisibility(View.GONE);
-                instance.pusherText.setText("");
-                instance.progressBar.setVisibility(View.GONE);
-                instance.playedTimeText.setText("");
-                instance.totalTimeText.setText("");
-                instance.buttonsLayout.setVisibility(View.GONE);
-                instance.likeButton.bindMusicList(null);
-                instance.addToPlaylistButton.bindMusicDetail(null);
-            } else {
+            displayMusicInfo(musicDetail, nextToPlay, lyricLines);
+            if (musicDetail != null && !musicDetail.equals(MusicDetail.NONE)) {
+                startProgressUpdater(musicDetail);
+            }
+            HomeView homeView = HomeView.getInstance();
+            if (homeView != null) {
+                homeView.switchMusic(musicDetail, nextToPlay, lyricLines);
+            }
+        }
+    }
+
+    private static void displayMusicInfo(MusicDetail musicDetail, MusicDetail nextToPlay, Queue<LyricLine> lyricLines) {
+        if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
+            instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
+            instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
+            instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            instance.artists.removeAllViews();
+            instance.albumContainer.removeAllViews();
+            instance.pusherHeadView.setVisibility(View.GONE);
+            instance.pusherText.setText("");
+            instance.progressBar.setVisibility(View.GONE);
+            instance.playedTimeText.setText("");
+            instance.totalTimeText.setText("");
+            instance.buttonsLayout.setVisibility(View.GONE);
+            instance.likeButton.bindMusicList(null);
+            instance.addToPlaylistButton.bindMusicDetail(null);
+        } else {
                 instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(240));
                 instance.titleText.setText(musicDetail.getName());
@@ -196,16 +219,13 @@ public class MainFragment extends Fragment {
                 instance.likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(musicDetail).currentUsersLikeList());
                 instance.addToPlaylistButton.bindMusicDetail(musicDetail);
                 instance.buttonsLayout.setVisibility(View.VISIBLE);
-                startProgressUpdater(musicDetail);
-            }
-            HomeView homeView = HomeView.getInstance();
-            if (homeView != null) {
-                homeView.switchMusic(musicDetail, nextToPlay, lyricLines);
             }
         }
-    }
+
+    private static final AtomicInteger progressUpdaterToken = new AtomicInteger(0);
 
     private static void startProgressUpdater(MusicDetail musicDetail) {
+        int token = progressUpdaterToken.incrementAndGet();
         NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
         Duration musicDuration = nowPlayingInfo.getMusicDuration();
         DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
@@ -214,7 +234,8 @@ public class MainFragment extends Fragment {
         String totalTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
         MusicHud.EXECUTOR.execute(() -> {
             do {
-                if (instance == null || instance.progressBar == null) {
+                if (instance == null || instance.progressBar == null
+                        || progressUpdaterToken.get() != token) {
                     return;
                 }
                 Duration playedDuration = nowPlayingInfo.getPlayedDuration();
@@ -492,7 +513,7 @@ public class MainFragment extends Fragment {
     private void refreshServerConnectStatus() {
         if (Minecraft.getInstance().player != null) {
             boolean singlePlayer = Minecraft.getInstance().getCurrentServer() == null;
-            switch (MusicHud.getConnectStatus()) {
+            switch (ConnectionStateMachine.getConnectStatus()) {
                 case CONNECTED -> {
                     if (singlePlayer) {
                         serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.connected.integrated"));
@@ -520,7 +541,7 @@ public class MainFragment extends Fragment {
                         template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer.isolated");
                     }
                     serverConnectStatus.setText(template.replace("{version}", connectionManager.getServerVersion().toString()));
-                    switchServerConnectButton.setVisibility(View.VISIBLE);
+                    switchServerConnectButton.setVisibility(View.GONE);
                     switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }
             }

@@ -255,6 +255,18 @@ public class MusicService implements IClientMusicService {
     @Override
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         if (clientConfig.getEnable()) {
+            NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+            MusicDetail current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+            boolean sameTrackStillPlaying = !musicDetail.equals(MusicDetail.NONE)
+                    && musicDetail.equals(current)
+                    && nowPlayingInfo.getMusicStartTime() != null;
+            if (sameTrackStillPlaying) {
+                // The same track is still playing after a state re-sync (e.g. connection mode
+                // switch): keep the audio stream and progress untouched, only sync the next
+                // track and refresh the UI instead of restarting the stream.
+                nowPlayingInfo.syncSameTrack(musicDetail, nextIdleMusicDetail);
+                return;
+            }
             if (!musicQueue.isEmpty()) {// preload image
                 MusicDetail peek = musicQueue.peek().musicDetail();
                 ImageUtils.downloadAsync(peek.getAlbum().getThumbnailPicUrl(240));
@@ -270,7 +282,6 @@ public class MusicService implements IClientMusicService {
                     ToastUtil.show(Toast.makeText(context, message, Toast.LENGTH_SHORT));
                 });
             }
-            NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             if (!musicDetail.equals(MusicDetail.NONE)) {
                 ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();

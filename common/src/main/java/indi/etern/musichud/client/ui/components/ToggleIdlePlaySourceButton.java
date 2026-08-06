@@ -51,7 +51,7 @@ public class ToggleIdlePlaySourceButton extends ToggleIconButton {
         return b;
     }
 
-    public void bindMusicList(IIdlePlaySourceCollectionState collectionState) {
+    public void bindState(IIdlePlaySourceCollectionState collectionState) {
         if (collectionState == null) {
             this.collectionState = null;
             if (unregister != null) {

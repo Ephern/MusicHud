@@ -222,7 +222,7 @@ public class LoginService implements IClientLoginService {
             eventService.registerClientPlayerQuit((player) -> {
                 MusicHud.EXECUTOR.execute(() -> {
                     IConnectionManager.getInstance().onPlayerQuit();
-                    if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
+                    if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                         if (clientConfig.getEnableIsolatedMode()) {
                             LoginApiService.getInstance().logout(VanillaPlayerProxy.ofPlayer(player));
                         }
