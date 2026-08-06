@@ -439,7 +439,8 @@ public class MainFragment extends Fragment {
                 serverConnectStatus = new TextView(context);
                 serverConnectStatus.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 serverConnectStatus.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                serverConnectPanel.addView(serverConnectStatus, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                serverConnectStatus.setMinLines(2);
+                serverConnectPanel.addView(serverConnectStatus, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
                 switchServerConnectButton = new Button(context);
                 switchServerConnectButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
@@ -512,11 +513,13 @@ public class MainFragment extends Fragment {
                     switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }
                 case INCOMPATIBLE -> {
+                    String template;
                     if (clientConfig.getEnableIsolatedMode()) {
-                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatible"));
+                        template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer");
                     } else {
-                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatible.isolated"));
+                        template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer.isolated");
                     }
+                    serverConnectStatus.setText(template.replace("{version}", connectionManager.getServerVersion().toString()));
                     switchServerConnectButton.setVisibility(View.VISIBLE);
                     switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }

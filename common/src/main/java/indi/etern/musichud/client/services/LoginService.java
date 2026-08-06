@@ -11,6 +11,7 @@ import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.account.LoginView;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
@@ -220,12 +221,13 @@ public class LoginService implements IClientLoginService {
             });
             eventService.registerClientPlayerQuit((player) -> {
                 MusicHud.EXECUTOR.execute(() -> {
+                    IConnectionManager.getInstance().onPlayerQuit();
                     if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                         if (clientConfig.getEnableIsolatedMode()) {
                             LoginApiService.getInstance().logout(VanillaPlayerProxy.ofPlayer(player));
                         }
                     } else {
-                        MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
+                        ConnectionStateMachine.enterDisconnected();
                     }
                 });
             });

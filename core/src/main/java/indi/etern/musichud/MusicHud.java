@@ -26,9 +26,6 @@ public final class MusicHud {
     public static final String LOGGER_BASE_NAME = "MusicHud";
     public static final Logger LOGGER = LogManager.getLogger(LOGGER_BASE_NAME);
     public static final ExecutorService EXECUTOR = Executors.newVirtualThreadPerTaskExecutor();
-    @Getter
-    private static ConnectStatus connectStatus = ConnectStatus.NOT_CONNECTED;
-    @Getter
     private static final Set<Consumer<ConnectStatus>> connectStatusListeners = new HashSet<>();
     @Getter
     @Setter
@@ -100,8 +97,24 @@ public final class MusicHud {
         void stop();
     }
 
+    /**
+     * Coarse connection status exposed to the UI, derived from the authoritative
+     * {@link indi.etern.musichud.connection.ConnectionStateMachine}.
+     */
+    public static ConnectStatus getConnectStatus() {
+        return indi.etern.musichud.connection.ConnectionStateMachine.getConnectStatus();
+    }
+
+    /**
+     * Internally used by {@link indi.etern.musichud.connection.ConnectionStateMachine} to publish
+     * the coarse status to UI listeners. Prefer driving state via the state machine instead of
+     * calling this directly.
+     */
     public static void setConnectStatus(ConnectStatus status) {
-        MusicHud.connectStatus = status;
         connectStatusListeners.forEach(l -> l.accept(status));
+    }
+
+    public static Set<Consumer<ConnectStatus>> getConnectStatusListeners() {
+        return connectStatusListeners;
     }
 }
