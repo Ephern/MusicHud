@@ -33,6 +33,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -43,7 +44,7 @@ public class LoginService implements IClientLoginService {
     private static final Period refreshInterval = Period.of(0, 0, 1);
     private static volatile LoginService instance = null;
     private final List<Consumer<LoginState>> loginStateListeners = new CopyOnWriteArrayList<>();
-    private volatile LoginState loginState = getLoginState();
+    private volatile LoginState loginState = refreshLoginState();
     @Getter
     private volatile String lastLoginErrorMessage;
     @Getter
@@ -65,7 +66,7 @@ public class LoginService implements IClientLoginService {
                 logger.warn("Login failed");
                 lastLoginErrorMessage = resolveLoginErrorMessage(loginResult.message());
             }
-            notifyLoginStateChanged();
+            notifyLoginStateChanged(this::refreshLoginState);
             AccountBaseView accountBaseView = AccountBaseView.getInstance();
             if (accountBaseView != null) {
                 if (loginResult.success()) {
@@ -112,11 +113,11 @@ public class LoginService implements IClientLoginService {
 
     @Override
     public boolean isLogined() {
-        return getLoginState() == LoginState.LOGGED_IN;
+        return refreshLoginState() == LoginState.LOGGED_IN;
     }
 
     @Override
-    public LoginState getLoginState() {
+    public LoginState refreshLoginState() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         LoginType type = loginCookieInfo.type();
         Profile current = Profile.getCurrent();
@@ -137,8 +138,8 @@ public class LoginService implements IClientLoginService {
         return () -> loginStateListeners.remove(listener);
     }
 
-    private void notifyLoginStateChanged() {
-        LoginState state = getLoginState();
+    private void notifyLoginStateChanged(Supplier<LoginState> supplier) {
+        LoginState state = supplier.get();
         if (state == loginState) return;
         loginState = state;
         loginStateListeners.forEach(listener -> listener.accept(state));
@@ -186,7 +187,7 @@ public class LoginService implements IClientLoginService {
     public void logoutAndReloginAsAnonymous() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         Profile.setCurrent(Profile.ANONYMOUS);
-        notifyLoginStateChanged();
+        notifyLoginStateChanged(this::refreshLoginState);
         loginAsAnonymousToServer();
     }
 
@@ -229,6 +230,8 @@ public class LoginService implements IClientLoginService {
                     } else {
                         ConnectionStateMachine.enterDisconnected();
                     }
+                    LoginService loginService = LoginService.getInstance();
+                    loginService.notifyLoginStateChanged(() -> LoginState.UNLOGGED);
                 });
             });
         }
