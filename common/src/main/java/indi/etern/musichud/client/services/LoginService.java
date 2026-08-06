@@ -5,10 +5,12 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
+import indi.etern.musichud.beans.state.IIdlePlaySourceLayerState;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.account.LoginView;
 import indi.etern.musichud.connection.ConnectionStateMachine;
@@ -66,7 +68,17 @@ public class LoginService implements IClientLoginService {
                 logger.warn("Login failed");
                 lastLoginErrorMessage = resolveLoginErrorMessage(loginResult.message());
             }
-            notifyLoginStateChanged(this::refreshLoginState);
+            notifyLoginStateChanged((this::refreshLoginState));
+            if (loginResult.success()) {
+                // Every successful login starts a new server session; re-sync the local idle
+                // play sources so they are pushed to whichever server-side component is active
+                // (network channel when connected, local loopback in isolated mode). This must
+                // not depend on the login state listeners, which are deduplicated and may not
+                // fire when the state is unchanged across a connection switch.
+                IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
+                localState.reset();
+                localState.loadFromConfig();
+            }
             AccountBaseView accountBaseView = AccountBaseView.getInstance();
             if (accountBaseView != null) {
                 if (loginResult.success()) {
