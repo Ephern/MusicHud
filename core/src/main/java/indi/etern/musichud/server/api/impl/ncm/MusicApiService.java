@@ -16,6 +16,7 @@ import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.throwable.MusicResourceLoadingException;
+import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.JsonUtil;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import indi.etern.musichud.utils.http.ApiClient;
@@ -165,31 +166,43 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
+    @NonNull
     public Playlist getPlaylistDetail(long id, boolean ignoreCache, @Nullable UUID playerUUID) {
-        Playlist cached = ignoreCache ? null : playlistsCache.getIfPresent(id);
-        Playlist playlist;
-        if (cached != null && !cached.getTracks().isEmpty()) {
-            playlist = cached;
-        } else {
-            playlist = joinMerged(playlistDetailInFlight, new IdAndUUIDKey(id, playerUUID), () -> {
-                String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
-                PlaylistResponse playlistResponse = ApiClient.post(ApiServerEndpointsMeta.Playlist.DETAIL, new IdRequest(id), rawCookie, true);
-                if (playlistResponse.getCode() == 200) {
-                    Playlist loaded = playlistResponse.getPlaylist();
-                    playlistsCache.put(id, loaded);
-                    return loaded;
-                } else {
-                    logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(playerUUID), playlistResponse.getCode());
-                    return Playlist.empty(id);
-                }
-            });
-        }
-        LoginApiService.PlayerLoginInfo playerLoginInfo = playerUUID == null ? null : loginApiService.playerInfoMap.get(playerUUID);
-        Profile profile = playerLoginInfo != null ? playerLoginInfo.getProfile() : null;
-        if (playlist.getPrivacy() == Privacy.PRIVATE && !playlist.getCreator().equals(profile)) {
-            return Playlist.privacyBlocked(id, playlist.getCreator());
-        } else {
-            return playlist;
+        try {
+            Playlist cached = playlistsCache.getIfPresent(id);
+            Playlist cachedUsed = ignoreCache ? null : cached;
+            Playlist playlist;
+            if (cachedUsed != null && !cachedUsed.getTracks().isEmpty()) {
+                playlist = cachedUsed;
+            } else {
+                playlist = joinMerged(playlistDetailInFlight, new IdAndUUIDKey(id, playerUUID), () -> {
+                    String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
+                    PlaylistResponse playlistResponse = ApiClient.post(ApiServerEndpointsMeta.Playlist.DETAIL, new IdRequest(id), rawCookie, true);
+                    if (playlistResponse.getCode() == 200) {
+                        Playlist loaded = playlistResponse.getPlaylist();
+                        if (cached != null) {
+                            //To avoid dist crossing issues due to shared common caches in integrated server
+                            cached.updateFrom(loaded, !IClientDistUtil.getInstance().inIntegratedServer());
+                            return cached;
+                        }
+                        playlistsCache.put(id, loaded);
+                        return loaded;
+                    } else {
+                        logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(playerUUID), playlistResponse.getCode());
+                        return Playlist.empty(id);
+                    }
+                });
+            }
+            LoginApiService.PlayerLoginInfo playerLoginInfo = playerUUID == null ? null : loginApiService.playerInfoMap.get(playerUUID);
+            Profile profile = playerLoginInfo != null ? playerLoginInfo.getProfile() : null;
+            if (playlist.getPrivacy() == Privacy.PRIVATE && !playlist.getCreator().equals(profile)) {
+                return Playlist.privacyBlocked(id, playlist.getCreator());
+            } else {
+                return playlist;
+            }
+        } catch (Throwable e) {
+            logger.error("Failed to load playlist detail: ", e);
+            return Playlist.EMPTY;
         }
     }
 
@@ -299,21 +312,33 @@ public class MusicApiService implements IMusicApiService {
         return result;
     }
 
-    @SneakyThrows
     @Override
+    @NonNull
     public Album getAlbumInfoDetail(long id, boolean ignoreCache, UUID playerUUID) {
-        if (ignoreCache) {
-            Album album = loadAlbumInfoDetail(id, playerUUID);
-            albumsCache.put(id, album);
-            return album;
-        } else {
-            Album cached = albumsCache.getIfPresent(id);
-            if (cached != null) {
-                return cached;
+        try {
+            if (ignoreCache) {
+                Album album = loadAlbumInfoDetail(id, playerUUID);
+                Album previousAlbum = albumsCache.getIfPresent(id);
+                if (previousAlbum != null) {
+                    //To avoid dist crossing issues due to shared common caches in integrated server
+                    previousAlbum.updateFrom(album, !IClientDistUtil.getInstance().inIntegratedServer());
+                    return previousAlbum;
+                } else {
+                    albumsCache.put(id, album);
+                    return album;
+                }
+            } else {
+                Album cached = albumsCache.getIfPresent(id);
+                if (cached != null) {
+                    return cached;
+                }
+                Album album = loadAlbumInfoDetail(id, playerUUID);
+                albumsCache.put(id, album);
+                return album;
             }
-            Album album = loadAlbumInfoDetail(id, playerUUID);
-            albumsCache.put(id, album);
-            return album;
+        } catch (Throwable e) {
+            logger.error("Failed to load playlist detail: ", e);
+            return Album.NONE;
         }
     }
 
@@ -335,9 +360,15 @@ public class MusicApiService implements IMusicApiService {
         return artistsCache.get(id,
                 () -> {
                     String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
-                    Artist artist = ApiClient.post(ApiServerEndpointsMeta.Artist.DETAIL, new IdRequest(id), rawCookie, true).data.artist;
-                    appendArtistMusic(0, artist, playerUUID);
-                    return artist;
+                    GetArtistDetailResponse post = ApiClient.post(ApiServerEndpointsMeta.Artist.DETAIL, new IdRequest(id), rawCookie, true);
+                    GetArtistDetailResponseData data = post.data;
+                    if (data != null) {
+                        Artist artist = data.artist;
+                        appendArtistMusic(0, artist, playerUUID);
+                        return artist;
+                    } else {
+                        return Artist.UNKNOWN;
+                    }
                 }
         );
     }
@@ -572,8 +603,8 @@ public class MusicApiService implements IMusicApiService {
             } else {
                 musicDetails.stream().filter(m -> m.getId() == musicId).findFirst()
                         .ifPresent(musicDetail -> {
-                            musicDetails.remove(musicDetail);
-                            playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
+                                    musicDetails.remove(musicDetail);
+                                    playlist.setMusicTrackCount(playlist.getMusicTrackCount() - 1);
                                 }
                         );
             }
