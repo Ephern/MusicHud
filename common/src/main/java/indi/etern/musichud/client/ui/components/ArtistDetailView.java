@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
@@ -31,6 +32,10 @@ public class ArtistDetailView extends LinearLayout {
     private final LinearLayout musicList;
     private final TextView noMoreResultText;
     private final ProgressBar loadingProgressRing;
+    private final ProgressBar progressBar;
+    private final TextView productionCounts;
+    private final TextView description;
+    private final UrlImageView avatarImageView;
     private static final IClientMusicService musicService = MusicService.getInstance();
     Artist artist;
 
@@ -68,7 +73,7 @@ public class ArtistDetailView extends LinearLayout {
         backButtonParams.setMargins(0, 0, dp(4), 0);
         topBar.addView(backButton, backButtonParams);
 
-        UrlImageView avatarImageView = new UrlImageView(context);
+        avatarImageView = new UrlImageView(context);
         avatarImageView.setLoading(true);
         LayoutParams imageParams = new LayoutParams(dp(128), dp(128));
         avatarImageView.setCircular(true);
@@ -96,7 +101,7 @@ public class ArtistDetailView extends LinearLayout {
         nameParams.setMargins(0, 0, dp(16), 0);
         row1.addView(name, nameParams);
 
-        TextView productionCounts = new TextView(context);
+        productionCounts = new TextView(context);
         productionCounts.setTextSize(Theme.TEXT_SIZE_LARGE);
         productionCounts.setTextColor(Theme.NORMAL_TEXT_COLOR);
         productionCounts.setVisibility(GONE);
@@ -110,17 +115,32 @@ public class ArtistDetailView extends LinearLayout {
                 .cornerRadius(dp(4))
                 .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
                 .build();
-        ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
-        toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
-        row1.addView(toggleSubscribeButton, new LayoutParams(dp(28), dp(28), 0));
-        var subscribeState = musicService.getArtistSubscribedState(artist);
-        toggleSubscribeButton.bindState(subscribeState);
+        int dp28 = dp(28);
+        {
+            ImageButton refreshButton = new ImageButton(context);
+            refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+            refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            var resources = getContext().getResources();
+            Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
+            refreshButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(resources, image1, dp(12), dp(16)), dp(3)));
+            refreshButton.setOnClickListener((v) -> {
+                loadData(true);
+            });
+            row1.addView(refreshButton, new LayoutParams(dp28, dp28));
+        }
+        {
+            ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
+            toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            row1.addView(toggleSubscribeButton, new LayoutParams(dp28, dp28, 0));
+            var subscribeState = musicService.getArtistSubscribedState(artist);
+            toggleSubscribeButton.bindState(subscribeState);
+        }
 
         ScrollView descriptionScrollView = new ScrollView(context);
         LayoutParams scrollParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
         descriptionScrollView.setLayoutParams(scrollParams);
 
-        TextView description = new TextView(context);
+        description = new TextView(context);
         description.setTextSize(Theme.TEXT_SIZE_NORMAL);
         description.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         LayoutParams descriptionParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
@@ -133,7 +153,7 @@ public class ArtistDetailView extends LinearLayout {
         topBarParams.setMargins(0, dp(24), 0, 0);
         addView(topBar, topBarParams);
 
-        ProgressBar progressBar = new ProgressBar(context);
+        progressBar = new ProgressBar(context);
         progressBar.setIndeterminate(true);
         LayoutParams progressParams = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
         progressParams.setMargins(0, dp(32), 0, 0);
@@ -184,7 +204,18 @@ public class ArtistDetailView extends LinearLayout {
             checkInfiniteScroll(scrollY, scrollView);
         });
 
-        MusicService.getInstance().loadArtistDetailAsync(artist).thenAcceptAsync(artist1 -> {
+        loadData(false);
+    }
+
+    private void loadData(boolean ignoreCache) {
+        noMoreResult = false;
+        loadingMore = false;
+        MuiModApi.postToUiThread(() -> {
+            noMoreResultText.setVisibility(GONE);
+            loadingProgressRing.setVisibility(GONE);
+            progressBar.setVisibility(View.VISIBLE);
+        });
+        MusicService.getInstance().loadArtist(artist.getId(), ignoreCache).thenAcceptAsync(artist1 -> {
             if (artist1 != null) {
                 ArtistDetailView.this.artist = artist1;
                 MuiModApi.postToUiThread(() -> {
@@ -223,10 +254,11 @@ public class ArtistDetailView extends LinearLayout {
                     }
                     description.setText(artist1.getDescription());
                     avatarImageView.loadUrl(artist1.getAvatarThumbnailUrl(dp(128)));
-                    removeView(progressBar);
+                    musicList.removeAllViews();
                     for (MusicDetail musicDetail : artist1.getMusicDetails()) {
-                        addItem(context, musicDetail);
+                        addItem(getContext(), musicDetail);
                     }
+                    progressBar.setVisibility(GONE);
                 });
             }
         }, MusicHud.EXECUTOR);

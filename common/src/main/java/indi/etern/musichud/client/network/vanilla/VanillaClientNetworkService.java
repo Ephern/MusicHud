@@ -1,10 +1,12 @@
 package indi.etern.musichud.client.network.vanilla;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.C2SPayload;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.ConfirmConnectMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
 import net.minecraft.client.Minecraft;
 
@@ -14,8 +16,9 @@ public interface VanillaClientNetworkService extends IClientNetworkService {
     @Override
     default <T extends C2SPayload> void sendToServer(T payload) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.getCurrentServer() != null && (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED
-                || payload instanceof ConnectRequest)) {
+        if (minecraft.getCurrentServer() != null && (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED
+                || payload instanceof ConnectRequest
+                || payload instanceof ConfirmConnectMessage)) {
             sendToNetworkServer(payload);
         } else if ((minecraft.getCurrentServer() != null || minecraft.player != null)
                 && ClientConfig.getInstance().getEnableIsolatedMode()){// in single player game or isolated client

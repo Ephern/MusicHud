@@ -208,4 +208,15 @@ public class Playlist implements MusicCollection {
             return copyWithPusherInfo(pusherInfo);
         }
     }
+
+    public void updateFrom(Playlist playlist, boolean triggerObservable) {
+        this.id = playlist.id;
+        this.name = playlist.name;
+        this.coverImgId = playlist.coverImgId;
+        this.coverImgUrl = playlist.coverImgUrl;
+        this.tracks.syncWith(playlist.tracks, triggerObservable);
+        this.creator = playlist.creator;
+        this.privacy = playlist.privacy;
+        this.musicTrackCount = playlist.musicTrackCount;
+    }
 }
