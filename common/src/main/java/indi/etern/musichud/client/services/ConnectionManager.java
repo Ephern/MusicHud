@@ -34,6 +34,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.world.entity.player.Player;
 import org.apache.logging.log4j.Logger;
@@ -112,8 +113,18 @@ public class ConnectionManager implements IConnectionManager {
             return;
         }
         lastMode = LastMode.ISOLATED;
-        IClientLoginService.getInstance().loginToServer();
-        requestInitialState();
+        // A failed connect attempt must not disturb an already running local session
+        // (isolated mode / integrated client): keep its playback, login and sources.
+        if (!isLocalSessionInitialized()) {
+            IClientLoginService.getInstance().loginToServer();
+            requestInitialState();
+        }
+    }
+
+    private static boolean isLocalSessionInitialized() {
+        LocalPlayer localPlayer = Minecraft.getInstance().player;
+        return localPlayer != null
+                && ILoginApiService.getInstance(ApiProvider.NCM).getLoginInfoByPlayerUUID(localPlayer.getUUID()) != null;
     }
 
     @Override

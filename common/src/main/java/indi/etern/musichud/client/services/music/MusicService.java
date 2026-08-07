@@ -255,17 +255,6 @@ public class MusicService implements IClientMusicService {
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         if (clientConfig.getEnable()) {
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-            MusicDetail current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-            boolean sameTrackStillPlaying = !musicDetail.equals(MusicDetail.NONE)
-                    && musicDetail.equals(current)
-                    && nowPlayingInfo.getMusicStartTime() != null;
-            if (sameTrackStillPlaying) {
-                // The same track is still playing after a state re-sync (e.g. connection mode
-                // switch): keep the audio stream and progress untouched, only sync the next
-                // track and refresh the UI instead of restarting the stream.
-                nowPlayingInfo.syncSameTrack(musicDetail, nextIdleMusicDetail);
-                return;
-            }
             if (!musicQueue.isEmpty()) {// preload image
                 MusicDetail peek = musicQueue.peek().musicDetail();
                 ImageUtils.downloadAsync(peek.getAlbum().getThumbnailPicUrl(240));
