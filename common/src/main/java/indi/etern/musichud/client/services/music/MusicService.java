@@ -16,12 +16,9 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.states.*;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.utils.IClientDistUtil;
-import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ClientRegister;
-import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
@@ -31,6 +28,8 @@ import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientRemoveMusicFr
 import indi.etern.musichud.network.payloads.pushMessages.c2s.VoteSkipCurrentMusicMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import indi.etern.musichud.utils.CollectionUpdateNotifier;
+import indi.etern.musichud.utils.IClientDistUtil;
+import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import lombok.*;
 import net.minecraft.client.resources.language.I18n;
 
@@ -98,20 +97,20 @@ public class MusicService implements IClientMusicService {
                     if (userCategoryPlaylists != null) {
                         Playlist likeList = userCategoryPlaylists.getLikeList();
                         if (playlistsCache.asMap().putIfAbsent(likeList.getId(), likeList) == null) {
-                            CollectionUpdateNotifier.notifyPlaylistUpdated(likeList.getId());
+                            CollectionUpdateNotifier.notifyPlaylistUpdated(likeList.getId(), true);
                         }
                         userCategoryPlaylists.getCreatedPlaylist()
                                 .forEach(playlist -> {
                                     if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
                                             && playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist) == null) {
-                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId());
+                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), true);
                                     }
                                 });
                         userCategoryPlaylists.getSubscribedPlaylist()
                                 .forEach(playlist -> {
                                     if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
                                             && playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist) == null) {
-                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId());
+                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), true);
                                     }
                                 });
                     }
@@ -119,7 +118,7 @@ public class MusicService implements IClientMusicService {
                         subscribedAlbums.forEach(album -> {
                             if (album.getMusicDetails() != null && album.getMusicDetails().size() == album.getMusicTrackCount()
                                     && albumsCache.asMap().putIfAbsent(album.getId(), album) == null) {
-                                CollectionUpdateNotifier.notifyAlbumUpdated(album.getId());
+                                CollectionUpdateNotifier.notifyAlbumUpdated(album.getId(), true);
                             }
                         });
                     }
@@ -255,6 +254,18 @@ public class MusicService implements IClientMusicService {
     @Override
     public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         if (clientConfig.getEnable()) {
+            NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+            MusicDetail current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+            boolean sameTrackStillPlaying = !musicDetail.equals(MusicDetail.NONE)
+                    && musicDetail.equals(current)
+                    && nowPlayingInfo.getMusicStartTime() != null;
+            if (sameTrackStillPlaying) {
+                // The same track is still playing after a state re-sync (e.g. connection mode
+                // switch): keep the audio stream and progress untouched, only sync the next
+                // track and refresh the UI instead of restarting the stream.
+                nowPlayingInfo.syncSameTrack(musicDetail, nextIdleMusicDetail);
+                return;
+            }
             if (!musicQueue.isEmpty()) {// preload image
                 MusicDetail peek = musicQueue.peek().musicDetail();
                 ImageUtils.downloadAsync(peek.getAlbum().getThumbnailPicUrl(240));
@@ -270,7 +281,6 @@ public class MusicService implements IClientMusicService {
                     ToastUtil.show(Toast.makeText(context, message, Toast.LENGTH_SHORT));
                 });
             }
-            NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             if (!musicDetail.equals(MusicDetail.NONE)) {
                 ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
@@ -466,11 +476,6 @@ public class MusicService implements IClientMusicService {
     public static class RegisterImpl implements ClientRegister {
         @Override
         public void register() {
-            LoginService.getInstance().addLoginStateListener(state -> {
-                if (state != IClientLoginService.LoginState.UNLOGGED) {
-                    MusicService.getInstance().getIdlePlaySourceState().local().loadFromConfig();
-                }
-            });
             IClientEventService.getInstance().registerClientPlayerQuit((player) -> {
                 MusicHud.EXECUTOR.execute(MusicService::resetCurrentMusicStatus);
             });

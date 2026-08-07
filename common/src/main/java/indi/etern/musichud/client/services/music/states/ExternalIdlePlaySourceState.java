@@ -3,6 +3,7 @@ package indi.etern.musichud.client.services.music.states;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.Playlist;
+import indi.etern.musichud.beans.music.PusherInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
 
@@ -24,12 +25,12 @@ public class ExternalIdlePlaySourceState extends AbstractIdlePlaySourceLayerStat
         }
         Player player = Minecraft.getInstance().player;
         for (MusicCollection musicCollection : playlistSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !isLocalOrOwnSource(musicCollection.getPusherInfo(), player)) {
                 toAdd.add(musicCollection);
             }
         }
         for (MusicCollection musicCollection : albumSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !(player != null && musicCollection.getPusherInfo().getPlayerUUID().equals(player.getUUID()))) {
+            if (!serverIdlePlaySources.contains(musicCollection) && !isLocalOrOwnSource(musicCollection.getPusherInfo(), player)) {
                 toAdd.add(musicCollection);
             }
         }
@@ -43,6 +44,15 @@ public class ExternalIdlePlaySourceState extends AbstractIdlePlaySourceLayerStat
             notifyChange(musicCollection);
             notifyAdd(musicCollection);
         });
+    }
+
+    private static boolean isLocalOrOwnSource(PusherInfo pusherInfo, Player player) {
+        if (pusherInfo == null || pusherInfo == PusherInfo.EMPTY) {
+            // Sources without a pusher are local sources; they must not leak into the
+            // external (server) layer, otherwise they would show up twice.
+            return true;
+        }
+        return player != null && pusherInfo.getPlayerUUID().equals(player.getUUID());
     }
 
     @Override

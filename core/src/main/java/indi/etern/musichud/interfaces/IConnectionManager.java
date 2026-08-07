@@ -1,6 +1,7 @@
 package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.Version;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectResponse;
 import indi.etern.musichud.platform.Environment;
 
@@ -27,11 +28,7 @@ public interface IConnectionManager {
         throw new UnsupportedOperationException();
     }
 
-    enum ConnectionMode {
-        DISCONNECTED, EXTERNAL, ISOLATED
-    }
-
-    ConnectionMode getMode();
+    Version getServerVersion();
 
     void connectToExternalServer();
 
@@ -47,6 +44,12 @@ public interface IConnectionManager {
 
 
     void connectAsPrevious();
+
+    /**
+     * Called when the local player leaves the server/world; invalidates pending toggles
+     * so that debounced tasks cannot act outside of a game session.
+     */
+    void onPlayerQuit();
 
     /**
      * Handles a ConnectResponse from the server: drives the connection state machine.

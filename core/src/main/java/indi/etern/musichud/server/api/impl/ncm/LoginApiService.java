@@ -116,13 +116,13 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public void logout(IPlayerClient player) {
         Runnable remove = pollingMap.remove(player);
+        MusicPlayerServerService playerServerService = MusicPlayerServerService.getInstance();
+        playerServerService.removeAllIdlePlaySource(getPusherInfo(player));
         playerInfoMap.remove(player.getUUID());
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
         if (remove != null) {
             logger.warn("Polling v-thread stopped as player {} quit", player.getName());
         }
-        MusicPlayerServerService playerServerService = MusicPlayerServerService.getInstance();
-        playerServerService.removeAllIdlePlaySource(getPusherInfo(player));
     }
 
     @SneakyThrows
@@ -166,7 +166,6 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public PusherInfo getPusherInfo(IPlayerClient player) {
-
         PlayerLoginInfo loginInfo = playerInfoMap.get(player.getUUID());
         PusherInfo pusherInfo = PusherInfo.EMPTY;
         if (loginInfo != null) {

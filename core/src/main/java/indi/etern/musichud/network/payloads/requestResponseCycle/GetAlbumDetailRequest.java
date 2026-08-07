@@ -36,10 +36,7 @@ public class GetAlbumDetailRequest extends ApiRequestPayload {
             RequestHandlerRegistry.autoRegisterPayload(GetAlbumDetailRequest.class, CODEC, (request, player) -> {
                 Album album = IMusicApiService.getInstance(ApiProvider.NCM)
                         .getAlbumInfoDetail(request.getId(), request.isIgnoreCache(), player.getUUID());
-                if (album != null) {
-                    return ResponseResult.of(new GetAlbumDetailResponse(album));
-                }
-                return ResponseResult.ignore();
+                return ResponseResult.of(new GetAlbumDetailResponse(album));
             });
         }
     }

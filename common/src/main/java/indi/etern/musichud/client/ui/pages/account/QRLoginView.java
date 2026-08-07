@@ -11,6 +11,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.CancelQRLoginMessage;
@@ -105,7 +106,7 @@ public class QRLoginView extends LinearLayout implements ILoginView {
 
             @Override
             public void onViewDetachedFromWindow(View v) {
-                if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
+                if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
                     clientNetworkService.sendToServer(CancelQRLoginMessage.REQUEST);
                 }
             }

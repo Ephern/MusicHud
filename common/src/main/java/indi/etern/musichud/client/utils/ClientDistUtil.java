@@ -10,6 +10,8 @@ import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.client.server.IntegratedServer;
 
+import java.util.UUID;
+
 /**
  * To avoid loading client classes in server environment, which may causing class load exceptions.
  * Before methods calling, using
@@ -50,5 +52,11 @@ public class ClientDistUtil implements IClientDistUtil {
     public boolean inSinglePlayer() {
         IntegratedServer integratedServer = Minecraft.getInstance().getSingleplayerServer();
         return integratedServer != null && !integratedServer.isPublished();
+    }
+
+    @Override
+    public UUID getClientPlayerUUID() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player == null ? new UUID(0,0) : player.getUUID();
     }
 }

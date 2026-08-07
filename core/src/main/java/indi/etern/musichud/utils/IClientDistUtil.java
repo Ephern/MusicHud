@@ -3,6 +3,7 @@ package indi.etern.musichud.utils;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.platform.Environment;
 
+import java.util.UUID;
 import java.util.function.Supplier;
 
 /**
@@ -35,4 +36,6 @@ public interface IClientDistUtil {
     boolean inIntegratedServer();
 
     boolean inSinglePlayer();
+
+    UUID getClientPlayerUUID();
 }
