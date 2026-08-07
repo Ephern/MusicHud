@@ -43,9 +43,9 @@ dependencies {
     shadowBundle(project(path: ':common', configuration: 'transformProductionNeoForge')) { transitive = false }
     shadowBundle(project(path: ':core')) { transitive = false }
 
-    implementation("net.neoforged.fancymodloader:bootstraplauncher:${rootProject.fancymodloader_version}")
-    implementation("net.neoforged.fancymodloader:earlydisplay:${rootProject.fancymodloader_version}")
-    implementation("net.neoforged.fancymodloader:securejarhandler:${rootProject.fancymodloader_version}")
+//    implementation("net.neoforged.fancymodloader:bootstraplauncher:${rootProject.fancymodloader_version}")
+//    implementation("net.neoforged.fancymodloader:earlydisplay:${rootProject.fancymodloader_version}")
+//    implementation("net.neoforged.fancymodloader:securejarhandler:${rootProject.fancymodloader_version}")
 
     implementation("icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+")
     modImplementation("dev.icyllis:modernui-core:${modernui_version}") {

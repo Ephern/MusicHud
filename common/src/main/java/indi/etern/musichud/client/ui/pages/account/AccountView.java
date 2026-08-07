@@ -1,13 +1,12 @@
 package indi.etern.musichud.client.ui.pages.account;
 
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.widget.Button;
-import icyllis.modernui.widget.LinearLayout;
-import icyllis.modernui.widget.ProgressBar;
-import icyllis.modernui.widget.TextView;
+import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.Artist;
@@ -21,6 +20,8 @@ import indi.etern.musichud.client.ui.components.ArtistCard;
 import indi.etern.musichud.client.ui.components.FlexWrapLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.Unregister;
@@ -187,39 +188,66 @@ public class AccountView extends LinearLayout {
         id.setText(Long.toString(currentProfile.getUserId()));
         infoLayout.addView(id, idLayoutParams);
 
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
-                .inset(0).cornerRadius(dp(4))
-                .padding(new ButtonInsetBackgroundFactory.Padding(0, dp(2), 0, dp(2)))
-                .build();
-
         LinearLayout buttonsLayout = new LinearLayout(context);
         buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
         infoLayout.addView(buttonsLayout);
 
-        Button refreshButton = new Button(context);
-        refreshButton.setTextColor(Theme.PRIMARY_COLOR);
-        refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        refreshButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
-        var background1 = backgroundFactory.newBackgroundDrawable();
-        refreshButton.setBackground(background1);
-        LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params.setMargins(0, 0, dp(8), 0);
-        refreshButton.setLayoutParams(params);
-        refreshButton.setOnClickListener(b -> {
-            refresh(true);
-        });
-        buttonsLayout.addView(refreshButton);
+        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .inset(0)
+                .cornerRadius(dp(4))
+                .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
+                .build();
+        int dp28 = dp(28);
+        {
+            ImageButton refreshButton = new ImageButton(context);
+            refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+            refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            var resources = getContext().getResources();
+            Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
+            refreshButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(resources, image1, dp(12), dp(16)), dp(3)));
+            refreshButton.setOnClickListener((v) -> {
+                refresh(true);
+            });
+            buttonsLayout.addView(refreshButton, new LayoutParams(dp28, dp28));
+        }
+        {
+            ImageButton logoutButton = new ImageButton(context);
+            logoutButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
+            logoutButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            var resources = getContext().getResources();
+            Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/log_out.png");
+            logoutButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(resources, image1, dp(12), dp(16)), dp(3)));
+            logoutButton.setOnClickListener((v) -> {
+                IClientLoginService.logoutAndReloginAsAnonymous();
+            });
+            buttonsLayout.addView(logoutButton, new LayoutParams(dp28, dp28));
+        }
 
-        Button logoutButton = new Button(context);
-        logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
-        logoutButton.setTextColor(Theme.PRIMARY_COLOR);
-        logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        var background2 = backgroundFactory.newBackgroundDrawable();
-        logoutButton.setBackground(background2);
-        logoutButton.setOnClickListener(b -> {
-            IClientLoginService.logoutAndReloginAsAnonymous();
-        });
-        buttonsLayout.addView(logoutButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+//        Button refreshButton = new Button(context);
+//        refreshButton.setTextColor(Theme.PRIMARY_COLOR);
+//        refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+//        refreshButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+//        var background1 = backgroundFactory.newBackgroundDrawable();
+//        refreshButton.setBackground(background1);
+//        LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+//        params.setMargins(0, 0, dp(8), 0);
+//        refreshButton.setLayoutParams(params);
+//        refreshButton.setOnClickListener(b -> {
+//            refresh(true);
+//        });
+//        buttonsLayout.addView(refreshButton);
+
+//        Button logoutButton = new Button(context);
+//        logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
+//        logoutButton.setTextColor(Theme.PRIMARY_COLOR);
+//        logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+//        var background2 = backgroundFactory.newBackgroundDrawable();
+//        logoutButton.setBackground(background2);
+//        logoutButton.setOnClickListener(b -> {
+//            IClientLoginService.logoutAndReloginAsAnonymous();
+//        });
+//        buttonsLayout.addView(logoutButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         LayoutParams topPanelLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topPanelLayoutParams.setMargins(0, dp(32), 0, dp(32));
@@ -355,8 +383,6 @@ public class AccountView extends LinearLayout {
                         }
                     });
                 });
-                myPlaylistsContent.setVisibility(createdPlaylist.isEmpty() ? GONE : VISIBLE);
-                mySubscribedPlaylistsContent.setVisibility(subscribedPlaylist.isEmpty() ? GONE : VISIBLE);
 
                 ObservableSequencedSet<Album> albums = userCollections.getSubscribedAlbums();
                 albums.forEach(albumCardCreator);
@@ -372,7 +398,6 @@ public class AccountView extends LinearLayout {
                         }
                     });
                 });
-                mySubscribedAlbumsContent.setVisibility(albums.isEmpty() ? GONE : VISIBLE);
 
                 ObservableSequencedSet<Artist> artists = userCollections.getSubscribedArtists();
                 artists.forEach(artistCardCreator);
@@ -388,7 +413,13 @@ public class AccountView extends LinearLayout {
                         }
                     });
                 });
-                mySubscribedArtistsContent.setVisibility(artists.isEmpty() ? GONE : VISIBLE);
+
+                post(() -> {
+                    myPlaylistsContent.setVisibility(createdPlaylist.isEmpty() ? GONE : VISIBLE);
+                    mySubscribedPlaylistsContent.setVisibility(subscribedPlaylist.isEmpty() ? GONE : VISIBLE);
+                    mySubscribedAlbumsContent.setVisibility(albums.isEmpty() ? GONE : VISIBLE);
+                    mySubscribedArtistsContent.setVisibility(artists.isEmpty() ? GONE : VISIBLE);
+                });
 
                 progressBar.setVisibility(View.GONE);
             });

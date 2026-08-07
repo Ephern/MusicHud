@@ -94,6 +94,8 @@
   "music_hud.config.layout.verticalAlign.TOP": "頂部",
   "music_hud.decrease_volume": "降低音量",
   "music_hud.error.apiServer": "無法連線到 API 服務\n請檢查 API 服務狀態",
+  "music_hud.error.cause.timeout": "請求逾時",
+  "music_hud.error.downloadingAudioStream": "重新載入音訊流（{trial}）\n{message}",
   "music_hud.error.getAccountInfo": "取得帳戶資訊出錯",
   "music_hud.field.hint.code": "驗證碼",
   "music_hud.field.hint.phone": "手機號碼",
