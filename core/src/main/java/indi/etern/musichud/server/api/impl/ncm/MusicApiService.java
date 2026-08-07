@@ -13,6 +13,7 @@ import indi.etern.musichud.beans.music.actions.SubscribeAction;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.PostProcessable;
+import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.throwable.MusicResourceLoadingException;
@@ -182,7 +183,7 @@ public class MusicApiService implements IMusicApiService {
                         Playlist loaded = playlistResponse.getPlaylist();
                         if (cached != null) {
                             //To avoid dist crossing issues due to shared common caches in integrated server
-                            cached.updateFrom(loaded, !IClientDistUtil.getInstance().inIntegratedServer());
+                            cached.updateFrom(loaded, MusicHud.getCurrentEnvironment().getSide() == Environment.Side.SERVER || !IClientDistUtil.getInstance().inIntegratedServer());
                             return cached;
                         }
                         playlistsCache.put(id, loaded);
@@ -321,7 +322,7 @@ public class MusicApiService implements IMusicApiService {
                 Album previousAlbum = albumsCache.getIfPresent(id);
                 if (previousAlbum != null) {
                     //To avoid dist crossing issues due to shared common caches in integrated server
-                    previousAlbum.updateFrom(album, !IClientDistUtil.getInstance().inIntegratedServer());
+                    previousAlbum.updateFrom(album, MusicHud.getCurrentEnvironment().getSide() == Environment.Side.SERVER || !IClientDistUtil.getInstance().inIntegratedServer());
                     return previousAlbum;
                 } else {
                     albumsCache.put(id, album);
