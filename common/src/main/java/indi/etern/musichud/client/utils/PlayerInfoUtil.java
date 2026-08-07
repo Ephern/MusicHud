@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.utils;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
@@ -25,7 +26,7 @@ public class PlayerInfoUtil {
     public static ResourceLocation getPlayerSkin(PlayerInfo playerInfo) {
         if (playerInfo == null) {
             if (Minecraft.getInstance().getCurrentServer() == null || //single player
-                    MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
+                    ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && clientConfig.getEnableIsolatedMode()) {// isolated mode
                 LocalPlayer player = Minecraft.getInstance().player;
                 if (player != null) {
                     return player.getSkin().body().texturePath();

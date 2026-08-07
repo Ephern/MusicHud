@@ -24,6 +24,7 @@ public class Artist implements IdentifiedBeans {
             Codecs.INT, Artist::getTotalMusicCount,
             Artist::new
     );
+    public static final Artist UNKNOWN = new Artist(-1, "unknown", "", 0, 0, "unknown", List.of(), 0);
     long id;
     String name = "";
     @SerializedName(value = "avatar", alternate = "img1v1Url")

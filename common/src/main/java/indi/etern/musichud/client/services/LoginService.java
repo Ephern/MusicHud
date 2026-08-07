@@ -5,12 +5,15 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.login.LoginType;
+import indi.etern.musichud.beans.state.IIdlePlaySourceLayerState;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
+import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.account.LoginView;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
@@ -32,6 +35,7 @@ import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.function.Consumer;
+import java.util.function.Supplier;
 import java.util.regex.Pattern;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
@@ -42,7 +46,7 @@ public class LoginService implements IClientLoginService {
     private static final Period refreshInterval = Period.of(0, 0, 1);
     private static volatile LoginService instance = null;
     private final List<Consumer<LoginState>> loginStateListeners = new CopyOnWriteArrayList<>();
-    private volatile LoginState loginState = getLoginState();
+    private volatile LoginState loginState = refreshLoginState();
     @Getter
     private volatile String lastLoginErrorMessage;
     @Getter
@@ -64,7 +68,17 @@ public class LoginService implements IClientLoginService {
                 logger.warn("Login failed");
                 lastLoginErrorMessage = resolveLoginErrorMessage(loginResult.message());
             }
-            notifyLoginStateChanged();
+            notifyLoginStateChanged((this::refreshLoginState));
+            if (loginResult.success()) {
+                // Every successful login starts a new server session; re-sync the local idle
+                // play sources so they are pushed to whichever server-side component is active
+                // (network channel when connected, local loopback in isolated mode). This must
+                // not depend on the login state listeners, which are deduplicated and may not
+                // fire when the state is unchanged across a connection switch.
+                IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
+                localState.reset();
+                localState.loadFromConfig();
+            }
             AccountBaseView accountBaseView = AccountBaseView.getInstance();
             if (accountBaseView != null) {
                 if (loginResult.success()) {
@@ -111,11 +125,11 @@ public class LoginService implements IClientLoginService {
 
     @Override
     public boolean isLogined() {
-        return getLoginState() == LoginState.LOGGED_IN;
+        return refreshLoginState() == LoginState.LOGGED_IN;
     }
 
     @Override
-    public LoginState getLoginState() {
+    public LoginState refreshLoginState() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         LoginType type = loginCookieInfo.type();
         Profile current = Profile.getCurrent();
@@ -136,8 +150,8 @@ public class LoginService implements IClientLoginService {
         return () -> loginStateListeners.remove(listener);
     }
 
-    private void notifyLoginStateChanged() {
-        LoginState state = getLoginState();
+    private void notifyLoginStateChanged(Supplier<LoginState> supplier) {
+        LoginState state = supplier.get();
         if (state == loginState) return;
         loginState = state;
         loginStateListeners.forEach(listener -> listener.accept(state));
@@ -185,7 +199,7 @@ public class LoginService implements IClientLoginService {
     public void logoutAndReloginAsAnonymous() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         Profile.setCurrent(Profile.ANONYMOUS);
-        notifyLoginStateChanged();
+        notifyLoginStateChanged(this::refreshLoginState);
         loginAsAnonymousToServer();
     }
 
@@ -220,13 +234,16 @@ public class LoginService implements IClientLoginService {
             });
             eventService.registerClientPlayerQuit((player) -> {
                 MusicHud.EXECUTOR.execute(() -> {
-                    if (MusicHud.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
+                    IConnectionManager.getInstance().onPlayerQuit();
+                    if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
                         if (clientConfig.getEnableIsolatedMode()) {
                             LoginApiService.getInstance().logout(VanillaPlayerProxy.ofPlayer(player));
                         }
                     } else {
-                        MusicHud.setConnectStatus(MusicHud.ConnectStatus.NOT_CONNECTED);
+                        ConnectionStateMachine.enterDisconnected();
                     }
+                    LoginService loginService = LoginService.getInstance();
+                    loginService.notifyLoginStateChanged(() -> LoginState.UNLOGGED);
                 });
             });
         }

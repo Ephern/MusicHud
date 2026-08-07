@@ -9,6 +9,7 @@ import indi.etern.musichud.interfaces.ICommonEventService;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerRegister;
 import indi.etern.musichud.network.IPlayerClient;
+import indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeResponse;
 import indi.etern.musichud.server.api.impl.ncm.LoginApiService;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -52,7 +53,8 @@ public interface ILoginApiService {
 
     String getRawCookieOrElse(UUID playerUUID, Supplier<String> supplier);
 
-    indi.etern.musichud.network.payloads.requestResponseCycle.SendPhoneValidationCodeResponse requestValidationCodeFor(int regionCode, long phone, IPlayerClient player);
+    SendPhoneValidationCodeResponse requestValidationCodeFor(int regionCode, long phone, IPlayerClient player);
+
     void loginWithPhoneAndCode(int regionCode, long phone, int code, IPlayerClient player);
 
     void loginWithPhoneAndPassword(long phone, String md5password, IPlayerClient player);

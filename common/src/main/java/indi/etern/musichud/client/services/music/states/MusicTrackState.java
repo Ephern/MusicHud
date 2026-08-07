@@ -152,16 +152,16 @@ public class MusicTrackState implements IMusicTrackState {
                         .handle((response, throwable) -> {
                             if (throwable != null) {
                                 edit.rollback();
-                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId());
+                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(throwable);
                             }
                             if (!response.isSuccess()) {
                                 edit.rollback();
-                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId());
+                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(response.getMessage());
                             }
                             edit.commit();
-                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId());
+                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                             return null;
                         });
             });
@@ -188,16 +188,16 @@ public class MusicTrackState implements IMusicTrackState {
                         .handle((response, throwable) -> {
                             if (throwable != null) {
                                 edit.rollback();
-                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId());
+                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(throwable);
                             }
                             if (!response.isSuccess()) {
                                 edit.rollback();
-                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId());
+                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(response.getMessage());
                             }
                             edit.commit();
-                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId());
+                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                             return null;
                         });
             });

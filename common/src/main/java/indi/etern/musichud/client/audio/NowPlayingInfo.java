@@ -292,6 +292,22 @@ public class NowPlayingInfo {
         callLyricsUpdateListeners(null);
     }
 
+    /**
+     * The same track is still playing after a state re-sync (e.g. a connection mode switch).
+     * Refreshes the UI listeners without restarting the audio stream or resetting the progress.
+     */
+    public void syncSameTrack(MusicDetail musicDetail, MusicDetail nextToPlay) {
+        MusicDetail previous = currentlyPlayingMusicDetail;
+        nextToPlayIdleMusicDetail = nextToPlay;
+        try {
+            MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, nextToPlay, this.lyricLines));
+        } catch (IllegalStateException ignored) {
+        }
+        List.copyOf(musicSwitchListener).forEach(consumer -> {
+            consumer.accept(previous, musicDetail);
+        });
+    }
+
     public void startAt(ZonedDateTime zonedDateTime) {
         musicStartTime = Objects.requireNonNullElseGet(zonedDateTime, ZonedDateTime::now);
         // SMTC state change picked up by jmtcLoop polling

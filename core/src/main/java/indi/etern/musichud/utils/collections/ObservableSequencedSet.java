@@ -133,6 +133,31 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
         return new EditHandle<>(this);
     }
 
+    public void syncWith(ObservableSequencedSet<E> target, boolean triggerObservable) {
+        List<E> current = List.copyOf(delegate);
+        List<E> wanted = List.copyOf(target);
+        Set<E> wantedSet = Set.copyOf(wanted);
+        Set<E> currentSet = Set.copyOf(current);
+        Set<E> removed = current.stream().filter(e -> !wantedSet.contains(e)).collect(LinkedHashSet::new, Set::add, Set::addAll);
+        List<E> added = wanted.stream().filter(e -> !currentSet.contains(e)).toList();
+
+        List<?> actuallyRemoved = ((Collection<?>) removed).stream().filter(this::contains).toList();
+        boolean changed = super.removeAll(removed);
+        if (changed && triggerObservable) {
+            //noinspection unchecked
+            removeListeners.forEach(l1 -> actuallyRemoved.forEach(i -> l1.accept((E) i)));
+            changeListeners.forEach(Runnable::run);
+        }
+
+        delegate.clear();
+        delegate.addAll(wanted);
+        // Addition fires addListeners + changeListeners.
+        if (!added.isEmpty() && triggerObservable) {
+            added.forEach(e -> addListeners.forEach(l -> l.accept(e)));
+            changeListeners.forEach(Runnable::run);
+        }
+    }
+
     public static class EditHandle<E> {
         private final ObservableSequencedSet<E> set;
         private final List<E> snapshot;

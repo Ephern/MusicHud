@@ -29,7 +29,7 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 - Streamed playback with no redundant client-side caching.
 - Staggered lyrics auto scroll inspired by Apple Music
 - HUD dynamic fluid background
-- Windows SMTC / Linux MPRIS (have not fully tested yet) support
+- Windows SMTC / Linux MPRIS (have not fully tested yet) support (Powered by slightly modified [JMTC](https://github.com/Selemba1000/JavaMediaTransportControls))
 
 ## Functions
 - Search for musics, playlists, albums and artists.
@@ -111,7 +111,7 @@ You can find "Download API..." button in setting page, which will open a downloa
 - 流式播放，无赘余的客户端缓存
 - 受 Apple Music 启发的歌词交错滚动与逐字歌词
 - HUD 动态流体背景
-- Windows SMTC / Linux MPRIS（尚未充分测试） 支持
+- Windows SMTC / Linux MPRIS（尚未充分测试） 支持 （略微修改自 [JMTC](https://github.com/Selemba1000/JavaMediaTransportControls)）
 
 ## 功能
 - 搜索音乐、歌单、专辑和歌手
