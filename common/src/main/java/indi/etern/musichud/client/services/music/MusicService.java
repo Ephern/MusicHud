@@ -97,20 +97,20 @@ public class MusicService implements IClientMusicService {
                     if (userCategoryPlaylists != null) {
                         Playlist likeList = userCategoryPlaylists.getLikeList();
                         if (playlistsCache.asMap().putIfAbsent(likeList.getId(), likeList) == null) {
-                            CollectionUpdateNotifier.notifyPlaylistUpdated(likeList.getId());
+                            CollectionUpdateNotifier.notifyPlaylistUpdated(likeList.getId(), true);
                         }
                         userCategoryPlaylists.getCreatedPlaylist()
                                 .forEach(playlist -> {
                                     if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
                                             && playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist) == null) {
-                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId());
+                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), true);
                                     }
                                 });
                         userCategoryPlaylists.getSubscribedPlaylist()
                                 .forEach(playlist -> {
                                     if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
                                             && playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist) == null) {
-                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId());
+                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), true);
                                     }
                                 });
                     }
@@ -118,7 +118,7 @@ public class MusicService implements IClientMusicService {
                         subscribedAlbums.forEach(album -> {
                             if (album.getMusicDetails() != null && album.getMusicDetails().size() == album.getMusicTrackCount()
                                     && albumsCache.asMap().putIfAbsent(album.getId(), album) == null) {
-                                CollectionUpdateNotifier.notifyAlbumUpdated(album.getId());
+                                CollectionUpdateNotifier.notifyAlbumUpdated(album.getId(), true);
                             }
                         });
                     }

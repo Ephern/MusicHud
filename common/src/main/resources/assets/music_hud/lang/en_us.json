@@ -94,6 +94,8 @@
   "music_hud.config.layout.verticalAlign.TOP": "Top",
   "music_hud.decrease_volume": "Decrease volume",
   "music_hud.error.apiServer": "Failed to connect to API service\nPlease check API server status",
+  "music_hud.error.cause.timeout": "Request timeout",
+  "music_hud.error.downloadingAudioStream": "Reload audio stream ({trial})\n{message}",
   "music_hud.error.getAccountInfo": "Failed to get account info",
   "music_hud.field.hint.code": "Validation Code",
   "music_hud.field.hint.phone": "Phone",

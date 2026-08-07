@@ -88,6 +88,7 @@ public class MusicListItem extends LinearLayout {
         row1.addView(musicName, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         row2 = new FlexWrapLayout(context);
+        row2.setAnimationsEnabled(false);
         musicTexts.addView(row2, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         LinearLayout row3 = new LinearLayout(context);
@@ -156,6 +157,26 @@ public class MusicListItem extends LinearLayout {
         buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
     }
 
+    public void setRowAnimationsEnabled(boolean enabled) {
+        row2.setAnimationsEnabled(enabled);
+    }
+
+    public void clearData() {
+        albumImage.clear();
+        musicName.setText("");
+        feeLabel.setText("");
+        feeLabel.setVisibility(GONE);
+        durationText.setText("");
+        row2.removeAllViews();
+        pusherText.setText("");
+        pusherHeadView.setVisibility(View.GONE);
+        pusherHeadView.setPlayerSkinSupplier(null);
+        addToPlaylistButton.bindMusicDetail(null);
+        likeButton.bindMusicList(null);
+        setTag(null);
+        musicDetail = null;
+    }
+
     public void bindData(MusicDetail musicDetail) {
         if (Objects.equals(this.musicDetail, musicDetail)) {
             return;
@@ -181,7 +202,7 @@ public class MusicListItem extends LinearLayout {
                 .cornerRadius(dp(2))
                 .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
                 .build();
-        for (Artist artist : musicDetail.getArtists()) {
+        for (final Artist artist : musicDetail.getArtists()) {
             if (index != 0) {
                 TextView split = new TextView(context);
                 split.setTextColor(Theme.SECONDARY_TEXT_COLOR);

@@ -39,6 +39,7 @@ public class MusicCollectionCard extends LinearLayout {
     private static final String ICON_DISC_ALBUM = "/assets/music_hud/textures/gui/icons/disc_album.png";
     private static final String ICON_LAYOUT_GRID = "/assets/music_hud/textures/gui/icons/layout_grid.png";
     private static final MusicService musicService = MusicService.getInstance();
+    private final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
     @Getter
     MusicCollection musicCollection;
     private Unregister onChangeUnregister;
@@ -146,7 +147,8 @@ public class MusicCollectionCard extends LinearLayout {
             toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
             row1.addView(toggleSubscribeButton, new LayoutParams(row2.dp(22), row2.dp(22), 0));
             if (musicCollection instanceof Playlist playlist) {
-                if (playlist.getCreator().getUserId() == Profile.getCurrent().getUserId()) {
+                Profile current = Profile.getCurrent();
+                if (current == null || current.equals(Profile.ANONYMOUS) || playlist.getCreator().getUserId() == current.getUserId()) {
                     toggleSubscribeButton.setVisibility(GONE);
                 } else {
                     var subscribeState = musicService.getPlaylistSubscribeState(playlist);
@@ -163,11 +165,10 @@ public class MusicCollectionCard extends LinearLayout {
         nameView.setTextColor(Theme.NORMAL_TEXT_COLOR);
         nameView.setSingleLine(false);
         nameView.setMaxLines(4);
-        nameView.setMinLines(2);
         nameView.setMaxWidth(dp(120));
         boolean isPrivatePlaylistToUser =
                 musicCollection instanceof Playlist playlist && playlist.getPrivacy() == Privacy.PRIVATE
-                        && !playlist.getCreator().equals(ProfileConfigData.getInstance().getProfile());
+                        && !playlist.getCreator().equals(profileConfigData.getProfile());
         LayoutParams params1 = new LayoutParams(0, WRAP_CONTENT, 1);
         params1.setMargins(dp(2), 0, dp(2), 0);
         row2.addView(nameView, params1);
@@ -176,6 +177,7 @@ public class MusicCollectionCard extends LinearLayout {
         LocalPlayer localPlayer = Minecraft.getInstance().player;
         if (pusherInfo == null || pusherInfo.equals(PusherInfo.EMPTY)
                 || (localPlayer != null && pusherInfo.getPlayerUUID().equals(localPlayer.getUUID()))) {
+            nameView.setMinLines(2);
             ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
             toggleIdleSourceButton.setBackground(backgroundFactory.newBackgroundDrawable());
             toggleIdleSourceButton.bindState(musicService.getIdlePlaySourceState().local().collection(musicCollection));
@@ -265,7 +267,7 @@ public class MusicCollectionCard extends LinearLayout {
         }
         boolean isPrivatePlaylistToUser = collection instanceof Playlist playlist
                 && playlist.getPrivacy() == Privacy.PRIVATE
-                && !playlist.getCreator().equals(ProfileConfigData.getInstance().getProfile());
+                && !playlist.getCreator().equals(profileConfigData.getProfile());
         nameView.setText(isPrivatePlaylistToUser
                 ? I18n.get(MusicHud.MOD_ID + ".text.privatePlaylist")
                 : collection.getName());
@@ -288,7 +290,7 @@ public class MusicCollectionCard extends LinearLayout {
         }
     }
 
-    private void onCollectionUpdateNotified() {
+    private void onCollectionUpdateNotified(boolean operateByRemoteSelf) {
         if (!refreshPending.compareAndSet(false, true)) {
             return;
         }

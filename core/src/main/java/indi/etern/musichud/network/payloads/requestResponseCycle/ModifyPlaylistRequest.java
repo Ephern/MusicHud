@@ -53,7 +53,7 @@ public class ModifyPlaylistRequest extends ApiRequestPayload {
                 }
                 IServerNetworkService.getInstance().sendToPlayerInfos(
                         LoginApiService.getInstance().getPlayerInfoMap().values(),
-                        new CollectionUpdatedMessage(request.getPlaylistId(), false)
+                        new CollectionUpdatedMessage(playerClient.getUUID(), request.getPlaylistId(), false)
                 );
                 return ResponseResult.of(new ModifyPlaylistResponse(true, ""));
             });

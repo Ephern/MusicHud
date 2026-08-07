@@ -44,6 +44,7 @@ public class UrlImageView extends FrameLayout {
     private boolean hasLoadedImage = false;
     private boolean isAttachedToWindow = false;
     private CompletableFuture<Void> loadFuture;
+    private AnimatorSet currentAnimator;
     // 滚动监听器
     private final ViewTreeObserver.OnScrollChangedListener scrollListener = this::checkVisibilityAndLoad;
     private final ViewTreeObserver.OnPreDrawListener preDrawListener = () -> {
@@ -347,11 +348,17 @@ public class UrlImageView extends FrameLayout {
     }
 
     private void setImageWithAnimation(RoundedImageDrawable drawable) {
+        // 取消上一次未完成的过渡动画, 防止其继续改动透明度/交换图层引用导致残留
+        if (currentAnimator != null) {
+            AnimatorSet old = currentAnimator;
+            currentAnimator = null;
+            old.cancel();
+        }
         nextImageView.setImageDrawable(drawable);
         progressRing.setVisibility(GONE);
 
-        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(imageView, View.ALPHA, 1f, 0f);
-        ObjectAnimator fadeIn = ObjectAnimator.ofFloat(nextImageView, View.ALPHA, 0f, 1f);
+        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(imageView, View.ALPHA, 0f);
+        ObjectAnimator fadeIn = ObjectAnimator.ofFloat(nextImageView, View.ALPHA, 1f);
 
         fadeOut.setDuration(400);
         fadeIn.setDuration(400);
@@ -361,11 +368,16 @@ public class UrlImageView extends FrameLayout {
         animatorSet.addListener(new AnimatorListener() {
             @Override
             public void onAnimationEnd(@NonNull Animator animation) {
+                if (currentAnimator != animatorSet) {
+                    return;
+                }
+                currentAnimator = null;
                 ImageView temp = imageView;
                 imageView = nextImageView;
                 nextImageView = temp;
             }
         });
+        currentAnimator = animatorSet;
         animatorSet.start();
     }
 
@@ -376,13 +388,22 @@ public class UrlImageView extends FrameLayout {
     }
 
     public void clear() {
+        if (currentAnimator != null) {
+            AnimatorSet old = currentAnimator;
+            currentAnimator = null;
+            old.cancel();
+        }
         progressRing.setVisibility(GONE);
         errorLayout.setVisibility(GONE);
         setLoading(false);
+        // 清除残留图片, 防止旧图在淡入动画结束后重新可见
+        imageView.setImageDrawable(null);
+        nextImageView.setImageDrawable(null);
         imageView.setAlpha(0);
         nextImageView.setAlpha(0);
 
         // 清除延迟加载状态
+        currentURLString = null;
         pendingUrl = null;
         hasLoadedImage = false;
     }

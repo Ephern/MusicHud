@@ -94,6 +94,8 @@
   "music_hud.config.layout.verticalAlign.TOP": "顶部",
   "music_hud.decrease_volume": "降低音量",
   "music_hud.error.apiServer": "无法连接到 API 服务\n请检查 API 服务状态",
+  "music_hud.error.cause.timeout": "请求超时",
+  "music_hud.error.downloadingAudioStream": "重载音频流（{trial}）\n{message}",
   "music_hud.error.getAccountInfo": "获取账户信息出错",
   "music_hud.field.hint.code": "验证码",
   "music_hud.field.hint.phone": "手机号码",
