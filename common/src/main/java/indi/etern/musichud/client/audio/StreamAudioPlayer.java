@@ -7,6 +7,7 @@ import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.audio.decoder.*;
 import indi.etern.musichud.client.services.music.MusicService;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -456,6 +457,7 @@ public class StreamAudioPlayer {
 
         MusicResourceInfo musicResourceInfo = MusicResourceInfo.NONE;
         while (!currentDownloadFuture.isDone() && currentDownloadFuture == downloadFuture) {
+            int trial = localRetryCount + 1;
             try {
                 if (musicResourceInfo == null || musicResourceInfo.equals(MusicResourceInfo.NONE) || localRetryCount % 3 == 0) {
                     musicResourceInfo = getCurrentMusicResourceInfo(clientConfig.getPrimaryChosenQuality(), musicResourceInfo).get();
@@ -464,7 +466,7 @@ public class StreamAudioPlayer {
                     }
                 }
 
-                LOGGER.debug("Starting audio download (attempt {})", localRetryCount + 1);
+                LOGGER.debug("Starting audio download (attempt {})", trial);
 
                 AudioDecoder decoder = loadAudioDecoder(musicResourceInfo.getUrl(), musicResourceInfo.getType());
                 currentDecoder = decoder;
@@ -514,8 +516,17 @@ public class StreamAudioPlayer {
                 LOGGER.debug("Download stopped by index out of bounds");
                 break;
             } catch (Exception e) {
-                if (e instanceof SocketException e1 && e1.getMessage().equals("Closed by interrupt")) break;
-                LOGGER.error("Download error (attempt {})\n{} : {}", localRetryCount + 1, e.getClass().getSimpleName(), e.getMessage());
+                String message = e.getMessage();
+                if (e instanceof SocketException e1 && message.equals("Closed by interrupt")) break;
+                LOGGER.error("Download error (attempt {})\n{} : {}", trial, e.getClass().getName(), message);
+                if (e.getCause() instanceof TimeoutException || message.contains("Timeout") || message.contains("timeout")) {
+                    message = I18n.get(MusicHud.MOD_ID + ".error.cause.timeout");
+                }
+                ToastUtil.show(
+                        I18n.get(MusicHud.MOD_ID + ".error.downloadingAudioStream")
+                                .replace("{trial}", String.valueOf(trial))
+                                .replace("{message}", message)
+                );
 
                 localAudioBuffer.clear();
                 totalBufferedBytes.set(0);

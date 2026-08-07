@@ -32,7 +32,7 @@ public interface IClientLoginService {
 
     boolean isLogined();
 
-    LoginState getLoginState();
+    LoginState refreshLoginState();
 
     Unregister addLoginStateListener(Consumer<LoginState> listener);
 

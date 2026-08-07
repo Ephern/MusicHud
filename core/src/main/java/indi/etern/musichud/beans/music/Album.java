@@ -150,4 +150,15 @@ public class Album implements MusicCollection {
     public int hashCode() {
         return Objects.hash(id, name, picUrl, pusherInfo.getPlayerUUID());
     }
+
+    public void updateFrom(Album album, boolean triggerObservable) {
+        this.id = album.id;
+        this.name = album.name;
+        this.picUrl = album.picUrl;
+        this.pusherInfo = album.pusherInfo;
+        this.musicTrackCount = album.musicTrackCount;
+        this.artists = album.artists;
+        this.nullFiltered = album.nullFiltered;
+        this.musicDetails.syncWith(album.musicDetails, triggerObservable);
+    }
 }

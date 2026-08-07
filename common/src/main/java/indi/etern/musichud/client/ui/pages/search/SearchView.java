@@ -19,6 +19,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SearchRequest;
@@ -65,7 +66,7 @@ public class SearchView extends LinearLayout {
         setOrientation(VERTICAL);
 
         boolean enabled = clientConfig.getEnable();
-        if (MusicHud.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
+        if (ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
             setGravity(Gravity.CENTER);
             TextView textView = Theme.getNotificationTextView(context, enabled);
             addView(textView);
