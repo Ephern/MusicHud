@@ -10,7 +10,6 @@ import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ModifyPlaylistRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ModifyPlaylistResponse;
-import indi.etern.musichud.utils.CollectionUpdateNotifier;
 import lombok.AllArgsConstructor;
 import lombok.SneakyThrows;
 
@@ -45,9 +44,9 @@ public class MusicTrackState implements IMusicTrackState {
     @Override
     public IPlaylistSubState currentUsersLikeList() {
         return new PlaylistSubState(-1, () ->
-                musicService.loadUserPlaylists(false)
-                        .thenCompose(p1 ->
-                                musicService.loadPlaylistDetail(p1.getLikeList().getId(), false)
+                musicService.loadUserCollections(false)
+                        .thenCompose(userCollections ->
+                                musicService.loadPlaylistDetail(userCollections.getUserCategoryPlaylists().getLikeList().getId(), false)
                         )
         );
     }
@@ -152,16 +151,16 @@ public class MusicTrackState implements IMusicTrackState {
                         .handle((response, throwable) -> {
                             if (throwable != null) {
                                 edit.rollback();
-                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
+//                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(throwable);
                             }
                             if (!response.isSuccess()) {
                                 edit.rollback();
-                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
+//                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(response.getMessage());
                             }
                             edit.commit();
-                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
+//                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                             return null;
                         });
             });
@@ -188,16 +187,16 @@ public class MusicTrackState implements IMusicTrackState {
                         .handle((response, throwable) -> {
                             if (throwable != null) {
                                 edit.rollback();
-                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
+//                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(throwable);
                             }
                             if (!response.isSuccess()) {
                                 edit.rollback();
-                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
+//                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(response.getMessage());
                             }
                             edit.commit();
-                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
+//                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                             return null;
                         });
             });
