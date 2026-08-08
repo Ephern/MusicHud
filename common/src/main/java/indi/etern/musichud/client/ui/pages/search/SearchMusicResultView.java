@@ -9,7 +9,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.MusicListItem;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 
@@ -20,6 +20,10 @@ public class SearchMusicResultView extends LinearLayout {
     @Getter
     private static SearchMusicResultView instance;
     private static List<MusicDetail> result;
+    private final InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
+            .cornerRadius(dp(12))
+            .inset(dp(1))
+            .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build();
 
     public SearchMusicResultView(Context context) {
         super(context);
@@ -54,11 +58,7 @@ public class SearchMusicResultView extends LinearLayout {
     private void addItem(Context context, MusicDetail musicDetail) {
         var musicLayout = new MusicListItem(context);
         musicLayout.bindData(musicDetail);
-        var background = ButtonInsetBackgroundFactory.builder()
-                .cornerRadius(dp(12))
-                .inset(dp(1))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build().newBackgroundDrawable();
-        musicLayout.setBackground(background);
+        backgroundFactory.applyBackgroundTo(musicLayout);
 
         musicLayout.setClickable(true);
         String artistsName = musicDetail.getArtists().stream()

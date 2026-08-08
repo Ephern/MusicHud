@@ -4,7 +4,7 @@ import indi.etern.musichud.interfaces.Unregister;
 
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 
 /**
@@ -19,8 +19,8 @@ import java.util.function.Consumer;
  * add/remove churn during rapid toggling.
  */
 public final class CollectionUpdateNotifier {
-    private static final ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<Boolean>>> PLAYLIST_LISTENERS = new ConcurrentHashMap<>();
-    private static final ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<Boolean>>> ALBUM_LISTENERS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, CopyOnWriteArraySet<Consumer<Boolean>>> PLAYLIST_LISTENERS = new ConcurrentHashMap<>();
+    private static final ConcurrentHashMap<Long, CopyOnWriteArraySet<Consumer<Boolean>>> ALBUM_LISTENERS = new ConcurrentHashMap<>();
 
     private CollectionUpdateNotifier() {
     }
@@ -49,15 +49,15 @@ public final class CollectionUpdateNotifier {
         notifyListeners(ALBUM_LISTENERS, albumId, self);
     }
 
-    private static Unregister register(ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<Boolean>>> listenersMap, long id, Consumer<Boolean> listener) {
-        listenersMap.computeIfAbsent(id, k -> new CopyOnWriteArrayList<>()).add(listener);
+    private static Unregister register(ConcurrentHashMap<Long, CopyOnWriteArraySet<Consumer<Boolean>>> listenersMap, long id, Consumer<Boolean> listener) {
+        listenersMap.computeIfAbsent(id, k -> new CopyOnWriteArraySet<>()).add(listener);
         return () -> {
             var list = listenersMap.get(id);
             if (list != null) list.remove(listener);
         };
     }
 
-    private static void notifyListeners(ConcurrentHashMap<Long, CopyOnWriteArrayList<Consumer<Boolean>>> listenersMap, long id, boolean self) {
+    private static void notifyListeners(ConcurrentHashMap<Long, CopyOnWriteArraySet<Consumer<Boolean>>> listenersMap, long id, boolean self) {
         var list = listenersMap.get(id);
         if (list == null) return;
         for (Consumer<Boolean> listener : list) {

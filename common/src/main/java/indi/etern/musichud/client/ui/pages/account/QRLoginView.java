@@ -10,7 +10,7 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.UrlImageView;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -69,10 +69,11 @@ public class QRLoginView extends LinearLayout implements ILoginView {
         messageTextView.setVisibility(View.GONE);
         messageTextView.setGravity(Gravity.CENTER_HORIZONTAL);
 
-        var background = ButtonInsetBackgroundFactory.builder()
-                .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
-                .cornerRadius(dp(4)).inset(dp(1)).build().newBackgroundDrawable();
-        loginButton.setBackground(background);
+        InsetBackgroundFactory.builder()
+                .padding(new InsetBackgroundFactory.Padding(0, 0, 0, 0))
+                .cornerRadius(dp(4)).inset(dp(1))
+                .build()
+                .applyBackgroundTo(loginButton);
         LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         buttonParams.setMargins(0, dp(8), 0, 0);
         loginButton.setLayoutParams(buttonParams);

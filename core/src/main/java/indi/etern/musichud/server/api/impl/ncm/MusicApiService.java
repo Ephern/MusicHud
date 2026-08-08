@@ -587,6 +587,7 @@ public class MusicApiService implements IMusicApiService {
             }
             throw e;
         }
+        refreshPlaylistCacheAfterModify(playlistId, playerUUID);
     }
 
     @Override
@@ -623,6 +624,14 @@ public class MusicApiService implements IMusicApiService {
                 musicDetailEditHandle.rollback();
             }
             throw e;
+        }
+        refreshPlaylistCacheAfterModify(playlistId, playerUUID);
+    }
+
+    private void refreshPlaylistCacheAfterModify(long playlistId, UUID playerUUID) {
+        Playlist refreshed = getPlaylistDetail(playlistId, true, playerUUID);
+        if (refreshed == Playlist.EMPTY || refreshed.getMusicDetails().isEmpty()) {
+            playlistsCache.invalidate(playlistId);
         }
     }
 

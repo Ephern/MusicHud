@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.KeyEvent;
@@ -18,7 +17,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -49,6 +48,9 @@ public class SearchView extends LinearLayout {
     @Getter
     private final HashSet<Consumer<SearchMeta>> searchRefreshListeners = new HashSet<>();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private final InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
+            .inset(0).padding(new InsetBackgroundFactory.Padding(dp(8), 0, dp(8), 0))
+            .cornerRadius(dp(4)).build();
     private EditText searchTextInput;
     private SearchResultTabPage searchResultTabPage;
     @Getter
@@ -91,10 +93,7 @@ public class SearchView extends LinearLayout {
         Button searchButton = new Button(context);
         searchButton.setText(I18n.get(MusicHud.MOD_ID + ".button.searchMusic"));
         LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
-        Drawable background = ButtonInsetBackgroundFactory.builder()
-                .inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), 0, dp(8), 0))
-                .cornerRadius(dp(4)).build().newBackgroundDrawable();
-        searchButton.setBackground(background);
+        backgroundFactory.applyBackgroundTo(searchButton);
         buttonParams.setMargins(dp(8), 0, 0, 0);
         top.addView(searchButton, buttonParams);
 

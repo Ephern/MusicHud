@@ -13,6 +13,9 @@ import indi.etern.musichud.utils.CollectionUpdateNotifier;
 
 import java.util.UUID;
 
+import static indi.etern.musichud.server.api.impl.ncm.CommonCaches.albumsCache;
+import static indi.etern.musichud.server.api.impl.ncm.CommonCaches.playlistsCache;
+
 /**
  * Notifies clients that a playlist/album has been modified on the server.
  * Carried over the network layer so that both integrated and external server
@@ -38,8 +41,10 @@ public record CollectionUpdatedMessage(UUID operatorUUID, long collectionId, boo
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
                 receiver = (message, context) -> MusicHud.EXECUTOR.execute(() -> {
                     if (message.album()) {
+                        albumsCache.invalidate(message.collectionId());
                         CollectionUpdateNotifier.notifyAlbumUpdated(message.operatorUUID, message.collectionId());
                     } else {
+                        playlistsCache.invalidate(message.collectionId());
                         CollectionUpdateNotifier.notifyPlaylistUpdated(message.operatorUUID, message.collectionId());
                     }
                 });
