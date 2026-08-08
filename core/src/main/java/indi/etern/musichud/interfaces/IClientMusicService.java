@@ -59,12 +59,6 @@ public interface IClientMusicService {
 
     void keyBindsVoteSkipCurrent();
 
-    CompletableFuture<UserCategoryPlaylists> loadUserPlaylists(boolean ignoreCache);
-
-    CompletableFuture<LinkedHashSet<Album>> loadUserAlbums(boolean ignoreCache);
-
-    CompletableFuture<LinkedHashSet<Artist>> loadUserArtists(boolean ignoreCache);
-
     CompletableFuture<Artist> loadArtistDetailAsync(Artist artist);
 
     CompletableFuture<Collection<MusicDetail>> loadMoreMusicOfArtist(Artist artist);

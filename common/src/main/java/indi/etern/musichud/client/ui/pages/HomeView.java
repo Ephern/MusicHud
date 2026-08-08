@@ -3,7 +3,6 @@ package indi.etern.musichud.client.ui.pages;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
@@ -23,7 +22,7 @@ import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
@@ -360,11 +359,11 @@ public class HomeView extends LinearLayout {
             Image removeIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/trash_2.png");
             removeButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             removeButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), removeIcon, dp(16), dp(16)));
-            Drawable background = ButtonInsetBackgroundFactory.builder()
+            InsetBackgroundFactory.builder()
                     .inset(dp(2))
                     .cornerRadius(dp(4))
-                    .build().newBackgroundDrawable();
-            removeButton.setBackground(background);
+                    .build()
+                    .applyBackgroundTo(removeButton);
             removeButton.setOnClickListener(v -> {
                 MusicService.getInstance().sendRemoveMusicFromQueue(playQueueView.indexOfChild(musicListItem), item);
             });

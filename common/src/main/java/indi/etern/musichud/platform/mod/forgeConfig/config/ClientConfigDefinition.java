@@ -186,6 +186,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public boolean getDefaultEnableAutoConnect() {
+        return enableAutoConnect.getDefault();
+    }
+
+    @Override
     public void setEnableAutoConnect(boolean autoConnect) {
         this.enableAutoConnect.set(autoConnect);
     }
@@ -196,6 +201,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public boolean getDefaultEnableIsolatedMode() {
+        return enableIsolatedMode.getDefault();
+    }
+
+    @Override
     public void setEnableIsolatedMode(boolean autoConnect) {
         this.enableIsolatedMode.set(autoConnect);
     }
@@ -203,6 +213,11 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public AutoConnectServerFilterType getConnectServerFilterType() {
         return AutoConnectServerFilterType.valueOf(autoConnectServerFilterType.get());
+    }
+
+    @Override
+    public AutoConnectServerFilterType getDefaultConnectServerFilterType() {
+        return AutoConnectServerFilterType.valueOf(autoConnectServerFilterType.getDefault());
     }
 
     @Override
@@ -217,6 +232,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public List<String> getDefaultBlackList() {
+        return List.of();
+    }
+
+    @Override
     public void setBlackList(List<String> blackList) {
         autoConnectBlackList.set(JsonUtil.gson.toJson(blackList));
     }
@@ -225,6 +245,11 @@ public class ClientConfigDefinition implements ClientConfig {
     public List<String> getWhiteList() {
         //noinspection unchecked
         return JsonUtil.gson.fromJson(autoConnectWhiteList.get(), List.class);
+    }
+
+    @Override
+    public List<String> getDefaultWhiteList() {
+        return List.of();
     }
 
     @Override
@@ -243,8 +268,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public boolean getDefaultEnable() {
+        return enable.getDefault();
+    }
+
+    @Override
     public boolean getShowTranslatedCnLyrics() {
         return showTranslatedCnLyrics.get();
+    }
+
+    @Override
+    public boolean getDefaultShowTranslatedCnLyrics() {
+        return showTranslatedCnLyrics.getDefault();
     }
 
     @Override
@@ -263,6 +298,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public boolean getDefaultDisableVanillaMusic() {
+        return disableVanillaMusic.getDefault();
+    }
+
+    @Override
     public boolean getHideHudWhenNotPlaying() {
         return hideHudWhenNotPlaying.get();
     }
@@ -273,8 +313,18 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public boolean getDefaultHideHudWhenNotPlaying() {
+        return hideHudWhenNotPlaying.getDefault();
+    }
+
+    @Override
     public boolean getEnableHud() {
         return enableHud.get();
+    }
+
+    @Override
+    public boolean getDefaultEnableHud() {
+        return enableHud.getDefault();
     }
 
     @Override
@@ -288,6 +338,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public Quality getDefaultPrimaryChosenQuality() {
+        return Quality.valueOf(primaryChosenQuality.getDefault());
+    }
+
+    @Override
     public void setPrimaryChosenQuality(Quality primaryChosenQuality) {
         this.primaryChosenQuality.set(primaryChosenQuality.name());
     }
@@ -295,6 +350,11 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public String getHudVerticalPosition() {
         return hudVerticalPosition.get();
+    }
+
+    @Override
+    public String getDefaultHudVerticalPosition() {
+        return hudVerticalPosition.getDefault();
     }
 
     @Override
@@ -308,6 +368,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public String getDefaultHudHorizontalPosition() {
+        return hudHorizontalPosition.getDefault();
+    }
+
+    @Override
     public void setHudHorizontalPosition(String hudHorizontalPosition) {
         this.hudHorizontalPosition.set(hudHorizontalPosition);
     }
@@ -315,6 +380,11 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public int getHudOffsetX() {
         return hudOffsetX.get();
+    }
+
+    @Override
+    public int getDefaultHudOffsetX() {
+        return hudOffsetX.getDefault();
     }
 
     @Override
@@ -328,6 +398,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public int getDefaultHudOffsetY() {
+        return hudOffsetY.getDefault();
+    }
+
+    @Override
     public void setHudOffsetY(int hudOffsetY) {
         this.hudOffsetY.set(hudOffsetY);
     }
@@ -335,6 +410,11 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public int getHudWidth() {
         return hudWidth.get();
+    }
+
+    @Override
+    public int getDefaultHudWidth() {
+        return hudWidth.getDefault();
     }
 
     @Override
@@ -348,6 +428,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public int getDefaultHudHeight() {
+        return hudHeight.getDefault();
+    }
+
+    @Override
     public void setHudHeight(int hudHeight) {
         this.hudHeight.set(hudHeight);
     }
@@ -355,6 +440,11 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public int getHudCornerRadius() {
         return hudCornerRadius.get();
+    }
+
+    @Override
+    public int getDefaultHudCornerRadius() {
+        return hudCornerRadius.getDefault();
     }
 
     @Override
@@ -388,6 +478,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public boolean getDefaultEnabledInIntegratedServer() {
+        return enabledInIntegratedServer.getDefault();
+    }
+
+    @Override
     public void setEnabledInIntegratedServer(boolean enabledInIntegratedServer) {
         this.enabledInIntegratedServer.set(enabledInIntegratedServer);
     }
@@ -403,6 +498,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public double getDefaultMainScreenAdditionalBackgroundDarken() {
+        return mainScreenAdditionalBackgroundDarken.getDefault();
+    }
+
+    @Override
     public void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken) {
         mainScreenAdditionalBackgroundDarken.set(additionalBackgroundDarken);
     }
@@ -413,6 +513,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public double getDefaultHudBackgroundMixAlpha() {
+        return hudBackgroundMixAlpha.getDefault();
+    }
+
+    @Override
     public void setHudBackgroundMixAlpha(double hudBackgroundMixAlpha) {
         this.hudBackgroundMixAlpha.set(hudBackgroundMixAlpha);
     }
@@ -420,6 +525,11 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public boolean getMixWithVanillaSoundVolume() {
         return mixWithVanillaSoundVolume.get();
+    }
+
+    @Override
+    public boolean getDefaultMixWithVanillaSoundVolume() {
+        return mixWithVanillaSoundVolume.getDefault();
     }
 
     @Override
@@ -440,6 +550,11 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public int getSoundVolume() {
         return soundVolume.get();
+    }
+
+    @Override
+    public int getDefaultSoundVolume() {
+        return soundVolume.getDefault();
     }
 
     @Override
@@ -464,6 +579,11 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
+    public int getDefaultSoundVolumeInterval() {
+        return soundVolumeInterval.getDefault();
+    }
+
+    @Override
     public void setSoundVolumeInterval(int soundVolume) {
         this.soundVolumeInterval.set(soundVolume);
     }
@@ -471,6 +591,11 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public boolean getEnableMarqueeText() {
         return enableMarqueeText.get();
+    }
+
+    @Override
+    public boolean getDefaultEnableMarqueeText() {
+        return enableMarqueeText.getDefault();
     }
 
     @Override

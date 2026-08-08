@@ -22,7 +22,7 @@ import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
@@ -192,15 +192,16 @@ public class AccountView extends LinearLayout {
         buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
         infoLayout.addView(buttonsLayout);
 
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .inset(0)
                 .cornerRadius(dp(4))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
+                .padding(new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
                 .build();
         int dp28 = dp(28);
         {
             ImageButton refreshButton = new ImageButton(context);
+            backgroundFactory.applyBackgroundTo(refreshButton);
             refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
             refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
@@ -213,6 +214,7 @@ public class AccountView extends LinearLayout {
         }
         {
             ImageButton logoutButton = new ImageButton(context);
+            backgroundFactory.applyBackgroundTo(logoutButton);
             logoutButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
             logoutButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
@@ -424,6 +426,7 @@ public class AccountView extends LinearLayout {
                 progressBar.setVisibility(View.GONE);
             });
         }).exceptionally((e) -> {
+            e.printStackTrace();
             MuiModApi.postToUiThread(() -> {
                 if (isAttachedToWindow()) {
                     progressBar.setVisibility(View.GONE);
