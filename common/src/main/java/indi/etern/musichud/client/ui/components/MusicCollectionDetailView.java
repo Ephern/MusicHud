@@ -3,7 +3,6 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
@@ -23,9 +22,8 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.Unregister;
-import indi.etern.musichud.server.api.impl.ncm.CommonCaches;
 import indi.etern.musichud.utils.CollectionUpdateNotifier;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import net.minecraft.client.resources.language.I18n;
@@ -45,11 +43,11 @@ public class MusicCollectionDetailView extends LinearLayout {
     private final ProgressBar progressBar;
     private final VirtualizedListLayout virtualList;
     private final UrlImageView imageView;
+    private final AtomicBoolean syncPending = new AtomicBoolean();
     private TextView musicTrackCountView;
     private MusicCollection musicCollection;
     private Unregister tracksSyncUnregister = null;
     private Unregister updateNotifierUnregister = null;
-    private final AtomicBoolean syncPending = new AtomicBoolean();
     private String currentCoverUrl = null;
     private long collectionId = -1;
     private boolean albumCollection = false;
@@ -79,12 +77,12 @@ public class MusicCollectionDetailView extends LinearLayout {
             RouterContainer.getInstance().popNavigate();
             backButton.setOnClickListener(null);
         });
-        Drawable drawable = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory.builder()
                 .inset(0)
                 .cornerRadius(dp(8))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
-                .build().newBackgroundDrawable();
-        backButton.setBackground(drawable);
+                .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
+                .build()
+                .applyBackgroundTo(backButton);
         LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
         backButtonParams.setMargins(0, 0, dp(4), 0);
         topBar.addView(backButton, backButtonParams);
@@ -173,15 +171,16 @@ public class MusicCollectionDetailView extends LinearLayout {
 
         row1.addView(new View(context), new LayoutParams(dp(16), MATCH_PARENT, 0));
 
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .inset(0)
                 .cornerRadius(dp(4))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
+                .padding(new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
                 .build();
         int dp28 = dp(28);
         {
             ImageButton refreshButton = new ImageButton(context);
+            backgroundFactory.applyBackgroundTo(refreshButton);
             refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
             refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
@@ -194,10 +193,11 @@ public class MusicCollectionDetailView extends LinearLayout {
         }
         {
             ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
-            toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(toggleSubscribeButton);
             row1.addView(toggleSubscribeButton, new LayoutParams(dp28, dp28, 0));
             if (musicCollection instanceof Playlist playlist) {
-                if (playlist.getCreator().getUserId() == Profile.getCurrent().getUserId()) {
+                Profile current = Profile.getCurrent();
+                if (current == null || current.equals(Profile.ANONYMOUS) || playlist.getCreator().getUserId() == current.getUserId()) {
                     toggleSubscribeButton.setVisibility(GONE);
                 } else {
                     var subscribeState = musicService.getPlaylistSubscribeState(playlist);
@@ -209,7 +209,7 @@ public class MusicCollectionDetailView extends LinearLayout {
             }
         }
         ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
-        toggleIdleSourceButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(toggleIdleSourceButton);
         toggleIdleSourceButton.bindState(musicService.getIdlePlaySourceState().local().collection(musicCollection));
         row1.addView(toggleIdleSourceButton, new LayoutParams(dp28, dp28, 0));
 
@@ -231,8 +231,6 @@ public class MusicCollectionDetailView extends LinearLayout {
         scrollView.addView(virtualList, new ScrollView.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) ->
                 virtualList.updateWindow(scrollY, v.getHeight()));
-        // 布局完成后用真实视口高度重算窗口, 否则初次加载时 viewportHeight 为 0
-        // 只会渲染缓冲区内的前几项, 下方全部空白
         scrollView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
             int height = bottom - top;
             if (height > 0) {
@@ -263,22 +261,6 @@ public class MusicCollectionDetailView extends LinearLayout {
     }
 
     private void onCollectionUpdateNotified(boolean operateByRemoteSelf) {
-        // 自己操作: 列表已由乐观更新 (ObservableSequencedSet 监听) 即时反映, 跳过列表同步;
-        // 但封面仍可能被远程自动更新, 无论如何都需要刷新
-        if (!operateByRemoteSelf) {
-            MuiModApi.postToUiThread(() -> {
-                if (!isAttachedToWindow()) return;
-                MusicCollection latest = albumCollection
-                        ? CommonCaches.albumsCache.getIfPresent(collectionId)
-                        : CommonCaches.playlistsCache.getIfPresent(collectionId);
-                if (latest != null && latest != musicCollection) {
-                    musicCollection = latest;
-                    unregisterTracksSync();
-                    registerTracksSync(latest);
-                }
-                syncTracksView();
-            });
-        }
         CompletableFuture<? extends MusicCollection> future;
         if (albumCollection) {
             future = musicService.loadAlbumDetail(collectionId, true);
@@ -293,6 +275,15 @@ public class MusicCollectionDetailView extends LinearLayout {
                 if (!Objects.equals(currentCoverUrl, newCoverUrl)) {
                     currentCoverUrl = newCoverUrl;
                     imageView.loadUrl(newCoverUrl);
+                }
+                if (!operateByRemoteSelf) {
+                    if (!isAttachedToWindow()) return;
+                    if (latest != musicCollection) {
+                        musicCollection = latest;
+                    }
+                    unregisterTracksSync();
+                    registerTracksSync(latest);
+                    syncTracksView();
                 }
             });
         });
@@ -349,7 +340,7 @@ public class MusicCollectionDetailView extends LinearLayout {
                         if (musicTrackCountView != null) {
                             if (musicCollection1 instanceof Album album) {
                                 updateAlbumTrackCountView(album);
-                            } else if (musicCollection1 instanceof Playlist playlist){
+                            } else if (musicCollection1 instanceof Playlist playlist) {
                                 updatePlaylistTrackCountView(playlist);
                             }
                         }
@@ -405,7 +396,7 @@ public class MusicCollectionDetailView extends LinearLayout {
 
     private String mappedAlbumType(String type) {
         return switch (type) {
-            case "专辑" -> I18n.get(MusicHud.MOD_ID +".text.album.type.album");
+            case "专辑" -> I18n.get(MusicHud.MOD_ID + ".text.album.type.album");
             case "EP" -> I18n.get(MusicHud.MOD_ID + ".text.album.type.ep");
             case "Single" -> I18n.get(MusicHud.MOD_ID + ".text.album.type.single");
             case "精选集" -> I18n.get(MusicHud.MOD_ID + ".text.album.type.compilation");

@@ -21,6 +21,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.Privacy;
+import indi.etern.musichud.beans.music.UserCategoryPlaylists;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.services.LoginService;
@@ -28,7 +29,7 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.Unregister;
@@ -142,10 +143,10 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
         retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
         retryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         retryButton.setTextColor(Theme.PRIMARY_COLOR);
-        var retryBackground = ButtonInsetBackgroundFactory.builder()
-                .padding(new ButtonInsetBackgroundFactory.Padding(retryButton.dp(2), retryButton.dp(1), retryButton.dp(2), retryButton.dp(1)))
-                .cornerRadius(retryButton.dp(4)).inset(dp(1)).build().newBackgroundDrawable();
-        retryButton.setBackground(retryBackground);
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
+                .padding(new InsetBackgroundFactory.Padding(retryButton.dp(2), retryButton.dp(1), retryButton.dp(2), retryButton.dp(1)))
+                .cornerRadius(retryButton.dp(4)).inset(dp(1)).build();
+        backgroundFactory.applyBackgroundTo(retryButton);
         LinearLayout.LayoutParams retryParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         retryParams.setMargins(0, dp(4), 0, 0);
         errorLayout.addView(retryButton, retryParams);
@@ -196,8 +197,9 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
                 scrollView.setVisibility(GONE);
                 confirmButton.setEnabled(false);
             });
-            MusicService.getInstance().loadUserPlaylists(false)
-                    .thenCompose(userPlaylists -> {
+            MusicService.getInstance().loadUserCollections(false)
+                    .thenCompose(userCollections -> {
+                        UserCategoryPlaylists userPlaylists = userCollections.getUserCategoryPlaylists();
                         if (generation.get() != gen) {
                             return CompletableFuture.completedFuture(null);
                         }

@@ -145,7 +145,7 @@ public class Playlist implements MusicCollection {
             tracks = new ObservableSequencedSet<>(0);
             return tracks;
         }
-        if (!nullFiltered) {
+        if (!nullFiltered || tracks.contains(null)) {
             filterTracksNullItem();
             nullFiltered = true;
         }
@@ -214,9 +214,53 @@ public class Playlist implements MusicCollection {
         this.name = playlist.name;
         this.coverImgId = playlist.coverImgId;
         this.coverImgUrl = playlist.coverImgUrl;
-        this.tracks.syncWith(playlist.tracks, triggerObservable);
+        getTracks().syncWith(playlist.getTracks(), triggerObservable);
         this.creator = playlist.creator;
         this.privacy = playlist.privacy;
         this.musicTrackCount = playlist.musicTrackCount;
+    }
+
+    /**
+     * Merges brief (summary) metadata from a user-collection listing into this instance.
+     * Tracks and pusher info are left untouched, so a brief object upgraded by
+     * {@link #updateFrom(Playlist, boolean)} keeps its full track list.
+     *
+     * @return true if any merged field actually changed
+     */
+    public boolean updateFromBrief(Playlist brief) {
+        boolean changed = false;
+        if (!Objects.equals(name, brief.name)) {
+            name = brief.name;
+            changed = true;
+        }
+        if (coverImgId != brief.coverImgId) {
+            coverImgId = brief.coverImgId;
+            changed = true;
+        }
+        if (!Objects.equals(coverImgId_str, brief.coverImgId_str)) {
+            coverImgId_str = brief.coverImgId_str;
+            changed = true;
+        }
+        if (!Objects.equals(coverImgUrl, brief.coverImgUrl)) {
+            coverImgUrl = brief.coverImgUrl;
+            changed = true;
+        }
+        if (musicTrackCount != brief.musicTrackCount) {
+            musicTrackCount = brief.musicTrackCount;
+            changed = true;
+        }
+        if (playedCount != brief.playedCount) {
+            playedCount = brief.playedCount;
+            changed = true;
+        }
+        if (!Objects.equals(creator, brief.creator)) {
+            creator = brief.creator;
+            changed = true;
+        }
+        if (privacy != brief.privacy) {
+            privacy = brief.privacy;
+            changed = true;
+        }
+        return changed;
     }
 }

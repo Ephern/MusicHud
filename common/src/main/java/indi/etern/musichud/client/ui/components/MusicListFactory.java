@@ -8,7 +8,7 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.stream.Collectors;
@@ -23,11 +23,12 @@ public class MusicListFactory {
         item.setRowAnimationsEnabled(false);
         item.setShowPusherInfo(false);
         if (item.getBackground() == null) {
-            item.setBackground(ButtonInsetBackgroundFactory.builder()
+            InsetBackgroundFactory.builder()
                     .cornerRadius(item.dp(12))
                     .inset(item.dp(1))
-                    .padding(new ButtonInsetBackgroundFactory.Padding(item.dp(4), item.dp(4), item.dp(4), item.dp(4)))
-                    .build().newBackgroundDrawable());
+                    .padding(new InsetBackgroundFactory.Padding(item.dp(4), item.dp(4), item.dp(4), item.dp(4)))
+                    .build()
+                    .applyBackgroundTo(item);
         }
         item.setClickable(true);
         Context context = parent.getContext();

@@ -94,10 +94,11 @@ public class Album implements MusicCollection {
 
     @Override
     public ObservableSequencedSet<MusicDetail> getMusicDetails() {
-        if (musicDetails == null || musicDetails.isEmpty()) {
-            return new ObservableSequencedSet<>(0);
+        if (musicDetails == null) {
+            musicDetails = new ObservableSequencedSet<>(0);
+            return musicDetails;
         }
-        if (!nullFiltered) {
+        if (!nullFiltered || musicDetails.contains(null)) {
             musicDetails = musicDetails.stream().filter(Objects::nonNull)
                     .collect(ObservableSequencedSet::new, Set::add, ObservableSequencedSet::addAll);
             nullFiltered = true;
@@ -158,7 +159,46 @@ public class Album implements MusicCollection {
         this.pusherInfo = album.pusherInfo;
         this.musicTrackCount = album.musicTrackCount;
         this.artists = album.artists;
+        if (this.musicDetails == null) {
+            this.musicDetails = new ObservableSequencedSet<>(0);
+        } else if (!this.nullFiltered) {
+            this.musicDetails = this.musicDetails.stream().filter(Objects::nonNull)
+                    .collect(ObservableSequencedSet::new, Set::add, ObservableSequencedSet::addAll);
+        }
         this.nullFiltered = album.nullFiltered;
-        this.musicDetails.syncWith(album.musicDetails, triggerObservable);
+        this.musicDetails.syncWith(album.getMusicDetails(), triggerObservable);
+    }
+
+    /**
+     * Merges brief (summary) metadata from a user-collection listing into this instance.
+     * Music details and pusher info are left untouched, so a brief object upgraded by
+     * {@link #updateFrom(Album, boolean)} keeps its full track list.
+     *
+     * @return true if any merged field actually changed
+     */
+    public boolean updateFromBrief(Album brief) {
+        boolean changed = false;
+        if (!Objects.equals(name, brief.name)) {
+            name = brief.name;
+            changed = true;
+        }
+        if (!Objects.equals(picUrl, brief.picUrl)) {
+            picUrl = brief.picUrl;
+            changed = true;
+        }
+        if (!Objects.equals(type, brief.type)) {
+            type = brief.type;
+            changed = true;
+        }
+        if (!Objects.equals(company, brief.company)) {
+            company = brief.company;
+            changed = true;
+        }
+        if (musicTrackCount != brief.musicTrackCount) {
+            musicTrackCount = brief.musicTrackCount;
+            changed = true;
+        }
+        artists = brief.artists;
+        return changed;
     }
 }

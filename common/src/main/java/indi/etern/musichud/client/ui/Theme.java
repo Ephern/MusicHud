@@ -26,9 +26,9 @@ public class Theme {
     public static final int WARN_TEXT_COLOR = 0xFFFFB04F;
 
     public static final int GHOST_BUTTON_BACKGROUND = 0x00FFFFFF;
-    public static final int GHOST_BUTTON_BACKGROUND_PRESSED = 0x05FFFFFF;
-    public static final int GHOST_BUTTON_BACKGROUND_HOVERED = 0x07FFFFFF;
-    public static final int GHOST_BUTTON_BACKGROUND_CHECKED = 0x08FFFFFF;
+    public static final int GHOST_BUTTON_BACKGROUND_PRESSED = 0x0BFFFFFF;
+    public static final int GHOST_BUTTON_BACKGROUND_HOVERED = 0x12FFFFFF;
+    public static final int GHOST_BUTTON_BACKGROUND_CHECKED = 0x10FFFFFF;
 
     public static final ColorStateList GHOST_CHECK_BUTTON_STATES = new ColorStateList(
             new int[][]{

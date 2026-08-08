@@ -247,10 +247,10 @@ public class Codecs {
 
             @Override
             public void encode(@NonNull ByteBuf buf, @NonNull S s) {
-                int count = Math.toIntExact(s.stream().filter(Objects::nonNull).count());
-                buf.writeInt(count);
+                List<T> nonNull = s.stream().filter(Objects::nonNull).toList();
+                buf.writeInt(nonNull.size());
                 ByteBufCodec<T> codec = codecSupplier.get();
-                for (T t : s) {
+                for (T t : nonNull) {
                     codec.encode(buf, t);
                 }
             }

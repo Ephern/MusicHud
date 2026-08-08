@@ -19,7 +19,7 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.Easing;
 import lombok.Getter;
 
@@ -136,7 +136,7 @@ public class Modal {
         float weight = 1.0f;
         int gapPx = card.dp(BUTTON_GAP);
 
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder().cornerRadius(card.dp(8)).build();
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder().cornerRadius(card.dp(8)).build();
 
         for (int i = 0; i < buttons.length; i++) {
             ActionButton buttonMeta = buttons[i];
@@ -152,7 +152,7 @@ public class Modal {
             button.setTextSize(14);
             button.setOnClickListener(v -> buttonMeta.getOnClickListener().accept(buttonMeta, this));
 
-            button.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(button);
 
             LinearLayout.LayoutParams btnParams = new LinearLayout.LayoutParams(
                     0, MATCH_PARENT, weight);
