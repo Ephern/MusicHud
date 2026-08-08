@@ -19,8 +19,8 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 
 ## Prerequisites
 - ModernUI (only client, using mVUS fork on 1.21.9-11, [this fork](https://github.com/Chino081/ModernUI-MC/releases/tag/26.2) on 26.2)
-- Forge Config API Port (only fabric)
-- Fabric API (only fabric)
+- Forge Config API Port (only Fabric)
+- Fabric API (only Fabric)
 - ~~Architectury API~~ (Fabric / NeoForge, required by MusicHUD 1.2.0 and below)
 
 ## Features
