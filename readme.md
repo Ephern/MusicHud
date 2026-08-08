@@ -20,7 +20,8 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 ## Prerequisites
 - ModernUI (only client, using mVUS fork on 1.21.9-11, [this fork](https://github.com/Chino081/ModernUI-MC/releases/tag/26.2) on 26.2)
 - Forge Config API Port (only fabric)
-- ~~Architectury API~~ (Mod edition, 1.2.0 and below)
+- Fabric API (only fabric)
+- ~~Architectury API~~ (Fabric / NeoForge, required by MusicHUD 1.2.0 and below)
 
 ## Features
 - With graceful GUI, providing an in-game operation interface and a easily configurable HUD.
@@ -102,7 +103,8 @@ You can find "Download API..." button in setting page, which will open a downloa
 ## 前置依赖
 - ModernUI （仅客户端，在 1.21.9 上使用 mVUS 分支，在 26.2 上使用[该分支](https://github.com/Chino081/ModernUI-MC/releases/tag/26.2)）
 - Forge Config API Port （仅 Fabric）
-- ~~Architectury API~~ （非插件版，1.2.0 以及更低版本）
+- Fabric API （仅 Fabric）
+- ~~Architectury API~~ （ Fabric / NeoForge，MusicHUD 1.2.0 以及更低版本需要）
 
 ## 特点
 - 具有优雅的 GUI，提供游戏内操作界面，以及易配置的 HUD
