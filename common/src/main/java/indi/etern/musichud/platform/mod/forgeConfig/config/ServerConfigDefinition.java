@@ -119,6 +119,11 @@ public class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public String getDefaultCorsAllowOrigin() {
+        return corsAllowOrigin.getDefault();
+    }
+
+    @Override
     public void setCorsAllowOrigin(String corsAllowOrigin) {
         this.corsAllowOrigin.set(corsAllowOrigin);
     }
@@ -126,6 +131,11 @@ public class ServerConfigDefinition implements ServerConfig {
     @Override
     public boolean getEnableProxy() {
         return enableProxy.get();
+    }
+
+    @Override
+    public boolean getDefaultEnableProxy() {
+        return enableProxy.getDefault();
     }
 
     @Override
@@ -139,6 +149,11 @@ public class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public String getDefaultProxyUrl() {
+        return proxyUrl.getDefault();
+    }
+
+    @Override
     public void setProxyUrl(String proxyUrl) {
         this.proxyUrl.set(proxyUrl);
     }
@@ -146,6 +161,11 @@ public class ServerConfigDefinition implements ServerConfig {
     @Override
     public boolean getEnableGeneralUnblock() {
         return enableGeneralUnblock.get();
+    }
+
+    @Override
+    public boolean getDefaultEnableGeneralUnblock() {
+        return enableGeneralUnblock.getDefault();
     }
 
     @Override
@@ -159,6 +179,11 @@ public class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public boolean getDefaultEnableFlac() {
+        return enableFlac.getDefault();
+    }
+
+    @Override
     public void setEnableFlac(boolean enableFlac) {
         this.enableFlac.set(enableFlac);
     }
@@ -166,6 +191,11 @@ public class ServerConfigDefinition implements ServerConfig {
     @Override
     public boolean getSelectMaxBr() {
         return selectMaxBr.get();
+    }
+
+    @Override
+    public boolean getDefaultSelectMaxBr() {
+        return selectMaxBr.getDefault();
     }
 
     @Override
@@ -179,6 +209,11 @@ public class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public boolean getDefaultFollowSourceOrder() {
+        return followSourceOrder.getDefault();
+    }
+
+    @Override
     public void setFollowSourceOrder(boolean followSourceOrder) {
         this.followSourceOrder.set(followSourceOrder);
     }
@@ -186,6 +221,11 @@ public class ServerConfigDefinition implements ServerConfig {
     @Override
     public int getPort() {
         return port.get();
+    }
+
+    @Override
+    public int getDefaultPort() {
+        return port.getDefault();
     }
 
     @Override
@@ -199,8 +239,18 @@ public class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public String getDefaultServerApiBaseUrl() {
+        return serverApiBaseUrl.getDefault();
+    }
+
+    @Override
     public boolean getStartupBinaryApiServerWhenLaunch() {
         return startupBinaryApiServerWhenLaunch.get();
+    }
+
+    @Override
+    public boolean getDefaultStartupBinaryApiServerWhenLaunch() {
+        return startupBinaryApiServerWhenLaunch.getDefault();
     }
 
     @Override
@@ -209,13 +259,28 @@ public class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public String getDefaultServerApiBinaryExecutablePath() {
+        return serverApiBinaryExecutablePath.getDefault();
+    }
+
+    @Override
     public double getPusherVoteAdditionalRate() {
         return pusherVoteAdditionalRate.get();
     }
 
     @Override
+    public double getDefaultPusherVoteAdditionalRate() {
+        return pusherVoteAdditionalRate.getDefault();
+    }
+
+    @Override
     public boolean getUseRandomCnIp() {
         return useRandomCnIp.get();
+    }
+
+    @Override
+    public boolean getDefaultUseRandomCnIp() {
+        return useRandomCnIp.getDefault();
     }
 
     @Override

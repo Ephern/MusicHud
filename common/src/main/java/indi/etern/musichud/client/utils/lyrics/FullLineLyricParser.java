@@ -18,7 +18,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class FullLineLyricParser {
-    private static final Pattern mainPattern = Pattern.compile("\\[[0-9:.]+].*");
+    private static final Pattern mainPattern = Pattern.compile("((?:\\[[0-9:.]+])+)(.*)");
+    private static final Pattern timestampPattern = Pattern.compile("\\[([0-9:.]+)]");
     private static final DateTimeFormatter TIME_FORMATTER = new DateTimeFormatterBuilder()
             .appendPattern("HH:mm:ss")
             .appendFraction(java.time.temporal.ChronoField.MILLI_OF_SECOND, 1, 3, true)
@@ -72,7 +73,7 @@ public class FullLineLyricParser {
                 s = s.replace('\n', ' ').replace('\u00A0', ' ').trim();
                 if (lyricLineTranslatedText == null || lyricLineTranslatedText.isEmpty()) {
                     lyricLine.setTranslatedText(s);
-                } else {
+                } else if (!lyricLineTranslatedText.equals(s)){
                     lyricLine.setTranslatedText(lyricLineTranslatedText + "\n" + s);
                 }
             } else {
@@ -170,38 +171,40 @@ public class FullLineLyricParser {
         });
         Matcher matcher = mainPattern.matcher(lyric);
         while (matcher.find()) {
-            String item = matcher.group();
-            try {
-                if (!item.contains(".")) {
-                    int colonCount = Math.toIntExact(item.chars().filter(c -> c == ':').count());
-                    int i = item.lastIndexOf(":");
-                    StringBuilder stringBuilder = new StringBuilder(item);
-                    if (colonCount == 2) {
-                        stringBuilder.setCharAt(i, '.');
-                    } else if (colonCount == 1) {
-                        stringBuilder.insert(i + 3, ".000");
-                    }
-                    item = stringBuilder.toString();
-                } else {
-                    int i = item.indexOf(']');
-                    int millisDigit = i - item.indexOf('.') - 1;
-                    if (millisDigit < 3) {
-                        StringBuilder stringBuilder = new StringBuilder(item);
-                        stringBuilder.insert(i, "0".repeat(3 - millisDigit));
-                        item = stringBuilder.toString();
-                    }
-                }
-                String[] split = item.split("]", 2);
-                String timestamp = split[0];
-                String lyricLineContent = split[1];
+            String timestampGroups = matcher.group(1);
+            String lyricLineContent = matcher.group(2);
+            Matcher timestampMatcher = timestampPattern.matcher(timestampGroups);
+            while (timestampMatcher.find()) {
+                String item = timestampMatcher.group();
                 try {
-                    Duration duration = parseToDuration(timestamp.substring(1, timestamp.length() - 1));
-                    matchedConsumer.accept(new LyricLineMetaData(duration, lyricLineContent, LyricLine.Type.NORMAL));
-                } catch (Exception ignored) {
-                    matchedConsumer.accept(new LyricLineMetaData(null, lyricLineContent, LyricLine.Type.NORMAL));
+                    if (!item.contains(".")) {
+                        int colonCount = Math.toIntExact(item.chars().filter(c -> c == ':').count());
+                        int i = item.lastIndexOf(":");
+                        StringBuilder stringBuilder = new StringBuilder(item);
+                        if (colonCount == 2) {
+                            stringBuilder.setCharAt(i, '.');
+                        } else if (colonCount == 1) {
+                            stringBuilder.insert(i + 3, ".000");
+                        }
+                        item = stringBuilder.toString();
+                    } else {
+                        int i = item.indexOf(']');
+                        int millisDigit = i - item.indexOf('.') - 1;
+                        if (millisDigit < 3) {
+                            StringBuilder stringBuilder = new StringBuilder(item);
+                            stringBuilder.insert(i, "0".repeat(3 - millisDigit));
+                            item = stringBuilder.toString();
+                        }
+                    }
+                    try {
+                        Duration duration = parseToDuration(item.substring(1, item.length() - 1));
+                        matchedConsumer.accept(new LyricLineMetaData(duration, lyricLineContent, LyricLine.Type.NORMAL));
+                    } catch (Exception ignored) {
+                        matchedConsumer.accept(new LyricLineMetaData(null, lyricLineContent, LyricLine.Type.NORMAL));
+                    }
+                } catch (Exception e) {
+                    logger.debug("failed to parse line \"{}\"", item);
                 }
-            } catch (Exception e) {
-                logger.debug("failed to parse line \"{}\"", item);
             }
         }
     }

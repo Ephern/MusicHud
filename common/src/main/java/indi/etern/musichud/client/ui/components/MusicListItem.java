@@ -15,7 +15,7 @@ import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -144,16 +144,16 @@ public class MusicListItem extends LinearLayout {
         buttonsLayoutParams.setMargins(0, 0, dp(10), 0);
         addView(buttonsLayout, buttonsLayoutParams);
 
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                 .inset(dp(2))
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .cornerRadius(dp(4)).build();
         addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
-        addToPlaylistButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(addToPlaylistButton);
         buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
 
         likeButton = new ToggleTrackLikeStateButton(context);
-        likeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(likeButton);
         buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
     }
 
@@ -197,10 +197,10 @@ public class MusicListItem extends LinearLayout {
         row2.removeAllViews();
         int index = 0;
         Context context = getContext();
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                 .inset(0)
                 .cornerRadius(dp(2))
-                .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
+                .padding(new InsetBackgroundFactory.Padding(0, 0, 0, 0))
                 .build();
         for (final Artist artist : musicDetail.getArtists()) {
             if (index != 0) {
@@ -213,7 +213,7 @@ public class MusicListItem extends LinearLayout {
             }
             index++;
             Button artistButton = new Button(context);
-            artistButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(artistButton);
             artistButton.setTextColor(Theme.PRIMARY_COLOR);
             artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             artistButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
@@ -236,7 +236,7 @@ public class MusicListItem extends LinearLayout {
         split.setSingleLine();
         row2.addView(split);
         Button albumButton = new Button(context);
-        albumButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(albumButton);
         albumButton.setTextColor(Theme.PRIMARY_COLOR);
         albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         albumButton.setText(musicDetail.getAlbum().getName());

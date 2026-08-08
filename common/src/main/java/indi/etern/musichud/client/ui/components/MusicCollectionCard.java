@@ -19,7 +19,7 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.utils.CollectionUpdateNotifier;
 import lombok.Getter;
@@ -67,12 +67,15 @@ public class MusicCollectionCard extends LinearLayout {
         imageView.setAspectRatio(1);
         addView(imageView, imageParams);
 
+        onChangeUnregister = musicCollection.getMusicDetails().registerOnChange(() -> {
+            MuiModApi.postToUiThread(() -> {
+                imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp160));
+            });
+        });
+        registerUpdateNotifier();
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
             public void onViewAttachedToWindow(View v) {
-                onChangeUnregister = musicCollection.getMusicDetails().registerOnChange(() -> {
-                    imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp160));
-                });
                 registerUpdateNotifier();
             }
 
@@ -95,13 +98,13 @@ public class MusicCollectionCard extends LinearLayout {
         LayoutTransition transition = new LayoutTransition();
         transition.enableTransitionType(LayoutTransition.CHANGING);
         row1.setLayoutTransition(transition);
-        addView(row1);
+        addView(row1, new LayoutParams(dp160, WRAP_CONTENT));
 
         LinearLayout row2 = new LinearLayout(context);
         row2.setOrientation(HORIZONTAL);
         row2.setBaselineAligned(false);
         row2.setGravity(Gravity.TOP);
-        addView(row2);
+        addView(row2, new LayoutParams(dp160, WRAP_CONTENT));
 
         if (musicCollection instanceof Playlist playlist) {
             {
@@ -136,15 +139,15 @@ public class MusicCollectionCard extends LinearLayout {
             }
         }
         row1.addView(new View(context), new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 1));
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .inset(0)
                 .cornerRadius(dp(4))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
+                .padding(new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
                 .build();
         {
             ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
-            toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(toggleSubscribeButton);
             row1.addView(toggleSubscribeButton, new LayoutParams(row2.dp(22), row2.dp(22), 0));
             if (musicCollection instanceof Playlist playlist) {
                 Profile current = Profile.getCurrent();
@@ -179,7 +182,7 @@ public class MusicCollectionCard extends LinearLayout {
                 || (localPlayer != null && pusherInfo.getPlayerUUID().equals(localPlayer.getUUID()))) {
             nameView.setMinLines(2);
             ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
-            toggleIdleSourceButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(toggleIdleSourceButton);
             toggleIdleSourceButton.bindState(musicService.getIdlePlaySourceState().local().collection(musicCollection));
             row1.addView(toggleIdleSourceButton, new LayoutParams(row2.dp(22), row2.dp(22), 0));
         } else {
@@ -227,11 +230,10 @@ public class MusicCollectionCard extends LinearLayout {
                 }
             });
 
-            ButtonInsetBackgroundFactory background = ButtonInsetBackgroundFactory.builder().inset(dp(1))
+            InsetBackgroundFactory.builder().inset(dp(1))
                     .cornerRadius(dp(12))
-                    .padding(new ButtonInsetBackgroundFactory.Padding(dp(6), dp(6), dp(6), dp(6)))
-                    .build();
-            setBackground(background.newBackgroundDrawable());
+                    .padding(new InsetBackgroundFactory.Padding(dp(6), dp(6), dp(6), dp(6)))
+                    .build().applyBackgroundTo(this);
         } else {
             ShapeDrawable background = new ShapeDrawable();
             background.setPadding(dp(6), dp(6), dp(6), dp(6));
@@ -274,7 +276,9 @@ public class MusicCollectionCard extends LinearLayout {
     }
 
     private void registerUpdateNotifier() {
-        if (updateNotifierUnregister != null) return;
+        if (updateNotifierUnregister != null) {
+            updateNotifierUnregister.unregister();
+        }
         MusicCollection collection = musicCollection;
         if (collection instanceof Playlist playlist) {
             updateNotifierUnregister = CollectionUpdateNotifier.registerPlaylist(playlist.getId(), this::onCollectionUpdateNotified);
@@ -302,9 +306,9 @@ public class MusicCollectionCard extends LinearLayout {
         long id = collection.getId();
         CompletableFuture<? extends MusicCollection> future;
         if (collection instanceof Album) {
-            future = musicService.loadAlbumDetail(id, true);
+            future = musicService.loadAlbumDetail(id, false);
         } else {
-            future = musicService.loadPlaylistDetail(id, true);
+            future = musicService.loadPlaylistDetail(id, false);
         }
         future.whenComplete((latest, throwable) -> {
             refreshPending.set(false);
