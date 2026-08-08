@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.components;
 
+import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
@@ -92,6 +93,11 @@ public class ArtistDetailView extends LinearLayout {
         LinearLayout row1 = new LinearLayout(context);
         row1.setOrientation(HORIZONTAL);
         row1.setGravity(Gravity.CENTER_VERTICAL);
+        LayoutTransition layoutTransition = new LayoutTransition();
+        layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+        layoutTransition.enableTransitionType(LayoutTransition.APPEARING);
+        layoutTransition.enableTransitionType(LayoutTransition.DISAPPEARING);
+        row1.setLayoutTransition(layoutTransition);
         LayoutParams row1Params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         row1Params.setMargins(0, 0, 0, dp(8));
         artistInfoView.addView(row1, row1Params);
