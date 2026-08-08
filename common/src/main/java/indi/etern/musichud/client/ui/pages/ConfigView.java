@@ -28,7 +28,7 @@ import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientLoginService;
@@ -88,59 +88,66 @@ public class ConfigView extends LinearLayout {
             HudRendererManager hudRendererManager = HudRendererManager.getInstance();
 
             var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
-            PreferencesFragment.BooleanOption booleanOption = new PreferencesFragment.BooleanOption(context,
+            new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.enable"),
                     clientConfig::getEnable,
-                    clientConfig::setEnable);
-            booleanOption.create(commonCategory);
-            booleanOption.setOnChanged(() -> {
-                MuiModApi.postToUiThread(MainFragment::refresh);
-                if (clientConfig.getEnable()) {
-                    connectionManager.connectAsPrevious();
-                } else {
-                    connectionManager.disconnect();
-                }
-            });
-            PreferencesFragment.BooleanOption translatedLyricOption = new PreferencesFragment.BooleanOption(context,
+                    clientConfig::setEnable)
+                    .setDefaultValue(clientConfig.getDefaultEnable())
+                    .setOnChanged(() -> {
+                        MuiModApi.postToUiThread(MainFragment::refresh);
+                        if (clientConfig.getEnable()) {
+                            connectionManager.connectAsPrevious();
+                        } else {
+                            connectionManager.disconnect();
+                        }
+                    })
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics"),
                     clientConfig::getShowTranslatedCnLyrics,
-                    clientConfig::setShowTranslatedCnLyrics);
-            translatedLyricOption.create(commonCategory);
-            translatedLyricOption.setOnChanged(() -> {
-                HomeView homeView = HomeView.getInstance();
-                if (homeView != null) {
-                    StaggeredLyricScrollView staggeredLyricScrollView = homeView.getStaggeredLyricScrollView();
-                    if (staggeredLyricScrollView != null) {
-                        MuiModApi.postToUiThread(() -> {
-                            staggeredLyricScrollView.getLyricLineViewList().forEach(LyricLineView::refreshSubLyricLine);
-                        });
-                    }
-                }
-            });
+                    clientConfig::setShowTranslatedCnLyrics)
+                    .setDefaultValue(clientConfig.getDefaultShowTranslatedCnLyrics())
+                    .setOnChanged(() -> {
+                        HomeView homeView = HomeView.getInstance();
+                        if (homeView != null) {
+                            StaggeredLyricScrollView staggeredLyricScrollView = homeView.getStaggeredLyricScrollView();
+                            if (staggeredLyricScrollView != null) {
+                                MuiModApi.postToUiThread(() -> {
+                                    staggeredLyricScrollView.getLyricLineViewList().forEach(LyricLineView::refreshSubLyricLine);
+                                });
+                            }
+                        }
+                    })
+                    .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying"),
                     clientConfig::getDisableVanillaMusic,
                     clientConfig::setDisableVanillaMusic)
+                    .setDefaultValue(clientConfig.getDefaultDisableVanillaMusic())
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.enableHud"),
                     clientConfig::getEnableHud,
                     clientConfig::setEnableHud)
+                    .setDefaultValue(clientConfig.getDefaultEnableHud())
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.autoHide"),
                     clientConfig::getHideHudWhenNotPlaying,
                     clientConfig::setHideHudWhenNotPlaying)
+                    .setDefaultValue(clientConfig.getDefaultHideHudWhenNotPlaying())
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.enableMarqueeText"),
                     clientConfig::getEnableMarqueeText,
                     clientConfig::setEnableMarqueeText)
+                    .setDefaultValue(clientConfig.getDefaultEnableMarqueeText())
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume"),
                     clientConfig::getMixWithVanillaSoundVolume,
                     clientConfig::setMixWithVanillaSoundVolume)
+                    .setDefaultValue(clientConfig.getDefaultMixWithVanillaSoundVolume())
                     .create(commonCategory);
             new PreferencesFragment.IntegerOption(
                     context,
@@ -148,7 +155,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getSoundVolume,
                     clientConfig::setSoundVolume)
                     .setRange(0, 100)
-                    .setDefaultValue(100)
+                    .setDefaultValue(clientConfig.getDefaultSoundVolume())
                     .create(commonCategory);
             new PreferencesFragment.IntegerOption(
                     context,
@@ -156,7 +163,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getSoundVolumeInterval,
                     clientConfig::setSoundVolumeInterval)
                     .setRange(1, 100)
-                    .setDefaultValue(10)
+                    .setDefaultValue(clientConfig.getDefaultSoundVolumeInterval())
                     .create(commonCategory);
             Quality[] qualities = {Quality.STANDARD, Quality.EX_HIGH, Quality.LOSSLESS, Quality.HIRES, Quality.JY_EFFECT, Quality.DOLBY, Quality.JY_MASTER, Quality.SKY};
             List<Quality> qualitiesList = Arrays.stream(qualities).toList();
@@ -167,7 +174,7 @@ public class ConfigView extends LinearLayout {
                     qualitiesList::indexOf,
                     clientConfig::getPrimaryChosenQuality,
                     clientConfig::setPrimaryChosenQuality)
-                    .setDefaultValue(Quality.LOSSLESS)
+                    .setDefaultValue(clientConfig.getDefaultPrimaryChosenQuality())
                     .create(commonCategory);
             new PreferencesFragment.FloatOption(
                     context,
@@ -175,6 +182,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getMainScreenAdditionalBackgroundDarken,
                     clientConfig::setMainScreenAdditionalBackgroundDarken)
                     .setRange(0, 1)
+                    .setDefaultValue(clientConfig.getDefaultMainScreenAdditionalBackgroundDarken())
                     .setOnChanged(() -> {
                         MusicHudScreen.setDarken(clientConfig.getMainScreenAdditionalBackgroundDarken());
                     })
@@ -186,7 +194,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getHudBackgroundMixAlpha,
                     clientConfig::setHudBackgroundMixAlpha)
                     .setRange(0, 1)
-                    .setDefaultValue(0.5)
+                    .setDefaultValue(clientConfig.getDefaultHudBackgroundMixAlpha())
                     .create(commonCategory);
             view.addView(commonCategory);
 
@@ -196,38 +204,38 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.layout.verticalAlign"),
                     VerticalAlign.values(),
                     VerticalAlign::ordinal,
-                    () -> VerticalAlign.valueOf(VerticalAlign.class, clientConfig.getHudVerticalPosition()),
+                    () -> VerticalAlign.valueOf(clientConfig.getHudVerticalPosition()),
                     (vp) -> clientConfig.setHudVerticalPosition(vp.name()))
+                    .setDefaultValue(VerticalAlign.valueOf(clientConfig.getDefaultHudVerticalPosition()))
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                     })
-                    .setDefaultValue(VerticalAlign.TOP)
                     .create(positionCategory);
             new PreferencesFragment.DropDownOption<>(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.horizontalAlign"),
                     HorizontalAlign.values(),
                     HorizontalAlign::ordinal,
-                    () -> HorizontalAlign.valueOf(HorizontalAlign.class, clientConfig.getHudHorizontalPosition()),
+                    () -> HorizontalAlign.valueOf(clientConfig.getHudHorizontalPosition()),
                     (hp) -> clientConfig.setHudHorizontalPosition(hp.name()))
+                    .setDefaultValue(HorizontalAlign.valueOf(clientConfig.getDefaultHudHorizontalPosition()))
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                     })
-                    .setDefaultValue(HorizontalAlign.LEFT)
                     .create(positionCategory);
             new SignedIntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.offsetX"),
                     clientConfig::getHudOffsetX,
                     clientConfig::setHudOffsetX)
+                    .setRange(-1920, 1920)
+                    .setDefaultValue(clientConfig.getDefaultHudOffsetX())
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                     })
-                    .setRange(-1920, 1920)
-                    .setDefaultValue(16)
                     .create(positionCategory);
             new SignedIntegerOption(
                     context,
@@ -235,11 +243,11 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getHudOffsetY,
                     clientConfig::setHudOffsetY)
                     .setRange(-1920, 1920)
+                    .setDefaultValue(clientConfig.getDefaultHudOffsetY())
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                     })
-                    .setDefaultValue(16)
                     .create(positionCategory);
             DynamicIntegerOption cornerRadiusOption = new DynamicIntegerOption(
                     context,
@@ -247,66 +255,64 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getHudCornerRadius,
                     clientConfig::setHudCornerRadius);
             cornerRadiusOption.setRange(0, clientConfig.getHudHeight() / 2);
+            cornerRadiusOption.setDefaultValue(clientConfig.getDefaultHudCornerRadius());
             cornerRadiusOption.setOnChanged(() -> {
                 hudRendererManager.updateLayoutFromConfig();
                 hudRendererManager.refreshStyle();
             });
-            cornerRadiusOption.setDefaultValue(8);
             DynamicIntegerOption widthOption = new DynamicIntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.hudWidth"),
                     clientConfig::getHudWidth,
                     clientConfig::setHudWidth);
+            widthOption.setRange(clientConfig.getHudHeight(), 800, 4);
+            widthOption.setDefaultValue(clientConfig.getDefaultHudWidth());
             widthOption.setOnChanged(() -> {
                 hudRendererManager.updateLayoutFromConfig();
                 hudRendererManager.refreshStyle();
             });
-            widthOption.setRange(clientConfig.getHudHeight(), 800, 4);
-            widthOption.setDefaultValue(150);
             PreferencesFragment.IntegerOption heightOption = new PreferencesFragment.IntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.layout.hudHeight"),
                     clientConfig::getHudHeight,
                     clientConfig::setHudHeight)
+                    .setRange(16, 256, 2)
+                    .setDefaultValue(clientConfig.getDefaultHudHeight())
                     .setOnChanged(() -> {
                         hudRendererManager.updateLayoutFromConfig();
                         hudRendererManager.refreshStyle();
                         cornerRadiusOption.updateRange(0, clientConfig.getHudHeight() / 2, 1);
                         widthOption.updateRange(clientConfig.getHudHeight(), 800, 4);
-                    })
-                    .setRange(16, 256, 2)
-                    .setDefaultValue(44);
+                    });
             widthOption.create(positionCategory);
             heightOption.create(positionCategory);
             cornerRadiusOption.create(positionCategory);
             view.addView(positionCategory);
 
             var multiplayerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.externalServer"));
-            PreferencesFragment.BooleanOption autoConnectToServerOption = new PreferencesFragment.BooleanOption(
+            new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.externalServer.autoConnect"),
                     clientConfig::getEnableAutoConnect,
                     clientConfig::setEnableAutoConnect)
-                    .setDefaultValue(true);
-            autoConnectToServerOption.create(multiplayerCategory);
-
-            PreferencesFragment.BooleanOption enableIsolatedMode = new PreferencesFragment.BooleanOption(
+                    .setDefaultValue(clientConfig.getDefaultEnableAutoConnect())
+                    .create(multiplayerCategory);
+            new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.externalServer.enableIsolatedMode"),
                     clientConfig::getEnableIsolatedMode,
                     clientConfig::setEnableIsolatedMode)
-                    .setDefaultValue(true);
-            enableIsolatedMode.setOnChanged(() -> {
-                if (ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED) {
-                    if (clientConfig.getEnableIsolatedMode()) {
-                        connectionManager.switchToIsolate();
-                    } else {
-                        connectionManager.disconnect();
-                    }
-                    MainFragment.refresh();
-                }
-            });
-            enableIsolatedMode.create(multiplayerCategory);
+                    .setDefaultValue(clientConfig.getDefaultEnableIsolatedMode())
+                    .setOnChanged(() -> {
+                        if (ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED) {
+                            if (clientConfig.getEnableIsolatedMode()) {
+                                connectionManager.switchToIsolate();
+                            } else {
+                                connectionManager.disconnect();
+                            }
+                            MainFragment.refresh();
+                        }
+                    }).create(multiplayerCategory);
 
             AutoConnectServerFilterType[] filterTypes = {AutoConnectServerFilterType.BLACK_LIST, AutoConnectServerFilterType.WHITE_LIST};
             List<AutoConnectServerFilterType> filterTypeList = Arrays.stream(filterTypes).toList();
@@ -317,7 +323,7 @@ public class ConfigView extends LinearLayout {
                     filterTypeList::indexOf,
                     clientConfig::getConnectServerFilterType,
                     clientConfig::setConnectServerFilterType)
-                    .setDefaultValue(AutoConnectServerFilterType.BLACK_LIST)
+                    .setDefaultValue(clientConfig.getDefaultConnectServerFilterType())
                     .create(multiplayerCategory);
 
             LinearLayout blackList = PreferencesFragment.createStringListOption(
@@ -387,86 +393,85 @@ public class ConfigView extends LinearLayout {
             var integratedServerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.integratedServer"));
             view.addView(integratedServerCategory, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-            PreferencesFragment.BooleanOption enableInIntegratedServerOption = new PreferencesFragment.BooleanOption(
+            ApiServerManager apiServerManager = ApiServerManager.getInstance();
+            new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.integratedServer.enable"),
                     clientConfig::getEnabledInIntegratedServer,
                     clientConfig::setEnabledInIntegratedServer)
-                    .setDefaultValue(true);
-            enableInIntegratedServerOption.create(integratedServerCategory);
-            ApiServerManager apiServerManager = ApiServerManager.getInstance();
-            enableInIntegratedServerOption.setOnChanged(() -> {
-                ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
-                if (clientConfig.getEnabledInIntegratedServer()) {
-                    if (apiServerManager != null) {
-                        apiServerManager.restartApiServer();
-                    }
-                    loginApiService.reconnectAll();
-                } else {
-                    MusicPlayerServerService.getInstance().reset();
-                    loginApiService.disconnectToAll();
-                    if (apiServerManager != null) {
-                        apiServerManager.stopApiServer();
-                    }
-                }
-            });
+                    .setDefaultValue(clientConfig.getDefaultEnabledInIntegratedServer()).setOnChanged(() -> {
+                        ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
+                        if (clientConfig.getEnabledInIntegratedServer()) {
+                            if (apiServerManager != null) {
+                                apiServerManager.restartApiServer();
+                            }
+                            loginApiService.reconnectAll();
+                        } else {
+                            MusicPlayerServerService.getInstance().reset();
+                            loginApiService.disconnectToAll();
+                            if (apiServerManager != null) {
+                                apiServerManager.stopApiServer();
+                            }
+                        }
+                    })
+                    .create(integratedServerCategory);
 
-            PreferencesFragment.FloatOption pusherVoteAdditionalRateOption = new PreferencesFragment.FloatOption(
+            new PreferencesFragment.FloatOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.integratedServer.pusherVoteAdditionalRate"),
                     serverConfig::getPusherVoteAdditionalRate,
                     serverConfig::setPusherVoteAdditionalRate)
                     .setRange(0, 1)
-                    .setDefaultValue(0.5);
-            pusherVoteAdditionalRateOption.create(integratedServerCategory);
+                    .setDefaultValue(serverConfig.getDefaultPusherVoteAdditionalRate())
+                    .create(integratedServerCategory);
 
             var apiCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.apiServer"));
             LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params1.setMargins(0, dp(6), 0, dp(128));
             view.addView(apiCategory, params1);
 
-            PreferencesFragment.BooleanOption startupBinaryApiServerOption = new PreferencesFragment.BooleanOption(
+            new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.apiServer.startupBinaryApiServerWhenLaunch"),
                     serverConfig::getStartupBinaryApiServerWhenLaunch,
                     serverConfig::setStartupBinaryApiServerWhenLaunch)
-                    .setDefaultValue(true);
-            startupBinaryApiServerOption.create(apiCategory);
+                    .setDefaultValue(serverConfig.getDefaultStartupBinaryApiServerWhenLaunch())
+                    .create(apiCategory);
 
-            PreferencesFragment.BooleanOption useRandomCnIpOption = new PreferencesFragment.BooleanOption(
+            new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.apiServer.useRandomCnIp"),
                     serverConfig::getUseRandomCnIp,
                     serverConfig::setUseRandomCnIp)
-                    .setDefaultValue(true);
-            useRandomCnIpOption.create(apiCategory);
+                    .setDefaultValue(serverConfig.getDefaultUseRandomCnIp())
+                    .create(apiCategory);
 
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableGeneralUnblock"),
                     serverConfig::getEnableGeneralUnblock,
                     serverConfig::setEnableGeneralUnblock)
-                    .setDefaultValue(true)
+                    .setDefaultValue(serverConfig.getDefaultEnableGeneralUnblock())
                     .create(apiCategory);
 
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableFlac"),
                     serverConfig::getEnableFlac,
                     serverConfig::setEnableFlac)
-                    .setDefaultValue(true)
+                    .setDefaultValue(serverConfig.getDefaultEnableFlac())
                     .create(apiCategory);
 
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.apiServer.selectMaxBr"),
                     serverConfig::getSelectMaxBr,
                     serverConfig::setSelectMaxBr)
-                    .setDefaultValue(false)
+                    .setDefaultValue(serverConfig.getDefaultSelectMaxBr())
                     .create(apiCategory);
 
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.apiServer.followSourceOrder"),
                     serverConfig::getFollowSourceOrder,
                     serverConfig::setFollowSourceOrder)
-                    .setDefaultValue(true)
+                    .setDefaultValue(serverConfig.getDefaultFollowSourceOrder())
                     .create(apiCategory);
 
             new PreferencesFragment.IntegerOption(context,
@@ -474,14 +479,14 @@ public class ConfigView extends LinearLayout {
                     serverConfig::getPort,
                     serverConfig::setPort)
                     .setRange(1, 65535)
-                    .setDefaultValue(3000)
+                    .setDefaultValue(serverConfig.getDefaultPort())
                     .create(apiCategory);
 
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableProxy"),
                     serverConfig::getEnableProxy,
                     serverConfig::setEnableProxy)
-                    .setDefaultValue(false)
+                    .setDefaultValue(serverConfig.getDefaultEnableProxy())
                     .create(apiCategory);
 
             {
@@ -593,7 +598,7 @@ public class ConfigView extends LinearLayout {
             String binaryApiStatusTemplate = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
             apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerManager.getBinaryApiServerStatus().i18nKey())));
 
-            ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder().inset(0).padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
+            InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder().inset(0).padding(new InsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
 
             Button downloadApiServerButton = createDownloadApiButton(context, backgroundFactory, serverApiBinaryPathInput);
 
@@ -601,7 +606,7 @@ public class ConfigView extends LinearLayout {
             stopApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.stopApiServer"));
             stopApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             stopApiServerButton.setTextSize(14);
-            stopApiServerButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(stopApiServerButton);
             stopApiServerButton.setOnClickListener((v1) -> {
                 apiServerManager.stopApiServer();
             });
@@ -610,7 +615,7 @@ public class ConfigView extends LinearLayout {
             restartApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.restartApiServer"));
             restartApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             restartApiServerButton.setTextSize(14);
-            restartApiServerButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(restartApiServerButton);
             restartApiServerButton.setOnClickListener((v1) -> {
                 apiServerManager.restartApiServer();
             });
@@ -638,7 +643,7 @@ public class ConfigView extends LinearLayout {
             checkVersionButton.setText(I18n.get(MusicHud.MOD_ID + ".button.checkApiServerVersion"));
             checkVersionButton.setTextColor(Theme.PRIMARY_COLOR);
             checkVersionButton.setTextSize(14);
-            checkVersionButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(checkVersionButton);
             checkVersionButton.setOnClickListener((v) -> {
                 ApiClient.checkAvailable();
                 apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
@@ -664,7 +669,7 @@ public class ConfigView extends LinearLayout {
             refreshApiLogButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refreshApiLog"));
             refreshApiLogButton.setTextColor(Theme.PRIMARY_COLOR);
             refreshApiLogButton.setTextSize(14);
-            refreshApiLogButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(refreshApiLogButton);
             refreshApiLogButton.setOnClickListener(v -> {
                 updateApiLogLabel(apiLogLabel);
             });
@@ -673,7 +678,7 @@ public class ConfigView extends LinearLayout {
             openApiLogDirButton.setText(I18n.get(MusicHud.MOD_ID + ".button.openApiLogDir"));
             openApiLogDirButton.setTextColor(Theme.PRIMARY_COLOR);
             openApiLogDirButton.setTextSize(14);
-            openApiLogDirButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(openApiLogDirButton);
             openApiLogDirButton.setOnClickListener(v -> {
                 Path logDir = apiServerManager.getLogDir();
                 try {
@@ -688,7 +693,7 @@ public class ConfigView extends LinearLayout {
             clearApiLogButton.setText(I18n.get(MusicHud.MOD_ID + ".button.clearApiLogs"));
             clearApiLogButton.setTextColor(Theme.ERROR_TEXT_COLOR);
             clearApiLogButton.setTextSize(14);
-            clearApiLogButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory.applyBackgroundTo(clearApiLogButton);
             clearApiLogButton.setOnClickListener(v -> {
                 LinearLayout warnContent = new LinearLayout(context);
                 warnContent.setOrientation(LinearLayout.VERTICAL);
@@ -758,12 +763,12 @@ public class ConfigView extends LinearLayout {
         return String.format("%.0f MiB", mib);
     }
 
-    private @NotNull Button createDownloadApiButton(Context context, ButtonInsetBackgroundFactory backgroundFactory, EditText[] serverApiBinaryPathInput) {
+    private @NotNull Button createDownloadApiButton(Context context, InsetBackgroundFactory backgroundFactory, EditText[] serverApiBinaryPathInput) {
         Button downloadApiServerButton = new Button(context);
         downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServer"));
         downloadApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
         downloadApiServerButton.setTextSize(14);
-        downloadApiServerButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(downloadApiServerButton);
 
         final String downloadingText = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.downloading");
         final String button1Text = I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.button1");
@@ -828,7 +833,7 @@ public class ConfigView extends LinearLayout {
         selectDirectoryButton.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.dir.button.select"));
         selectDirectoryButton.setTextColor(Theme.PRIMARY_COLOR);
         selectDirectoryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        selectDirectoryButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(selectDirectoryButton);
         selectDirectoryButton.setOnClickListener(v -> {
             Path defaultPath = targetDir[0].toAbsolutePath();
             String folder = TinyFileDialogs.tinyfd_selectFolderDialog(
@@ -867,6 +872,7 @@ public class ConfigView extends LinearLayout {
                 tv.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 return tv;
             }
+
             @Override
             public View getDropDownView(int position, View convertView, @NotNull ViewGroup parent) {
                 View dropDownView = super.getDropDownView(position, convertView, parent);
@@ -902,7 +908,7 @@ public class ConfigView extends LinearLayout {
         refreshReleaseButton.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.refresh"));
         refreshReleaseButton.setTextColor(Theme.PRIMARY_COLOR);
         refreshReleaseButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        refreshReleaseButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(refreshReleaseButton);
         refreshReleaseButton.setOnClickListener(v -> {
             refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning, proxySpinnerRef[0]);
         });
@@ -979,7 +985,7 @@ public class ConfigView extends LinearLayout {
         final Path[] downloadedTempFile = {null};
         final String[] releaseTag = {""};
 
-        enum Page { IDLE, DOWNLOADING, DONE, RESETTING }
+        enum Page {IDLE, DOWNLOADING, DONE, RESETTING}
         final Page[] state = {Page.IDLE};
         final CompletableFuture<?>[] downloadFuture = {null};
         final AtomicBoolean cancelled = new AtomicBoolean(false);
@@ -1031,7 +1037,8 @@ public class ConfigView extends LinearLayout {
                 targetDir[0] = Paths.get(directoryTextInput.getText().toString().trim());
                 try {
                     Files.createDirectories(targetDir[0]);
-                } catch (IOException ignored) {}
+                } catch (IOException ignored) {
+                }
 
                 releaseTag[0] = latestRelease[0] != null ? latestRelease[0].tag() : "unknown";
                 String tempFileName = ApiServerFetcher.Platform.detect().getAssetName() + "." + releaseTag[0] + ".temp";

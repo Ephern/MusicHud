@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
@@ -19,7 +18,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import net.minecraft.client.resources.language.I18n;
 
@@ -37,6 +36,10 @@ public class ArtistDetailView extends LinearLayout {
     private final TextView description;
     private final UrlImageView avatarImageView;
     private static final IClientMusicService musicService = MusicService.getInstance();
+    private final InsetBackgroundFactory itemBackgroundFactory = InsetBackgroundFactory.builder()
+            .cornerRadius(dp(12))
+            .inset(dp(1))
+            .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build();
     Artist artist;
 
     public ArtistDetailView(Context context, Artist artist) {
@@ -63,12 +66,12 @@ public class ArtistDetailView extends LinearLayout {
             RouterContainer.getInstance().popNavigate();
             backButton.setOnClickListener(null);
         });
-        Drawable drawable = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                 .inset(0)
                 .cornerRadius(dp(8))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
-                .build().newBackgroundDrawable();
-        backButton.setBackground(drawable);
+                .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
+                .build();
+        backgroundFactory.applyBackgroundTo(backButton);
         LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
         backButtonParams.setMargins(0, 0, dp(4), 0);
         topBar.addView(backButton, backButtonParams);
@@ -109,15 +112,16 @@ public class ArtistDetailView extends LinearLayout {
         productionCountsParams.setMargins(0, 0, dp(16), 0);
         row1.addView(productionCounts, productionCountsParams);
 
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory backgroundFactory1 = InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .inset(0)
                 .cornerRadius(dp(4))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
+                .padding(new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
                 .build();
         int dp28 = dp(28);
         {
             ImageButton refreshButton = new ImageButton(context);
+            backgroundFactory1.applyBackgroundTo(refreshButton);
             refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
             refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
@@ -130,7 +134,7 @@ public class ArtistDetailView extends LinearLayout {
         }
         {
             ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
-            toggleSubscribeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+            backgroundFactory1.applyBackgroundTo(toggleSubscribeButton);
             row1.addView(toggleSubscribeButton, new LayoutParams(dp28, dp28, 0));
             var subscribeState = musicService.getArtistSubscribedState(artist);
             toggleSubscribeButton.bindState(subscribeState);
@@ -307,11 +311,7 @@ public class ArtistDetailView extends LinearLayout {
         var musicLayout = new MusicListItem(context);
         musicLayout.setShowPusherInfo(false);
         musicLayout.bindData(musicDetail);
-        var background = ButtonInsetBackgroundFactory.builder()
-                .cornerRadius(dp(12))
-                .inset(dp(1))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build().newBackgroundDrawable();
-        musicLayout.setBackground(background);
+        itemBackgroundFactory.applyBackgroundTo(musicLayout);
 
         musicLayout.setClickable(true);
         String artistsName = musicDetail.getArtists().stream()

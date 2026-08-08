@@ -6,7 +6,6 @@ import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
-import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.util.DataSet;
@@ -30,7 +29,7 @@ import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
@@ -54,6 +53,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class MainFragment extends Fragment {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final ConnectionManager connectionManager = ConnectionManager.getInstance();
+    private static final AtomicInteger progressUpdaterToken = new AtomicInteger(0);
     private static volatile MainFragment instance = null;
 
     static {
@@ -146,83 +146,77 @@ public class MainFragment extends Fragment {
             instance.likeButton.bindMusicList(null);
             instance.addToPlaylistButton.bindMusicDetail(null);
         } else {
-                instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(240));
-                instance.titleText.setText(musicDetail.getName());
-                PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
-                String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().getName() : null;
-                if (name == null || name.isEmpty()) {
-                    instance.pusherHeadView.setVisibility(View.GONE);
-                    instance.pusherText.setText("");
-                } else {
-                    instance.pusherHeadView.setVisibility(View.VISIBLE);
-                    instance.pusherText.setText(name);
+            instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
+            instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(240));
+            instance.titleText.setText(musicDetail.getName());
+            PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
+            String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().getName() : null;
+            if (name == null || name.isEmpty()) {
+                instance.pusherHeadView.setVisibility(View.GONE);
+                instance.pusherText.setText("");
+            } else {
+                instance.pusherHeadView.setVisibility(View.VISIBLE);
+                instance.pusherText.setText(name);
+            }
+            Context context = ModernUI.getInstance();
+            instance.artists.removeAllViews();
+            int index = 0;
+            InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
+                    .inset(0)
+                    .cornerRadius(instance.buttonsLayout.dp(2))
+                    .padding(new InsetBackgroundFactory.Padding(0, 0, 0, 0))
+                    .build();
+            for (Artist artist : musicDetail.getArtists()) {
+                if (index != 0) {
+                    TextView split = new TextView(context);
+                    split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                    split.setTextSize(Theme.TEXT_SIZE_SMALL);
+                    split.setText(" / ");
+                    instance.artists.addView(split);
                 }
-                Context context = ModernUI.getInstance();
-                instance.artists.removeAllViews();
-                int index = 0;
-                for (Artist artist : musicDetail.getArtists()) {
-                    if (index != 0) {
-                        TextView split = new TextView(context);
-                        split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                        split.setTextSize(Theme.TEXT_SIZE_SMALL);
-                        split.setText(" / ");
-                        instance.artists.addView(split);
-                    }
-                    index++;
-                    Button artistButton = new Button(context);
-                    Drawable background = ButtonInsetBackgroundFactory.builder()
-                            .inset(0)
-                            .cornerRadius(artistButton.dp(2))
-                            .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
-                            .build().newBackgroundDrawable();
-                    artistButton.setBackground(background);
-                    artistButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
-                    artistButton.setTextColor(Theme.PRIMARY_COLOR);
-                    artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                    artistButton.setText(artist.getName());
-                    artistButton.setOnClickListener(button -> {
-                        RouterContainer routerContainer = RouterContainer.getInstance();
-                        if (routerContainer != null) {
-                            routerContainer.pushNavigate(
-                                    new ArtistDetailView(context, artist)
-                            );
-                        }
-                    });
-                    instance.artists.addView(artistButton);
-                }
-
-                instance.albumContainer.removeAllViews();
-                Button albumButton = new Button(context);
-                Drawable background = ButtonInsetBackgroundFactory.builder()
-                        .inset(0)
-                        .cornerRadius(albumButton.dp(2))
-                        .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
-                        .build().newBackgroundDrawable();
-                albumButton.setBackground(background);
-                albumButton.setTextColor(Theme.PRIMARY_COLOR);
-                albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                albumButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
-                albumButton.setText(musicDetail.getAlbum().getName());
-                albumButton.setOnClickListener(button -> {
+                index++;
+                Button artistButton = new Button(context);
+                backgroundFactory.applyBackgroundTo(artistButton);
+                artistButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
+                artistButton.setTextColor(Theme.PRIMARY_COLOR);
+                artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                artistButton.setText(artist.getName());
+                artistButton.setSingleLine();
+                artistButton.setOnClickListener(button -> {
                     RouterContainer routerContainer = RouterContainer.getInstance();
                     if (routerContainer != null) {
                         routerContainer.pushNavigate(
-                                new MusicCollectionDetailView(context, musicDetail.getAlbum())
+                                new ArtistDetailView(context, artist)
                         );
                     }
                 });
-                instance.albumContainer.addView(albumButton);
-
-                instance.skipCurrentButton.reset();
-                instance.progressBar.setVisibility(View.VISIBLE);
-                instance.likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(musicDetail).currentUsersLikeList());
-                instance.addToPlaylistButton.bindMusicDetail(musicDetail);
-                instance.buttonsLayout.setVisibility(View.VISIBLE);
+                instance.artists.addView(artistButton);
             }
-        }
 
-    private static final AtomicInteger progressUpdaterToken = new AtomicInteger(0);
+            instance.albumContainer.removeAllViews();
+            Button albumButton = new Button(context);
+            backgroundFactory.applyBackgroundTo(albumButton);
+            albumButton.setTextColor(Theme.PRIMARY_COLOR);
+            albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            albumButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
+            albumButton.setText(musicDetail.getAlbum().getName());
+            albumButton.setOnClickListener(button -> {
+                RouterContainer routerContainer = RouterContainer.getInstance();
+                if (routerContainer != null) {
+                    routerContainer.pushNavigate(
+                            new MusicCollectionDetailView(context, musicDetail.getAlbum())
+                    );
+                }
+            });
+            instance.albumContainer.addView(albumButton);
+
+            instance.skipCurrentButton.reset();
+            instance.progressBar.setVisibility(View.VISIBLE);
+            instance.likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(musicDetail).currentUsersLikeList());
+            instance.addToPlaylistButton.bindMusicDetail(musicDetail);
+            instance.buttonsLayout.setVisibility(View.VISIBLE);
+        }
+    }
 
     private static void startProgressUpdater(MusicDetail musicDetail) {
         int token = progressUpdaterToken.incrementAndGet();
@@ -409,23 +403,23 @@ public class MainFragment extends Fragment {
                 buttonsLayout = new LinearLayout(context);
                 buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
 
-                ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+                InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                         .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                        .padding(new ButtonInsetBackgroundFactory.Padding(buttonsLayout.dp(2), buttonsLayout.dp(1), buttonsLayout.dp(2), buttonsLayout.dp(1)))
+                        .padding(new InsetBackgroundFactory.Padding(buttonsLayout.dp(2), buttonsLayout.dp(1), buttonsLayout.dp(2), buttonsLayout.dp(1)))
                         .cornerRadius(buttonsLayout.dp(4)).build();
                 {
                     likeButton = new ToggleTrackLikeStateButton(context);
-                    likeButton.setBackground(backgroundFactory.newBackgroundDrawable());
+                    backgroundFactory.applyBackgroundTo(likeButton);
                     buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
                 }
                 {
                     addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
-                    addToPlaylistButton.setBackground(backgroundFactory.newBackgroundDrawable());
+                    backgroundFactory.applyBackgroundTo(addToPlaylistButton);
                     buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
                 }
                 {
                     skipCurrentButton = new VoteSkipButton(context);
-                    skipCurrentButton.setBackground(backgroundFactory.newBackgroundDrawable());
+                    backgroundFactory.applyBackgroundTo(skipCurrentButton);
                     buttonsLayout.addView(skipCurrentButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
                 }
 
@@ -468,12 +462,7 @@ public class MainFragment extends Fragment {
                 switchServerConnectButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
                 switchServerConnectButton.setGravity(Gravity.CENTER);
-                Drawable background1 = ButtonInsetBackgroundFactory.builder()
-                        .inset(0)
-                        .cornerRadius(switchServerConnectButton.dp(2))
-                        .padding(new ButtonInsetBackgroundFactory.Padding(0, 0, 0, 0))
-                        .build().newBackgroundDrawable();
-                switchServerConnectButton.setBackground(background1);
+                backgroundFactory.applyBackgroundTo(switchServerConnectButton);
                 switchServerConnectButton.setOnClickListener(b -> {
                     MusicHud.EXECUTOR.execute(connectionManager::toggleConnection);
                 });
