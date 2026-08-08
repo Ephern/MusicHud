@@ -150,7 +150,7 @@ public class MainFragment extends Fragment {
             instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(240));
             instance.titleText.setText(musicDetail.getName());
             PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
-            String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().getName() : null;
+            String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().name() : null;
             if (name == null || name.isEmpty()) {
                 instance.pusherHeadView.setVisibility(View.GONE);
                 instance.pusherText.setText("");
