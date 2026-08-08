@@ -14,7 +14,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class WordByWordLyricParser {
-    private static final Pattern mainPattern = Pattern.compile("\\[([0-9]+),([0-9]+)](.*)");
+    private static final Pattern mainPattern = Pattern.compile("((?:\\[[0-9]+,[0-9]+])+)(.*)");
+    private static final Pattern timestampPattern = Pattern.compile("\\[([0-9]+),([0-9]+)]");
     private static final Pattern phrasePattern = Pattern.compile("\\((\\d+),(\\d+),(\\d+)\\)([\\s\\S]*?)(?=\\(\\d+,\\d+,(\\d+)\\)|$)");
     private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(5);
     private static final Logger logger = MusicHud.getLogger(FullLineLyricParser.class);
@@ -139,40 +140,44 @@ public class WordByWordLyricParser {
         Matcher lineMatcher = mainPattern.matcher(lyric);
         Duration lastLineEnd = Duration.ZERO;
         while (lineMatcher.find()) {
-            Map<Duration, Integer> phrases = new LinkedHashMap<>();
-            String lineStartTimestamp = lineMatcher.group(1);
-            String lineDurationString = lineMatcher.group(2);
-            String lineRawText = lineMatcher.group(3);
-            Duration lineStart = Duration.ofMillis(Long.parseLong(lineStartTimestamp));
+            String timestampGroups = lineMatcher.group(1);
+            String lineRawText = lineMatcher.group(2);
+            Matcher timestampMatcher = timestampPattern.matcher(timestampGroups);
+            while (timestampMatcher.find()) {
+                Map<Duration, Integer> phrases = new LinkedHashMap<>();
+                String lineStartTimestamp = timestampMatcher.group(1);
+                String lineDurationString = timestampMatcher.group(2);
+                Duration lineStart = Duration.ofMillis(Long.parseLong(lineStartTimestamp));
 
-            Duration interval = lineStart.minus(lastLineEnd);
-            if (interval.compareTo(emptyLineIgnoreDuration) > 0) {
-                matchedConsumer.accept(new LyricLineMetaData(lastLineEnd, interval, "", LyricLine.Type.RHYTHM, null));
-            }
+                Duration interval = lineStart.minus(lastLineEnd);
+                if (interval.compareTo(emptyLineIgnoreDuration) > 0) {
+                    matchedConsumer.accept(new LyricLineMetaData(lastLineEnd, interval, "", LyricLine.Type.RHYTHM, null));
+                }
 
-            Duration nextPhraseStart = lineStart;
-            Matcher phraseMatcher = phrasePattern.matcher(lineRawText);
-            StringBuilder lineText = new StringBuilder();
-            int charIndex = 0;
-            while (phraseMatcher.find()) {
+                Duration nextPhraseStart = lineStart;
+                Matcher phraseMatcher = phrasePattern.matcher(lineRawText);
+                StringBuilder lineText = new StringBuilder();
+                int charIndex = 0;
+                while (phraseMatcher.find()) {
 //                String phraseStartTimestamp = phraseMatcher.group(1);
-                String phraseDurationMillis = phraseMatcher.group(2);
+                    String phraseDurationMillis = phraseMatcher.group(2);
 //                String unknown = phraseMatcher.group(3);
-                String phraseText = phraseMatcher.group(4);
-                String suffix = phraseText.endsWith(" ") ? " " : "";
-                phraseText = phraseText.replace('\u00A0', ' ').replace("\n", "").trim() + suffix;
-                lineText.append(phraseText);
-                charIndex += phraseText.length();
-                nextPhraseStart = nextPhraseStart.plusMillis(Long.parseLong(phraseDurationMillis));
-                phrases.put(nextPhraseStart, charIndex);
+                    String phraseText = phraseMatcher.group(4);
+                    String suffix = phraseText.endsWith(" ") ? " " : "";
+                    phraseText = phraseText.replace('\u00A0', ' ').replace("\n", "").trim() + suffix;
+                    lineText.append(phraseText);
+                    charIndex += phraseText.length();
+                    nextPhraseStart = nextPhraseStart.plusMillis(Long.parseLong(phraseDurationMillis));
+                    phrases.put(nextPhraseStart, charIndex);
+                }
+                Duration lineDuration = Duration.ofMillis(Long.parseLong(lineDurationString));
+                Duration allPhraseDuration = nextPhraseStart.minus(lineStart);
+                if (allPhraseDuration.compareTo(lineDuration) < 0) {
+                    lineDuration = allPhraseDuration;
+                }
+                matchedConsumer.accept(new LyricLineMetaData(lineStart, lineDuration, lineText.toString(), LyricLine.Type.NORMAL, phrases));
+                lastLineEnd = lineStart.plus(lineDuration);
             }
-            Duration lineDuration = Duration.ofMillis(Long.parseLong(lineDurationString));
-            Duration allPhraseDuration = nextPhraseStart.minus(lineStart);
-            if (allPhraseDuration.compareTo(lineDuration) < 0) {
-                lineDuration = allPhraseDuration;
-            }
-            matchedConsumer.accept(new LyricLineMetaData(lineStart, lineDuration, lineText.toString(), LyricLine.Type.NORMAL, phrases));
-            lastLineEnd = lineStart.plus(lineDuration);
         }
     }
 

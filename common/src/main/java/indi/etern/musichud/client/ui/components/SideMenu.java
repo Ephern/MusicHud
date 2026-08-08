@@ -16,7 +16,7 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.RadioButton;
 import icyllis.modernui.widget.RadioGroup;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import lombok.Getter;
 import org.jetbrains.annotations.Nullable;
@@ -137,10 +137,10 @@ public class SideMenu extends FrameLayout {
 
             button.setHeight(button.dp(40));
 
-            var background = ButtonInsetBackgroundFactory.builder()
-                    .padding(new ButtonInsetBackgroundFactory.Padding(button.dp(2), button.dp(1), button.dp(2), button.dp(1)))
-                    .cornerRadius(button.dp(4)).inset(dp(1)).build().newBackgroundDrawable();
-            button.setBackground(background);
+            InsetBackgroundFactory.builder()
+                    .padding(new InsetBackgroundFactory.Padding(button.dp(2), button.dp(1), button.dp(2), button.dp(1)))
+                    .cornerRadius(button.dp(4)).inset(dp(1)).build()
+                    .applyBackgroundTo(button);
             button.setLayoutParams(buttonParams);
 
             navBarButtonGroup.addView(button);

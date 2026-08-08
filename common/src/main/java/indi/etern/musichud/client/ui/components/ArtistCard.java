@@ -11,10 +11,14 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 
-public class ArtistCard extends LinearLayout {//TODO
+public class ArtistCard extends LinearLayout {
     public static final int imageSize = 100;
+    private final InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
+            .cornerRadius(dp(12))
+            .inset(dp(1))
+            .padding(new InsetBackgroundFactory.Padding(dp(8), dp(8), dp(8), dp(8))).build();
     private UrlImageView albumImage;
     private TextView artistName;
     private TextView productionsCounts;
@@ -55,11 +59,7 @@ public class ArtistCard extends LinearLayout {//TODO
         productionsCounts.setTextAlignment(TEXT_ALIGNMENT_CENTER);
         texts.addView(productionsCounts);
 
-        var background = ButtonInsetBackgroundFactory.builder()
-                .cornerRadius(dp(12))
-                .inset(dp(1))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(8), dp(8), dp(8), dp(8))).build().newBackgroundDrawable();
-        setBackground(background);
+        backgroundFactory.applyBackgroundTo(this);
 
         setClickable(true);
         setOnClickListener((view) -> {

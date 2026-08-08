@@ -8,7 +8,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.utils.ui.ButtonInsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
@@ -123,16 +123,16 @@ public class AccountBaseView extends LinearLayout {
 
         view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(32)));
 
-        ButtonInsetBackgroundFactory backgroundFactory = ButtonInsetBackgroundFactory.builder()
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                 .inset(dp(1)).cornerRadius(dp(4))
-                .padding(new ButtonInsetBackgroundFactory.Padding(dp(16), dp(8), dp(16), dp(8)))
+                .padding(new InsetBackgroundFactory.Padding(dp(16), dp(8), dp(16), dp(8)))
                 .build();
 
         retryButton = new Button(context);
         retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
         retryButton.setTextColor(Theme.PRIMARY_COLOR);
         retryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        retryButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(retryButton);
         retryButton.setOnClickListener(v -> {
             loadingErrorText.setVisibility(GONE);
             retryButton.setVisibility(GONE);
@@ -146,7 +146,7 @@ public class AccountBaseView extends LinearLayout {
         logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
         logoutButton.setTextColor(Theme.PRIMARY_COLOR);
         logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        logoutButton.setBackground(backgroundFactory.newBackgroundDrawable());
+        backgroundFactory.applyBackgroundTo(logoutButton);
         logoutButton.setOnClickListener(v -> {
             loadingErrorText.setVisibility(GONE);
             logoutButton.setVisibility(GONE);
