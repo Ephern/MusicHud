@@ -108,7 +108,6 @@ public class MusicHudScreen extends Screen implements MuiScreen {
 
     @Override
     public void extractRenderState(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
-        mHost.render(gr, mouseX, mouseY, deltaTick);
         super.extractRenderState(gr, mouseX, mouseY, deltaTick);
     }
 
