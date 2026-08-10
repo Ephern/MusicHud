@@ -55,18 +55,24 @@ public class MusicPlayerServerService {
             pusherThreadRunning = true;
             String message = "";
             Map<UUID, LoginApiService.PlayerLoginInfo> loginedPlayerInfoMap = loginApiService.getPlayerInfoMap();
+            boolean hasAvailableIdlePlaySourcesMusic = false;
             while (MusicPlayerServerService.this.continuable) {
                 MusicDetail switchedToPlay = null;
+                Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources = MusicPlayerServerService.this.idlePlaySources;
                 try {
+                    hasAvailableIdlePlaySourcesMusic = hasAvailableIdlePlaySourcesMusic(idlePlaySources);
                     if (musicQueue.isEmpty()) {
-                        Optional<MusicDetail> optionalMusicDetail = getRandomMusicFromIdleSources();
+                        if (!hasAvailableIdlePlaySourcesMusic) {
+                            break;
+                        }
+                        Optional<MusicDetail> optionalMusicDetail = getRandomMusicFromIdleSources(idlePlaySources);
                         if (optionalMusicDetail.isEmpty()) {
                             break;
                         } else {
                             MusicDetail musicDetail = optionalMusicDetail.get();
                             if (preloadMusicDetail == null || preloadMusicDetail.equals(MusicDetail.NONE)) {
                                 preloadMusicDetail = musicDetail;
-                                Optional<MusicDetail> optionalMusicDetail1 = getRandomMusicFromIdleSources();
+                                Optional<MusicDetail> optionalMusicDetail1 = getRandomMusicFromIdleSources(idlePlaySources);
                                 if (optionalMusicDetail1.isPresent()) {
                                     switchedToPlay = preloadMusicDetail;
                                     nextIdleMusicDetail = optionalMusicDetail1.get();
@@ -145,29 +151,33 @@ public class MusicPlayerServerService {
                     }
                 }
             }
-            logger.info("Music Pusher stopped");
             pusherThread = null;
             pusherThreadRunning = false;
             MusicPlayerServerService.this.stopSendingMusic();
             // A source/queue added during the shutdown window (between the loop break and
             // pusherThreadRunning = false) would have missed the updateContinuable(true)
             // restart; pick it up here so the pusher does not stay dead.
-            if (!musicQueue.isEmpty() || !idlePlaySources.isEmpty()) {
+            if (!musicQueue.isEmpty() || !hasAvailableIdlePlaySourcesMusic) {
                 updateContinuable(true);
+            } else {
+                logger.info("Music Pusher stopped");
             }
         }
 
-        private Optional<MusicDetail> getRandomMusicFromIdleSources() {
-            if (idlePlaySources.isEmpty()) {
-                return Optional.empty();
-            }
+        private boolean hasAvailableIdlePlaySourcesMusic(Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources) {
+            return !idlePlaySources.isEmpty() && idlePlaySources.entrySet().stream()
+                    .flatMap(entry -> entry.getValue().stream())
+                    .flatMap(playSource -> playSource.getMusicCollection().getMusicDetails().stream())
+                    .findAny().isPresent();
+        }
 
-            List<Map.Entry<PusherInfo, Set<IdlePlaySource>>> entryList =
-                    new ArrayList<>(idlePlaySources.entrySet());
-
-            if (entryList.isEmpty()) {
-                return Optional.empty();
-            }
+        private Optional<MusicDetail> getRandomMusicFromIdleSources(Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources) {
+            List<Map.Entry<PusherInfo, Set<IdlePlaySource>>> entryList = idlePlaySources.entrySet().stream().filter(
+                    entry -> entry.getValue().stream()
+                            .anyMatch(playSource ->
+                                    !playSource.getMusicCollection().getMusicDetails().isEmpty()
+                            )
+            ).toList();
 
             Map.Entry<PusherInfo, Set<IdlePlaySource>> randomEntry =
                     entryList.get(MusicHud.RANDOM.nextInt(entryList.size()));
@@ -180,7 +190,7 @@ public class MusicPlayerServerService {
                     .toList();
 
             if (allTracks.isEmpty()) {
-                return Optional.empty();
+                throw new IllegalStateException();
             }
 
             MusicDetail randomTrack = allTracks.get(MusicHud.RANDOM.nextInt(allTracks.size()));
@@ -191,10 +201,10 @@ public class MusicPlayerServerService {
                     if (musicDetail.getId() == randomTrack.getId()) {
                         randomTrack.setExtraInfo(musicDetail.getExtraInfo());
                     } else {
-                        return Optional.empty();
+                        throw new MusicResourceLoadingException(new IllegalStateException("Api returned a music detail with different id"), randomTrack, false);
                     }
                 } else {
-                    return Optional.empty();
+                    throw new MusicResourceLoadingException(new IllegalStateException("Api returned a invalid music detail"), randomTrack, false);
                 }
             }
 
@@ -264,17 +274,6 @@ public class MusicPlayerServerService {
                     new SwitchMusicMessage(MusicDetail.NONE, MusicDetail.NONE, "")
             );
             currentVoteInfo.resetTo(MusicDetail.NONE);
-        }
-    }
-
-    public void sendSyncPlayingStatusToPlayer(IPlayerClient player) {
-        serverNetworkService.sendToPlayer(player,
-                new RefreshMusicQueueMessage(musicQueue));
-        sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
-        if (currentMusicDetail != MusicDetail.NONE) {
-            haveSentMusic = true;
-            serverNetworkService.sendToPlayer(player,
-                    new SyncCurrentPlayingMessage(currentMusicDetail, nextIdleMusicDetail, nowPlayingStartTime));
         }
     }
 
@@ -361,7 +360,7 @@ public class MusicPlayerServerService {
         updateContinuable(true);
     }
 
-    public void removeMusicDetailFromQueue(int index, long id, UUID queueUniqueID, UUID playerUUID) {
+    public void removeMusicDetailFromQueue(long id, UUID queueUniqueID, UUID playerUUID) {
         for (QueueItem queueItem : musicQueue) {
             if (queueItem.musicDetail().getId() == id && queueItem.queueUniqueID().equals(queueUniqueID)) {
                 if (queueItem.musicDetail().getPusherInfo().getPlayerUUID().equals(playerUUID)) {

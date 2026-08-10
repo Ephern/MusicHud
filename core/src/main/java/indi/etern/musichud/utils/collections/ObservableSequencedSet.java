@@ -21,11 +21,21 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
     }
 
     public ObservableSequencedSet(Integer integer) {
-        this.delegate = new LinkedHashSet<>(integer);
+        this.delegate = new SynchronizedSequencedSet<>(new LinkedHashSet<>(integer));
     }
 
     public ObservableSequencedSet() {
         this(0);
+    }
+
+    /**
+     * 线程安全的快照, 供跨线程遍历使用 (乐观更新在 EXECUTOR 线程修改集合,
+     * UI 线程读取时必须避免并发迭代)。
+     */
+    public List<E> snapshot() {
+        synchronized (delegate) {
+            return new ArrayList<>(delegate);
+        }
     }
 
     @Override
@@ -164,7 +174,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
 
         EditHandle(ObservableSequencedSet<E> set) {
             this.set = set;
-            this.snapshot = List.copyOf(set);
+            this.snapshot = List.copyOf(set.snapshot());
         }
 
         public void rollback() {
