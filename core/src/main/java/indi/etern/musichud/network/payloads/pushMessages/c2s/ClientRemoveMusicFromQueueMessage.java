@@ -11,10 +11,8 @@ import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 
 import java.util.UUID;
 
-public record ClientRemoveMusicFromQueueMessage(int index, long id, UUID queueUniqueID) implements C2SPayload {
+public record ClientRemoveMusicFromQueueMessage(long id, UUID queueUniqueID) implements C2SPayload {
     public static final ByteBufCodec<ClientRemoveMusicFromQueueMessage> CODEC = ByteBufCodec.composite(
-            Codecs.INT,
-            ClientRemoveMusicFromQueueMessage::index,
             Codecs.LONG,
             ClientRemoveMusicFromQueueMessage::id,
             Codecs.UUID,
@@ -29,7 +27,7 @@ public record ClientRemoveMusicFromQueueMessage(int index, long id, UUID queueUn
                     ClientRemoveMusicFromQueueMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
                             MusicPlayerServerService.getInstance().removeMusicDetailFromQueue(
-                                    message.index, message.id, message.queueUniqueID, player.getUUID()
+                                    message.id, message.queueUniqueID, player.getUUID()
                             );
                     })
             );
