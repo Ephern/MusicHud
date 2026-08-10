@@ -166,8 +166,18 @@ public final class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public String getDefaultServerApiBaseUrl() {
+        return DEFAULT_SERVER_API_BASE_URL;
+    }
+
+    @Override
     public boolean getStartupBinaryApiServerWhenLaunch() {
         return startupBinaryApiServerWhenLaunch;
+    }
+
+    @Override
+    public boolean getDefaultStartupBinaryApiServerWhenLaunch() {
+        return DEFAULT_STARTUP_BINARY_API_SERVER;
     }
 
     @Override
@@ -181,8 +191,18 @@ public final class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public String getDefaultServerApiBinaryExecutablePath() {
+        return DEFAULT_SERVER_API_BINARY_EXECUTABLE_PATH;
+    }
+
+    @Override
     public double getPusherVoteAdditionalRate() {
         return pusherVoteAdditionalRate;
+    }
+
+    @Override
+    public double getDefaultPusherVoteAdditionalRate() {
+        return DEFAULT_PUSHER_VOTE_ADDITIONAL_RATE;
     }
 
     @Override
@@ -191,8 +211,18 @@ public final class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public boolean getDefaultUseRandomCnIp() {
+        return DEFAULT_USE_RANDOM_CN_IP;
+    }
+
+    @Override
     public String getCorsAllowOrigin() {
         return corsAllowOrigin;
+    }
+
+    @Override
+    public String getDefaultCorsAllowOrigin() {
+        return DEFAULT_CORS_ALLOW_ORIGIN;
     }
 
     @Override
@@ -206,6 +236,11 @@ public final class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public boolean getDefaultEnableProxy() {
+        return DEFAULT_ENABLE_PROXY;
+    }
+
+    @Override
     public void setEnableProxy(boolean enableProxy) {
         this.enableProxy = enableProxy;
     }
@@ -213,6 +248,11 @@ public final class ServerConfigDefinition implements ServerConfig {
     @Override
     public String getProxyUrl() {
         return proxyUrl;
+    }
+
+    @Override
+    public String getDefaultProxyUrl() {
+        return DEFAULT_PROXY_URL;
     }
 
     @Override
@@ -226,6 +266,11 @@ public final class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public boolean getDefaultEnableGeneralUnblock() {
+        return DEFAULT_ENABLE_GENERAL_UNBLOCK;
+    }
+
+    @Override
     public void setEnableGeneralUnblock(boolean enableGeneralUnblock) {
         this.enableGeneralUnblock = enableGeneralUnblock;
     }
@@ -233,6 +278,11 @@ public final class ServerConfigDefinition implements ServerConfig {
     @Override
     public boolean getEnableFlac() {
         return enableFlac;
+    }
+
+    @Override
+    public boolean getDefaultEnableFlac() {
+        return DEFAULT_ENABLE_FLAC;
     }
 
     @Override
@@ -246,6 +296,11 @@ public final class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public boolean getDefaultSelectMaxBr() {
+        return DEFAULT_SELECT_MAX_BR;
+    }
+
+    @Override
     public void setSelectMaxBr(boolean selectMaxBr) {
         this.selectMaxBr = selectMaxBr;
     }
@@ -256,6 +311,11 @@ public final class ServerConfigDefinition implements ServerConfig {
     }
 
     @Override
+    public boolean getDefaultFollowSourceOrder() {
+        return DEFAULT_FOLLOW_SOURCE_ORDER;
+    }
+
+    @Override
     public void setFollowSourceOrder(boolean followSourceOrder) {
         this.followSourceOrder = followSourceOrder;
     }
@@ -263,6 +323,11 @@ public final class ServerConfigDefinition implements ServerConfig {
     @Override
     public int getPort() {
         return port;
+    }
+
+    @Override
+    public int getDefaultPort() {
+        return DEFAULT_PORT;
     }
 
     @Override
