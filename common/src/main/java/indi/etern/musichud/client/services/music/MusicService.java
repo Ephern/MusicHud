@@ -285,8 +285,8 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
-    public void sendRemoveMusicFromQueue(int index, QueueItem item) {
-        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(index, item.musicDetail().getId(), item.queueUniqueID()));
+    public void sendRemoveMusicFromQueue(QueueItem item) {
+        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(item.musicDetail().getId(), item.queueUniqueID()));
     }
 
     @Override
