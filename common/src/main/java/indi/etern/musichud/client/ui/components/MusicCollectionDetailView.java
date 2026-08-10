@@ -345,7 +345,9 @@ public class MusicCollectionDetailView extends LinearLayout {
                             }
                         }
                         progressBar.setVisibility(View.GONE);
-                        virtualList.resetItems(new ArrayList<>(musicDetails));
+                        virtualList.resetItems(musicDetails instanceof ObservableSequencedSet<MusicDetail> observable
+                                ? observable.snapshot()
+                                : new ArrayList<>(musicDetails));
                         unregisterTracksSync();
                         registerTracksSync(musicCollection1);
                     });
@@ -391,7 +393,7 @@ public class MusicCollectionDetailView extends LinearLayout {
     }
 
     private void syncTracksList(ObservableSequencedSet<MusicDetail> tracks) {
-        virtualList.syncItems(new ArrayList<>(tracks));
+        virtualList.syncItems(tracks.snapshot());
     }
 
     private String mappedAlbumType(String type) {
