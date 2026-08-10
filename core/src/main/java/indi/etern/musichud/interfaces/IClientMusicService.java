@@ -47,7 +47,7 @@ public interface IClientMusicService {
 
     void sendPushMusicToQueue(MusicDetail musicDetail);
 
-    void sendRemoveMusicFromQueue(int index, QueueItem item);
+    void sendRemoveMusicFromQueue(QueueItem item);
 
     void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message);
 
