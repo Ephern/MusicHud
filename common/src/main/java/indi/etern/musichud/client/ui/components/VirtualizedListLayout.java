@@ -22,6 +22,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -58,20 +59,21 @@ public class VirtualizedListLayout extends FrameLayout {
         activeViews.clear();
         viewPool.clear();
         heightByItemId.clear();
-        items = newItems;
-        indexById = rebuildIndex(newItems);
+        items = filterNull(newItems);
+        indexById = rebuildIndex(items);
         rebuildWindow();
     }
 
     public void syncItems(List<MusicDetail> newItems) {
         Map<Long, Integer> oldIndex = indexById;
-        Map<Long, Integer> newIndex = rebuildIndex(newItems);
+        List<MusicDetail> cleanItems = filterNull(newItems);
+        Map<Long, Integer> newIndex = rebuildIndex(cleanItems);
         for (long id : oldIndex.keySet()) {
             if (!newIndex.containsKey(id)) {
                 removeItem(id, oldIndex.get(id));
             }
         }
-        items = newItems;
+        items = cleanItems;
         indexById = newIndex;
         for (long id : newIndex.keySet()) {
             if (!oldIndex.containsKey(id)) {
@@ -90,9 +92,16 @@ public class VirtualizedListLayout extends FrameLayout {
     private static Map<Long, Integer> rebuildIndex(List<MusicDetail> list) {
         Map<Long, Integer> map = new HashMap<>(list.size());
         for (int i = 0; i < list.size(); i++) {
-            map.put(list.get(i).getId(), i);
+            MusicDetail item = list.get(i);
+            if (item != null) {
+                map.put(item.getId(), i);
+            }
         }
         return map;
+    }
+
+    private static List<MusicDetail> filterNull(List<MusicDetail> list) {
+        return list.stream().filter(Objects::nonNull).toList();
     }
 
     private void rebuildWindow() {

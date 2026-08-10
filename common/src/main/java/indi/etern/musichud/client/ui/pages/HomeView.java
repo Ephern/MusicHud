@@ -365,7 +365,7 @@ public class HomeView extends LinearLayout {
                     .build()
                     .applyBackgroundTo(removeButton);
             removeButton.setOnClickListener(v -> {
-                MusicService.getInstance().sendRemoveMusicFromQueue(playQueueView.indexOfChild(musicListItem), item);
+                MusicService.getInstance().sendRemoveMusicFromQueue(item);
             });
             musicListItem.getButtonsLayout().addView(removeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
         }
