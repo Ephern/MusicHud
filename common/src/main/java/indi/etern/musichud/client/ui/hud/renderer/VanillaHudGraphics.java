@@ -7,7 +7,7 @@ import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix3x2fStack;
 
 /**
- * 1.21.6-1.21.8 adapter: exposes a {@link GuiGraphics} behind the neutral {@link HudGraphics}.
+ * Adapter: exposes a {@link GuiGraphics} behind the neutral {@link HudGraphics}.
  */
 public class VanillaHudGraphics implements HudGraphics {
     private final GuiGraphics graphics;

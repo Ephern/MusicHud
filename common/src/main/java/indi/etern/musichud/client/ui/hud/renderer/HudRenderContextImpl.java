@@ -14,6 +14,7 @@ import indi.etern.musichud.client.ui.hud.pipelines.HudTextureSetup;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import indi.etern.musichud.client.ui.hud.pipelines.RenderPipelineHudPipeline;
 import indi.etern.musichud.client.ui.hud.pipelines.RenderStateUtil;
+import lombok.Getter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.DynamicUniformStorage;
@@ -28,24 +29,27 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 1.21.6-1.21.8 implementation of the neutral {@link HudRenderContext}.
  * <p>
- * Implements 方案一: multiple elements may share one {@link HudPipeline} while carrying
+ * Multiple elements may share one {@link HudPipeline} while carrying
  * different per-element uniform content. Every submitted element is kept as its own
- * {@link TextureSetup} identity and gets its own set of UBO slices written into a shared
- * {@link DynamicUniformStorage}. During the GUI pass each draw binds only the slices of the
- * element it belongs to (per-draw uniform upload, equivalent to
+ * {@link TextureSetup} identity and gets its own set of UBO slices. Uniform storage is
+ * keyed by UBO name alone, so shared uniforms (e.g. {@code MHDynamicStatus}) are uploaded
+ * only once per frame and deduplicated across elements by
+ * {@link DynamicUniformStorage#writeUniform}, while distinct content for the same name
+ * lives in separate blocks of the same buffer. During the GUI pass each draw binds only the
+ * slices of the element it belongs to (per-draw uniform upload, equivalent to
  * {@code RenderPass.drawMultipleIndexed}'s {@code uniformUploaderConsumer}).
  * <p>
  * On-demand upload is preserved: if a logical element's uniform data did not change since
- * the last frame ({@link HudUniform#shouldUseBuffer}), the previously uploaded slice is
- * reused and nothing is re-written.
+ * the last frame ({@link HudUniform#shouldUseBuffer}) and its previously uploaded slice is
+ * still backed by a live buffer, the slice is reused and nothing is re-written.
  */
 public class HudRenderContextImpl implements HudRenderContext {
     private static final RenderStateUtil UNIFORM_WRITER = new RenderStateUtil();
+    @Getter
     private static HudRenderContext current;
 
-    private final Map<StorageKey, DynamicUniformStorage<UniformAdapter>> storageMap = new HashMap<>();
+    private final Map<String, DynamicUniformStorage<UniformAdapter>> storageMap = new HashMap<>();
     private final Map<CacheKey, LastWritten> lastWrittenUniforms = new HashMap<>();
 
     private final List<ElementRecord> elements = new ArrayList<>();
@@ -56,10 +60,6 @@ public class HudRenderContextImpl implements HudRenderContext {
 
     public HudRenderContextImpl() {
         current = this;
-    }
-
-    public static HudRenderContext getCurrent() {
-        return current;
     }
 
     @Override
@@ -137,11 +137,12 @@ public class HudRenderContextImpl implements HudRenderContext {
                 CacheKey cacheKey = new CacheKey(element.elementKey, element.pipeline, uniform.getUBOName());
                 GpuBufferSlice slice;
                 LastWritten last = lastWrittenUniforms.get(cacheKey);
-                if (last != null && last.uniform.shouldUseBuffer(uniform) && last.slice != null) {
+                if (last != null && last.uniform.shouldUseBuffer(uniform)
+                        && last.slice != null && !last.slice.buffer().isClosed()) {
                     slice = last.slice;
                 } else {
                     DynamicUniformStorage<UniformAdapter> storage = storageMap.computeIfAbsent(
-                            new StorageKey(element.pipeline, uniform.getUBOName()),
+                            uniform.getUBOName(),
                             k -> new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
                     );
                     slice = storage.writeUniform(new UniformAdapter(uniform));
@@ -229,9 +230,6 @@ public class HudRenderContextImpl implements HudRenderContext {
     @Override
     public void fill(int fromX, int fromY, int toX, int toY, int color) {
         graphics.fill(fromX, fromY, toX, toY, color);
-    }
-
-    private record StorageKey(HudPipeline pipeline, String uboName) {
     }
 
     private record CacheKey(String elementKey, HudPipeline pipeline, String uboName) {

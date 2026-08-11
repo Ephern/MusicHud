@@ -11,7 +11,7 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
 /**
- * 1.21.6-1.21.8 adapter: turns a neutral {@link indi.etern.musichud.client.ui.hud.pipelines.HudRenderState}
+ * Adapter: turns a neutral {@link indi.etern.musichud.client.ui.hud.pipelines.HudRenderState}
  * into a {@link GuiElementRenderState} consumable by {@code GuiRenderer}.
  */
 public class HudGuiElementRenderState implements GuiElementRenderState {

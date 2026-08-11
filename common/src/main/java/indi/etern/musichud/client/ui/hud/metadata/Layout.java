@@ -50,7 +50,7 @@ public class Layout implements HudUniform {
 
     @Override
     public String getUBOName() {
-        return "MH" + targetElementName + "Position";
+        return "MHPosition";
     }
 
     @Override

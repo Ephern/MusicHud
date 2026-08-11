@@ -9,7 +9,7 @@ import org.joml.Matrix3x2f;
  * Version-neutral render context used by the HUD renderers and metadata beans.
  * <p>
  * Each supported Minecraft version supplies one implementation
- * ({@link HudRenderContextImpl} on 1.21.6-1.21.8); everything above this interface is
+ * ({@link HudRenderContextImpl}); everything above this interface is
  * shared verbatim across branches.
  */
 public interface HudRenderContext {
