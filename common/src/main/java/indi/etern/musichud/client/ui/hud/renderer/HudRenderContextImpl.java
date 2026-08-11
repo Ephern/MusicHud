@@ -4,6 +4,8 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.systems.SamplerCache;
+import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
@@ -126,7 +128,9 @@ public class HudRenderContextImpl implements HudRenderContext {
     private TextureSetup toVanillaTextureSetup(HudTextureSetup setup, @org.jetbrains.annotations.Nullable String elementKey) {
         GpuTextureView primary = setup.primary() == null ? null : ((GpuTextureViewRef) setup.primary()).view();
         GpuTextureView secondary = setup.secondary() == null ? null : ((GpuTextureViewRef) setup.secondary()).view();
-        return new TextureSetup(primary, secondary, discriminatorView(elementKey));
+        SamplerCache samplerCache = RenderSystem.getSamplerCache();
+        return new TextureSetup(primary, secondary, discriminatorView(elementKey),
+                samplerCache.getRepeat(FilterMode.NEAREST), samplerCache.getRepeat(FilterMode.NEAREST), samplerCache.getRepeat(FilterMode.NEAREST));
     }
 
     public void prepareUniforms() {

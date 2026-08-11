@@ -6,7 +6,7 @@ import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.gui.render.state.GuiElementRenderState;
+import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
@@ -54,15 +54,15 @@ public class HudGuiElementRenderState implements GuiElementRenderState {
     }
 
     @Override
-    public void buildVertices(VertexConsumer consumer, float z) {
+    public void buildVertices(VertexConsumer consumer) {
         float left = -width / 2f;
         float right = width / 2f;
         float top = -height / 2f;
         float bottom = height / 2f;
-        consumer.addVertexWith2DPose(pose, right, bottom, z).setColor(-1);
-        consumer.addVertexWith2DPose(pose, right, top, z).setColor(-1);
-        consumer.addVertexWith2DPose(pose, left, top, z).setColor(-1);
-        consumer.addVertexWith2DPose(pose, left, bottom, z).setColor(-1);
+        consumer.addVertexWith2DPose(pose, right, bottom).setColor(-1);
+        consumer.addVertexWith2DPose(pose, right, top).setColor(-1);
+        consumer.addVertexWith2DPose(pose, left, top).setColor(-1);
+        consumer.addVertexWith2DPose(pose, left, bottom).setColor(-1);
     }
 
     @Override
