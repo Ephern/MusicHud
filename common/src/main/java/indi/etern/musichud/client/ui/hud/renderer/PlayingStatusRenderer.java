@@ -7,7 +7,6 @@ import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 
 public class PlayingStatusRenderer implements HudRenderer {
@@ -96,7 +95,7 @@ public class PlayingStatusRenderer implements HudRenderer {
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
                     .end(transforming -> {
-                        hudRenderContext.blit(RenderPipelines.GUI_TEXTURED, currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height);
+                        hudRenderContext.graphics().blitTextured(currentResourceLocation1.toString(), screenX, screenY, 0, 0, width, height, width, height);
                     });
         }
     }

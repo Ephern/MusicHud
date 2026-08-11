@@ -3,8 +3,6 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.RenderPipelines;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.ARGB;
 import org.jetbrains.annotations.Nullable;
@@ -65,42 +63,40 @@ public class PlayerHeadRenderer implements HudRenderer {
         int h = (int) layout.getHeight();
 
         if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
-            renderHead(context.getGraphics(), skinResource,
+            renderHead(context.graphics(), skinResource,
                     absolutePosition.x(), absolutePosition.y(), w, h, 1);
         } else {
             float transitionProgress = Math.clamp((float) (currentTimeMillis - lastUpdateTime) / TRANSITION_DURATION, 0, 1);
             if (previousSkinResource != null) {
-                renderHead(context.getGraphics(), previousSkinResource,
+                renderHead(context.graphics(), previousSkinResource,
                         absolutePosition.x(), absolutePosition.y(), w, h, 1 - transitionProgress);
             }
-            renderHead(context.getGraphics(), skinResource,
+            renderHead(context.graphics(), skinResource,
                     absolutePosition.x(), absolutePosition.y(), w, h, transitionProgress);
         }
     }
 
-    public static void renderHead(GuiGraphicsExtractor gr, Identifier skin,
+    public static void renderHead(HudGraphics graphics, Identifier skin,
                                    float x, float y, int w, int h, float alpha) {
         if (alpha <= 0.003) {
             return;
         }
         float scale = 0.87f;
         float inset = (1 - scale) / 2;
-        gr.nextStratum();
+        graphics.nextStratum();
 
         // Inner face layer (8,8 to 16,16) - slightly smaller for depth
-        gr.pose().pushMatrix();
-        gr.pose().translate(x + w * inset, y + h * inset);
-        gr.pose().scale(scale);
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(x + w * inset, y + h * inset);
+        graphics.pose().scale(scale);
         int alphaColor = ARGB.color(Math.min(alpha, 1), 0xFFFFFF);
-        gr.blit(RenderPipelines.GUI_TEXTURED, skin,
-                0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
-        gr.pose().popMatrix();
+        graphics.blitTextured(skin.toString(), 0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
+        graphics.pose().popMatrix();
 
-        gr.pose().pushMatrix();
-        gr.pose().translate(x, y);
+        graphics.pose().pushMatrix();
+        graphics.pose().translate(x, y);
         // Outer hat layer (40,8 to 48,16) - full size on top
-        gr.blit(RenderPipelines.GUI_TEXTURED, skin,
-                0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
-        gr.pose().popMatrix();
+        graphics.blitTextured(skin.toString(), 0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
+        graphics.pose().popMatrix();
     }
 }
