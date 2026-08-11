@@ -8,6 +8,7 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.UUID;
 
@@ -36,5 +37,15 @@ public class PlayerInfoUtil {
             return playerInfo.getSkin().texture();
         }
         return null;
+    }
+
+    /**
+     * Version-neutral skin resource path ({@code "namespace:path"} string) so the HUD layer
+     * does not depend on the {@code ResourceLocation}/{@code Identifier} class name, which
+     * changes across Minecraft versions.
+     */
+    public static @Nullable String getPlayerSkinPath(PlayerInfo playerInfo) {
+        ResourceLocation location = getPlayerSkin(playerInfo);
+        return location == null ? null : location.toString();
     }
 }

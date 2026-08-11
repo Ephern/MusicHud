@@ -3,7 +3,6 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.ARGB;
 import org.jetbrains.annotations.Nullable;
 
@@ -13,16 +12,16 @@ public class PlayerHeadRenderer implements HudRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
     @Getter
     private Layout layout;
-    private ResourceLocation previousSkinResource;
-    private ResourceLocation skinResource;
+    private String previousSkinResource;
+    private String skinResource;
     @Getter
-    private Supplier<ResourceLocation> playerSkinSupplier;
+    private Supplier<String> playerSkinSupplier;
     private long lastUpdateTime = -1;
     private static final int TRANSITION_DURATION = 400;
 
-    public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
+    public void setPlayerSkinSupplier(@Nullable Supplier<String> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
-        ResourceLocation newSkin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
+        String newSkin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
         long now = System.currentTimeMillis();
         if (now - lastUpdateTime > TRANSITION_DURATION) {
             previousSkinResource = skinResource;
@@ -44,7 +43,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         long currentTimeMillis = System.currentTimeMillis();
         try {
             if (playerSkinSupplier != null) {
-                ResourceLocation skin = playerSkinSupplier.get();
+                String skin = playerSkinSupplier.get();
                 if (skinResource != skin) {
                     if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
                         previousSkinResource = skinResource;
@@ -76,7 +75,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         }
     }
 
-    public static void renderHead(HudGraphics graphics, ResourceLocation skin,
+    public static void renderHead(HudGraphics graphics, String skinPath,
                                    float x, float y, int w, int h, float alpha) {
         if (alpha <= 0.003) {
             return;
@@ -90,13 +89,13 @@ public class PlayerHeadRenderer implements HudRenderer {
         graphics.pose().translate(x + w * inset, y + h * inset);
         graphics.pose().scale(scale);
         int alphaColor = ARGB.color(Math.min(alpha, 1), 0xFFFFFF);
-        graphics.blitTextured(skin.toString(), 0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
+        graphics.blitTextured(skinPath, 0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
         graphics.pose().popMatrix();
 
         graphics.pose().pushMatrix();
         graphics.pose().translate(x, y);
         // Outer hat layer (40,8 to 48,16) - full size on top
-        graphics.blitTextured(skin.toString(), 0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
+        graphics.blitTextured(skinPath, 0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
         graphics.pose().popMatrix();
     }
 }

@@ -89,7 +89,7 @@ public class HudRendererManager {
         });
         PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
             PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-            return PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo);
+            return PlayerInfoUtil.getPlayerSkinPath(pusherPlayerInfo);
         });
         updateLayoutFromConfig();
         refreshStyle();

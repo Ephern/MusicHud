@@ -25,12 +25,14 @@ import java.util.Deque;
 import java.util.function.Supplier;
 
 /**
- * Hooks {@link GuiRenderer} to support 方案一: multiple HUD elements sharing one pipeline
- * while each carries its own uniform content.
+ * Hooks {@link GuiRenderer} to support multiple HUD elements sharing one pipeline while each
+ * carries its own uniform content.
  * <ul>
- *   <li>Merge breaking is driven by each element's {@link ScreenRectangle} bounds (see
- *       {@code HudGuiElementRenderState.scissorArea()}): elements at different screen
- *       positions never merge, so per-element uniform content stays correct.</li>
+ *   <li>Merge breaking is driven by the per-element discriminator texture view that
+ *       {@code HudRenderContextImpl.toVanillaTextureSetup} places into {@code texure2} of
+ *       each element's {@link TextureSetup}: elements of different profiles are
+ *       record-unequal, so {@code GuiRenderer} never merges different uniform content into a
+ *       single draw.</li>
  *   <li>Per-draw uniform upload: the set of {@link TextureSetup}s recorded by
  *       {@code recordMesh} is exactly aligned with the draw list, so each draw uploads only
  *       the uniforms of the element it belongs to (the GUI-pass equivalent of
