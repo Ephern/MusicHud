@@ -2,6 +2,7 @@
 package indi.etern.musichud.mixin;
 
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -19,7 +20,7 @@ public class ScreenMixin {
         //noinspection ConstantValue (incorrect warning)
         if (((Object) this instanceof ServerReconfigScreen) || ((Object) this instanceof LevelLoadingScreen)) {
             guiGraphics.nextStratum();
-            HudRendererManager.getInstance().renderFrame(guiGraphics, null);
+            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics), null);
         }
     }
 }
