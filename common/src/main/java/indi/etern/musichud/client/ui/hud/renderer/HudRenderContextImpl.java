@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import com.mojang.blaze3d.GpuFormat;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderPass;
@@ -8,7 +9,6 @@ import com.mojang.blaze3d.systems.SamplerCache;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
 import indi.etern.musichud.client.ui.hud.pipelines.*;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
@@ -111,7 +111,7 @@ public class HudRenderContextImpl implements HudRenderContext {
             GpuDevice device = RenderSystem.getDevice();
             GpuTexture texture = device.createTexture(
                     "music_hud_" + key, GpuTexture.USAGE_TEXTURE_BINDING,
-                    TextureFormat.RGBA8, 1, 1, 1, 1);
+                    GpuFormat.RGBA8_UNORM, 1, 1, 1, 1);
             return device.createTextureView(texture);
         });
     }
