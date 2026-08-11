@@ -7,26 +7,17 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
-import indi.etern.musichud.client.ui.hud.pipelines.GpuTextureViewRef;
-import indi.etern.musichud.client.ui.hud.pipelines.HudPipeline;
-import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
-import indi.etern.musichud.client.ui.hud.pipelines.HudTextureSetup;
-import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
-import indi.etern.musichud.client.ui.hud.pipelines.RenderPipelineHudPipeline;
-import indi.etern.musichud.client.ui.hud.pipelines.RenderStateUtil;
+import indi.etern.musichud.client.ui.hud.pipelines.*;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.DynamicUniformStorage;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.IdentityHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 /**
  * <p>
@@ -123,7 +114,7 @@ public class HudRenderContextImpl implements HudRenderContext {
         });
     }
 
-    private TextureSetup toVanillaTextureSetup(HudTextureSetup setup, @org.jetbrains.annotations.Nullable String elementKey) {
+    private TextureSetup toVanillaTextureSetup(HudTextureSetup setup, @Nullable String elementKey) {
         GpuTextureView primary = setup.primary() == null ? null : ((GpuTextureViewRef) setup.primary()).view();
         GpuTextureView secondary = setup.secondary() == null ? null : ((GpuTextureViewRef) setup.secondary()).view();
         return new TextureSetup(primary, secondary, discriminatorView(elementKey));
