@@ -54,15 +54,15 @@ public class HudGuiElementRenderState implements GuiElementRenderState {
     }
 
     @Override
-    public void buildVertices(VertexConsumer consumer, float z) {
+    public void buildVertices(VertexConsumer consumer) {
         float left = -width / 2f;
         float right = width / 2f;
         float top = -height / 2f;
         float bottom = height / 2f;
-        consumer.addVertexWith2DPose(pose, right, bottom, z).setColor(-1);
-        consumer.addVertexWith2DPose(pose, right, top, z).setColor(-1);
-        consumer.addVertexWith2DPose(pose, left, top, z).setColor(-1);
-        consumer.addVertexWith2DPose(pose, left, bottom, z).setColor(-1);
+        consumer.addVertexWith2DPose(pose, right, bottom).setColor(-1);
+        consumer.addVertexWith2DPose(pose, right, top).setColor(-1);
+        consumer.addVertexWith2DPose(pose, left, top).setColor(-1);
+        consumer.addVertexWith2DPose(pose, left, bottom).setColor(-1);
     }
 
     @Override
