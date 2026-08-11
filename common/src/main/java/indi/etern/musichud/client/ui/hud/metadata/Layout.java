@@ -1,8 +1,8 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import com.mojang.blaze3d.buffers.Std140Builder;
-import com.mojang.blaze3d.buffers.Std140SizeCalculator;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
+import indi.etern.musichud.client.ui.hud.pipelines.Std140Sizes;
+import indi.etern.musichud.client.ui.hud.pipelines.Std140Writer;
 import indi.etern.musichud.client.ui.hud.renderer.HudRenderContext;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -12,7 +12,7 @@ import org.joml.Matrix4f;
 @EqualsAndHashCode
 @Getter
 public class Layout implements HudUniform {
-    public static final int UBO_SIZE = new Std140SizeCalculator().putMat4f().putVec3().align(16).get(); // pad to 16-byte alignment (std140)
+    public static final int UBO_SIZE = Std140Sizes.calc().putMat4f().putVec3().align(16).get(); // pad to 16-byte alignment (std140)
     private volatile float x, y, width, height;
     private volatile float radius;
     private volatile HorizontalAlign horizontalAlign;
@@ -59,7 +59,7 @@ public class Layout implements HudUniform {
     }
 
     @Override
-    public void write(Std140Builder builder) {
+    public void write(Std140Writer builder) {
         Matrix3x2f localMatrix = new Matrix3x2f();
         Layout.AbsolutePosition absolutePosition = calcAbsoluteCenterPosition(HudRenderContext.getCurrent());
         localMatrix.translate(absolutePosition.x(), absolutePosition.y());

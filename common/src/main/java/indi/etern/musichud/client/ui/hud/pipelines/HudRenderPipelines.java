@@ -16,14 +16,14 @@ public class HudRenderPipelines {
                     .withBlend(BlendFunction.TRANSLUCENT)
                     .buildSnippet();
 
-    public static final RenderPipeline BACKGROUND;
+    public static final HudPipeline BACKGROUND;
 
-    public static final RenderPipeline ROUNDED_ALBUM;
+    public static final HudPipeline ROUNDED_ALBUM;
 
-    public static final RenderPipeline PROGRESS_BAR;
+    public static final HudPipeline PROGRESS_BAR;
 
     static {
-        BACKGROUND = RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
+        BACKGROUND = wrap("background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
                 .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/background"))
                 .withVertexShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/background"))
                 .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/background"))
@@ -31,8 +31,8 @@ public class HudRenderPipelines {
                 .withUniform("MHNowPlayingThemeColor", UniformType.UNIFORM_BUFFER)
                 .withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER)
                 .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-                .build();
-        ROUNDED_ALBUM = RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
+                .build());
+        ROUNDED_ALBUM = wrap("album_image", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
                 .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/album_image"))
                 .withVertexShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/album_image"))
                 .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/album_image"))
@@ -41,8 +41,8 @@ public class HudRenderPipelines {
                 .withSampler("Sampler0")
                 .withSampler("Sampler1")
                 .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-                .build();
-        PROGRESS_BAR = RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
+                .build());
+        PROGRESS_BAR = wrap("progress_bar", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
                 .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/progress_bar"))
                 .withVertexShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/progress_bar"))
                 .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/progress_bar"))
@@ -50,6 +50,10 @@ public class HudRenderPipelines {
                 .withUniform("MHProgressStyle", UniformType.UNIFORM_BUFFER)
                 .withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER)
                 .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
-                .build();
+                .build());
+    }
+
+    private static HudPipeline wrap(String name, RenderPipeline pipeline) {
+        return new RenderPipelineHudPipeline(name, pipeline);
     }
 }
