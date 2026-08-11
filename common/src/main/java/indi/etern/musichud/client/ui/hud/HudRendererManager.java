@@ -21,7 +21,6 @@ import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
@@ -50,7 +49,7 @@ public class HudRendererManager {
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private final DateTimeFormatter LONG_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter SHORT_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("mm:ss");
-    private final HudRenderContext hudRenderContext = new HudRenderContext();
+    private final HudRenderContext hudRenderContext = new HudRenderContextImpl();
     private volatile HudRenderData hudBaseData;
     private volatile HudRenderData imageDisplayData;
     @Setter
@@ -369,7 +368,7 @@ public class HudRendererManager {
         hudBaseData.getTransitionableBackground().startTransition(nextData);
     }
 
-    public void renderFrame(GuiGraphics graphics, @Nullable DeltaTracker deltaTracker) {
+    public void renderFrame(HudGraphics graphics, @Nullable DeltaTracker deltaTracker) {
         try {
             if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
                 return;
@@ -400,8 +399,7 @@ public class HudRendererManager {
                 PLAY_TIME_RENDERER.setText(playTimeString);
             }
 
-            hudRenderContext.clearContext();
-            hudRenderContext.setGraphics(graphics);
+            hudRenderContext.beginFrame(graphics);
 
 //            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
 //            PLAYER_HEAD_RENDERER.setSkinResource(PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo));
@@ -429,7 +427,7 @@ public class HudRendererManager {
             ARTISTS_AND_ALBUM_RENDERER.render(hudRenderContext);
             PLAY_TIME_RENDERER.render(hudRenderContext);
 
-            hudRenderContext.prepareUniforms();
+            hudRenderContext.endFrame();
         } catch (Exception e) {
             if (logger == null) {
                 logger = MusicHud.getLogger(HudRendererManager.class);
