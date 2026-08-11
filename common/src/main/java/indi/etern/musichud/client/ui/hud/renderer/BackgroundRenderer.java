@@ -7,8 +7,8 @@ import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
+import indi.etern.musichud.client.ui.hud.pipelines.HudTextureSetup;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.render.TextureSetup;
 
 public class BackgroundRenderer implements HudRenderer {
     private static volatile BackgroundRenderer instance;
@@ -63,9 +63,10 @@ public class BackgroundRenderer implements HudRenderer {
 
         HudRenderState hudRenderState = new HudRenderState(
                 HudRenderPipelines.BACKGROUND,
-                TextureSetup.noTexture(),
+                HudTextureSetup.NONE,
                 hudRenderContext.currentPose(),
                 layout,
+                "background",
                 layout,
                 currentData.getTransitionableBackground().getMixed(),
                 dynamicStatusUniform

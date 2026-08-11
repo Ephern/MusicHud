@@ -1,50 +1,37 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.vertex.VertexConsumer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.utils.ui.UniformDataUtils;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.gui.render.state.GuiElementRenderState;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
+/**
+ * Version-neutral description of a single HUD element.
+ * <p>
+ * {@code elementKey} identifies the logical element (e.g. {@code "background"}) so that
+ * multiple elements sharing the same pipeline but carrying different uniform content are
+ * kept in separate draws and get their own uniform binding.
+ */
 public record HudRenderState(
-        @NonNull RenderPipeline pipeline,
-        @NonNull TextureSetup textureSetup,
+        @NonNull HudPipeline pipeline,
+        @NonNull HudTextureSetup textureSetup,
         @NonNull Matrix3x2f pose,
         float width,
         float height,
         @Nullable ScreenRectangle bounds,
+        @Nullable String elementKey,
         HudUniform[] uniforms
-) implements GuiElementRenderState {
-
-    public HudRenderState(@NonNull RenderPipeline pipeline,
-                          @NonNull TextureSetup textureSetup,
+) {
+    public HudRenderState(@NonNull HudPipeline pipeline,
+                          @NonNull HudTextureSetup textureSetup,
                           @NonNull Matrix3x2f pose,
                           @NonNull Layout layout,
+                          @Nullable String elementKey,
                           HudUniform... uniforms) {
         this(pipeline, textureSetup, pose, layout.getWidth(), layout.getHeight(),
-                UniformDataUtils.getBounds(-layout.getWidth() / 2f, -layout.getHeight() / 2f, layout.getWidth() / 2f, layout.getHeight() / 2f, pose), uniforms);
-    }
-
-    @Override
-    public void buildVertices(@NonNull VertexConsumer consumer) {
-        float left = -width / 2f;
-        float right = width / 2f;
-        float top = -height / 2f;
-        float bottom = height / 2f;
-        consumer.addVertexWith2DPose(pose, right, bottom).setColor(-1);
-        consumer.addVertexWith2DPose(pose, right, top).setColor(-1);
-        consumer.addVertexWith2DPose(pose, left, top).setColor(-1);
-        consumer.addVertexWith2DPose(pose, left, bottom).setColor(-1);
-    }
-
-    @Nullable
-    @Override
-    public ScreenRectangle scissorArea() {
-        return null;
+                UniformDataUtils.getBounds(-layout.getWidth() / 2f, -layout.getHeight() / 2f, layout.getWidth() / 2f, layout.getHeight() / 2f, pose),
+                elementKey, uniforms);
     }
 }

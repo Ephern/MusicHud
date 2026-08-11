@@ -3,7 +3,7 @@
 #moj_import <minecraft:dynamictransforms.glsl>
 #moj_import <minecraft:projection.glsl>
 
-layout(std140) uniform MHAlbumPosition {
+layout(std140) uniform MHPosition {
     mat4 u_Translation;
     vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
 };

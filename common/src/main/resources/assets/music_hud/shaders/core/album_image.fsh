@@ -3,7 +3,7 @@
 uniform sampler2D Sampler0;
 uniform sampler2D Sampler1;
 
-layout(std140) uniform MHAlbumPosition {
+layout(std140) uniform MHPosition {
     mat4 u_Translation;
     vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
 };
