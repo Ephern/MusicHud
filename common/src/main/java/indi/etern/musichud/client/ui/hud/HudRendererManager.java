@@ -342,11 +342,13 @@ public class HudRendererManager {
 
     private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail) {
         ImageTextureData[] imageTextures = new ImageTextureData[2];
+        Album album = musicDetail.getAlbum();
+        Album album1 = musicDetail.getAlbum();
         return CompletableFuture.allOf(
-                        ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(albumImageThumbnailSize)).thenAccept(imageTextureData -> {
+                        ImageUtils.downloadAsync(album1.getImageThumbnailUrl(albumImageThumbnailSize)).thenAccept(imageTextureData -> {
                             imageTextures[0] = imageTextureData;
                         }),
-                        ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240)).thenAccept(imageTextureData -> {
+                        ImageUtils.downloadAsync(album.getImageThumbnailUrl(240)).thenAccept(imageTextureData -> {
                             imageTextures[1] = imageTextureData;
                         })
                 ).thenAccept(imageTextureData -> {
@@ -437,6 +439,6 @@ public class HudRendererManager {
     }
 
     public void preloadAlbumImage(Album album) {
-        ImageUtils.downloadAsync(album.getThumbnailPicUrl(albumImageThumbnailSize));
+        ImageUtils.downloadAsync(album.getImageThumbnailUrl(albumImageThumbnailSize));
     }
 }

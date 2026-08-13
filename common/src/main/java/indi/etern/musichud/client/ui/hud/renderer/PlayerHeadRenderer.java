@@ -6,6 +6,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.util.ARGB;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Objects;
 import java.util.function.Supplier;
 
 public class PlayerHeadRenderer implements HudRenderer {
@@ -44,7 +45,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         try {
             if (playerSkinSupplier != null) {
                 String skin = playerSkinSupplier.get();
-                if (skinResource != skin) {
+                if (!Objects.equals(skinResource, skin)) {
                     if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
                         previousSkinResource = skinResource;
                     } else {

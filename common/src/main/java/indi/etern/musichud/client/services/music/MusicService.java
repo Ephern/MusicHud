@@ -295,10 +295,12 @@ public class MusicService implements IClientMusicService {
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             if (!musicQueue.isEmpty()) {// preload image
                 MusicDetail peek = musicQueue.peek().musicDetail();
-                ImageUtils.downloadAsync(peek.getAlbum().getThumbnailPicUrl(240));
+                Album album = peek.getAlbum();
+                ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 HudRendererManager.getInstance().preloadAlbumImage(peek.getAlbum());
             } else if (nextIdleMusicDetail != null && !nextIdleMusicDetail.equals(MusicDetail.NONE)) {
-                ImageUtils.downloadAsync(nextIdleMusicDetail.getAlbum().getThumbnailPicUrl(240));
+                Album album = nextIdleMusicDetail.getAlbum();
+                ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 HudRendererManager.getInstance().preloadAlbumImage(nextIdleMusicDetail.getAlbum());
             }
             if (!message.isEmpty()) {
@@ -309,7 +311,8 @@ public class MusicService implements IClientMusicService {
                 });
             }
             if (!musicDetail.equals(MusicDetail.NONE)) {
-                ImageUtils.downloadAsync(musicDetail.getAlbum().getThumbnailPicUrl(240));
+                Album album = musicDetail.getAlbum();
+                ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 streamAudioPlayer.playAsync(musicDetail, serverStartTime)
