@@ -51,7 +51,7 @@ public final class CommonInitializer {
 
     public static void onRenderGui(RenderGuiEvent.Pre event) {
         if (hudRendererManager != null) {
-            hudRendererManager.renderFrame(new VanillaHudGraphics(event.getGuiGraphics()), event.getPartialTick());
+            hudRendererManager.renderFrame(new VanillaHudGraphics(event.getGuiGraphics()));
         }
     }
 

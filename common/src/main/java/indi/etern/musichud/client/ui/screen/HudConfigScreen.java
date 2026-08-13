@@ -23,12 +23,13 @@ package indi.etern.musichud.client.ui.screen;
  */
 
 import icyllis.modernui.fragment.Fragment;
-import icyllis.modernui.graphics.Color;
-import icyllis.modernui.mc.*;
-import indi.etern.musichud.interfaces.ClientConfig;
+import icyllis.modernui.mc.MuiScreen;
+import icyllis.modernui.mc.ScreenCallback;
+import icyllis.modernui.mc.UIManager;
+import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -39,35 +40,22 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Objects;
 
 /**
- * Represents the GUI screen that receives events from Minecraft.
- * All vanilla methods are completely taken over by Modern UI.
+ * Transparent screen for editing HUD
  */
 @SuppressWarnings("UnstableApiUsage")
-public class MusicHudScreen extends Screen implements MuiScreen {
-    static {
-        MuiModApi.addOnScreenChangeListener((oldScreen, newScreen) -> {
-            if (newScreen instanceof MusicHudScreen || newScreen instanceof HudConfigScreen) {
-                BlurHandler.INSTANCE.blur(null);
-                BlurHandler.INSTANCE.blur(newScreen);
-            }
-        });
-    }
-
+public class HudConfigScreen extends Screen implements MuiScreen {
     private final UIManager mHost;
     @Nullable
     private final Screen mPrevious;
     private final Fragment mFragment;
     @Nullable
     private final ScreenCallback mCallback;
-
-    private final static int FADE_IN_DURATION_MILLIS = 200;
     @Getter
-    @Setter
-    private static double darken = ClientConfig.getInstance().getMainScreenAdditionalBackgroundDarken();
+    private static volatile boolean visible = false;
 
-    MusicHudScreen(UIManager host, Fragment fragment,
-                   @Nullable ScreenCallback callback, @Nullable Screen previous,
-                   @Nullable CharSequence title) {
+    HudConfigScreen(UIManager host, Fragment fragment,
+                    @Nullable ScreenCallback callback, @Nullable Screen previous,
+                    @Nullable CharSequence title) {
         super(title == null || title.isEmpty()
                 ? CommonComponents.EMPTY
                 : Component.literal(title.toString()));
@@ -78,17 +66,17 @@ public class MusicHudScreen extends Screen implements MuiScreen {
                 fragment instanceof ScreenCallback cbk ? cbk : null;
     }
 
-    public static MusicHudScreen createScreen(@NonNull Fragment fragment,
-                                              @Nullable ScreenCallback callback,
-                                              @Nullable Screen previousScreen,
-                                              @Nullable CharSequence title) {
-        return new MusicHudScreen(UIManager.getInstance(),
-                fragment, callback, previousScreen, title);
+    public static HudConfigScreen createScreen(@NonNull Fragment fragment,
+                                               @Nullable Screen previousScreen,
+                                               @Nullable CharSequence title) {
+        return new HudConfigScreen(UIManager.getInstance(),
+                fragment, null, previousScreen, title);
     }
 
     @Override
     protected void init() {
         super.init();
+        visible = true;
         mHost.initScreen(this);
     }
 
@@ -98,16 +86,11 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
-        ScreenCallback callback = getCallback();
-        if (callback == null || callback.hasDefaultBackground()) {
-            if (minecraft != null && minecraft.level == null) {
-                super.renderBackground(gr, mouseX, mouseY, deltaTick);
-            } else {
-                BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
-            }
-            float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
-            gr.fill(0, 0, this.width, this.height, Color.argb((int) (progress * darken * 255), 0, 0, 0));//additional darken
+    public void renderBackground(@NonNull GuiGraphics guiGraphics, int mouseX, int mouseY, float deltaTick) {
+        if (minecraft != null && minecraft.level == null) {
+            this.renderPanorama(guiGraphics, deltaTick);
+            guiGraphics.nextStratum();
+            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
         }
     }
 
@@ -119,6 +102,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Override
     public void removed() {
         super.removed();
+        visible = false;
         mHost.removed(this);
     }
 
@@ -156,8 +140,6 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     public boolean isMenuScreen() {
         return false;
     }
-
-    // IMPL - GuiEventListener
 
     @Override
     public void onBackPressed() {
@@ -207,4 +189,3 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         return mHost.onCharTyped(ch);
     }
 }
-

@@ -11,6 +11,7 @@ import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
+import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
@@ -19,7 +20,6 @@ import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
@@ -370,7 +370,7 @@ public class HudRendererManager {
         hudBaseData.getTransitionableBackground().startTransition(nextData);
     }
 
-    public void renderFrame(HudGraphics graphics, @Nullable DeltaTracker deltaTracker) {
+    public void renderFrame(HudGraphics graphics) {
         try {
             if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
                 return;
@@ -383,7 +383,7 @@ public class HudRendererManager {
             MusicDetail musicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
             if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
                 TITLE_RENDERER.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));//To prevent i18n lazy loading result in wrong text
-                if (clientConfig.getHideHudWhenNotPlaying()) {
+                if (clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()) {
                     return;
                 }
             }
@@ -403,9 +403,6 @@ public class HudRendererManager {
 
             hudRenderContext.beginFrame(graphics);
 
-//            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-//            PLAYER_HEAD_RENDERER.setSkinResource(PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo));
-
             BACKGROUND_RENDERER.render(hudRenderContext);
 
             IMAGE_RENDERER.render(hudRenderContext);
@@ -415,12 +412,10 @@ public class HudRendererManager {
 
             float progressWidth = PROGRESS_RENDERER.getProgressData().getLayout().getWidth();
             Layout titleLayout = TITLE_RENDERER.getLayout();
-            float maxTitleWidth = progressWidth - PLAYER_HEAD_RENDERER.getLayout().getWidth() - Math.max(4, contentInterval);
-            if (PLAYING_STATUS_RENDERER.isVisible()) {
-                titleLayout.setWidth(maxTitleWidth - Math.max(4, contentInterval) - PLAYING_STATUS_RENDERER.getLayout().getWidth());
-            } else {
-                titleLayout.setWidth(maxTitleWidth);
-            }
+            float headSpace = PLAYER_HEAD_RENDERER.isVisible() ? PLAYER_HEAD_RENDERER.getLayout().getWidth() + Math.max(4, contentInterval) : 0;
+            float statusSpace = PLAYING_STATUS_RENDERER.isVisible() ? PLAYING_STATUS_RENDERER.getLayout().getWidth() + Math.max(4, contentInterval) : 0;
+            float maxTitleWidth = progressWidth - headSpace - statusSpace;
+            titleLayout.setWidth(maxTitleWidth);
 
             TITLE_RENDERER.render(hudRenderContext);
             LYRICS_LINE_RENDERER.render(hudRenderContext);

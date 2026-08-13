@@ -33,6 +33,10 @@ public class PlayerHeadRenderer implements HudRenderer {
         skinResource = newSkin;
     }
 
+    public boolean isVisible() {
+        return skinResource != null;
+    }
+
     public void configure(Layout layout) {
         this.layout = layout;
     }
