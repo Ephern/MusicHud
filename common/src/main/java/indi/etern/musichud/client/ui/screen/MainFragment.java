@@ -15,6 +15,7 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
@@ -84,6 +85,7 @@ public class MainFragment extends Fragment {
     private TextView totalTimeText;
     private ToggleTrackLikeStateButton likeButton;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
+    private int sideWidth = -1;
 
     public MainFragment() {
     }
@@ -147,7 +149,8 @@ public class MainFragment extends Fragment {
             instance.addToPlaylistButton.bindMusicDetail(null);
         } else {
             instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
-            instance.albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(240));
+            Album album = musicDetail.getAlbum();
+            instance.albumImage.loadUrl(album.getImageThumbnailUrl(instance.sideWidth));
             instance.titleText.setText(musicDetail.getName());
             PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
             String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().name() : null;
@@ -236,7 +239,7 @@ public class MainFragment extends Fragment {
                 String playedTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()));
                 MuiModApi.postToUiThread(() -> {
                     if (instance != null && instance.progressBar != null) {
-                        instance.progressBar.setProgress((int) (nowPlayingInfo.getProgressRate() * 100));
+                        instance.progressBar.setProgress((int) (nowPlayingInfo.getProgressRate() * instance.sideWidth));
                         instance.playedTimeText.setText(playedTimeString);
                         instance.totalTimeText.setText(totalTimeString);
                     }
@@ -299,13 +302,13 @@ public class MainFragment extends Fragment {
                     settingsNav.select();
                 }
 
-                int widthDp = base.dp(160);
-                var params = new LinearLayout.LayoutParams(widthDp, MATCH_PARENT);
+                sideWidth = base.dp(240);
+                var params = new LinearLayout.LayoutParams(sideWidth, MATCH_PARENT);
                 params.gravity = Gravity.CENTER;
                 albumImage = new UrlImageView(context);
                 albumImage.loadUrl(MusicHud.ICON_BASE64);
                 //noinspection SuspiciousNameCombination
-                var imageParams = new FrameLayout.LayoutParams(widthDp, widthDp);
+                var imageParams = new FrameLayout.LayoutParams(sideWidth, sideWidth);
                 sideContent.addView(albumImage, imageParams);
 
                 LinearLayout musicInfo = new LinearLayout(context);
@@ -359,7 +362,7 @@ public class MainFragment extends Fragment {
 
                 progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
                 progressBar.setMin(0);
-                progressBar.setMax(100);
+                progressBar.setMax(sideWidth);
                 progressBar.setVisibility(View.GONE);
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 StreamAudioPlayer.Status status = streamAudioPlayer.getStatus();
@@ -442,7 +445,7 @@ public class MainFragment extends Fragment {
                 var bottomBlank = new FrameLayout(context);
                 sideContent.addView(bottomBlank, new FrameLayout.LayoutParams(MATCH_PARENT, base.dp(128)));
 
-                var sideParams = new LinearLayout.LayoutParams(widthDp, MATCH_PARENT);
+                var sideParams = new LinearLayout.LayoutParams(sideWidth, MATCH_PARENT);
                 sideParams.setMargins(0, sideContent.dp(32), 0, 0);
 
                 sideScrollView.addView(sideContent, sideParams);
@@ -468,7 +471,7 @@ public class MainFragment extends Fragment {
                 });
                 serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(40)));
                 refreshServerConnectStatus();
-                LinearLayout.LayoutParams params4 = new LinearLayout.LayoutParams(widthDp, WRAP_CONTENT);
+                LinearLayout.LayoutParams params4 = new LinearLayout.LayoutParams(sideWidth, WRAP_CONTENT);
                 params4.setMargins(0, serverConnectPanel.dp(8), 0, serverConnectPanel.dp(48));
                 side.addView(serverConnectPanel, params4);
 

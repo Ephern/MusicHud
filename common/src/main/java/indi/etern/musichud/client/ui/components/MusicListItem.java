@@ -8,10 +8,7 @@ import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.beans.music.Fee;
-import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.PusherInfo;
+import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
@@ -183,7 +180,8 @@ public class MusicListItem extends LinearLayout {
         }
         setTag(musicDetail.getId());
         this.musicDetail = musicDetail;
-        albumImage.loadUrl(musicDetail.getAlbum().getThumbnailPicUrl(dp(imageSize)));
+        Album album = musicDetail.getAlbum();
+        albumImage.loadUrl(album.getImageThumbnailUrl(dp(imageSize)));
 
         musicName.setText(musicDetail.getName());
         Fee fee1 = musicDetail.getFee();

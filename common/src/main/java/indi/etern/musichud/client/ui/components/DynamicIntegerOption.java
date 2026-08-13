@@ -4,14 +4,13 @@ import icyllis.arc3d.core.MathUtil;
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.mc.ui.PreferencesFragment;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.SeekBar;
 
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
-public class DynamicIntegerOption extends PreferencesFragment.IntegerOption {
+public class DynamicIntegerOption extends AdaptiveIntegerOption {
     public DynamicIntegerOption(Context context, String name,
                                 Supplier<Integer> getter,
                                 Consumer<Integer> setter) {
@@ -19,28 +18,26 @@ public class DynamicIntegerOption extends PreferencesFragment.IntegerOption {
     }
 
     public DynamicIntegerOption updateRange(int min, int max, int step) {
-        MuiModApi.postToUiThread(() -> {
-            super.setRange(min, max, step);
-            if (slider == null) {
-                return;
+        super.setRange(min, max, step);
+        if (slider == null) {
+            return this;
+        }
+
+        slider.setOnSeekBarChangeListener(null);
+
+        int currentValue = getter.get();
+        int clampedValue = MathUtil.clamp(currentValue, min, max);
+
+        input.setText(Integer.toString(clampedValue));
+
+        if (clampedValue != currentValue) {
+            setter.accept(clampedValue);
+            if (onChanged != null) {
+                onChanged.run();
             }
+        }
 
-            slider.setOnSeekBarChangeListener(null);
-
-            int currentValue = getter.get();
-            int clampedValue = MathUtil.clamp(currentValue, min, max);
-
-            input.setText(Integer.toString(clampedValue));
-
-            if (clampedValue != currentValue) {
-                setter.accept(clampedValue);
-                if (onChanged != null) {
-                    onChanged.run();
-                }
-            }
-
-            rebuildSlider(min, max, step);
-        });
+        rebuildSlider(min, max, step);
         return this;
     }
 
@@ -48,7 +45,6 @@ public class DynamicIntegerOption extends PreferencesFragment.IntegerOption {
         if (slider == null) {
             return;
         }
-
         // 保存父容器和位置
         ViewGroup parent = (ViewGroup) slider.getParent();
         assert parent != null;
@@ -84,5 +80,23 @@ public class DynamicIntegerOption extends PreferencesFragment.IntegerOption {
 
         // 更新输入框
         input.setText(Integer.toString(clampedValue));
+    }
+
+    public void refresh() {
+        MuiModApi.postToUiThread(() -> {
+            int currentValue = getter.get();
+            int previousValue = Math.clamp(Integer.parseInt(input.getText().toString()), minValue, maxValue);
+            input.setText(Integer.toString(currentValue));
+            if (slider != null) {
+                int progress = MathUtil.clamp((currentValue - minValue) / stepSize, 0, slider.getMax());
+                slider.setProgress(progress);
+            }
+            if (previousValue != currentValue) {
+                setter.accept(previousValue);
+                if (onChanged != null) {
+                    onChanged.run();
+                }
+            }
+        });
     }
 }
