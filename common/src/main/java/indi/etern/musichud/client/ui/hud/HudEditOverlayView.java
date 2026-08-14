@@ -254,7 +254,7 @@ public class HudEditOverlayView extends View {
             return;
         }
 
-        hudRendererManager.setBaseLayout(new Layout("Base", newOffsetX, newOffsetY, newWidth, newHeight, newRadius, ha, va));
+        hudRendererManager.setBaseLayout(new Layout(newOffsetX, newOffsetY, newWidth, newHeight, newRadius, ha, va));
         hudRendererManager.refreshStyle();
         if (onConfigChanged != null) {
             onConfigChanged.run();

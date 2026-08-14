@@ -121,7 +121,6 @@ public class HudRendererManager {
     public void updateLayoutFromConfig() {
         try {
             Layout layout = new Layout(
-                    "Base",
                     clientConfig.getHudOffsetX(),
                     clientConfig.getHudOffsetY(),
                     clientConfig.getHudWidth(),
@@ -162,7 +161,7 @@ public class HudRendererManager {
 
             float imageHeightAndWidth = height - 2 * contentPadding;
             float imageRadius = Math.clamp(baseLayout.getRadius() - contentPadding, 0, imageHeightAndWidth / 2f);
-            Layout imageLayout = new Layout("Album", contentPadding, contentPadding, imageHeightAndWidth, imageHeightAndWidth, imageRadius);
+            Layout imageLayout = new Layout(contentPadding, contentPadding, imageHeightAndWidth, imageHeightAndWidth, imageRadius);
             imageLayout.setParent(baseLayout);
 
             configureImageRenderer(imageLayout);
@@ -177,7 +176,7 @@ public class HudRendererManager {
             float mainContentX = contentPadding + imageHeightAndWidth + contentPadding;
             float progressY = contentPadding + imageHeightAndWidth - progressHeight - 1;
             float progressRadius = progressHeight / 2;
-            Layout progressLayout = new Layout("Progress", mainContentX, progressY, contentWidth, progressHeight, progressRadius);
+            Layout progressLayout = new Layout(mainContentX, progressY, contentWidth, progressHeight, progressRadius);
             progressLayout.setParent(baseLayout);
 
             configureProgressRenderer(progressLayout);
@@ -203,30 +202,30 @@ public class HudRendererManager {
             float aboveProgressY = progressY - infoTextSize - contentInterval;
             float progressRightX = mainContentX + contentWidth;
 
-            Layout statusLayout = new Layout("Status", statusX, titleY, titleSize, titleSize, 0f);
+            Layout statusLayout = new Layout(statusX, titleY, titleSize, titleSize, 0f);
             statusLayout.setParent(baseLayout);
             PLAYING_STATUS_RENDERER.configure(statusLayout);
             PLAYING_STATUS_RENDERER.setVisibility(statusVisible);
 
-            Layout layout1 = new Layout("PlayerHead", headX, titleY, titleSize, titleSize, 0f);
+            Layout layout1 = new Layout(headX, titleY, titleSize, titleSize, 0f);
             layout1.setParent(baseLayout);
             PLAYER_HEAD_RENDERER.configure(layout1);
 
-            Layout titleLayout = Layout.ofTextLayout("Title", mainContentX, titleY, maxTitleWidth, titleSize);
+            Layout titleLayout = Layout.ofTextLayout(mainContentX, titleY, maxTitleWidth, titleSize);
             titleLayout.setParent(baseLayout);
             TITLE_RENDERER.configure(titleLayout, Theme.EMPHASIZE_TEXT_COLOR, TextRenderer.Position.LEFT);
 
             float lyricHeight = contentHeight - titleSize - progressHeight - infoTextSize - contentInterval * 2;
-            Layout layout = new Layout("MainContent", mainContentX, lyricsY, contentWidth, lyricHeight, 0);
+            Layout layout = new Layout(mainContentX, lyricsY, contentWidth, lyricHeight, 0);
             layout.setParent(baseLayout);
             LYRICS_LINE_RENDERER.setLayout(layout);
             LYRICS_LINE_RENDERER.setLine1Height(lyricsSize);
             LYRICS_LINE_RENDERER.setLine2Height(subLyricsSize);
             LYRICS_LINE_RENDERER.setLineSpacing((int) contentInterval);
 
-            Layout artistAndAlbumLayout = Layout.ofTextLayout("InfoText", mainContentX, aboveProgressY, contentWidth, infoTextSize);
+            Layout artistAndAlbumLayout = Layout.ofTextLayout(mainContentX, aboveProgressY, contentWidth, infoTextSize);
             artistAndAlbumLayout.setParent(baseLayout);
-            Layout playTimeLayout = Layout.ofTextLayout("PlayTimeText", progressRightX, aboveProgressY, contentWidth, infoTextSize);
+            Layout playTimeLayout = Layout.ofTextLayout(progressRightX, aboveProgressY, contentWidth, infoTextSize);
             playTimeLayout.setParent(baseLayout);
             ARTISTS_AND_ALBUM_RENDERER.configure(artistAndAlbumLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.LEFT);
             PLAY_TIME_RENDERER.configure(playTimeLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.RIGHT);

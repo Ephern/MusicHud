@@ -17,6 +17,7 @@ import indi.etern.musichud.client.services.music.states.*;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -378,6 +379,7 @@ public class MusicService implements IClientMusicService {
                     //noinspection UnstableApiUsage
                     Context context = UIManager.getInstance().getDecorView().getContext();
                     String s = IClientDistUtil.getInstance().inSinglePlayer()
+                            || ConnectionStateMachine.getState() == ConnectionStateMachine.ConnectionState.ISOLATED
                             ? I18n.get(MusicHud.MOD_ID + ".text.skipConfirmed")
                             : I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed");
                     ToastUtil.show(Toast.makeText(context, s, Toast.LENGTH_SHORT));
@@ -388,6 +390,7 @@ public class MusicService implements IClientMusicService {
                     //noinspection UnstableApiUsage
                     Context context = UIManager.getInstance().getDecorView().getContext();
                     String s = IClientDistUtil.getInstance().inSinglePlayer()
+                            || ConnectionStateMachine.getState() == ConnectionStateMachine.ConnectionState.ISOLATED
                             ? I18n.get(MusicHud.MOD_ID + ".text.confirmSkip")
                             : I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip");
                     ToastUtil.show(Toast.makeText(context, s, Toast.LENGTH_SHORT));
