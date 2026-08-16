@@ -10,6 +10,7 @@ import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.audio.PlaybackTask;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.LoginService;
@@ -316,7 +317,7 @@ public class MusicService implements IClientMusicService {
                 ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
-                streamAudioPlayer.playAsync(musicDetail, serverStartTime)
+                streamAudioPlayer.play(PlaybackTask.of(musicDetail, serverStartTime))
                         .thenAccept(nowPlayingInfo::startAt)
                         .exceptionally(e -> null);
             } else {//TODO optional account sync
