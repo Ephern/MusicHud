@@ -19,27 +19,19 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.sounds.SoundSource;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
-import org.lwjgl.openal.SOFTDirectChannels;
 
 import java.io.BufferedInputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.net.HttpURLConnection;
-import java.net.SocketException;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.net.URL;
-import java.nio.ByteBuffer;
+import java.net.*;
 import java.time.Duration;
 import java.time.ZonedDateTime;
-import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Consumer;
 
 /**
@@ -87,31 +79,26 @@ public class PlaybackTask {
     private final CompletableFuture<ZonedDateTime> startFuture = new CompletableFuture<>();
     private final CompletableFuture<Void> finishFuture = new CompletableFuture<>();
     private final CompletableFuture<Void> gate = new CompletableFuture<>();
-    private final Set<Consumer<PlaybackState>> stateListeners = new HashSet<>();
-    private final AtomicLong totalBufferedBytes = new AtomicLong(0);
-    private final int[] buffers = new int[BUFFER_COUNT];
-    private final AtomicBoolean initialized = new AtomicBoolean(false);
+    private final Set<Consumer<PlaybackState>> stateListeners = new CopyOnWriteArraySet<>();
+    private final PlaybackLedger ledger = new PlaybackLedger();
 
     private volatile BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(AUDIO_BUFFER_CAPACITY);
     private volatile PlaybackState state = PlaybackState.PENDING;
     private volatile boolean cancelled = false;
     private volatile boolean restartRequested = false;
     private volatile boolean downloadDone = false;
-    private volatile int source = 0;
+    private volatile OpenAlSource source;
     private volatile long fadeStartNanos = -1;
     private volatile long fadeDurationMs = 0;
     private volatile float lastSetGain = -1;
     private float lastVolume = 1;
-    private AudioDecoder currentDecoder;
-    private long playedBytes = 0;
-    private long fedBytes = 0;
+    private volatile AudioDecoder currentDecoder;
     private int lastDecoderFormat = -1;
     private int lastDecoderSampleRate = -1;
     private long lastStaleDropLogTime = 0;
     private long lastUnderrunLogTime = 0;
     private long lastDownloadRestartTimestamp = 0;
     private long underrunSinceNanos = -1;
-    private int roundRobinBufferIndex = 0;
     private volatile Future<?> downloadThreadFuture;
     private volatile Future<?> playThreadFuture;
 
@@ -273,7 +260,7 @@ public class PlaybackTask {
                     if (audioData == null) break;
                     if (cancelled || restartRequested) break;
                     audioBuffer.put(audioData);
-                    totalBufferedBytes.addAndGet(audioData.length);
+                    ledger.prefetchBytes.addAndGet(audioData.length);
                     initialBuffers++;
                 }
 
@@ -286,8 +273,8 @@ public class PlaybackTask {
                     if (cancelled || restartRequested) break;
 
                     audioBuffer.put(audioData);
-                    playedBytes += audioData.length;
-                    totalBufferedBytes.addAndGet(audioData.length);
+                    ledger.decodedBytes.addAndGet(audioData.length);
+                    ledger.prefetchBytes.addAndGet(audioData.length);
                 }
 
                 if (cancelled || restartRequested) return;
@@ -305,20 +292,22 @@ public class PlaybackTask {
             } catch (Exception e) {
                 if (restartRequested || cancelled) return;
                 String message = e.getMessage();
-                if (e instanceof SocketException e1 && "Closed by interrupt".equals(message)) return;
+                if (e instanceof SocketException && "Closed by interrupt".equals(message)) return;
                 LOGGER.error("Download error (attempt {})\n{} : {}", trial, e.getClass().getName(), message);
                 if (e.getCause() instanceof TimeoutException || (message != null && (message.contains("Timeout") || message.contains("timeout")))) {
                     message = I18n.get(MusicHud.MOD_ID + ".error.cause.timeout");
                 }
-                ToastUtil.show(
-                        I18n.get(MusicHud.MOD_ID + ".error.downloadingAudioStream")
-                                .replace("{trial}", String.valueOf(trial))
-                                .replace("{message}", message)
-                );
+                if (message != null) {
+                    ToastUtil.show(
+                            I18n.get(MusicHud.MOD_ID + ".error.downloadingAudioStream")
+                                    .replace("{trial}", String.valueOf(trial))
+                                    .replace("{message}", message)
+                    );
+                }
 
                 audioBuffer.clear();
-                totalBufferedBytes.set(0);
-                playedBytes = 0;
+                ledger.prefetchBytes.set(0);
+                ledger.decodedBytes.set(0);
                 forceSync = true;
                 localRetryCount++;
                 setState(PlaybackState.RETRYING);
@@ -337,22 +326,18 @@ public class PlaybackTask {
 
     private void syncPlaying() {
         if (serverStartTime == null || currentDecoder == null) return;
-        int bytesPerSample = getBytesPerSample(currentDecoder.getFormat());
+        int bytesPerSample = OpenAlSource.bytesPerSample(currentDecoder.getFormat());
         long bytesPerSecond = (long) currentDecoder.getSampleRate() * bytesPerSample;
 
-        // 解码器头直接对齐墙钟绝对位置（不再减半缓冲补偿）：
-        // 起播时播放线程的 fedBytes 也锚定在同一墙钟位置，内容位置与墙钟完全对齐，
-        // 出声即同步；旧版的固定半缓冲补偿与实际起播延迟不匹配，反而导致内容
-        // 永久落后墙钟（stale drop 校准到 margin 边界后停止，无法自动恢复）。
         while (!cancelled && !restartRequested) {
             long millis = Duration.between(serverStartTime, ZonedDateTime.now()).toMillis();
             long skipBytes = millis * bytesPerSecond / 1000;
-            if (playedBytes > skipBytes - bytesPerSample) {
+            if (ledger.decodedBytes.get() > skipBytes - bytesPerSample) {
                 break;
             }
-            byte[] chunk = currentDecoder.readChunk(Math.max(0, skipBytes - playedBytes));
+            byte[] chunk = currentDecoder.readChunk(Math.max(0, skipBytes - ledger.decodedBytes.get()));
             if (chunk == null) break;
-            playedBytes += chunk.length;
+            ledger.decodedBytes.addAndGet(chunk.length);
         }
     }
 
@@ -389,6 +374,7 @@ public class PlaybackTask {
     private void waitForGate() {
         while (!gate.isDone() && !cancelled && !Thread.currentThread().isInterrupted()) {
             try {
+                //noinspection BusyWait
                 Thread.sleep(10);
             } catch (InterruptedException e) {
                 return;
@@ -401,20 +387,23 @@ public class PlaybackTask {
      * playback with fade-in, run the main loop until natural end or restart.
      */
     private PlayResult playOnce() {
-        initSource();
+        source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, AL.getCapabilities().AL_SOFT_direct_channels), ledger);
         waitInitialBuffer();
         if (cancelled) return PlayResult.RESTARTED;
 
-        if (totalBufferedBytes.get() == 0) {
+        if (ledger.prefetchBytes.get() == 0) {
             LOGGER.error("No audio data available");
             setState(PlaybackState.ERROR);
             rebuildForRetry();
             return PlayResult.RESTARTED;
         }
 
-        if (!initialized.get() || source == 0) {
+        if (source == null) {
             throw new IllegalStateException("Audio player not initialized");
         }
+
+        int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
+        int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
 
         boolean firstChunk = true;
         for (int i = 0; i < BUFFER_COUNT; i++) {
@@ -424,31 +413,26 @@ public class PlaybackTask {
             if (firstChunk) {
                 firstChunk = false;
                 // 锚定内容绝对位置：服务器同步时下载线程已把解码器跳到
-                // 墙钟位置，fedBytes 从这里开始累计，之后与 expectedBytes
+                // 墙钟位置，ledger.fedBytes 从这里开始累计，之后与 expectedBytes
                 // （墙钟绝对位置）基准一致。不再减半缓冲补偿——内容与墙钟
                 // 完全对齐，出声即同步（见 syncPlaying 注释）。
                 if (serverStartTime != null && currentDecoder != null) {
                     long bytesPerSecond = (long) currentDecoder.getSampleRate()
-                            * getBytesPerSample(currentDecoder.getFormat());
-                    fedBytes = Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
-                    fedBytes = Math.max(0, fedBytes);
+                            * OpenAlSource.bytesPerSample(currentDecoder.getFormat());
+                    ledger.anchor(Math.max(0, Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000));
                 }
             }
 
-            queueBuffer(buffers[i], audioData);
-            fedBytes += audioData.length;
-            totalBufferedBytes.addAndGet(-audioData.length);
+            source.queueChunk(audioData, format, sampleRate);
+            ledger.prefetchBytes.addAndGet(-audioData.length);
         }
 
         if (clientConfig.getDisableVanillaMusic())
             Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC);
 
-        if (source != 0 && AL10.alIsSource(source)) {
-            AL10.alSourcef(source, AL10.AL_GAIN, 0);
-            lastSetGain = 0;
-        }
-        AL10.alSourcePlay(source);
-        checkALError("alSourcePlay-Pre");
+        source.setGain(0);
+        lastSetGain = 0;
+        source.play();
 
         // fade progress 与 startFuture 同刻起算：网络缓冲等待不会提前消耗淡入进度，
         // HUD 进度/歌词/淡入起点严格一致
@@ -479,122 +463,146 @@ public class PlaybackTask {
                     long stallMs = (iterationNow - lastIterationNanos) / 1_000_000;
                     if (stallMs > PLAYBACK_STALL_LOG_MS) {
                         // GC STW / 调度暂停：本地线程被冻结，恢复后第一轮间隔 = 冻结时长
-                        int bytesPerSample = currentDecoder != null ? getBytesPerSample(currentDecoder.getFormat()) : 4;
+                        int bytesPerSample = currentDecoder != null ? OpenAlSource.bytesPerSample(currentDecoder.getFormat()) : 4;
                         long bytesPerSecond = (long) (currentDecoder != null ? currentDecoder.getSampleRate() : 44100) * bytesPerSample;
                         long expected = Duration.between(wallStart, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
                         LOGGER.info("Playback thread stalled for {} ms (GC STW / scheduling pause?)" +
-                                        " [content={} ms expected={} ms bufferedChunks={} processed={} state={}]",
+                                        " [content={} ms expected={} ms bufferedChunks={} sourceQueued={} playing={} state={}]",
                                 stallMs,
-                                fedBytes * 1000L / bytesPerSecond, expected * 1000L / bytesPerSecond,
+                                ledger.fedBytes.get() * 1000L / bytesPerSecond, expected * 1000L / bytesPerSecond,
                                 audioBuffer.size(),
-                                AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED),
-                                AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE));
+                                source != null ? source.queuedCount() : -1,
+                                source != null && source.isPlaying(),
+                                state);
                     }
                 }
                 lastIterationNanos = iterationNow;
 
                 updateGain();
-                if (!initialized.get() || source == 0) break;
+                if (source == null) break;
 
                 if (state == PlaybackState.FADING_OUT && fadeProgress() >= 1.0) break;
 
                 checkDecoderChangeAndFlush();
 
-                int processed = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
-                //noinspection SpellCheckingInspection
-                checkALError("alGetSourcei-Processed");
-
-                int bytesPerSample = currentDecoder != null ? getBytesPerSample(currentDecoder.getFormat()) : 4;
+                int bytesPerSample = currentDecoder != null ? OpenAlSource.bytesPerSample(currentDecoder.getFormat()) : 4;
                 long bytesPerSecond = (long) (currentDecoder != null ? currentDecoder.getSampleRate() : 44100) * bytesPerSample;
                 long expectedBytes = Duration.between(wallStart, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
                 long staleDropMarginBytes = STALE_DROP_MARGIN_MS * bytesPerSecond / 1000;
+                int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
+                int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
 
-                while (processed-- > 0) {
-                    int[] buffer = new int[1];
-                    AL10.alSourceUnqueueBuffers(source, buffer);
-                    //noinspection SpellCheckingInspection
-                    checkALError("alSourceUnqueueBuffers-Main");
-
-                    byte[] audioData = audioBuffer.poll(0, TimeUnit.MILLISECONDS);
-                    if (audioData != null && underrunSinceNanos >= 0) {
-                        // 欠载恢复：数据位置已被下载线程 sync 对齐墙钟，重置基准并跳过陈旧判定，
-                        // 否则落后的 fedBytes 会把墙钟位置的新鲜数据误判为陈旧连续丢弃（音频提前）
-                        underrunSinceNanos = -1;
-                        fedBytes = expectedBytes;
-                        logUnderrunDiagnostics("underrun-recovered", expectedBytes, bytesPerSecond);
-                    } else if (audioData == null) {
-                        if (!downloadDone && underrunSinceNanos < 0) {
-                            underrunSinceNanos = System.nanoTime();
-                            logUnderrunDiagnostics("underrun-started", expectedBytes, bytesPerSecond);
+                // source 已空即重新起播点：填充数据位置已被 sync 对齐墙钟，
+                // 对齐落后基准，避免欠播累积的落后触发陈旧丢弃（跳音/空帧）。
+                // 欠载恢复需等待缓冲积累到阈值再填充（与 waitInitialBuffer 一致），
+                // 否则边产边播使队列无法建立超前缓冲，下载产出≈播放时周期性空帧。
+                boolean sourceEmpty = source.isEmpty();
+                boolean waitForBuffer = sourceEmpty && !downloadDone
+                        && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT;
+                if (!waitForBuffer) {
+                    if (sourceEmpty) {
+                        if (underrunSinceNanos >= 0) {
+                            underrunSinceNanos = -1;
+                            logUnderrunDiagnostics("underrun-recovered", expectedBytes, bytesPerSecond);
                         }
-                        continue;
-                    } else {
-                        while (audioData != null && fedBytes < expectedBytes - staleDropMarginBytes) {
-                            totalBufferedBytes.addAndGet(-audioData.length);
-                            fedBytes += audioData.length;
-                            logStaleDrop(audioData.length, bytesPerSecond);
-                            audioData = audioBuffer.poll(0, TimeUnit.MILLISECONDS);
-                        }
-                        if (audioData == null) {
-                            if (!downloadDone && underrunSinceNanos < 0) {
-                                underrunSinceNanos = System.nanoTime();
-                                logUnderrunDiagnostics("underrun-started", expectedBytes, bytesPerSecond);
-                            }
-                            continue;
+                        if (ledger.fedBytes.get() < expectedBytes) {
+                            ledger.fedBytes.set(expectedBytes);
                         }
                     }
-                    if (state == PlaybackState.BUFFERING || state == PlaybackState.LOADING) setState(PlaybackState.PLAYING);
-
-                    queueBuffer(buffer[0], audioData);
-                    fedBytes += audioData.length;
-                    if (audioData.length == BUFFER_SIZE) {
-                        totalBufferedBytes.addAndGet(-audioData.length);
+                    int filled = source.fill(() -> takeChunk(expectedBytes, staleDropMarginBytes, bytesPerSecond),
+                            BUFFER_COUNT, format, sampleRate);
+                    if (filled > 0) {
+                        resumeIfWaiting();
                     }
                 }
 
-                if (underrunSinceNanos < 0 && audioBuffer.isEmpty() && !downloadDone) {
-                    underrunSinceNanos = System.nanoTime();
-                    logUnderrunDiagnostics("underrun-started", expectedBytes, bytesPerSecond);
-                    // 下载线程异常退出（非 EOF）时温和重启下载，避免永久卡 BUFFERING
-                    Future<?> currentDownloadFuture = downloadThreadFuture;
-                    if (currentDownloadFuture != null && currentDownloadFuture.isDone() && !cancelled
-                            && System.currentTimeMillis() - lastDownloadRestartTimestamp > 1000) {
-                        LOGGER.warn("Download thread died during playback, restarting download");
-                        downloadThreadFuture = MusicHud.EXECUTOR.submit(this::downloadLoop);
-                        lastDownloadRestartTimestamp = System.currentTimeMillis();
-                    }
-                }
+                updateUnderrunState(expectedBytes, bytesPerSecond);
+                source.updatePlaybackPosition();
 
-                if (downloadDone && audioBuffer.isEmpty() && state != PlaybackState.FADING_OUT
-                        && state != PlaybackState.ERROR && state != PlaybackState.RETRYING) {
-                    int queuedNow = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-                    if (queuedNow == 0) {
-                        beginFadeOut(fadeOut.durationMs());
-                    }
-                }
-
-                // 下载完成后内容耗尽应走自然结束淡出，不再上报 BUFFERING
-                if (underrunSinceNanos >= 0 && !downloadDone && state != PlaybackState.ERROR && state != PlaybackState.RETRYING
-                        && state != PlaybackState.FADING_IN && state != PlaybackState.FADING_OUT) {
-                    long underrunMs = (System.nanoTime() - underrunSinceNanos) / 1_000_000;
-                    if (underrunMs >= UNDERFLOW_BUFFERING_DELAY_MS) {
-                        setState(PlaybackState.BUFFERING);
-                    }
-                }
-
-                refillBuffersIfSourceEmpty(expectedBytes, bytesPerSecond);
-
-                int sourceState = AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE);
-                //noinspection SpellCheckingInspection
-                checkALError("alGetSourcei-SourceState");
-                int queuedNow = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-                if (sourceState != AL10.AL_PLAYING && queuedNow > 0 && !cancelled) {
-                    AL10.alSourcePlay(source);
-                    checkALError("alSourcePlay-Main");
+                if (!source.isPlaying() && source.queuedCount() > 0 && !cancelled) {
+                    source.play();
                 }
                 Thread.sleep(PLAY_LOOP_SLEEP_MS);
             } catch (InterruptedException e) {
                 break;
+            }
+        }
+    }
+
+    /**
+     * 取一块数据供 OpenAL 填充：poll 预取队列，应用陈旧丢弃与欠载策略。
+     * 欠载恢复时重置 ledger 基准到墙钟并跳过陈旧判定（数据已被 sync 对齐）。
+     */
+    private byte @Nullable [] takeChunk(long expectedBytes, long staleDropMarginBytes, long bytesPerSecond) {
+        if (underrunSinceNanos >= 0) {
+            underrunSinceNanos = -1;
+            ledger.fedBytes.set(expectedBytes);
+            logUnderrunDiagnostics("underrun-recovered", expectedBytes, bytesPerSecond);
+            byte[] data = audioBuffer.poll();
+            if (data == null) {
+                if (!downloadDone) {
+                    underrunSinceNanos = System.nanoTime();
+                    logUnderrunDiagnostics("underrun-started", expectedBytes, bytesPerSecond);
+                }
+                return null;
+            }
+            ledger.prefetchBytes.addAndGet(-data.length);
+            return data;
+        }
+        byte[] data = audioBuffer.poll();
+        if (data != null) {
+            ledger.prefetchBytes.addAndGet(-data.length);
+        }
+        while (data != null && ledger.fedBytes.get() < expectedBytes - staleDropMarginBytes) {
+            // 陈旧内容：落后墙钟超过余量，丢弃而不是排入 OpenAL 源。
+            // 下载线程的 syncPlaying 保证解码器头 ≥ 墙钟，新鲜内容随后到达。
+            ledger.fedBytes.set(data.length);
+            logStaleDrop(data.length, bytesPerSecond);
+            data = audioBuffer.poll();
+            if (data != null) {
+                ledger.prefetchBytes.addAndGet(-data.length);
+            }
+        }
+        if (data == null && !downloadDone && underrunSinceNanos < 0) {
+            underrunSinceNanos = System.nanoTime();
+            logUnderrunDiagnostics("underrun-started", expectedBytes, bytesPerSecond);
+        }
+        return data;
+    }
+
+    private void resumeIfWaiting() {
+        if (state == PlaybackState.LOADING || state == PlaybackState.BUFFERING) {
+            setState(PlaybackState.PLAYING);
+        }
+    }
+
+    private void updateUnderrunState(long expectedBytes, long bytesPerSecond) {
+        if (underrunSinceNanos < 0 && audioBuffer.isEmpty() && !downloadDone) {
+            underrunSinceNanos = System.nanoTime();
+            logUnderrunDiagnostics("underrun-started", expectedBytes, bytesPerSecond);
+            // 下载线程异常退出（非 EOF）时温和重启下载，避免永久卡 BUFFERING
+            Future<?> currentDownloadFuture = downloadThreadFuture;
+            if (currentDownloadFuture != null && currentDownloadFuture.isDone() && !cancelled
+                    && System.currentTimeMillis() - lastDownloadRestartTimestamp > 1000) {
+                LOGGER.warn("Download thread died during playback, restarting download");
+                downloadThreadFuture = MusicHud.EXECUTOR.submit(this::downloadLoop);
+                lastDownloadRestartTimestamp = System.currentTimeMillis();
+            }
+        }
+
+        if (downloadDone && audioBuffer.isEmpty() && state != PlaybackState.FADING_OUT
+                && state != PlaybackState.ERROR && state != PlaybackState.RETRYING) {
+            if (source != null && source.queuedCount() == 0) {
+                beginFadeOut(fadeOut.durationMs());
+            }
+        }
+
+        // 下载完成后内容耗尽应走自然结束淡出，不再上报 BUFFERING
+        if (underrunSinceNanos >= 0 && !downloadDone && state != PlaybackState.ERROR && state != PlaybackState.RETRYING
+                && state != PlaybackState.FADING_IN && state != PlaybackState.FADING_OUT) {
+            long underrunMs = (System.nanoTime() - underrunSinceNanos) / 1_000_000;
+            if (underrunMs >= UNDERFLOW_BUFFERING_DELAY_MS) {
+                setState(PlaybackState.BUFFERING);
             }
         }
     }
@@ -607,57 +615,17 @@ public class PlaybackTask {
             lastUnderrunLogTime = now;
         }
         try {
-            int queued = source != 0 && AL10.alIsSource(source) ? AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED) : -1;
-            int processed = source != 0 && AL10.alIsSource(source) ? AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED) : -1;
-            LOGGER.debug("PlaybackDiagnostics {}: fedBytes={} ms, expectedBytes={} ms, deltaMs={}, "
-                            + "bufferedChunks={}, sourceQueued={}, sourceProcessed={}, state={}",
-                    event,
-                    fedBytes * 1000L / bytesPerSecond, expectedBytes * 1000L / bytesPerSecond,
-                    (fedBytes - expectedBytes) * 1000L / bytesPerSecond,
-                    audioBuffer.size(), queued, processed, state);
+            int queued = source != null ? source.queuedCount() : -1;
+            if (LOGGER.isDebugEnabled()) {
+                LOGGER.debug("PlaybackDiagnostics {}: fedBytes={} ms, expectedBytes={} ms, deltaMs={}, "
+                                + "bufferedChunks={}, sourceQueued={}, state={}",
+                        event,
+                        ledger.fedBytes.get() * 1000L / bytesPerSecond, expectedBytes * 1000L / bytesPerSecond,
+                        (ledger.fedBytes.get() - expectedBytes) * 1000L / bytesPerSecond,
+                        audioBuffer.size(), queued, state);
+            }
         } catch (Exception e) {
             LOGGER.warn("PlaybackDiagnostics failed to log {}: {}", event, e.getMessage());
-        }
-    }
-
-    private void refillBuffersIfSourceEmpty(long expectedBytes, long bytesPerSecond) {
-        if (source == 0 || !AL10.alIsSource(source)) return;
-        int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-        if (queued > 0) return;
-
-        boolean wasUnderrun = underrunSinceNanos >= 0;
-        if (wasUnderrun) {
-            underrunSinceNanos = -1;
-        }
-        // source 已空即重新起播点：填充数据位置已被 sync 对齐墙钟，
-        // 对齐落后基准，避免欠播期间累积的落后周期性触发陈旧丢弃（跳音/空帧）
-        if (fedBytes < expectedBytes) {
-            fedBytes = expectedBytes;
-        }
-
-        boolean filled = false;
-        int fillCount = 0;
-        while (!cancelled && fillCount < BUFFER_COUNT) {
-            byte[] audioData = audioBuffer.poll();
-            if (audioData == null) break;
-            fillCount++;
-
-            int bufferId = buffers[roundRobinBufferIndex];
-            roundRobinBufferIndex = (roundRobinBufferIndex + 1) % BUFFER_COUNT;
-            queueBuffer(bufferId, audioData);
-            fedBytes += audioData.length;
-            if (audioData.length == BUFFER_SIZE) {
-                totalBufferedBytes.addAndGet(-audioData.length);
-            }
-            filled = true;
-        }
-        if (filled) {
-            if (wasUnderrun) {
-                logUnderrunDiagnostics("underrun-recovered", expectedBytes, bytesPerSecond);
-            }
-            if (state == PlaybackState.BUFFERING || state == PlaybackState.LOADING) setState(PlaybackState.PLAYING);
-            AL10.alSourcePlay(source);
-            checkALError("alSourcePlay-Fill");
         }
     }
 
@@ -669,18 +637,18 @@ public class PlaybackTask {
                     : Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
             LOGGER.info("Dropped {} ms of stale audio [content now at {} ms, expected {} ms]",
                     droppedBytes * 1000L / bytesPerSecond,
-                    fedBytes * 1000L / bytesPerSecond, expected * 1000L / bytesPerSecond);
+                    ledger.fedBytes.get() * 1000L / bytesPerSecond, expected * 1000L / bytesPerSecond);
         }
     }
 
     private void updateGain() {
         float targetGain = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
                 (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
-        if (lastVolume != targetGain && source != 0 && AL10.alIsSource(source)) {
+        if (lastVolume != targetGain && source != null) {
             PlayingStatusRenderer.getInstance().updateStatus(null);
             lastVolume = targetGain;
         }
-        if (source == 0 || !AL10.alIsSource(source)) return;
+        if (source == null) return;
 
         float gain = targetGain;
         PlaybackState s = state;
@@ -699,59 +667,10 @@ public class PlaybackTask {
         }
 
         if (gain != lastSetGain) {
-            AL10.alSourcef(source, AL10.AL_GAIN, gain);
-            int error = AL10.alGetError();
-            if (error != AL10.AL_NO_ERROR) {
-                LOGGER.warn("Failed to set source gain to {}: {} (source: {})", gain, getALErrorString(error), source);
-                if (error == AL10.AL_INVALID_NAME) {
-                    LOGGER.error("Source {} is invalid, will be reinitialized on next restart", source);
-                    source = 0;
-                    initialized.set(false);
-                    throw new RuntimeException("AL source invalid");
-                } else {
-                    setState(PlaybackState.ERROR);
-                }
-            } else {
-                lastSetGain = gain;
-            }
+            // INVALID_NAME 时门面抛 SourceInvalidException，由 playLoop 统一走 rebuild
+            source.setGain(gain);
+            lastSetGain = gain;
         }
-    }
-
-    private void initSource() {
-        source = AL10.alGenSources();
-        checkALError("alGenSources");
-
-        for (int i = 0; i < BUFFER_COUNT; i++) {
-            buffers[i] = AL10.alGenBuffers();
-            checkALError("alGenBuffers");
-        }
-
-        // 配置为非空间播放
-        AL10.alSourcei(source, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE);
-        AL10.alSource3f(source, AL10.AL_POSITION, 0, 0, 0);
-        AL10.alSourcef(source, AL10.AL_ROLLOFF_FACTOR, 0);
-        if (AL.getCapabilities().AL_SOFT_direct_channels) {
-            AL10.alSourcei(source, SOFTDirectChannels.AL_DIRECT_CHANNELS_SOFT, AL10.AL_TRUE);
-        }
-        checkALError("source configuration");
-        lastVolume = 1;
-        lastSetGain = -1;
-
-        initialized.set(true);
-    }
-
-    private void queueBuffer(int bufferId, byte[] audioData) {
-        ByteBuffer directBuffer = ByteBuffer.allocateDirect(audioData.length);
-        directBuffer.put(audioData);
-        directBuffer.flip();
-
-        int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-        int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
-
-        AL10.alBufferData(bufferId, format, directBuffer, sampleRate);
-        checkALError("alBufferData");
-        AL10.alSourceQueueBuffers(source, bufferId);
-        checkALError("alSourceQueueBuffers");
     }
 
     private void checkDecoderChangeAndFlush() {
@@ -767,51 +686,12 @@ public class PlaybackTask {
             lastDecoderFormat = format;
             lastDecoderSampleRate = sampleRate;
             LOGGER.info("Decoder format changed to {}/{}Hz, flushing pipeline", format, sampleRate);
-            if (source != 0) {
-                AL10.alSourceStop(source);
-                checkALError("alSourceStop-Flush");
-                int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-                checkALError("alGetSourcei-Queued-Flush");
-                for (int i = 0; i < queued; i++) {
-                    int[] buffer = new int[1];
-                    AL10.alSourceUnqueueBuffers(source, buffer);
-                    checkALError("alSourceUnqueueBuffers-Flush");
-                }
+            if (source != null) {
+                source.flush();
             }
-            fedBytes = 0;
             audioBuffer.clear();
-            totalBufferedBytes.set(0);
-            roundRobinBufferIndex = 0;
+            ledger.prefetchBytes.set(0);
         }
-    }
-
-    private int getBytesPerSample(int format) {
-        return switch (format) {
-            case AL10.AL_FORMAT_MONO8 -> 1;
-            case AL10.AL_FORMAT_MONO16, AL10.AL_FORMAT_STEREO8 -> 2;
-            case AL10.AL_FORMAT_STEREO16 -> 4;
-            default -> 4;
-        };
-    }
-
-    private void checkALError(String operation) {
-        int error = AL10.alGetError();
-        if (error != AL10.AL_NO_ERROR) {
-            String errorMsg = getALErrorString(error);
-            LOGGER.warn("OpenAL Error during {}: {} ({})", operation, errorMsg, error);
-            throw new RuntimeException("al error occurred while \"" + operation + "\": " + errorMsg);
-        }
-    }
-
-    private String getALErrorString(int error) {
-        return switch (error) {
-            case AL10.AL_INVALID_NAME -> "AL_INVALID_NAME";
-            case AL10.AL_INVALID_ENUM -> "AL_INVALID_ENUM";
-            case AL10.AL_INVALID_VALUE -> "AL_INVALID_VALUE";
-            case AL10.AL_INVALID_OPERATION -> "AL_INVALID_OPERATION";
-            case AL10.AL_OUT_OF_MEMORY -> "AL_OUT_OF_MEMORY";
-            default -> "UNKNOWN_ERROR";
-        };
     }
 
     private void rebuildForRetry() {
@@ -835,7 +715,7 @@ public class PlaybackTask {
 
     private void waitInitialBuffer() {
         long lastRestartTimestamp = 0;
-        while (!cancelled && !downloadDone && totalBufferedBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT) {
+        while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT) {
             Future<?> currentDownloadFuture = downloadThreadFuture;
             if (currentDownloadFuture != null && currentDownloadFuture.isDone() && !downloadDone
                     && System.currentTimeMillis() - lastRestartTimestamp > 1000) {
@@ -860,73 +740,16 @@ public class PlaybackTask {
 
     private void cleanup() {
         try {
-            if (source != 0 && AL10.alIsSource(source)) {
-                AL10.alSourceStop(source);
-                int error = AL10.alGetError();
-                if (error != AL10.AL_NO_ERROR) {
-                    LOGGER.warn("Error stopping source {}: {}", source, getALErrorString(error));
-                }
-
-                int processed;
-                try {
-                    processed = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
-                    error = AL10.alGetError();
-                    if (error != AL10.AL_NO_ERROR) {
-                        LOGGER.warn("Error getting processed buffers: {}", getALErrorString(error));
-                        processed = BUFFER_COUNT;
-                    }
-                } catch (Exception e) {
-                    LOGGER.warn("Exception getting processed buffers", e);
-                    processed = BUFFER_COUNT;
-                }
-
-                //noinspection SpellCheckingInspection
-                int unqueueCount = 0;
-                for (int i = 0; i < processed; i++) {
-                    int[] buffer = new int[1];
-                    AL10.alSourceUnqueueBuffers(source, buffer);
-                    error = AL10.alGetError();
-                    if (error != AL10.AL_NO_ERROR) {
-                        LOGGER.warn("Failed to unqueue buffer (attempt {}): {}", i + 1, getALErrorString(error));
-                    } else {
-                        unqueueCount++;
-                    }
-                }
-                LOGGER.debug("Unqueued {} buffers", unqueueCount);
-
-                AL10.alDeleteSources(source);
-                error = AL10.alGetError();
-                if (error != AL10.AL_NO_ERROR) {
-                    LOGGER.warn("Failed to delete source {}: {}", source, getALErrorString(error));
-                }
-                source = 0;
+            if (source != null) {
+                source.close();
+                source = null;
             }
 
-            for (int i = 0; i < buffers.length; i++) {
-                if (buffers[i] != 0) {
-                    if (AL10.alIsBuffer(buffers[i])) {
-                        AL10.alDeleteBuffers(buffers[i]);
-                        int error = AL10.alGetError();
-                        if (error != AL10.AL_NO_ERROR) {
-                            LOGGER.warn("Failed to delete buffer {}: {}", buffers[i], getALErrorString(error));
-                        }
-                    } else {
-                        LOGGER.warn("Buffer {} is not a valid OpenAL buffer", buffers[i]);
-                    }
-                    buffers[i] = 0;
-                }
-            }
-
-            initialized.set(false);
             lastVolume = 1;
             lastSetGain = -1;
             downloadDone = false;
             underrunSinceNanos = -1;
-            roundRobinBufferIndex = 0;
             audioBuffer = new LinkedBlockingQueue<>(AUDIO_BUFFER_CAPACITY);
-            totalBufferedBytes.set(0);
-            playedBytes = 0;
-            fedBytes = 0;
             lastDecoderFormat = -1;
             lastDecoderSampleRate = -1;
             if (currentDecoder != null) {
@@ -953,9 +776,7 @@ public class PlaybackTask {
             case WAV -> new WavStreamDecoder(inputStream);
             case MP3 -> new MP3StreamDecoder(inputStream);
             case FLAC -> new FLACStreamDecoder(inputStream);
-            case AUTO -> {
-                throw new IllegalArgumentException();
-            }
+            case AUTO -> throw new IllegalArgumentException();
         };
     }
 
