@@ -12,7 +12,7 @@ public final class HudLayoutMath {
     public static RectF computeGuiRect(int guiWidth, int guiHeight,
                                        HorizontalAlign horizontalAlign, VerticalAlign verticalAlign,
                                        int offsetX, int offsetY, int width, int height) {
-        Layout root = new Layout("HudEdit", offsetX, offsetY, width, height, 0, horizontalAlign, verticalAlign);
+        Layout root = new Layout(offsetX, offsetY, width, height, 0, horizontalAlign, verticalAlign);
         float x = horizontalAlign.calcX(offsetX, guiWidth, root);
         float y = verticalAlign.calcY(offsetY, guiHeight, root);
         return new RectF(x, y, x + width, y + height);

@@ -285,7 +285,13 @@ public class NowPlayingInfo {
             MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, idleNextToPlay, this.lyricLines));
         } catch (IllegalStateException ignored) {
         }
-        HudRendererManager.getInstance().switchMusic(musicDetail);
+        MusicHud.EXECUTOR.submit(() -> {
+            // 补偿音频过渡
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ignored) {}
+            HudRendererManager.getInstance().switchMusic(musicDetail);
+        });
         List.copyOf(musicSwitchListener).forEach(consumer -> {
             consumer.accept(previous, musicDetail);
         });

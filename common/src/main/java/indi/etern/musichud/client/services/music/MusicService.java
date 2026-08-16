@@ -10,6 +10,7 @@ import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.audio.PlaybackTask;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.LoginService;
@@ -17,6 +18,7 @@ import indi.etern.musichud.client.services.music.states.*;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -315,7 +317,7 @@ public class MusicService implements IClientMusicService {
                 ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
-                streamAudioPlayer.playAsync(musicDetail, serverStartTime)
+                streamAudioPlayer.play(PlaybackTask.of(musicDetail, serverStartTime))
                         .thenAccept(nowPlayingInfo::startAt)
                         .exceptionally(e -> null);
             } else {//TODO optional account sync
@@ -378,6 +380,7 @@ public class MusicService implements IClientMusicService {
                     //noinspection UnstableApiUsage
                     Context context = UIManager.getInstance().getDecorView().getContext();
                     String s = IClientDistUtil.getInstance().inSinglePlayer()
+                            || ConnectionStateMachine.getState() == ConnectionStateMachine.ConnectionState.ISOLATED
                             ? I18n.get(MusicHud.MOD_ID + ".text.skipConfirmed")
                             : I18n.get(MusicHud.MOD_ID + ".text.voteForSkipConfirmed");
                     ToastUtil.show(Toast.makeText(context, s, Toast.LENGTH_SHORT));
@@ -388,6 +391,7 @@ public class MusicService implements IClientMusicService {
                     //noinspection UnstableApiUsage
                     Context context = UIManager.getInstance().getDecorView().getContext();
                     String s = IClientDistUtil.getInstance().inSinglePlayer()
+                            || ConnectionStateMachine.getState() == ConnectionStateMachine.ConnectionState.ISOLATED
                             ? I18n.get(MusicHud.MOD_ID + ".text.confirmSkip")
                             : I18n.get(MusicHud.MOD_ID + ".text.confirmVoteForSkip");
                     ToastUtil.show(Toast.makeText(context, s, Toast.LENGTH_SHORT));

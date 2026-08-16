@@ -17,13 +17,11 @@ public class Layout implements HudUniform {
     private volatile float radius;
     private volatile HorizontalAlign horizontalAlign;
     private volatile VerticalAlign verticalAlign;
-    private String targetElementName;
     private volatile Layout parent;
     private boolean dirty;
     private AbsolutePosition lastAbsolutePosition;
 
-    public Layout(String targetElementName, float x, float y, float width, float height, float radius) {
-        this.targetElementName = targetElementName;
+    public Layout(float x, float y, float width, float height, float radius) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -33,8 +31,7 @@ public class Layout implements HudUniform {
         verticalAlign = VerticalAlign.TOP;
     }
 
-    public Layout(String targetElementName, float x, float y, float width, float height, float radius, HorizontalAlign horizontalAlign, VerticalAlign verticalAlign) {
-        this.targetElementName = targetElementName;
+    public Layout(float x, float y, float width, float height, float radius, HorizontalAlign horizontalAlign, VerticalAlign verticalAlign) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -44,8 +41,8 @@ public class Layout implements HudUniform {
         this.verticalAlign = verticalAlign;
     }
 
-    public static Layout ofTextLayout(String targetElementName, float x, float y, float maxWidth, float fontSize) {
-        return new Layout(targetElementName, x, y, maxWidth, fontSize, 0);
+    public static Layout ofTextLayout(float x, float y, float maxWidth, float fontSize) {
+        return new Layout(x, y, maxWidth, fontSize, 0);
     }
 
     @Override
@@ -146,11 +143,6 @@ public class Layout implements HudUniform {
     public void setVerticalAlign(VerticalAlign verticalAlign) {
         this.dirty = true;
         this.verticalAlign = verticalAlign;
-    }
-
-    public void setTargetElementName(String targetElementName) {
-        this.dirty = true;
-        this.targetElementName = targetElementName;
     }
 
     public void setParent(Layout parent) {

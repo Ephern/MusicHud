@@ -91,7 +91,7 @@ public class MusicCollectionCard extends LinearLayout {
         imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp160));
         imageView.setCornerRadius(dp(8));
 
-        LinearLayout row1 = new LinearLayout(context);
+        FlexWrapLayout row1 = new FlexWrapLayout(context);
         row1.setOrientation(HORIZONTAL);
         row1.setBaselineAligned(false);
         row1.setGravity(Gravity.CENTER_VERTICAL);
