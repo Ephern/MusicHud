@@ -67,10 +67,6 @@ public class Album implements MusicCollection {
         this.pusherInfo = pusherInfo;
     }
 
-    public String getThumbnailPicUrl(int size) {
-        return picUrl + "?param=" + size + "y" + size;
-    }
-
     public String getName() {
         return Objects.requireNonNullElse(name, "");
     }
@@ -108,7 +104,11 @@ public class Album implements MusicCollection {
 
     @Override
     public String getImageThumbnailUrl(int size) {
-        return getThumbnailPicUrl(size);
+        if (picUrl.startsWith("data:image")) {
+            return picUrl;
+        } else {
+            return size >= 0 ? picUrl + "?param=" + size + "y" + size : picUrl;
+        }
     }
 
     public LinkedHashSet<Artist> getArtists() {

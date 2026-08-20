@@ -17,7 +17,7 @@ public final class ClientInitializer implements ClientModInitializer {
                 HudRendererManager hudRendererManager = HudRendererManager.getInstance();
                 HudElementRegistry.addFirst(
                         ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "main_hud"),
-                        (graphics, deltaTracker) -> hudRendererManager.renderFrame(new VanillaHudGraphics(graphics), deltaTracker)
+                        (graphics, deltaTracker) -> hudRendererManager.renderFrame(new VanillaHudGraphics(graphics))
                 );
             }
         });

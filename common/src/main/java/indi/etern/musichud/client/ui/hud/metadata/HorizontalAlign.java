@@ -10,18 +10,18 @@ import net.minecraft.client.resources.language.I18n;
 public enum HorizontalAlign {
     LEFT(MusicHud.MOD_ID + ".config.layout.horizontalAlign.LEFT", Gravity.LEFT) {
         @Override
-        float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
+        public float calcX(float x, int guiWidth, Layout hudLayout) {
             return x;
         }
     }, CENTER(MusicHud.MOD_ID + ".config.layout.horizontalAlign.CENTER", Gravity.CENTER) {
         @Override
-        float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
-            return (float) renderContext.guiWidth() / 2 + x - hudLayout.getWidth() / 2;
+        public float calcX(float x, int guiWidth, Layout hudLayout) {
+            return (float) guiWidth / 2 + x - hudLayout.getWidth() / 2;
         }
     }, RIGHT(MusicHud.MOD_ID + ".config.layout.horizontalAlign.RIGHT", Gravity.RIGHT) {
         @Override
-        float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
-            return renderContext.guiWidth() - hudLayout.getWidth() - x;
+        public float calcX(float x, int guiWidth, Layout hudLayout) {
+            return guiWidth - hudLayout.getWidth() - x;
         }
     };
 
@@ -37,5 +37,10 @@ public enum HorizontalAlign {
     public String toString() {
         return I18n.get(displayName);
     }
-    abstract float calcX(float x, HudRenderContext renderContext, Layout hudLayout);
+
+    public float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
+        return calcX(x, renderContext.guiWidth(), hudLayout);
+    }
+
+    public abstract float calcX(float x, int guiWidth, Layout hudLayout);
 }
