@@ -32,6 +32,8 @@ import java.time.ZonedDateTime;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -65,20 +67,19 @@ public class PlaybackTask {
     private final MusicDetail musicDetail;
     /**
      * 同步基准时刻：初始为服务器广播的开始时间（可为 null），首次起播时惰性重赋为
-     * wallStart（服务器时间 ?? 本地起播时刻），此后保持不变（复刻旧版 this.serverStartTime = wallStart
-     * 的重赋语义，保证重试/完全重试后仍以首次起播时刻为基准，从当前墙钟位置继续而不是从头）。
+     * wallStart（服务器时间 ?? 本地起播时刻），此后保持不变
      */
     private volatile ZonedDateTime serverStartTime;
     /**
      * 调度器在交叉淡化时指定的淡入时长（transitionMs = max(outgoing.fadeOut, incoming.fadeIn)）。
-     * -1 表示未指定，起播时使用任务自己的 fadeIn。
+     * -1 表示未指定，起播时使用任务自己的 fadeIn
      */
     private volatile long transitionFadeInMs = -1;
     private final Fade fadeIn;
     private final Fade fadeOut;
     private final CompletableFuture<ZonedDateTime> startFuture = new CompletableFuture<>();
     private final CompletableFuture<Void> finishFuture = new CompletableFuture<>();
-    private final CompletableFuture<Void> gate = new CompletableFuture<>();
+    private final CountDownLatch gate = new CountDownLatch(1);
     private final Set<Consumer<PlaybackState>> stateListeners = new CopyOnWriteArraySet<>();
     private final PlaybackLedger ledger = new PlaybackLedger();
 
@@ -101,6 +102,7 @@ public class PlaybackTask {
     private long underrunSinceNanos = -1;
     private volatile Future<?> downloadThreadFuture;
     private volatile Future<?> playThreadFuture;
+    private final AtomicBoolean cleanupGuard = new AtomicBoolean();
 
     private PlaybackTask(MusicDetail musicDetail, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
         this.musicDetail = musicDetail;
@@ -182,7 +184,7 @@ public class PlaybackTask {
      * Release the start gate; the play worker proceeds once audio is buffered.
      */
     void openGate() {
-        gate.complete(null);
+        gate.countDown();
     }
 
     /**
@@ -205,7 +207,7 @@ public class PlaybackTask {
         restartRequested = true;
         if (downloadThreadFuture != null) downloadThreadFuture.cancel(true);
         if (playThreadFuture != null) playThreadFuture.cancel(true);
-        gate.complete(null);
+        gate.countDown();
         startFuture.completeExceptionally(new CancellationException("Playback task cancelled"));
         cleanup();
         finishFuture.complete(null);
@@ -372,14 +374,9 @@ public class PlaybackTask {
     }
 
     private void waitForGate() {
-        while (!gate.isDone() && !cancelled && !Thread.currentThread().isInterrupted()) {
-            try {
-                //noinspection BusyWait
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                return;
-            }
-        }
+        try {
+            gate.await();
+        } catch (InterruptedException ignored) {}
     }
 
     /**
@@ -427,8 +424,11 @@ public class PlaybackTask {
             ledger.prefetchBytes.addAndGet(-audioData.length);
         }
 
-        if (clientConfig.getDisableVanillaMusic())
-            Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC);
+        if (clientConfig.getDisableVanillaMusic()) {
+            // SoundManager 仅允许在主线程访问，投递到客户端线程
+            Minecraft.getInstance().execute(() ->
+                    Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC));
+        }
 
         source.setGain(0);
         lastSetGain = 0;
@@ -554,9 +554,9 @@ public class PlaybackTask {
             ledger.prefetchBytes.addAndGet(-data.length);
         }
         while (data != null && ledger.fedBytes.get() < expectedBytes - staleDropMarginBytes) {
-            // 陈旧内容：落后墙钟超过余量，丢弃而不是排入 OpenAL 源。
-            // 下载线程的 syncPlaying 保证解码器头 ≥ 墙钟，新鲜内容随后到达。
-            ledger.fedBytes.set(data.length);
+            // 陈旧内容：丢弃并累加 fedBytes 推进绝对位置，追上墙钟后接住新鲜内容；
+            // 若覆盖赋值会把位置压塌导致整个队列被误判陈旧。
+            ledger.fedBytes.addAndGet(data.length);
             logStaleDrop(data.length, bytesPerSecond);
             data = audioBuffer.poll();
             if (data != null) {
@@ -739,6 +739,17 @@ public class PlaybackTask {
     }
 
     private void cleanup() {
+        if (!cleanupGuard.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            cleanupInternal();
+        } finally {
+            cleanupGuard.set(false);
+        }
+    }
+
+    private void cleanupInternal() {
         try {
             if (source != null) {
                 source.close();

@@ -229,6 +229,8 @@ public class MainFragment extends Fragment {
                 DateTimeFormatter.ofPattern("HH:mm:ss") :
                 DateTimeFormatter.ofPattern("mm:ss");
         String totalTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
+        // 兜底退出：startAt 可能因任务被取代/失败永不触发，超时后结束进度循环防泄漏
+        long deadline = System.currentTimeMillis() + musicDuration.toMillis() + 120_000;
         MusicHud.EXECUTOR.execute(() -> {
             do {
                 if (instance == null || instance.progressBar == null
@@ -250,7 +252,8 @@ public class MainFragment extends Fragment {
                     return;
                 }
             } while (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())
-                    && nowPlayingInfo.getProgressRate() < 1);
+                    && nowPlayingInfo.getProgressRate() < 1
+                    && System.currentTimeMillis() < deadline);
         });
     }
 

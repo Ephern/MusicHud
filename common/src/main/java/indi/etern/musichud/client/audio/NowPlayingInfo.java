@@ -30,6 +30,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -59,13 +60,15 @@ public class NowPlayingInfo {
     private ArrayDeque<LyricLine> lyricLines;
     @Getter
     private LyricLine currentLyricLine;
-    private Thread lyricUpdaterVThread;
+    private volatile Thread lyricUpdaterVThread;
+    private final AtomicLong lyricUpdaterGeneration = new AtomicLong(0);
 
     final Runnable lyricUpdater = () -> {
         Thread thread = Thread.currentThread();
         lyricUpdaterVThread = thread;
         thread.setName("MHWorker-Lyrics-Updater");
-        while (true) {
+        long generation = lyricUpdaterGeneration.get();
+        while (generation == lyricUpdaterGeneration.get()) {
             if (this.musicStartTime == null) {
                 break;
             }
@@ -96,7 +99,9 @@ public class NowPlayingInfo {
                 }
             }
         }
-        lyricUpdaterVThread = null;
+        if (lyricUpdaterVThread == thread) {
+            lyricUpdaterVThread = null;
+        }
     };
 
     private NowPlayingInfo() {
@@ -302,11 +307,13 @@ public class NowPlayingInfo {
         musicStartTime = Objects.requireNonNullElseGet(zonedDateTime, ZonedDateTime::now);
         // SMTC state change picked up by jmtcLoop polling
         if (lyricLines != null && !lyricLines.isEmpty()) {
-            if (lyricUpdaterVThread == null) {
-                MusicHud.EXECUTOR.execute(lyricUpdater);
-            } else {
-                lyricUpdaterVThread.interrupt();
+            lyricUpdaterGeneration.incrementAndGet();
+            Thread old = lyricUpdaterVThread;
+            if (old != null) {
+                old.interrupt();
             }
+            // 代际递增后总是新提交一个更新器，旧更新器检测到代际变化自行退出，避免并发消费歌词
+            MusicHud.EXECUTOR.execute(lyricUpdater);
         }
     }
 
@@ -369,6 +376,7 @@ public class NowPlayingInfo {
     }
 
     public void stop() {
+        lyricUpdaterGeneration.incrementAndGet();
         if (lyricUpdaterVThread != null) {
             lyricUpdaterVThread.interrupt();
         }

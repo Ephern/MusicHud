@@ -57,6 +57,15 @@ public class StreamAudioPlayer {
         }
     }
 
+    // audible 的 pending 先淡出自然结束，避免硬取消爆音
+    private static void retirePending(PlaybackTask pending) {
+        if (pending.isAudible()) {
+            pending.beginFadeOut(pending.fadeOut().durationMs());
+        } else {
+            pending.cancel();
+        }
+    }
+
     /**
      * Submit a playback task. If another task is currently audible, a cross-fade
      * transition is scheduled; otherwise the task starts as soon as its audio is
@@ -72,7 +81,7 @@ public class StreamAudioPlayer {
         PlaybackTask current = currentTask;
         if (current == null || !current.isAudible()) {
             if (pendingTask != null && pendingTask != task) {
-                pendingTask.cancel();
+                retirePending(pendingTask);
             }
             pendingTask = null;
             if (current != null) {
@@ -82,7 +91,7 @@ public class StreamAudioPlayer {
             task.openGate();
         } else {
             if (pendingTask != null && pendingTask != task) {
-                pendingTask.cancel();
+                retirePending(pendingTask);
             }
             pendingTask = task;
             long transitionMs = Math.max(current.fadeOut().durationMs(), task.fadeIn().durationMs());
@@ -144,8 +153,12 @@ public class StreamAudioPlayer {
             } else {
                 pendingTask = null;
                 currentTask = next;
-                // 提升时按 next 实际状态设全局 Status（next 可能已在交叉淡化期间静默起播）
-                setStatus(next.isAudible() ? Status.PLAYING : Status.BUFFERING);
+                setStatus(switch (next.state()) {
+                    case FADING_IN, PLAYING, FADING_OUT -> Status.PLAYING;
+                    case RETRYING -> Status.RETRYING;
+                    case ERROR -> Status.ERROR;
+                    default -> Status.BUFFERING;
+                });
                 next.openGate();
             }
         }
