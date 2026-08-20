@@ -9,6 +9,8 @@ import org.lwjgl.openal.AL11;
 import org.lwjgl.openal.SOFTDirectChannels;
 
 import java.nio.ByteBuffer;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Facade over a single OpenAL source: owns the source and its buffer pool,
@@ -33,6 +35,24 @@ public final class OpenAlSource implements AutoCloseable {
 
     private static final Logger LOGGER = MusicHud.getLogger(OpenAlSource.class);
 
+    private static final Set<Integer> OWNED = ConcurrentHashMap.newKeySet();
+
+    public static boolean isMusicHudSource(int sourceId) {
+        return OWNED.contains(sourceId);
+    }
+
+    private static void register(int sourceId) {
+        OWNED.add(sourceId);
+    }
+
+    private static void unregister(int sourceId) {
+        OWNED.remove(sourceId);
+    }
+
+    public static Set<Integer> ownedSourceIds() {
+        return Set.copyOf(OWNED);
+    }
+
     private final PlaybackLedger ledger;
     private final Config config;
     private final int[] buffers;
@@ -50,11 +70,16 @@ public final class OpenAlSource implements AutoCloseable {
     public static OpenAlSource create(Config config, PlaybackLedger ledger) {
         OpenAlSource alSource = new OpenAlSource(config, ledger);
         alSource.initSource();
+        register(alSource.source);
         return alSource;
     }
 
     public void setPcmSink(@Nullable PcmSink pcmSink) {
         this.pcmSink = pcmSink;
+    }
+
+    public int sourceId() {
+        return source;
     }
 
     private void initSource() {
@@ -159,7 +184,6 @@ public final class OpenAlSource implements AutoCloseable {
         checkALError("alBufferData");
         AL10.alSourceQueueBuffers(source, bufferId);
         checkALError("alSourceQueueBuffers");
-        // 喂入 AL 即推进队尾位置（feed 的唯一点：fill/queueChunk 均经由这里）
         ledger.fedBytes.addAndGet(data.length);
         ledger.add(new PlaybackLedger.LedgerEntry(direct, format, sampleRate, data.length,
                 data.length / Math.max(1, bytesPerSample(format))));
@@ -175,7 +199,6 @@ public final class OpenAlSource implements AutoCloseable {
         try {
             long offset = AL10.alGetSourcei(source, AL11.AL_SAMPLE_OFFSET);
             checkALError("alGetSourcei-SampleOffset");
-            // offset 单调递增才采信：欠载重启/flush 后 offset 可能重置，退化到队首近似
             if (offset >= 0 && offset >= lastSampleOffset) {
                 PlaybackLedger.LedgerEntry head = ledger.peekFirst();
                 int bytesPerFrame = head != null && head.sampleCount() > 0 ? head.bytes() / head.sampleCount() : 4;
@@ -271,6 +294,7 @@ public final class OpenAlSource implements AutoCloseable {
             }
             AL10.alDeleteSources(source);
             AL10.alGetError();
+            unregister(source);
             source = 0;
         }
         for (int i = 0; i < buffers.length; i++) {
