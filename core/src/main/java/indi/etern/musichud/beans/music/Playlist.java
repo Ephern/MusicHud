@@ -108,7 +108,11 @@ public class Playlist implements MusicCollection {
 
     @Override
     public String getImageThumbnailUrl(int size) {
-        return getThumbnailCoverUrl(size);
+        if (coverImgUrl.startsWith("data:image")) {
+            return coverImgUrl;
+        } else {
+            return size >= 0 ? coverImgUrl + "?param=" + size + "y" + size : coverImgUrl;
+        }
     }
 
     @Override
@@ -122,14 +126,6 @@ public class Playlist implements MusicCollection {
 
     public String getCoverImgUrl() {
         return Objects.requireNonNullElse(coverImgUrl, "");
-    }
-
-    public String getThumbnailCoverUrl(int size) {
-        if (coverImgUrl.startsWith("data:image")) {
-            return coverImgUrl;
-        } else {
-            return coverImgUrl + "?param=" + size + "y" + size;
-        }
     }
 
     public Profile getCreator() {

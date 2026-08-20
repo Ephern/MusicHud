@@ -1,0 +1,46 @@
+package indi.etern.musichud.client.ui.hud.metadata;
+
+import icyllis.modernui.view.Gravity;
+import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.hud.renderer.HudRenderContext;
+import lombok.Getter;
+import net.minecraft.client.resources.language.I18n;
+
+@Getter
+public enum HorizontalAlign {
+    LEFT(MusicHud.MOD_ID + ".config.layout.horizontalAlign.LEFT", Gravity.LEFT) {
+        @Override
+        public float calcX(float x, int guiWidth, Layout hudLayout) {
+            return x;
+        }
+    }, CENTER(MusicHud.MOD_ID + ".config.layout.horizontalAlign.CENTER", Gravity.CENTER) {
+        @Override
+        public float calcX(float x, int guiWidth, Layout hudLayout) {
+            return (float) guiWidth / 2 + x - hudLayout.getWidth() / 2;
+        }
+    }, RIGHT(MusicHud.MOD_ID + ".config.layout.horizontalAlign.RIGHT", Gravity.RIGHT) {
+        @Override
+        public float calcX(float x, int guiWidth, Layout hudLayout) {
+            return guiWidth - hudLayout.getWidth() - x;
+        }
+    };
+
+    private final String displayName;
+    private final int gravity;
+
+    HorizontalAlign(String displayName, int gravity) {
+        this.displayName = displayName;
+        this.gravity = gravity;
+    }
+
+    @Override
+    public String toString() {
+        return I18n.get(displayName);
+    }
+
+    public float calcX(float x, HudRenderContext renderContext, Layout hudLayout) {
+        return calcX(x, renderContext.guiWidth(), hudLayout);
+    }
+
+    public abstract float calcX(float x, int guiWidth, Layout hudLayout);
+}

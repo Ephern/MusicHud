@@ -13,6 +13,7 @@ import icyllis.modernui.widget.FrameLayout;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.EasingInterpolator;
+import lombok.Setter;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -38,8 +39,11 @@ public class VirtualizedListLayout extends FrameLayout {
     private final Map<Long, Integer> heightByItemId = new HashMap<>();
     private final List<PendingRemoval> pendingRemovals = new ArrayList<>();
     private final Map<Long, AnimatorSet> runningAnimations = new HashMap<>();
+    private final Deque<MusicListItem> pendingRecycle = new ArrayDeque<>();
+    private boolean recyclePosted;
     private int scrollY;
     private int viewportHeight;
+    @Setter
     private int defaultItemHeight;
 
     private record PendingRemoval(long id, MusicListItem view, int index) {
@@ -55,6 +59,12 @@ public class VirtualizedListLayout extends FrameLayout {
         pendingRemovals.clear();
         for (MusicListItem view : activeViews.values()) {
             removeView(view);
+        }
+        while (!pendingRecycle.isEmpty()) {
+            MusicListItem view = pendingRecycle.poll();
+            if (view.getParent() != null) {
+                removeView(view);
+            }
         }
         activeViews.clear();
         viewPool.clear();
@@ -164,9 +174,15 @@ public class VirtualizedListLayout extends FrameLayout {
     private MusicListItem obtainView(long id) {
         Integer idx = indexById.get(id);
         MusicDetail data = idx != null ? items.get(idx) : null;
-        MusicListItem view = viewPool.poll();
+        MusicListItem view = pendingRecycle.pollFirst();
         if (view == null) {
-            view = MusicListFactory.createItem(this);
+            view = viewPool.poll();
+            if (view == null) {
+                view = MusicListFactory.createItem(this);
+            } else {
+                view.clearData();
+            }
+            addView(view, new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         } else {
             view.clearData();
         }
@@ -174,13 +190,30 @@ public class VirtualizedListLayout extends FrameLayout {
             view.bindData(data);
         }
         view.setAlpha(1f);
-        addView(view, new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         return view;
     }
 
+    /**
+     * 延迟回收: 视图加入待回收队列, 在消息循环独立时机 (post) 执行 removeView,
+     * 避免在滚动/布局/绘制遍历中触发 detach -> tooltip 隐藏的嵌套 removeView。
+     */
     private void recycleView(MusicListItem view) {
-        removeView(view);
-        viewPool.add(view);
+        pendingRecycle.add(view);
+        if (!recyclePosted) {
+            recyclePosted = true;
+            post(this::flushPendingRecycle);
+        }
+    }
+
+    private void flushPendingRecycle() {
+        recyclePosted = false;
+        MusicListItem view;
+        while ((view = pendingRecycle.poll()) != null) {
+            if (view.getParent() != null) {
+                removeView(view);
+            }
+            viewPool.add(view);
+        }
     }
 
     private void removeItem(long id, int index) {
@@ -259,7 +292,6 @@ public class VirtualizedListLayout extends FrameLayout {
         set.addListener(new AnimatorListener() {
             @Override
             public void onAnimationCancel(@NonNull Animator animation) {
-                // 加入动画被取消 (项被删除/容器重置): 视图需回收, 否则残留
                 recycleViewIfAttached(view);
             }
 
@@ -389,13 +421,13 @@ public class VirtualizedListLayout extends FrameLayout {
         super.onDetachedFromWindow();
         cancelAllAnimations();
         pendingRemovals.clear();
+        pendingRecycle.clear();
         activeViews.clear();
         viewPool.clear();
         heightByItemId.clear();
     }
 
     private void cancelAllAnimations() {
-        // 拷贝后取消: cancel() 会同步触发 onAnimationEnd 回调, 回调内会从 runningAnimations 移除条目
         for (AnimatorSet animator : new ArrayList<>(runningAnimations.values())) {
             animator.cancel();
         }

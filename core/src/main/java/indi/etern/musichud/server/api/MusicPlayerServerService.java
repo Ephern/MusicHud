@@ -119,9 +119,9 @@ public class MusicPlayerServerService {
                     currentMusicDetail = switchedToPlay;
                     nowPlayingStartTime = ZonedDateTime.now();
                     logger.info("Switched to music: {} (ID: {})", switchedToPlay.getName(), switchedToPlay.getId());
-                    int musicIntervalMillis = 1000;
+                    int musicMixMillis = 1200;
                     //noinspection BusyWait
-                    Thread.sleep(switchedToPlay.getDurationMillis() + musicIntervalMillis);
+                    Thread.sleep(Math.max(1000, switchedToPlay.getDurationMillis() - musicMixMillis));
                 } catch (InterruptedException ignored) {//When force switch
                     logger.info("Skip current, switch to nextIdle");
                     if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT
