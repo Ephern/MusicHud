@@ -17,7 +17,7 @@ import org.spongepowered.asm.mixin.injection.Redirect;
  * Fully optional: the redirected method only exists when SPP is installed, so
  * on any other setup this injector no-ops.
  */
-@Mixin(SoundEngine.class)
+@Mixin(value = SoundEngine.class, priority = 9100)
 public abstract class SoundEngineSppCompatMixin {
 
     @SuppressWarnings({"UnresolvedMixinReference", "MixinAnnotationTarget"})
