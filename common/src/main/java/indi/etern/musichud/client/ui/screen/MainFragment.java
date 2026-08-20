@@ -6,8 +6,11 @@ import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
+import icyllis.modernui.graphics.Image;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
 import icyllis.modernui.util.DataSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.LayoutInflater;
@@ -30,6 +33,7 @@ import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -77,7 +81,6 @@ public class MainFragment extends Fragment {
     private int defaultSelectedIndex = 0;
     private ProgressBar progressBar;
     private VoteSkipButton skipCurrentButton;
-    private TextView serverConnectStatus;
     private Button switchServerConnectButton;
     private PlayerHeadView pusherHeadView;
     private LinearLayout buttonsLayout;
@@ -287,23 +290,7 @@ public class MainFragment extends Fragment {
                 var sideContent = new LinearLayout(context);
                 sideContent.setOrientation(LinearLayout.VERTICAL);
 
-                var sideMenu = new SideMenu(context, routerContainer);
-                if (Minecraft.getInstance().player != null) {//in game
-                    var homeNav = sideMenu.createNavigationPage("Home", "/assets/music_hud/textures/gui/icons/house.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
-                    var searchNav = sideMenu.createNavigationPage("Search", "/assets/music_hud/textures/gui/icons/search.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.search"), SearchView::new);
-                    var accountNav = sideMenu.createNavigationPage("Account", "/assets/music_hud/textures/gui/icons/square_user_round.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.account"), AccountBaseView::new);
-                    var settingsNav = sideMenu.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
-                    SideMenu.NavigationMeta defaultMeta = List.of(homeNav, searchNav, accountNav, settingsNav).get(defaultSelectedIndex);
-                    defaultMeta.select();
-                } else {
-                    var settingsNav = sideMenu.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
-                    settingsNav.select();
-                }
+                sideContent.addView(new View(context), new LinearLayout.LayoutParams(MATCH_PARENT, sideContent.dp(24)));
 
                 sideWidth = base.dp(240);
                 var params = new LinearLayout.LayoutParams(sideWidth, MATCH_PARENT);
@@ -443,39 +430,45 @@ public class MainFragment extends Fragment {
                 musicInfo.setMinimumHeight(sideContent.dp(132));
 
                 sideContent.addView(musicInfo, params1);
+
+                var sideMenu = new SideMenu(context, routerContainer);
+                if (Minecraft.getInstance().player != null) {//in game
+                    var homeNav = sideMenu.createNavigationPage("Home", "/assets/music_hud/textures/gui/icons/house.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
+                    var searchNav = sideMenu.createNavigationPage("Search", "/assets/music_hud/textures/gui/icons/search.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.search"), SearchView::new);
+                    var accountNav = sideMenu.createNavigationPage("Account", "/assets/music_hud/textures/gui/icons/square_user_round.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.account"), AccountBaseView::new);
+                    var settingsNav = sideMenu.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
+                    SideMenu.NavigationMeta defaultMeta = List.of(homeNav, searchNav, accountNav, settingsNav).get(defaultSelectedIndex);
+                    defaultMeta.select();
+                } else {
+                    var settingsNav = sideMenu.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
+                            I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
+                    settingsNav.select();
+                }
                 sideContent.addView(sideMenu, params);
 
-                var bottomBlank = new FrameLayout(context);
-                sideContent.addView(bottomBlank, new FrameLayout.LayoutParams(MATCH_PARENT, base.dp(128)));
-
                 var sideParams = new LinearLayout.LayoutParams(sideWidth, MATCH_PARENT);
-                sideParams.setMargins(0, sideContent.dp(32), 0, 0);
-
                 sideScrollView.addView(sideContent, sideParams);
 
                 LinearLayout serverConnectPanel = new LinearLayout(context);
                 serverConnectPanel.setOrientation(LinearLayout.VERTICAL);
                 serverConnectPanel.setGravity(Gravity.CENTER_VERTICAL);
 
-                serverConnectStatus = new TextView(context);
-                serverConnectStatus.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                serverConnectStatus.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                serverConnectStatus.setMinLines(2);
-                serverConnectPanel.addView(serverConnectStatus, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
                 switchServerConnectButton = new Button(context);
                 switchServerConnectButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 switchServerConnectButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
-                switchServerConnectButton.setGravity(Gravity.CENTER);
+                switchServerConnectButton.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
                 backgroundFactory.applyBackgroundTo(switchServerConnectButton);
                 switchServerConnectButton.setOnClickListener(b -> {
-                    MusicHud.EXECUTOR.execute(connectionManager::toggleConnection);
+                    connectionManager.toggleConnection();
                 });
-                serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(40)));
+                serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(36)));
                 refreshServerConnectStatus();
                 LinearLayout.LayoutParams params4 = new LinearLayout.LayoutParams(sideWidth, WRAP_CONTENT);
-                params4.setMargins(0, serverConnectPanel.dp(8), 0, serverConnectPanel.dp(48));
+                params4.setMargins(0, serverConnectPanel.dp(8), 0, serverConnectPanel.dp(16));
                 side.addView(serverConnectPanel, params4);
 
                 LayoutTransition transition1 = new LayoutTransition();
@@ -507,41 +500,54 @@ public class MainFragment extends Fragment {
 
     private void refreshServerConnectStatus() {
         if (Minecraft.getInstance().player != null) {
+            switchServerConnectButton.setVisibility(View.VISIBLE);
             boolean singlePlayer = Minecraft.getInstance().getCurrentServer() == null;
+            String buttonText = "";
+            String icon = "";
             switch (ConnectionStateMachine.getConnectStatus()) {
                 case CONNECTED -> {
+                    icon = "/assets/music_hud/textures/gui/icons/link.png";
                     if (singlePlayer) {
-                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.connected.integrated"));
-                        switchServerConnectButton.setVisibility(View.GONE);
+                        buttonText = I18n.get(MusicHud.MOD_ID + ".text.connected.integrated");
+                        switchServerConnectButton.setEnabled(false);
+                        switchServerConnectButton.setTooltipText(null);
                     } else {
-                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.connected"));
-                        switchServerConnectButton.setVisibility(View.VISIBLE);
-                        switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.disconnect"));
+                        buttonText = I18n.get(MusicHud.MOD_ID + ".text.connected");
+                        switchServerConnectButton.setEnabled(true);
+                        switchServerConnectButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.disconnect"));
                     }
                 }
                 case NOT_CONNECTED -> {
+                    icon = "/assets/music_hud/textures/gui/icons/unlink.png";
                     if (clientConfig.getEnableIsolatedMode()) {
-                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected.isolated"));
+                        buttonText = I18n.get(MusicHud.MOD_ID + ".text.notConnected.isolated");
                     } else {
-                        serverConnectStatus.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
+                        buttonText = I18n.get(MusicHud.MOD_ID + ".text.notConnected");
                     }
-                    switchServerConnectButton.setVisibility(View.VISIBLE);
-                    switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
+                    switchServerConnectButton.setEnabled(true);
+                    switchServerConnectButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }
                 case INCOMPATIBLE -> {
+                    icon = "/assets/music_hud/textures/gui/icons/unlink.png";
                     String template;
                     if (clientConfig.getEnableIsolatedMode()) {
                         template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer");
                     } else {
                         template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer.isolated");
                     }
-                    serverConnectStatus.setText(template.replace("{version}", connectionManager.getServerVersion().toString()));
-                    switchServerConnectButton.setVisibility(View.GONE);
-                    switchServerConnectButton.setText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
+                    buttonText = template.replace("{version}", connectionManager.getServerVersion().toString());
+                    switchServerConnectButton.setEnabled(false);
+                    switchServerConnectButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }
             }
+            String linkUnicode = "\uD83D\uDD17";
+            SpannableString string = new SpannableString("  " + linkUnicode + " " + buttonText);
+            Image imageFromResource = ImageUtils.getImageFromResource(icon);
+            if (imageFromResource != null) {
+                string.setSpan(ImageUtils.getIconSpan(imageFromResource), 2, 2 + linkUnicode.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            switchServerConnectButton.setText(string);
         } else {
-            serverConnectStatus.setText("");
             switchServerConnectButton.setVisibility(View.GONE);
         }
     }

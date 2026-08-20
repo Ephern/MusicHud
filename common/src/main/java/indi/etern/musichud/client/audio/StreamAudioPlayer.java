@@ -35,6 +35,7 @@ public class StreamAudioPlayer {
     private PlaybackTask currentTask;
     private PlaybackTask pendingTask;
 
+
     public static StreamAudioPlayer getInstance() {
         if (instance == null) {
             synchronized (StreamAudioPlayer.class) {
