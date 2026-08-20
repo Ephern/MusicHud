@@ -9,6 +9,7 @@
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
+    "SoundEngineSppCompatMixin",
     "SpanSetMixin",
     "ToastManagerMixin",
     "ToastRecordAccessor"

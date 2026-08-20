@@ -263,6 +263,7 @@ public class PlaybackTask {
                     if (audioData == null) break;
                     if (cancelled || restartRequested) break;
                     audioBuffer.put(audioData);
+                    ledger.decodedBytes.addAndGet(audioData.length);
                     ledger.prefetchBytes.addAndGet(audioData.length);
                     initialBuffers++;
                 }
