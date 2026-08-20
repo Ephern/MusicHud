@@ -32,6 +32,8 @@ import java.time.ZonedDateTime;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
 /**
@@ -60,28 +62,28 @@ public class PlaybackTask {
     private static final long UNDERFLOW_BUFFERING_DELAY_MS = 300;// 预取队列连续欠载超过该值才上报 BUFFERING
     private static final Logger LOGGER = MusicHud.getLogger(PlaybackTask.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
 
     @Getter
     private final MusicDetail musicDetail;
-    /**
-     * 同步基准时刻：初始为服务器广播的开始时间（可为 null），首次起播时惰性重赋为
-     * wallStart（服务器时间 ?? 本地起播时刻），此后保持不变（复刻旧版 this.serverStartTime = wallStart
-     * 的重赋语义，保证重试/完全重试后仍以首次起播时刻为基准，从当前墙钟位置继续而不是从头）。
-     */
-    private volatile ZonedDateTime serverStartTime;
-    /**
-     * 调度器在交叉淡化时指定的淡入时长（transitionMs = max(outgoing.fadeOut, incoming.fadeIn)）。
-     * -1 表示未指定，起播时使用任务自己的 fadeIn。
-     */
-    private volatile long transitionFadeInMs = -1;
     private final Fade fadeIn;
     private final Fade fadeOut;
     private final CompletableFuture<ZonedDateTime> startFuture = new CompletableFuture<>();
     private final CompletableFuture<Void> finishFuture = new CompletableFuture<>();
-    private final CompletableFuture<Void> gate = new CompletableFuture<>();
+    private final CountDownLatch gate = new CountDownLatch(1);
     private final Set<Consumer<PlaybackState>> stateListeners = new CopyOnWriteArraySet<>();
     private final PlaybackLedger ledger = new PlaybackLedger();
-
+    private final AtomicBoolean cleanupGuard = new AtomicBoolean();
+    /**
+     * 同步基准时刻：初始为服务器广播的开始时间（可为 null），首次起播时惰性重赋为
+     * wallStart（服务器时间 ?? 本地起播时刻），此后保持不变
+     */
+    private volatile ZonedDateTime serverStartTime;
+    /**
+     * 调度器在交叉淡化时指定的淡入时长（transitionMs = max(outgoing.fadeOut, incoming.fadeIn)）。
+     * -1 表示未指定，起播时使用任务自己的 fadeIn
+     */
+    private volatile long transitionFadeInMs = -1;
     private volatile BlockingQueue<byte[]> audioBuffer = new LinkedBlockingQueue<>(AUDIO_BUFFER_CAPACITY);
     private volatile PlaybackState state = PlaybackState.PENDING;
     private volatile boolean cancelled = false;
@@ -101,6 +103,7 @@ public class PlaybackTask {
     private long underrunSinceNanos = -1;
     private volatile Future<?> downloadThreadFuture;
     private volatile Future<?> playThreadFuture;
+    private long lastJmtcTickMs = 0;
 
     private PlaybackTask(MusicDetail musicDetail, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
         this.musicDetail = musicDetail;
@@ -182,7 +185,7 @@ public class PlaybackTask {
      * Release the start gate; the play worker proceeds once audio is buffered.
      */
     void openGate() {
-        gate.complete(null);
+        gate.countDown();
     }
 
     /**
@@ -205,7 +208,7 @@ public class PlaybackTask {
         restartRequested = true;
         if (downloadThreadFuture != null) downloadThreadFuture.cancel(true);
         if (playThreadFuture != null) playThreadFuture.cancel(true);
-        gate.complete(null);
+        gate.countDown();
         startFuture.completeExceptionally(new CancellationException("Playback task cancelled"));
         cleanup();
         finishFuture.complete(null);
@@ -355,8 +358,14 @@ public class PlaybackTask {
                     return;
                 }
             } catch (Exception e) {
+                SoundEngineState current = SoundEngineState.getCurrent();
+                if (current == SoundEngineState.SHUTDOWN) {
+                    break;
+                }
                 if (cancelled) break;
-                LOGGER.error("Playback error: {}", e.getMessage(), e);
+                if (current == SoundEngineState.RUNNING) {//only logs when running normally
+                    LOGGER.error("Playback error: {}", e.getMessage(), e);
+                }
                 rebuildForRetry();
                 if (cancelled) break;
             }
@@ -364,21 +373,10 @@ public class PlaybackTask {
         finish();
     }
 
-    private enum PlayResult {
-        /** 播放自然结束（淡出完成），可以完成整个任务。 */
-        FINISHED,
-        /** 需要重启（资源已重建、下载线程已重启），播放线程继续下一轮。 */
-        RESTARTED
-    }
-
     private void waitForGate() {
-        while (!gate.isDone() && !cancelled && !Thread.currentThread().isInterrupted()) {
-            try {
-                //noinspection BusyWait
-                Thread.sleep(10);
-            } catch (InterruptedException e) {
-                return;
-            }
+        try {
+            gate.await();
+        } catch (InterruptedException ignored) {
         }
     }
 
@@ -427,8 +425,11 @@ public class PlaybackTask {
             ledger.prefetchBytes.addAndGet(-audioData.length);
         }
 
-        if (clientConfig.getDisableVanillaMusic())
-            Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC);
+        if (clientConfig.getDisableVanillaMusic()) {
+            // SoundManager 仅允许在主线程访问，投递到客户端线程
+            Minecraft.getInstance().execute(() ->
+                    Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC));
+        }
 
         source.setGain(0);
         lastSetGain = 0;
@@ -462,7 +463,6 @@ public class PlaybackTask {
                 if (lastIterationNanos > 0) {
                     long stallMs = (iterationNow - lastIterationNanos) / 1_000_000;
                     if (stallMs > PLAYBACK_STALL_LOG_MS) {
-                        // GC STW / 调度暂停：本地线程被冻结，恢复后第一轮间隔 = 冻结时长
                         int bytesPerSample = currentDecoder != null ? OpenAlSource.bytesPerSample(currentDecoder.getFormat()) : 4;
                         long bytesPerSecond = (long) (currentDecoder != null ? currentDecoder.getSampleRate() : 44100) * bytesPerSample;
                         long expected = Duration.between(wallStart, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
@@ -478,6 +478,12 @@ public class PlaybackTask {
                 }
                 lastIterationNanos = iterationNow;
 
+                long jmtcNow = System.currentTimeMillis();
+                if (jmtcNow - lastJmtcTickMs >= 1000) {
+                    lastJmtcTickMs = jmtcNow;
+                    nowPlayingInfo.onPlaybackTick();
+                }
+
                 updateGain();
                 if (source == null) break;
 
@@ -492,10 +498,6 @@ public class PlaybackTask {
                 int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
                 int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
 
-                // source 已空即重新起播点：填充数据位置已被 sync 对齐墙钟，
-                // 对齐落后基准，避免欠播累积的落后触发陈旧丢弃（跳音/空帧）。
-                // 欠载恢复需等待缓冲积累到阈值再填充（与 waitInitialBuffer 一致），
-                // 否则边产边播使队列无法建立超前缓冲，下载产出≈播放时周期性空帧。
                 boolean sourceEmpty = source.isEmpty();
                 boolean waitForBuffer = sourceEmpty && !downloadDone
                         && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT;
@@ -531,7 +533,7 @@ public class PlaybackTask {
 
     /**
      * 取一块数据供 OpenAL 填充：poll 预取队列，应用陈旧丢弃与欠载策略。
-     * 欠载恢复时重置 ledger 基准到墙钟并跳过陈旧判定（数据已被 sync 对齐）。
+     * 欠载恢复时重置 ledger 基准到墙钟并跳过陈旧判定（数据已被 sync 对齐）
      */
     private byte @Nullable [] takeChunk(long expectedBytes, long staleDropMarginBytes, long bytesPerSecond) {
         if (underrunSinceNanos >= 0) {
@@ -554,9 +556,9 @@ public class PlaybackTask {
             ledger.prefetchBytes.addAndGet(-data.length);
         }
         while (data != null && ledger.fedBytes.get() < expectedBytes - staleDropMarginBytes) {
-            // 陈旧内容：落后墙钟超过余量，丢弃而不是排入 OpenAL 源。
-            // 下载线程的 syncPlaying 保证解码器头 ≥ 墙钟，新鲜内容随后到达。
-            ledger.fedBytes.set(data.length);
+            // 陈旧内容：丢弃并累加 fedBytes 推进绝对位置，追上墙钟后接住新鲜内容；
+            // 若覆盖赋值会把位置压塌导致整个队列被误判陈旧。
+            ledger.fedBytes.addAndGet(data.length);
             logStaleDrop(data.length, bytesPerSecond);
             data = audioBuffer.poll();
             if (data != null) {
@@ -597,7 +599,6 @@ public class PlaybackTask {
             }
         }
 
-        // 下载完成后内容耗尽应走自然结束淡出，不再上报 BUFFERING
         if (underrunSinceNanos >= 0 && !downloadDone && state != PlaybackState.ERROR && state != PlaybackState.RETRYING
                 && state != PlaybackState.FADING_IN && state != PlaybackState.FADING_OUT) {
             long underrunMs = (System.nanoTime() - underrunSinceNanos) / 1_000_000;
@@ -667,7 +668,6 @@ public class PlaybackTask {
         }
 
         if (gain != lastSetGain) {
-            // INVALID_NAME 时门面抛 SourceInvalidException，由 playLoop 统一走 rebuild
             source.setGain(gain);
             lastSetGain = gain;
         }
@@ -739,6 +739,17 @@ public class PlaybackTask {
     }
 
     private void cleanup() {
+        if (!cleanupGuard.compareAndSet(false, true)) {
+            return;
+        }
+        try {
+            cleanupInternal();
+        } finally {
+            cleanupGuard.set(false);
+        }
+    }
+
+    private void cleanupInternal() {
         try {
             if (source != null) {
                 source.close();
@@ -821,5 +832,16 @@ public class PlaybackTask {
                     }
                     return CompletableFuture.completedFuture(value);
                 });
+    }
+
+    private enum PlayResult {
+        /**
+         * 播放自然结束（淡出完成），可以完成整个任务
+         */
+        FINISHED,
+        /**
+         * 需要重启（资源已重建、下载线程已重启），播放线程继续下一轮
+         */
+        RESTARTED
     }
 }
