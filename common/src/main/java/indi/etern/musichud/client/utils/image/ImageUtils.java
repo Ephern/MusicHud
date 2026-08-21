@@ -33,6 +33,7 @@ import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
@@ -47,7 +48,7 @@ public class ImageUtils {
     @Getter(AccessLevel.PACKAGE)
     private static final Cache<String, ImageTextureData> cachedTexturesData = CacheBuilder.newBuilder()
             .expireAfterAccess(Duration.ofMinutes(20))
-            .maximumSize(64)
+            .maximumSize(256)
             .build();
     private static final ConcurrentHashMap<PendingKey, CompletableFuture<?>> pendingDownloads =
             new ConcurrentHashMap<>();
@@ -55,7 +56,7 @@ public class ImageUtils {
     private static ExecutorService downloadExecutor;
     private static Semaphore downloadSemaphore;
     private static int maxConcurrentDownloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS;
-    private static final Map<String, Image> cachedIconImageMap = new ConcurrentHashMap<>();
+    private static final Map<String, Image> cachedIconImageMap = new HashMap<>();
 
     static {
         initializeVirtualThreadExecutor();
@@ -79,12 +80,6 @@ public class ImageUtils {
                 maxConcurrentDownloads);
     }
 
-    /**
-     * 设置最大并发下载数
-     * 虚拟线程下可以设置更高的并发数(如 50-100)
-     *
-     * @param maxDownloads 最大并发下载数
-     */
     @SuppressWarnings("unused")
     public static void setMaxConcurrentDownloads(int maxDownloads) {
         if (maxDownloads <= 0) {
@@ -105,23 +100,14 @@ public class ImageUtils {
         LOGGER.info("Updated max concurrent downloads from {} to {}", oldMax, maxDownloads);
     }
 
-    /**
-     * 获取当前活跃的下载数
-     */
     public static int getActiveDownloads() {
         return maxConcurrentDownloads - downloadSemaphore.availablePermits();
     }
 
-    /**
-     * 获取等待中的下载数
-     */
     public static int getQueuedDownloads() {
         return downloadSemaphore.getQueueLength();
     }
 
-    /**
-     * 异步下载图片
-     */
     public static CompletableFuture<ImageTextureData> downloadAsync(String url) {
         ImageTextureData cached = cachedTexturesData.getIfPresent(url);
         if (cached != null) {
@@ -142,12 +128,6 @@ public class ImageUtils {
         }, true);
     }
 
-    /**
-     * 异步下载图片
-     *
-     * @param url             图片URL
-     * @param streamProcessor 输入流处理器
-     */
     public static <R> CompletableFuture<R> downloadAsync(String url, Function<InputStream, R> streamProcessor, boolean computable) {
         if (computable) {
             PendingKey key = new PendingKey(url, streamProcessor);
@@ -187,9 +167,6 @@ public class ImageUtils {
         }, downloadExecutor);
     }
 
-    /**
-     * 同步下载图片(阻塞当前线程)
-     */
     private static <R> R downloadImage(String url, Function<InputStream, R> streamProcessor) throws IOException {
         HttpURLConnection connection = null;
         try {

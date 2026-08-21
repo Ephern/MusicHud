@@ -12,6 +12,7 @@
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
+    "SoundEngineSppCompatMixin",
     "SpanSetMixin",
     "UIManagerRenderMixin"
   ],
