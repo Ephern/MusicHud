@@ -39,13 +39,14 @@ public class HudShaderManager {
     }
 
     public static HudShaderProgram getOrCreate(
+            String name,
             ResourceLocation vertexShaderLocation,
             ResourceLocation fragmentShaderLocation,
             List<String> UBONames) {
         String key = cacheKey(vertexShaderLocation, fragmentShaderLocation);
         return programs.computeIfAbsent(key, k -> {
             try {
-                HudShaderProgram program = createProgram(vertexShaderLocation, fragmentShaderLocation);
+                HudShaderProgram program = createProgram(name, vertexShaderLocation, fragmentShaderLocation);
 
                 for (String uboName : UBONames) {
                     int index = glGetUniformBlockIndex(program.getProgramId(), uboName);
@@ -65,12 +66,12 @@ public class HudShaderManager {
                 }
                 return program;
             } catch (Exception e) {
-                return new HudShaderProgram(0); // invalid program, fallback rendering will be used
+                return new HudShaderProgram(0, name); // invalid program, fallback rendering will be used
             }
         });
     }
 
-    private static HudShaderProgram createProgram(ResourceLocation vertexLocation, ResourceLocation fragmentLocation) {
+    private static HudShaderProgram createProgram(String name, ResourceLocation vertexLocation, ResourceLocation fragmentLocation) {
         int programId = glCreateProgram();
         if (programId <= 0) {
             throw new IllegalStateException("Failed to create program");
@@ -112,7 +113,7 @@ public class HudShaderManager {
                     Integer.toHexString(err), programId);
         }
 
-        return new HudShaderProgram(programId);
+        return new HudShaderProgram(programId, name);
     }
 
     private static int compileShader(int type, String source) {

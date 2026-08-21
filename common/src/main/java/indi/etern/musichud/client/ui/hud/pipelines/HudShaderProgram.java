@@ -11,17 +11,24 @@ import static org.lwjgl.opengl.GL20.glGetUniformLocation;
 import static org.lwjgl.opengl.GL31.GL_UNIFORM_BUFFER;
 import static org.lwjgl.opengl.GL31.glBindBufferRange;
 
-public class HudShaderProgram {
+public class HudShaderProgram implements HudPipeline{
     @Getter
     private final int programId;
     private final Map<String, Integer> uniformLocations = new HashMap<>();
+    private final String name;
 
-    public HudShaderProgram(int programId) {
+    public HudShaderProgram(int programId, String name) {
         this.programId = programId;
+        this.name = name;
     }
 
     public int getUniformOrSamplerLocation(String name) {
         return uniformLocations.computeIfAbsent(name, n -> glGetUniformLocation(programId, n));
+    }
+
+    @Override
+    public String name() {
+        return name;
     }
 
     public static final class UniformBufferHandle {

@@ -175,7 +175,7 @@ public class TextRenderer implements HudRenderer {
             if (text.isEmpty()) return;
         }
         context.pushScissor((int) x, (int) y, (int) (x + layoutWidth), (int) (y + layout.getHeight() + 1));
-        HudRenderContext.Transforming transform = context.transform();
+        Transforming transform = context.transform();
         String finalText = text;
         transform.translate(x1, y)
                 .subTransform(transforming -> {

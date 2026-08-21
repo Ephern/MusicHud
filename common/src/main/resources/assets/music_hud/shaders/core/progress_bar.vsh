@@ -3,7 +3,7 @@
 uniform mat4 ProjMat;
 uniform mat4 ModelViewMat;
 
-layout(std140) uniform MHProgressPosition {
+layout(std140) uniform MHPosition {
     mat4 u_Translation;
     vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
 };

@@ -224,7 +224,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         float y = absolutePosition.y();
         context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
         if (isTransitioning && nextLine1.line != null && nextLine2.line != null) {
-            float easedProgress = Easing.EASE_IN_OUT_QUINT.getInterpolation(transitionProgress);
+            float easedProgress = Easing.EASE_IN_OUT_CUBIC.getInterpolation(transitionProgress);
             float oldYOffset = -easedProgress * layout.getHeight();
             if (currentLine1.line != null && currentLine1.line.lyricLine != null) {
                 if (currentLine1.line.lyricLine.isWordByWord()) {

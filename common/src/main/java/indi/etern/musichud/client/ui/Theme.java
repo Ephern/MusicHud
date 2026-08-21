@@ -14,8 +14,6 @@ import net.minecraft.client.resources.language.I18n;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class Theme {
-    public static final int BASE_BACKGROUND_COLOR = 0xB0000000;
-
     public static final int PRIMARY_COLOR = 0xFFE0BFB7;
 
     public static final int EMPHASIZE_TEXT_COLOR = 0xFFFFFFFF;
@@ -89,6 +87,21 @@ public class Theme {
     public static final int HUD_PROGRESS_LEFT = 0x00000000;
     public static final int HUD_PROGRESS_CURRENT = 0x50FFFFFF;
     public static final int HUD_PROGRESS_BACKGROUND = 0x32FFFFFF;
+
+    public static final ColorStateList HUD_HANDLE_STATES = new ColorStateList(
+            new int[][]{
+                    new int[]{R.attr.state_pressed},
+                    new int[]{R.attr.state_hovered},
+                    StateSet.WILD_CARD
+            },
+            new int[]{
+                    0xEBFFFFFF,
+                    0x90FFFFFF,
+                    0x45FFFFFF
+            }
+    );
+
+    public static final int HUD_EDIT_BORDER_COLOR = 0x52FFFFFF;
 
     public static TextView getNotificationTextView(Context context, boolean enabled) {
         TextView textView = new TextView(context);

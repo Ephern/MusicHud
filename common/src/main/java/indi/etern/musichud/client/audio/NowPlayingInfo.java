@@ -4,9 +4,10 @@ import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.LyricInfo;
-import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.client.services.music.MusicService;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
@@ -30,6 +31,9 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -44,10 +48,14 @@ public class NowPlayingInfo {
     private final AtomicReference<ArrayDeque<LyricLine>> atomicLyricLines = new AtomicReference<>();
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     private volatile JMTC jmtc;
+    private final ExecutorService jmtcExecutor = Executors.newSingleThreadExecutor(r -> {
+        Thread t = new Thread(r, "MH-JMTC");
+        t.setDaemon(true);
+        return t;
+    });
     @Setter
     @Getter
     private Duration updateInAdvanceDuration = Duration.of(500, ChronoUnit.MILLIS);
-    private MusicDetail smtcPlayingMusicDetail = null;
     @Getter
     private MusicDetail currentlyPlayingMusicDetail;
     private MusicDetail nextToPlayIdleMusicDetail;
@@ -59,13 +67,15 @@ public class NowPlayingInfo {
     private ArrayDeque<LyricLine> lyricLines;
     @Getter
     private LyricLine currentLyricLine;
-    private Thread lyricUpdaterVThread;
+    private volatile Thread lyricUpdaterVThread;
+    private final AtomicLong lyricUpdaterGeneration = new AtomicLong(0);
 
     final Runnable lyricUpdater = () -> {
         Thread thread = Thread.currentThread();
         lyricUpdaterVThread = thread;
         thread.setName("MHWorker-Lyrics-Updater");
-        while (true) {
+        long generation = lyricUpdaterGeneration.get();
+        while (generation == lyricUpdaterGeneration.get()) {
             if (this.musicStartTime == null) {
                 break;
             }
@@ -96,13 +106,13 @@ public class NowPlayingInfo {
                 }
             }
         }
-        lyricUpdaterVThread = null;
+        if (lyricUpdaterVThread == thread) {
+            lyricUpdaterVThread = null;
+        }
     };
 
     private NowPlayingInfo() {
-        Thread smtcThread = new Thread(this::jmtcLoop, "MH-SMTC");
-        smtcThread.setDaemon(true);
-        smtcThread.start();
+        jmtcExecutor.execute(this::initJmtc);
     }
 
     public static NowPlayingInfo getInstance() {
@@ -116,7 +126,7 @@ public class NowPlayingInfo {
         return instance;
     }
 
-    private void jmtcLoop() {
+    private void initJmtc() {
         jmtc = JMTC.getInstance(new JMTCSettings("Minecraft-MusicHUD", "Minecraft-MusicHUD"));
         JMTCCallbacks jmtcCallbacks = new JMTCCallbacks();
         jmtcCallbacks.onPlay = () -> {
@@ -124,121 +134,130 @@ public class NowPlayingInfo {
                 clientConfig.setMuted(false);
                 clientConfig.save();
             });
-            jmtc.setPlayingState(JMTCPlayingState.PLAYING);
-            jmtc.updateDisplay();
+            postJmtc(() -> {
+                jmtc.setPlayingState(JMTCPlayingState.PLAYING);
+                jmtc.updateDisplay();
+            });
         };
         jmtcCallbacks.onPause = () -> {
             MusicHud.EXECUTOR.execute(() -> {
                 clientConfig.setMuted(true);
                 clientConfig.save();
             });
-            jmtc.setPlayingState(JMTCPlayingState.PAUSED);
-            jmtc.updateDisplay();
-        };
-        jmtcCallbacks.onNext = () -> {
-            MusicHud.EXECUTOR.execute(() -> {
-                MusicService.getInstance().voteForSkipCurrent();
+            postJmtc(() -> {
+                jmtc.setPlayingState(JMTCPlayingState.PAUSED);
+                jmtc.updateDisplay();
             });
+        };
+        jmtcCallbacks.onNext = () -> MusicHud.EXECUTOR.execute(() -> MusicService.getInstance().voteForSkipCurrent());
+        jmtcCallbacks.onVolume = (volume) -> {
+            clientConfig.forceSetSoundVolume(Math.clamp(volume.intValue() * 100L, 0, 100));
+            clientConfig.save();
         };
 
         jmtc.setEnabled(true);
-        jmtc.setEnabledButtons(new JMTCEnabledButtons(
-                true, true, false, true, false
-        ));
+        jmtc.setEnabledButtons(new JMTCEnabledButtons(true, true, false, true, false));
         jmtc.setCallbacks(jmtcCallbacks);
-
-        // begin in STOPPED state with track info loaded
         jmtc.setPlayingState(JMTCPlayingState.STOPPED);
         jmtc.setMediaType(JMTCMediaType.Music);
-        jmtc.setParameters(new JMTCParameters(JMTCParameters.LoopStatus.Track, 1.0, 1.0, false));
+        jmtc.setParameters(new JMTCParameters(JMTCParameters.LoopStatus.Track, clientConfig.getMuted() ? 0 : clientConfig.getSoundVolume() / 100.0, 1.0, false));
         jmtc.updateDisplay();
+    }
 
-        while (true) {
-            MusicDetail musicDetail = currentlyPlayingMusicDetail == null ? MusicDetail.NONE : currentlyPlayingMusicDetail;
-            boolean updateDisplay = false;
-            if (musicDetail != smtcPlayingMusicDetail) {
-                smtcPlayingMusicDetail = musicDetail;
-                String artists = musicDetail.getArtists().stream()
-                        .map(Artist::getName)
-                        .reduce((a, b) -> a + " / " + b)
-                        .orElse("");
-                ArrayList<MusicDetail> albumTracks = new ArrayList<>(musicDetail.getAlbum().getMusicDetails());
-                long durationMillis = musicDetail.getDurationMillis();
-                jmtc.setTimelineProperties(new JMTCTimelineProperties(0L, durationMillis, 0L, durationMillis));
-                URI artUri = null;
-                String picUrl = musicDetail.getAlbum().getPicUrl();
-                if (picUrl.startsWith("http")) {
-                    try {
-                        String suffix = "png";
-                        String[] splits = picUrl.split("\\.");
-                        if (splits.length > 1) {
-                            suffix = splits[splits.length - 1];
-                        }
-                        Path tempFile = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
-                        tempFile.toFile().deleteOnExit();
-                        artUri = ImageUtils.downloadAsync(picUrl, inputStream -> {
-                            try {
-                                Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                                return tempFile.toUri();
-                            } catch (IOException e) {
-                                throw new RuntimeException(e);
-                            }
-                        }, false).join();
-                    } catch (Exception e) {
-                        logger.warn("Failed to download album art for SMTC", e);
-                    }
-                } else {
-                    try {
-                        Path tempFile = Files.createTempFile("MusicHUD-SMTC-Icon", ".png");
-                        tempFile.toFile().deleteOnExit();
-                        try (InputStream iconStream = getClass().getResourceAsStream("/assets/music_hud/icon.png")) {
-                            if (iconStream != null) {
-                                Files.copy(iconStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                                artUri = tempFile.toUri();
-                            }
-                        }
-                    } catch (Exception e) {
-                        logger.warn("Failed to set default SMTC icon", e);
-                    }
-                }
-                jmtc.setMediaProperties(new JMTCMusicProperties(
-                        smtcPlayingMusicDetail.getName(),
-                        artists,
-                        musicDetail.getAlbum().getName(),
-                        artists,
-                        new String[]{""},
-                        albumTracks.size(),
-                        albumTracks.indexOf(musicDetail),
-                        artUri
-                ));
-                updateDisplay = true;
-                jmtc.setPlayingState(JMTCPlayingState.PLAYING);
-            }
-            if (musicDetail != MusicDetail.NONE) {
-                Duration playedDuration = getPlayedDuration();
-                long position = playedDuration.toMillis();
-                jmtc.setPosition(position);
-//                System.out.println("position: " + position);
-                if (getPlayedDuration().equals(musicDuration)) {
-                    jmtc.setPlayingState(JMTCPlayingState.STOPPED);
-                } else if (clientConfig.getMuted()) {
-                    jmtc.setPlayingState(JMTCPlayingState.PAUSED);
-                } else {
-                    jmtc.setPlayingState(JMTCPlayingState.PLAYING);
-                }
-                updateDisplay = true;
-            } else {
-                jmtc.setPlayingState(JMTCPlayingState.CLOSED);
-            }
-            if (updateDisplay) {
-                jmtc.updateDisplay();
-            }
+    private void postJmtc(Runnable task) {
+        jmtcExecutor.execute(() -> {
             try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                return;
+                task.run();
+            } catch (Exception e) {
+                logger.warn("JMTC task failed", e);
             }
+        });
+    }
+
+    /**
+     * Called by the play worker thread (throttled ~1s) to push position/state.
+     */
+    public void onPlaybackTick() {
+        MusicDetail current = currentlyPlayingMusicDetail;
+        if (current == null || current.equals(MusicDetail.NONE)) {
+            return;
         }
+        Duration played = getPlayedDuration();
+        Duration duration = musicDuration;
+        boolean muted = clientConfig.getMuted();
+        long position = played.toMillis();
+        postJmtc(() -> {
+            jmtc.setPosition(position);
+            JMTCPlayingState state = played.equals(duration)
+                    ? JMTCPlayingState.STOPPED
+                    : muted ? JMTCPlayingState.PAUSED : JMTCPlayingState.PLAYING;
+            jmtc.setPlayingState(state);
+            jmtc.updateDisplay();
+        });
+    }
+
+    private void postMediaInfo(MusicDetail musicDetail) {
+        String artists = musicDetail.getArtists().stream()
+                .map(Artist::getName)
+                .reduce((a, b) -> a + " / " + b)
+                .orElse("");
+        String album = musicDetail.getAlbum().getName();
+        ArrayList<MusicDetail> albumTracks = new ArrayList<>(musicDetail.getAlbum().getMusicDetails());
+        long durationMillis = musicDetail.getDurationMillis();
+        int tracks = albumTracks.size();
+        int track = albumTracks.indexOf(musicDetail);
+        postJmtc(() -> {
+            jmtc.setTimelineProperties(new JMTCTimelineProperties(0L, durationMillis, 0L, durationMillis));
+            jmtc.setMediaProperties(new JMTCMusicProperties(musicDetail.getName(), artists, album, artists, new String[]{""}, tracks, track, null));
+            jmtc.setPlayingState(JMTCPlayingState.PLAYING);
+            jmtc.updateDisplay();
+        });
+        loadAlbumArtAsync(musicDetail, artUri -> postJmtc(() ->
+                jmtc.setMediaProperties(new JMTCMusicProperties(musicDetail.getName(), artists, album, artists, new String[]{""}, tracks, track, artUri))));
+    }
+
+    private void loadAlbumArtAsync(MusicDetail musicDetail, Consumer<URI> onReady) {
+        String picUrl = musicDetail.getAlbum().getPicUrl();
+        MusicHud.EXECUTOR.submit(() -> {
+            URI artUri = null;
+            if (picUrl.startsWith("http")) {
+                try {
+                    String suffix = "png";
+                    String[] splits = picUrl.split("\\.");
+                    if (splits.length > 1) {
+                        suffix = splits[splits.length - 1];
+                    }
+                    Path tempFile = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
+                    tempFile.toFile().deleteOnExit();
+                    artUri = ImageUtils.downloadAsync(picUrl, inputStream -> {
+                        try {
+                            Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                            return tempFile.toUri();
+                        } catch (IOException e) {
+                            throw new RuntimeException(e);
+                        }
+                    }, false).join();
+                } catch (Exception e) {
+                    logger.warn("Failed to download album art for SMTC", e);
+                }
+            } else {
+                try {
+                    Path tempFile = Files.createTempFile("MusicHUD-SMTC-Icon", ".png");
+                    tempFile.toFile().deleteOnExit();
+                    try (InputStream iconStream = getClass().getResourceAsStream("/assets/music_hud/icon.png")) {
+                        if (iconStream != null) {
+                            Files.copy(iconStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
+                            artUri = tempFile.toUri();
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to set default SMTC icon", e);
+                }
+            }
+            if (artUri != null) {
+                onReady.accept(artUri);
+            }
+        });
     }
 
     private Duration getCallTime(LyricLine line) {
@@ -259,8 +278,13 @@ public class NowPlayingInfo {
         nextToPlayIdleMusicDetail = idleNextToPlay;
         if (!musicDetail.equals(MusicDetail.NONE)) {
             musicDuration = Duration.ofMillis(musicDetail.getDurationMillis());
+            postMediaInfo(musicDetail);
         } else {
             musicDuration = null;
+            postJmtc(() -> {
+                jmtc.setPlayingState(JMTCPlayingState.CLOSED);
+                jmtc.updateDisplay();
+            });
         }
         musicStartTime = null;
         LyricInfo lyricInfo = musicDetail.getLyricInfo();
@@ -285,7 +309,13 @@ public class NowPlayingInfo {
             MuiModApi.postToUiThread(() -> MainFragment.switchMusic(musicDetail, idleNextToPlay, this.lyricLines));
         } catch (IllegalStateException ignored) {
         }
-        HudRendererManager.getInstance().switchMusic(musicDetail);
+        MusicHud.EXECUTOR.submit(() -> {
+            // 补偿音频过渡
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException ignored) {}
+            HudRendererManager.getInstance().switchMusic(musicDetail);
+        });
         List.copyOf(musicSwitchListener).forEach(consumer -> {
             consumer.accept(previous, musicDetail);
         });
@@ -294,13 +324,14 @@ public class NowPlayingInfo {
 
     public void startAt(ZonedDateTime zonedDateTime) {
         musicStartTime = Objects.requireNonNullElseGet(zonedDateTime, ZonedDateTime::now);
-        // SMTC state change picked up by jmtcLoop polling
         if (lyricLines != null && !lyricLines.isEmpty()) {
-            if (lyricUpdaterVThread == null) {
-                MusicHud.EXECUTOR.execute(lyricUpdater);
-            } else {
-                lyricUpdaterVThread.interrupt();
+            lyricUpdaterGeneration.incrementAndGet();
+            Thread old = lyricUpdaterVThread;
+            if (old != null) {
+                old.interrupt();
             }
+            // 代际递增后总是新提交一个更新器，旧更新器检测到代际变化自行退出，避免并发消费歌词
+            MusicHud.EXECUTOR.execute(lyricUpdater);
         }
     }
 
@@ -356,13 +387,18 @@ public class NowPlayingInfo {
 
     public MusicDetail getNextToPlayIdleMusicDetail() {
         if (!MusicService.getInstance().getMusicQueue().isEmpty()) {
-            return MusicService.getInstance().getMusicQueue().peek().musicDetail();
+            QueueItem peek = MusicService.getInstance().getMusicQueue().peek();
+            if (peek == null) {
+                return MusicDetail.NONE;
+            }
+            return peek.musicDetail();
         } else {
             return nextToPlayIdleMusicDetail;
         }
     }
 
     public void stop() {
+        lyricUpdaterGeneration.incrementAndGet();
         if (lyricUpdaterVThread != null) {
             lyricUpdaterVThread.interrupt();
         }
@@ -374,5 +410,9 @@ public class NowPlayingInfo {
         lyricLines = null;
         atomicLyricLines.set(null);
         currentLyricLine = null;
+        postJmtc(() -> {
+            jmtc.setPlayingState(JMTCPlayingState.CLOSED);
+            jmtc.updateDisplay();
+        });
     }
 }

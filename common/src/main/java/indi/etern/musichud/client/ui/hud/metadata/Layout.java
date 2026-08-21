@@ -1,7 +1,8 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
-import indi.etern.musichud.client.ui.hud.pipelines.Std140BufferWriter;
+import indi.etern.musichud.client.ui.hud.pipelines.Std140Sizes;
+import indi.etern.musichud.client.ui.hud.pipelines.Std140Writer;
 import indi.etern.musichud.client.ui.hud.renderer.HudRenderContext;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
@@ -11,18 +12,16 @@ import org.joml.Matrix4f;
 @EqualsAndHashCode
 @Getter
 public class Layout implements HudUniform {
-    public static final int UBO_SIZE = new Std140BufferWriter.Calculator().putMat4f().putVec3().align(16).get();
+    public static final int UBO_SIZE = Std140Sizes.calc().putMat4f().putVec3().align(16).get(); // pad to 16-byte alignment (std140)
     private volatile float x, y, width, height;
     private volatile float radius;
     private volatile HorizontalAlign horizontalAlign;
     private volatile VerticalAlign verticalAlign;
-    private String targetElementName;
     private volatile Layout parent;
     private boolean dirty;
     private AbsolutePosition lastAbsolutePosition;
 
-    public Layout(String targetElementName, float x, float y, float width, float height, float radius) {
-        this.targetElementName = targetElementName;
+    public Layout(float x, float y, float width, float height, float radius) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -32,8 +31,7 @@ public class Layout implements HudUniform {
         verticalAlign = VerticalAlign.TOP;
     }
 
-    public Layout(String targetElementName, float x, float y, float width, float height, float radius, HorizontalAlign horizontalAlign, VerticalAlign verticalAlign) {
-        this.targetElementName = targetElementName;
+    public Layout(float x, float y, float width, float height, float radius, HorizontalAlign horizontalAlign, VerticalAlign verticalAlign) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -43,13 +41,13 @@ public class Layout implements HudUniform {
         this.verticalAlign = verticalAlign;
     }
 
-    public static Layout ofTextLayout(String targetElementName, float x, float y, float maxWidth, float fontSize) {
-        return new Layout(targetElementName, x, y, maxWidth, fontSize, 0);
+    public static Layout ofTextLayout(float x, float y, float maxWidth, float fontSize) {
+        return new Layout(x, y, maxWidth, fontSize, 0);
     }
 
     @Override
     public String getUBOName() {
-        return "MH" + targetElementName + "Position";
+        return "MHPosition";
     }
 
     @Override
@@ -58,10 +56,11 @@ public class Layout implements HudUniform {
     }
 
     @Override
-    public void write(Std140BufferWriter builder) {
+    public void write(Std140Writer builder) {
+        Matrix3x2f localMatrix = new Matrix3x2f();
         Layout.AbsolutePosition absolutePosition = calcAbsoluteCenterPosition(HudRenderContext.getCurrent());
-        Matrix4f mat = new Matrix4f().translate(absolutePosition.x(), absolutePosition.y(), 0);
-        builder.putMat4f(mat).putVec3(width / 2, height / 2, radius);
+        localMatrix.translate(absolutePosition.x(), absolutePosition.y());
+        builder.putMat4f(new Matrix4f().mul(localMatrix)).putVec3(width / 2, height / 2, radius);
         if (dirty) {
             dirty = false;
         }
@@ -144,11 +143,6 @@ public class Layout implements HudUniform {
     public void setVerticalAlign(VerticalAlign verticalAlign) {
         this.dirty = true;
         this.verticalAlign = verticalAlign;
-    }
-
-    public void setTargetElementName(String targetElementName) {
-        this.dirty = true;
-        this.targetElementName = targetElementName;
     }
 
     public void setParent(Layout parent) {

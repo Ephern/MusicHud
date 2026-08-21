@@ -7,6 +7,7 @@ import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
+import indi.etern.musichud.client.ui.hud.pipelines.HudTextureSetup;
 import net.minecraft.client.Minecraft;
 
 public class BackgroundRenderer implements HudRenderer {
@@ -62,9 +63,10 @@ public class BackgroundRenderer implements HudRenderer {
 
         HudRenderState hudRenderState = new HudRenderState(
                 HudRenderPipelines.BACKGROUND,
-                null,
+                HudTextureSetup.NONE,
                 hudRenderContext.currentPose(),
                 layout,
+                "background",
                 layout,
                 currentData.getTransitionableBackground().getMixed(),
                 dynamicStatusUniform
@@ -75,5 +77,6 @@ public class BackgroundRenderer implements HudRenderer {
         }
 
         hudRenderContext.submitHudRenderState(hudRenderState);
+        hudRenderContext.nextStratum();
     }
 }

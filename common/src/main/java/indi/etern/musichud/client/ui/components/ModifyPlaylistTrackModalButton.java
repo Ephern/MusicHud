@@ -292,7 +292,7 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
             setBackground(new InsetDrawable(bgDrawable, dp(2)));
 
             UrlImageView coverView = new UrlImageView(context);
-            coverView.loadUrl(playlist.getThumbnailCoverUrl(dp(COVER_SIZE_DP)));
+            coverView.loadUrl(playlist.getImageThumbnailUrl(dp(COVER_SIZE_DP)));
             coverView.setCornerRadius(dp(4));
 
             LinearLayout textColumn = new LinearLayout(context);
