@@ -7,7 +7,6 @@ import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.resources.Identifier;
 
 public class PlayingStatusRenderer implements HudRenderer {
     // From Lucide Icons. Plain resource paths so this file stays identical across the

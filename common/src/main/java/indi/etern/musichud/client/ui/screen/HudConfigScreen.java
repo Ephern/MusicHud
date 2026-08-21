@@ -31,10 +31,14 @@ import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
 import lombok.Getter;
 import lombok.NonNull;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.input.CharacterEvent;
+import net.minecraft.client.input.KeyEvent;
+import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -81,21 +85,16 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public void resize(@NonNull Minecraft minecraft, int width, int height) {
-        super.resize(minecraft, width, height);
-    }
-
-    @Override
-    public void renderBackground(@NonNull GuiGraphics guiGraphics, int mouseX, int mouseY, float deltaTick) {
-        if (minecraft != null && minecraft.level == null) {
-            this.renderPanorama(guiGraphics, deltaTick);
+    public void extractBackground(@NonNull GuiGraphicsExtractor guiGraphics, int mouseX, int mouseY, float deltaTick) {
+        if (minecraft.level == null) {
+            this.extractPanorama(guiGraphics, deltaTick);
             guiGraphics.nextStratum();
             HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
         }
     }
 
     @Override
-    public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
+    public void extractRenderState(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
         mHost.render(gr, mouseX, mouseY, deltaTick);
     }
 
@@ -152,17 +151,17 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public boolean mouseClicked(double mouseX, double mouseY, int mouseButton) {
+    public boolean mouseClicked(@NotNull MouseButtonEvent event, boolean bl) {
         return false;
     }
 
     @Override
-    public boolean mouseReleased(double mouseX, double mouseY, int mouseButton) {
+    public boolean mouseReleased(@NotNull MouseButtonEvent event) {
         return false;
     }
 
     @Override
-    public boolean mouseDragged(double mouseX, double mouseY, int mouseButton, double deltaX, double deltaY) {
+    public boolean mouseDragged(@NotNull MouseButtonEvent event, double deltaX, double deltaY) {
         return true;
     }
 
@@ -173,19 +172,19 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        mHost.onKeyPress(keyCode, scanCode, modifiers);
+    public boolean keyPressed(KeyEvent event) {
+        mHost.onKeyPress(event.key(), event.scancode(), event.modifiers());
         return false;
     }
 
     @Override
-    public boolean keyReleased(int keyCode, int scanCode, int modifiers) {
-        mHost.onKeyRelease(keyCode, scanCode, modifiers);
+    public boolean keyReleased(KeyEvent event) {
+        mHost.onKeyRelease(event.key(), event.scancode(), event.modifiers());
         return false;
     }
 
     @Override
-    public boolean charTyped(char ch, int modifiers) {
-        return mHost.onCharTyped(ch);
+    public boolean charTyped(CharacterEvent event) {
+        return mHost.onCharTyped((char) event.codepoint());
     }
 }
