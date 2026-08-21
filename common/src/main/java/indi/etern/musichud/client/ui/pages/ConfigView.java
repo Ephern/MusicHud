@@ -174,9 +174,9 @@ public class ConfigView extends LinearLayout {
             openHudConfigButton.setOnClickListener((v) -> {
                 Minecraft minecraft = Minecraft.getInstance();
                 minecraft.execute(() -> {
-                    minecraft.setScreen(HudConfigScreen.createScreen(
+                    minecraft.setScreenAndShow(HudConfigScreen.createScreen(
                             new HudConfigFragment(),
-                            minecraft.screen,
+                            minecraft.gui.screen(),
                             I18n.get(MusicHud.MOD_ID + ".config.hudScreenTitle")));
                 });
             });
