@@ -19,13 +19,10 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.Modal;
-import indi.etern.musichud.client.ui.components.DynamicIntegerOption;
 import indi.etern.musichud.client.ui.components.LyricLineView;
-import indi.etern.musichud.client.ui.components.SignedIntegerOption;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
-import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
+import indi.etern.musichud.client.ui.screen.HudConfigFragment;
+import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
@@ -37,6 +34,7 @@ import indi.etern.musichud.server.api.*;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
 import net.minecraft.util.Util;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.commons.lang3.Range;
 import org.jetbrains.annotations.NotNull;
@@ -85,8 +83,6 @@ public class ConfigView extends LinearLayout {
             params.setMargins(0, dp(32), 0, 0);
             scrollView.addView(view, params);
 
-            HudRendererManager hudRendererManager = HudRendererManager.getInstance();
-
             var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.enable"),
@@ -124,24 +120,6 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getDisableVanillaMusic,
                     clientConfig::setDisableVanillaMusic)
                     .setDefaultValue(clientConfig.getDefaultDisableVanillaMusic())
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.enableHud"),
-                    clientConfig::getEnableHud,
-                    clientConfig::setEnableHud)
-                    .setDefaultValue(clientConfig.getDefaultEnableHud())
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.autoHide"),
-                    clientConfig::getHideHudWhenNotPlaying,
-                    clientConfig::setHideHudWhenNotPlaying)
-                    .setDefaultValue(clientConfig.getDefaultHideHudWhenNotPlaying())
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.enableMarqueeText"),
-                    clientConfig::getEnableMarqueeText,
-                    clientConfig::setEnableMarqueeText)
-                    .setDefaultValue(clientConfig.getDefaultEnableMarqueeText())
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume"),
@@ -188,106 +166,24 @@ public class ConfigView extends LinearLayout {
                     })
                     .setDefaultValue(0.5)
                     .create(commonCategory);
-            new PreferencesFragment.FloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha"),
-                    clientConfig::getHudBackgroundMixAlpha,
-                    clientConfig::setHudBackgroundMixAlpha)
-                    .setRange(0, 1)
-                    .setDefaultValue(clientConfig.getDefaultHudBackgroundMixAlpha())
-                    .create(commonCategory);
-            view.addView(commonCategory);
 
-            var positionCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.layout"));
-            new PreferencesFragment.DropDownOption<>(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.layout.verticalAlign"),
-                    VerticalAlign.values(),
-                    VerticalAlign::ordinal,
-                    () -> VerticalAlign.valueOf(clientConfig.getHudVerticalPosition()),
-                    (vp) -> clientConfig.setHudVerticalPosition(vp.name()))
-                    .setDefaultValue(VerticalAlign.valueOf(clientConfig.getDefaultHudVerticalPosition()))
-                    .setOnChanged(() -> {
-                        hudRendererManager.updateLayoutFromConfig();
-                        hudRendererManager.refreshStyle();
-                    })
-                    .create(positionCategory);
-            new PreferencesFragment.DropDownOption<>(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.layout.horizontalAlign"),
-                    HorizontalAlign.values(),
-                    HorizontalAlign::ordinal,
-                    () -> HorizontalAlign.valueOf(clientConfig.getHudHorizontalPosition()),
-                    (hp) -> clientConfig.setHudHorizontalPosition(hp.name()))
-                    .setDefaultValue(HorizontalAlign.valueOf(clientConfig.getDefaultHudHorizontalPosition()))
-                    .setOnChanged(() -> {
-                        hudRendererManager.updateLayoutFromConfig();
-                        hudRendererManager.refreshStyle();
-                    })
-                    .create(positionCategory);
-            new SignedIntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.layout.offsetX"),
-                    clientConfig::getHudOffsetX,
-                    clientConfig::setHudOffsetX)
-                    .setRange(-1920, 1920)
-                    .setDefaultValue(clientConfig.getDefaultHudOffsetX())
-                    .setOnChanged(() -> {
-                        hudRendererManager.updateLayoutFromConfig();
-                        hudRendererManager.refreshStyle();
-                    })
-                    .create(positionCategory);
-            new SignedIntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.layout.offsetY"),
-                    clientConfig::getHudOffsetY,
-                    clientConfig::setHudOffsetY)
-                    .setRange(-1920, 1920)
-                    .setDefaultValue(clientConfig.getDefaultHudOffsetY())
-                    .setOnChanged(() -> {
-                        hudRendererManager.updateLayoutFromConfig();
-                        hudRendererManager.refreshStyle();
-                    })
-                    .create(positionCategory);
-            DynamicIntegerOption cornerRadiusOption = new DynamicIntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.layout.hudCornerRadius"),
-                    clientConfig::getHudCornerRadius,
-                    clientConfig::setHudCornerRadius);
-            cornerRadiusOption.setRange(0, clientConfig.getHudHeight() / 2);
-            cornerRadiusOption.setDefaultValue(clientConfig.getDefaultHudCornerRadius());
-            cornerRadiusOption.setOnChanged(() -> {
-                hudRendererManager.updateLayoutFromConfig();
-                hudRendererManager.refreshStyle();
+            Button openHudConfigButton = new Button(context);
+            openHudConfigButton.setText(I18n.get(MusicHud.MOD_ID + ".config.openHudConfig"));
+            openHudConfigButton.setTextColor(Theme.PRIMARY_COLOR);
+            openHudConfigButton.setTextSize(14);
+            InsetBackgroundFactory openHudBgFactory = InsetBackgroundFactory.builder().inset(0).cornerRadius(dp(8)).build();
+            openHudBgFactory.applyBackgroundTo(openHudConfigButton);
+            openHudConfigButton.setOnClickListener((v) -> {
+                Minecraft minecraft = Minecraft.getInstance();
+                minecraft.execute(() -> {
+                    minecraft.setScreen(HudConfigScreen.createScreen(
+                            new HudConfigFragment(),
+                            minecraft.screen,
+                            I18n.get(MusicHud.MOD_ID + ".config.hudScreenTitle")));
+                });
             });
-            DynamicIntegerOption widthOption = new DynamicIntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.layout.hudWidth"),
-                    clientConfig::getHudWidth,
-                    clientConfig::setHudWidth);
-            widthOption.setRange(clientConfig.getHudHeight(), 800, 4);
-            widthOption.setDefaultValue(clientConfig.getDefaultHudWidth());
-            widthOption.setOnChanged(() -> {
-                hudRendererManager.updateLayoutFromConfig();
-                hudRendererManager.refreshStyle();
-            });
-            PreferencesFragment.IntegerOption heightOption = new PreferencesFragment.IntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.layout.hudHeight"),
-                    clientConfig::getHudHeight,
-                    clientConfig::setHudHeight)
-                    .setRange(16, 256, 2)
-                    .setDefaultValue(clientConfig.getDefaultHudHeight())
-                    .setOnChanged(() -> {
-                        hudRendererManager.updateLayoutFromConfig();
-                        hudRendererManager.refreshStyle();
-                        cornerRadiusOption.updateRange(0, clientConfig.getHudHeight() / 2, 1);
-                        widthOption.updateRange(clientConfig.getHudHeight(), 800, 4);
-                    });
-            widthOption.create(positionCategory);
-            heightOption.create(positionCategory);
-            cornerRadiusOption.create(positionCategory);
-            view.addView(positionCategory);
+            commonCategory.addView(openHudConfigButton, new LayoutParams(MATCH_PARENT, dp(40)));
+            view.addView(commonCategory);
 
             var multiplayerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.externalServer"));
             new PreferencesFragment.BooleanOption(

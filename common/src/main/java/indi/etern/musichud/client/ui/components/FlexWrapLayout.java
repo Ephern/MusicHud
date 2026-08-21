@@ -88,9 +88,6 @@ public class FlexWrapLayout extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        rows.forEach(ViewGroup::removeAllViews);
-        rows.clear();
-        super.removeAllViews();
         rowsDirty = true;
     }
 
@@ -262,9 +259,7 @@ public class FlexWrapLayout extends LinearLayout {
     @Override
     public void removeView(@NotNull View view) {
         allChildren.remove(view);
-        rows.forEach(row -> {
-            row.removeView(view);
-        });
+        rows.forEach(row -> row.removeView(view));
         rowsDirty = true;
         requestLayout();
     }

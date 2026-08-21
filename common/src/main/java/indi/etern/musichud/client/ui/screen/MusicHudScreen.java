@@ -46,6 +46,15 @@ import java.util.Objects;
  */
 @SuppressWarnings("UnstableApiUsage")
 public class MusicHudScreen extends Screen implements MuiScreen {
+    static {
+        MuiModApi.addOnScreenChangeListener((oldScreen, newScreen) -> {
+            if (newScreen instanceof MusicHudScreen || newScreen instanceof HudConfigScreen) {
+                BlurHandler.INSTANCE.blur(null);
+                BlurHandler.INSTANCE.blur(newScreen);
+            }
+        });
+    }
+
     private final UIManager mHost;
     @Nullable
     private final Screen mPrevious;
@@ -70,13 +79,6 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         mCallback = callback != null ? callback :
                 fragment instanceof ScreenCallback cbk ? cbk : null;
     }
-
-    /*@Override
-    public void init(@Nonnull Minecraft minecraft, int width, int height) {
-        this.minecraft = minecraft;
-        this.width = width;
-        this.height = height;
-    }*/
 
     public static MusicHudScreen createScreen(@NonNull Fragment fragment,
                                               @Nullable ScreenCallback callback,

@@ -318,7 +318,8 @@ public class HomeView extends LinearLayout {
         } else {
             queueTitle.setVisibility(View.VISIBLE);
             playQueueListView.setVisibility(View.VISIBLE);
-            checkNextToPlay(queue.peek().musicDetail());
+            QueueItem peek = queue.peek();
+            checkNextToPlay(peek == null ? MusicDetail.NONE : peek.musicDetail());
         }
     }
 

@@ -20,7 +20,7 @@ public class ScreenMixin {
         //noinspection ConstantValue (incorrect warning)
         if (((Object) this instanceof ServerReconfigScreen) || ((Object) this instanceof LevelLoadingScreen)) {
             guiGraphics.nextStratum();
-            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics), null);
+            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
         }
     }
 }
