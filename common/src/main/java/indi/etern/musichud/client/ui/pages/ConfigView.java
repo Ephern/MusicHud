@@ -1,12 +1,16 @@
 package indi.etern.musichud.client.ui.pages;
 
 import icyllis.modernui.R;
+import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.drawable.BuiltinIconDrawable;
+import icyllis.modernui.graphics.drawable.StateListDrawable;
 import icyllis.modernui.mc.ConfigItem;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.PreferencesFragment;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.style.URLSpan;
+import icyllis.modernui.util.StateSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
@@ -54,6 +58,7 @@ import java.util.function.Consumer;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
+@SuppressWarnings("UnstableApiUsage")
 public class ConfigView extends LinearLayout {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final ServerConfig serverConfig = ServerConfig.getInstance();
@@ -77,9 +82,9 @@ public class ConfigView extends LinearLayout {
             LinearLayout view = new LinearLayout(context);
             view.setOrientation(LinearLayout.VERTICAL);
             view.setGravity(Gravity.CENTER_HORIZONTAL);
-            LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params.setMargins(0, dp(32), 0, 0);
-            scrollView.addView(view, params);
+            scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+            view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(32)));
 
             var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
             new PreferencesFragment.BooleanOption(context,
@@ -321,7 +326,7 @@ public class ConfigView extends LinearLayout {
 
             var apiCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.apiServer"));
             LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(0, dp(6), 0, dp(128));
+            params1.setMargins(0, dp(6), 0, dp(6));
             view.addView(apiCategory, params1);
 
             new PreferencesFragment.BooleanOption(
@@ -331,104 +336,6 @@ public class ConfigView extends LinearLayout {
                     serverConfig::setStartupBinaryApiServerWhenLaunch)
                     .setDefaultValue(serverConfig.getDefaultStartupBinaryApiServerWhenLaunch())
                     .create(apiCategory);
-
-            new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.useRandomCnIp"),
-                    serverConfig::getUseRandomCnIp,
-                    serverConfig::setUseRandomCnIp)
-                    .setDefaultValue(serverConfig.getDefaultUseRandomCnIp())
-                    .create(apiCategory);
-
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableGeneralUnblock"),
-                    serverConfig::getEnableGeneralUnblock,
-                    serverConfig::setEnableGeneralUnblock)
-                    .setDefaultValue(serverConfig.getDefaultEnableGeneralUnblock())
-                    .create(apiCategory);
-
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableFlac"),
-                    serverConfig::getEnableFlac,
-                    serverConfig::setEnableFlac)
-                    .setDefaultValue(serverConfig.getDefaultEnableFlac())
-                    .create(apiCategory);
-
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.selectMaxBr"),
-                    serverConfig::getSelectMaxBr,
-                    serverConfig::setSelectMaxBr)
-                    .setDefaultValue(serverConfig.getDefaultSelectMaxBr())
-                    .create(apiCategory);
-
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.followSourceOrder"),
-                    serverConfig::getFollowSourceOrder,
-                    serverConfig::setFollowSourceOrder)
-                    .setDefaultValue(serverConfig.getDefaultFollowSourceOrder())
-                    .create(apiCategory);
-
-            new PreferencesFragment.IntegerOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.port"),
-                    serverConfig::getPort,
-                    serverConfig::setPort)
-                    .setRange(1, 65535)
-                    .setDefaultValue(serverConfig.getDefaultPort())
-                    .create(apiCategory);
-
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableProxy"),
-                    serverConfig::getEnableProxy,
-                    serverConfig::setEnableProxy)
-                    .setDefaultValue(serverConfig.getDefaultEnableProxy())
-                    .create(apiCategory);
-
-            {
-                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.corsAllowOrigin"));
-                EditText input = inputBox.findViewById(R.id.input);
-                if (input != null) {
-                    input.setMinimumWidth(dp(256));
-                    input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-                    input.setText(serverConfig.getCorsAllowOrigin());
-                    input.setOnKeyListener((v, c, e) -> {
-                        if (c == GLFW.GLFW_KEY_ENTER) {
-                            input.clearFocus();
-                            return true;
-                        }
-                        return false;
-                    });
-                    input.setOnFocusChangeListener((v, b) -> {
-                        if (!b) {
-                            serverConfig.setCorsAllowOrigin(input.getText().toString());
-                        }
-                    });
-                }
-                apiCategory.addView(inputBox);
-            }
-
-            {
-                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.proxyUrl"));
-                EditText input = inputBox.findViewById(R.id.input);
-                if (input != null) {
-                    input.setMinimumWidth(dp(256));
-                    input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-                    input.setText(serverConfig.getProxyUrl());
-                    input.setOnKeyListener((v, c, e) -> {
-                        if (c == GLFW.GLFW_KEY_ENTER) {
-                            input.clearFocus();
-                            return true;
-                        }
-                        return false;
-                    });
-                    input.setOnFocusChangeListener((v, b) -> {
-                        if (!b) {
-                            serverConfig.setProxyUrl(input.getText().toString());
-                        }
-                    });
-                }
-                apiCategory.addView(inputBox);
-            }
-
 
             {
                 LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.serverApiBaseUrl"));
@@ -492,7 +399,8 @@ public class ConfigView extends LinearLayout {
             String binaryApiStatusTemplate = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
             apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerManager.getBinaryApiServerStatus().i18nKey())));
 
-            InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder().inset(0).padding(new InsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
+            InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder().inset(0).cornerRadius(dp(4))
+                    .padding(new InsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
 
             Button downloadApiServerButton = createDownloadApiButton(context, backgroundFactory, serverApiBinaryPathInput);
 
@@ -611,6 +519,33 @@ public class ConfigView extends LinearLayout {
             apiLogLayout.addView(openApiLogDirButton);
             apiLogLayout.addView(clearApiLogButton);
             apiCategory.addView(apiLogLayout);
+
+            var envVarCategory = PreferencesFragment.createCategoryList(view, null);
+            {
+                var transition = new LayoutTransition();
+                transition.enableTransitionType(LayoutTransition.CHANGING);
+                envVarCategory.setLayoutTransition(transition);
+
+                final Button title = new ToggleButton(context, null, R.attr.borderlessButtonStyle);
+                title.setText(I18n.get(MusicHud.MOD_ID + ".config.apiServer.environmentVariables"));
+                title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+                {
+                    var icon = new StateListDrawable();
+                    icon.addState(new int[]{R.attr.state_checked}, new BuiltinIconDrawable(
+                            context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_UP
+                    ));
+                    icon.addState(StateSet.WILD_CARD, new BuiltinIconDrawable(
+                            context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_DOWN
+                    ));
+                    icon.setTintList(title.getTextColors());
+                    title.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon, null);
+                }
+                title.setOnClickListener(new EnvVarAccordion(envVarCategory));
+                envVarCategory.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            }
+            LayoutParams envVarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            envVarParams.setMargins(0, dp(6), 0, dp(128));
+            view.addView(envVarCategory, envVarParams);
 
             Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiServerStatus) -> {
                 MuiModApi.postToUiThread(() -> {
@@ -743,7 +678,9 @@ public class ConfigView extends LinearLayout {
         params1.setMargins(0, 0, dp(8), 0);
         directoryLayout.addView(directoryText, params1);
         directoryLayout.addView(directoryTextInput, new LayoutParams(0, WRAP_CONTENT, 1));
-        directoryLayout.addView(selectDirectoryButton, new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0));
+        LayoutParams params2 = new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0);
+        params2.setMargins(dp(4), 0, 0, 0);
+        directoryLayout.addView(selectDirectoryButton, params2);
 
         LinearLayout proxyLayout = new LinearLayout(context);
         proxyLayout.setOrientation(HORIZONTAL);
@@ -754,8 +691,6 @@ public class ConfigView extends LinearLayout {
         proxyText.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.proxy"));
 
         Spinner proxySpinner = new Spinner(context);
-        final Spinner[] proxySpinnerRef = {null};
-        proxySpinnerRef[0] = proxySpinner;
         String[] proxyLabels = Arrays.stream(ApiServerFetcher.DownloadProxy.values())
                 .map(dp -> I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.proxy." + dp.name())).toArray(String[]::new);
         ArrayAdapter<String> proxyAdapter = new ArrayAdapter<>(context, proxyLabels) {
@@ -804,7 +739,7 @@ public class ConfigView extends LinearLayout {
         refreshReleaseButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         backgroundFactory.applyBackgroundTo(refreshReleaseButton);
         refreshReleaseButton.setOnClickListener(v -> {
-            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning, proxySpinnerRef[0]);
+            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning);
         });
 
         releaseInfoLayout.addView(releaseNameLabel, new LayoutParams(0, WRAP_CONTENT, 1));
@@ -1036,14 +971,14 @@ public class ConfigView extends LinearLayout {
         });
 
         downloadApiServerButton.setOnClickListener((v) -> {
-            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning, proxySpinnerRef[0]);
+            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning);
             setPage.accept(state[0] == Page.DOWNLOADING ? Page.DOWNLOADING : state[0] == Page.DONE ? Page.DONE : Page.IDLE);
             dialog.show();
         });
         return downloadApiServerButton;
     }
 
-    private void refreshReleaseInfo(TextView releaseLabel, ApiServerFetcher.ReleaseSummary[] latest, Path[] targetDir, TextView warning, Spinner proxySpinner) {
+    private void refreshReleaseInfo(TextView releaseLabel, ApiServerFetcher.ReleaseSummary[] latest, Path[] targetDir, TextView warning) {
         releaseLabel.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.fetching"));
         ApiBinaryUpdateService.getInstance().fetchLatestRelease().thenAccept(r -> {
             if (r != null) {
@@ -1081,6 +1016,115 @@ public class ConfigView extends LinearLayout {
             warning.setVisibility(VISIBLE);
         } else {
             warning.setVisibility(GONE);
+        }
+    }
+
+    private static final class EnvVarAccordion implements View.OnClickListener {
+        final ViewGroup mParent;
+        LinearLayout mContent;
+
+        EnvVarAccordion(ViewGroup parent) {
+            mParent = parent;
+        }
+
+        @Override
+        public void onClick(View v) {
+            if (mContent != null) {
+                mContent.setVisibility(mContent.getVisibility() == View.GONE
+                        ? View.VISIBLE
+                        : View.GONE);
+                return;
+            }
+            addContent();
+        }
+
+        private void addContent() {
+            var context = mParent.getContext();
+            mContent = new LinearLayout(context);
+            mContent.setOrientation(LinearLayout.VERTICAL);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.useRandomCnIp"),
+                    serverConfig::getUseRandomCnIp,
+                    serverConfig::setUseRandomCnIp)
+                    .setDefaultValue(serverConfig.getDefaultUseRandomCnIp())
+                    .create(mContent);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableGeneralUnblock"),
+                    serverConfig::getEnableGeneralUnblock,
+                    serverConfig::setEnableGeneralUnblock)
+                    .setDefaultValue(serverConfig.getDefaultEnableGeneralUnblock())
+                    .create(mContent);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableFlac"),
+                    serverConfig::getEnableFlac,
+                    serverConfig::setEnableFlac)
+                    .setDefaultValue(serverConfig.getDefaultEnableFlac())
+                    .create(mContent);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.selectMaxBr"),
+                    serverConfig::getSelectMaxBr,
+                    serverConfig::setSelectMaxBr)
+                    .setDefaultValue(serverConfig.getDefaultSelectMaxBr())
+                    .create(mContent);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.followSourceOrder"),
+                    serverConfig::getFollowSourceOrder,
+                    serverConfig::setFollowSourceOrder)
+                    .setDefaultValue(serverConfig.getDefaultFollowSourceOrder())
+                    .create(mContent);
+
+            new PreferencesFragment.IntegerOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.port"),
+                    serverConfig::getPort,
+                    serverConfig::setPort)
+                    .setRange(1, 65535)
+                    .setDefaultValue(serverConfig.getDefaultPort())
+                    .create(mContent);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.enableProxy"),
+                    serverConfig::getEnableProxy,
+                    serverConfig::setEnableProxy)
+                    .setDefaultValue(serverConfig.getDefaultEnableProxy())
+                    .create(mContent);
+
+            createEnvVarInputBox(context, mContent, MusicHud.MOD_ID + ".config.apiServer.corsAllowOrigin",
+                    serverConfig.getCorsAllowOrigin(), serverConfig::setCorsAllowOrigin);
+            createEnvVarInputBox(context, mContent, MusicHud.MOD_ID + ".config.apiServer.proxyUrl",
+                    serverConfig.getProxyUrl(), serverConfig::setProxyUrl);
+
+            var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params.setMargins(0, mContent.dp(6), 0, 0);
+            mParent.addView(mContent, params);
+        }
+
+        private static void createEnvVarInputBox(Context context, LinearLayout parent, String i18nKey,
+                                                 String currentValue, Consumer<String> setter) {
+            LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(i18nKey));
+            EditText input = inputBox.findViewById(R.id.input);
+            if (input != null) {
+                input.setMinimumWidth(input.dp(256));
+                input.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
+                input.setText(currentValue);
+                input.setOnKeyListener((v, c, e) -> {
+                    if (c == GLFW.GLFW_KEY_ENTER) {
+                        input.clearFocus();
+                        return true;
+                    }
+                    return false;
+                });
+                input.setOnFocusChangeListener((v, b) -> {
+                    if (!b) {
+                        setter.accept(input.getText().toString());
+                    }
+                });
+            }
+            parent.addView(inputBox);
         }
     }
 }
