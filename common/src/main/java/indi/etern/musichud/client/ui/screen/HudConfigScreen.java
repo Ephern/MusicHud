@@ -89,7 +89,6 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     public void renderBackground(@NonNull GuiGraphics guiGraphics, int mouseX, int mouseY, float deltaTick) {
         if (minecraft != null && minecraft.level == null) {
             this.renderPanorama(guiGraphics, deltaTick);
-            guiGraphics.nextStratum();
             HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
         }
     }

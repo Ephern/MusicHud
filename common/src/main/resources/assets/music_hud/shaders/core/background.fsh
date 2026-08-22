@@ -15,7 +15,6 @@ layout(std140) uniform MHDynamicStatus {
 };
 
 in vec2 f_Position;
-in vec4 f_Color;
 
 out vec4 fragColor;
 

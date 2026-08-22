@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
-import net.minecraft.util.ARGB;
+import net.minecraft.util.Mth;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -11,6 +11,7 @@ import java.util.function.Supplier;
 
 public class PlayerHeadRenderer implements HudRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
+    private static final int TRANSITION_DURATION = 400;
     @Getter
     private Layout layout;
     private String previousSkinResource;
@@ -18,7 +19,30 @@ public class PlayerHeadRenderer implements HudRenderer {
     @Getter
     private Supplier<String> playerSkinSupplier;
     private long lastUpdateTime = -1;
-    private static final int TRANSITION_DURATION = 400;
+
+    public static void renderHead(HudGraphics graphics, String skinPath,
+                                  float x, float y, int w, int h, float alpha) {
+        if (alpha <= 0.003) {
+            return;
+        }
+        float scale = 0.87f;
+        float inset = (1 - scale) / 2;
+        graphics.nextStratum();
+
+        // Inner face layer (8,8 to 16,16) - slightly smaller for depth
+        graphics.pose().pushPose();
+        graphics.pose().translate(x + w * inset, y + h * inset, 0);
+        graphics.pose().scale(scale, scale, 1);
+        int alphaColor = Mth.floor(Math.min(alpha, 1) * 255.0F) << 24 | 0xFFFFFF;// 0x[alpha(2)]FFFFFF
+        graphics.blitTextured(skinPath, 0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
+        graphics.pose().popPose();
+
+        graphics.pose().pushPose();
+        graphics.pose().translate(x, y, 0);
+        // Outer hat layer (40,8 to 48,16) - full size on top
+        graphics.blitTextured(skinPath, 0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
+        graphics.pose().popPose();
+    }
 
     public void setPlayerSkinSupplier(@Nullable Supplier<String> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
@@ -60,7 +84,8 @@ public class PlayerHeadRenderer implements HudRenderer {
                 }
             }
             if (skinResource == null) return;
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
 
         Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
         int w = (int) layout.getWidth();
@@ -78,29 +103,5 @@ public class PlayerHeadRenderer implements HudRenderer {
             renderHead(context.graphics(), skinResource,
                     absolutePosition.x(), absolutePosition.y(), w, h, transitionProgress);
         }
-    }
-
-    public static void renderHead(HudGraphics graphics, String skinPath,
-                                   float x, float y, int w, int h, float alpha) {
-        if (alpha <= 0.003) {
-            return;
-        }
-        float scale = 0.87f;
-        float inset = (1 - scale) / 2;
-        graphics.nextStratum();
-
-        // Inner face layer (8,8 to 16,16) - slightly smaller for depth
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(x + w * inset, y + h * inset);
-        graphics.pose().scale(scale);
-        int alphaColor = ARGB.color(Math.min(alpha, 1), 0xFFFFFF);
-        graphics.blitTextured(skinPath, 0, 0, 8, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
-        graphics.pose().popMatrix();
-
-        graphics.pose().pushMatrix();
-        graphics.pose().translate(x, y);
-        // Outer hat layer (40,8 to 48,16) - full size on top
-        graphics.blitTextured(skinPath, 0, 0, 40, 8, w, h, 8, 8, SKIN_TEXTURE_SIZE, SKIN_TEXTURE_SIZE, alphaColor);
-        graphics.pose().popMatrix();
     }
 }

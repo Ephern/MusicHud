@@ -64,11 +64,11 @@ public class AlbumImageRenderer implements HudRenderer {
         }
         if (transitionTexture != null) {
             return HudTextureSetup.doubleTexture(
-                    new GpuTextureViewRef(currentTexture.getTextureView()),
-                    new GpuTextureViewRef(transitionTexture.getTextureView())
+                    new GpuTextureViewRef(currentTexture.getId()),
+                    new GpuTextureViewRef(transitionTexture.getId())
             );
         }
-        return HudTextureSetup.single(new GpuTextureViewRef(currentTexture.getTextureView()));
+        return HudTextureSetup.single(new GpuTextureViewRef(currentTexture.getId()));
     }
 
     private DynamicTexture getIconTexture() {

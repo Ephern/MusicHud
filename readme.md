@@ -41,7 +41,8 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 - Display lyrics, requesting player (or avatar) in the HUD and user interface.
 
 ## Compatibility
-- Currently specially supports to mute Reactive Music when MusicHUD is playing
+- Mute Reactive Music when MusicHUD is playing
+- Force disabled reverb applied to OpenAL source from MusicHUD by SoundPhysicsPerfected
 
 ## TO-DO List
 - Customizable HUD layout [target 1.3.0/1.4.0]
@@ -124,7 +125,8 @@ You can find "Download API..." button in setting page, which will open a downloa
 - 在 HUD 和用户界面中展示歌词，点歌玩家（或头像）
 
 ## 兼容
-- 目前特殊支持在 MusicHUD 播放时静音 Reactive Music
+- 在 MusicHUD 播放时静音 Reactive Music
+- 强制禁用 SoundPhysicsPerfected 对来自 MusicHUD 的 OpenAL source 应用的混响
 
 ## ~~大饼~~ 待办清单
 - 可自定义的 HUD 布局 [目标 1.3.0/1.4.0]

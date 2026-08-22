@@ -1,36 +1,34 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import org.joml.Matrix3x2fStack;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.math.Axis;
 
 import java.util.function.Consumer;
 
-/**
- * Version-neutral 2D transform helper backed by a JOML {@link Matrix3x2fStack}.
- */
 public class Transforming {
-    private final Matrix3x2fStack pose;
+    private final PoseStack pose;
 
-    private Transforming(Matrix3x2fStack pose) {
+    private Transforming(PoseStack pose) {
         this.pose = pose;
-        pose.pushMatrix();
+        pose.pushPose();
     }
 
-    public static Transforming on(Matrix3x2fStack pose) {
+    public static Transforming on(PoseStack pose) {
         return new Transforming(pose);
     }
 
     public Transforming translate(float x, float y) {
-        pose.translate(x, y);
+        pose.translate(x, y, 0);
         return this;
     }
 
     public Transforming rotate(float angle) {
-        pose.rotate(angle);
+        pose.mulPose(Axis.ZP.rotation(angle));
         return this;
     }
 
     public Transforming scale(float scale) {
-        pose.scale(scale);
+        pose.scale(scale, scale, 0);
         return this;
     }
 
@@ -41,17 +39,17 @@ public class Transforming {
 
     public void end(Consumer<Transforming> task) {
         task.accept(this);
-        pose.popMatrix();
+        pose.popPose();
     }
 
     public void end() {
-        pose.popMatrix();
+        pose.popPose();
     }
 
     public Transforming subTransform(Consumer<Transforming> consumer) {
-        pose.pushMatrix();
+        pose.pushPose();
         consumer.accept(this);
-        pose.popMatrix();
+        pose.popPose();
         return this;
     }
 }

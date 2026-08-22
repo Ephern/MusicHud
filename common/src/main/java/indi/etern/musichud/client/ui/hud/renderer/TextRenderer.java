@@ -202,8 +202,8 @@ public class TextRenderer implements HudRenderer {
     private int getColorWithAlpha(int baseColor, float alpha) {
         float a = ((baseColor >> 24) & 0xff) / 255.0f;
         int alphaValue = (int) (a * alpha * 255);
-        // 确保 alpha 值在 0-255 范围内
-        alphaValue = Math.clamp(alphaValue, 0, 255);
+        // 确保 alpha 值在 4-255 范围内（MC 把较低 alpha 视为不透明）
+        alphaValue = Math.clamp(alphaValue, 4, 255);
         // 将 Alpha 通道合并到颜色中 (ARGB 格式)
         return (alphaValue << 24) | (baseColor & 0x00FFFFFF);
     }

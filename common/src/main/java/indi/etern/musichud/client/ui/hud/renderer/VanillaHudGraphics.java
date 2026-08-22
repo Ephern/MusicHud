@@ -1,10 +1,10 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
-import org.joml.Matrix3x2fStack;
 
 /**
  * Adapter: exposes a {@link GuiGraphics} behind the neutral {@link HudGraphics}.
@@ -21,23 +21,27 @@ public class VanillaHudGraphics implements HudGraphics {
     }
 
     @Override
-    public Matrix3x2fStack pose() {
+    public PoseStack pose() {
         return graphics.pose();
     }
 
     @Override
     public void nextStratum() {
-        graphics.nextStratum();
+        // not implemented in 1.21.1
     }
 
     @Override
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int textureWidth, int textureHeight) {
-        graphics.blit(RenderPipelines.GUI_TEXTURED, ResourceLocation.parse(texturePath), x, y, u0, v0, width, height, textureWidth, textureHeight);
+        graphics.blit(ResourceLocation.parse(texturePath), x, y, width, height, (float)u0, (float)v0, textureWidth, textureHeight, textureWidth, textureHeight);
     }
 
     @Override
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int u1, int v1, int textureWidth, int textureHeight, int color) {
-        graphics.blit(RenderPipelines.GUI_TEXTURED, ResourceLocation.parse(texturePath), x, y, u0, v0, width, height, u1, v1, textureWidth, textureHeight, color);
+        float[] prevColor = RenderSystem.getShaderColor();
+
+        applyArgbColor(graphics, color);
+        graphics.blit(ResourceLocation.parse(texturePath), x, y, width, height, (float)u0, (float)v0, u1, v1, textureWidth, textureHeight);
+        graphics.setColor(prevColor[0], prevColor[1], prevColor[2], prevColor[3]);
     }
 
     @Override
@@ -68,5 +72,13 @@ public class VanillaHudGraphics implements HudGraphics {
     @Override
     public void popScissor() {
         graphics.disableScissor();
+    }
+
+    private static void applyArgbColor(GuiGraphics graphics, int color) {
+        float a = ((color >> 24) & 0xFF) / 255.0f;
+        float r = ((color >> 16) & 0xFF) / 255.0f;
+        float g = ((color >> 8) & 0xFF) / 255.0f;
+        float b = (color & 0xFF) / 255.0f;
+        graphics.setColor(r, g, b, a);
     }
 }

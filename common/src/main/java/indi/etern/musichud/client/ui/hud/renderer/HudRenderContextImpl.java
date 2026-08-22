@@ -1,241 +1,270 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
+import com.mojang.blaze3d.vertex.*;
 import indi.etern.musichud.client.ui.hud.pipelines.*;
 import lombok.Getter;
+import lombok.NonNull;
+import lombok.Setter;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.renderer.DynamicUniformStorage;
-import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
+import org.joml.Matrix4f;
 
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.*;
 
-/**
- * <p>
- * Multiple elements may share one {@link HudPipeline} while carrying
- * different per-element uniform content. Every submitted element is kept as its own
- * {@link TextureSetup} identity and gets its own set of UBO slices. Uniform storage is
- * keyed by UBO name alone, so shared uniforms (e.g. {@code MHDynamicStatus}) are uploaded
- * only once per frame and deduplicated across elements by
- * {@link DynamicUniformStorage#writeUniform}, while distinct content for the same name
- * lives in separate blocks of the same buffer. During the GUI pass each draw binds only the
- * slices of the element it belongs to (per-draw uniform upload, equivalent to
- * {@code RenderPass.drawMultipleIndexed}'s {@code uniformUploaderConsumer}).
- * <p>
- * On-demand upload is preserved: if a logical element's uniform data did not change since
- * the last frame ({@link HudUniform#shouldUseBuffer}) and its previously uploaded slice is
- * still backed by a live buffer, the slice is reused and nothing is re-written.
- */
+import static org.lwjgl.opengl.GL11.GL_BLEND;
+import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
+import static org.lwjgl.opengl.GL11.GL_ONE;
+import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11.glBindTexture;
+import static org.lwjgl.opengl.GL11.glDisable;
+import static org.lwjgl.opengl.GL11.glEnable;
+import static org.lwjgl.opengl.GL11.glGetIntegerv;
+import static org.lwjgl.opengl.GL11.glIsEnabled;
+import static org.lwjgl.opengl.GL13.GL_ACTIVE_TEXTURE;
+import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
+import static org.lwjgl.opengl.GL13.glActiveTexture;
+import static org.lwjgl.opengl.GL14.*;
+import static org.lwjgl.opengl.GL14.GL_BLEND_DST_ALPHA;
+import static org.lwjgl.opengl.GL20.*;
+import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
+
 public class HudRenderContextImpl implements HudRenderContext {
-    private static final RenderStateUtil UNIFORM_WRITER = new RenderStateUtil();
     @Getter
     private static HudRenderContext current;
 
-    private final Map<String, DynamicUniformStorage<UniformAdapter>> storageMap = new HashMap<>();
-    private final Map<CacheKey, LastWritten> lastWrittenUniforms = new HashMap<>();
-
-    private final List<ElementRecord> elements = new ArrayList<>();
-    private final Map<TextureSetup, Map<String, GpuBufferSlice>> elementSlices = new IdentityHashMap<>();
-    private final Map<String, GpuBufferSlice> defaultSlices = new HashMap<>();
-
+    @Getter
+    @Setter
     private HudGraphics graphics;
+    private final Map<String, HudShaderProgram.UniformBufferHandle> uboHandles = new HashMap<>();
+    private final Map<String, ByteBuffer> uboBuffers = new HashMap<>();
 
     public HudRenderContextImpl() {
         current = this;
     }
 
+    public void submitHudRenderState(HudRenderState hudRenderState) {
+        HudPipeline pipeline = hudRenderState.pipeline();
+        if (!(pipeline instanceof HudShaderProgram program)) {
+            renderFallback(hudRenderState);
+            return;
+        }
+        if (program.getProgramId() <= 0) {
+            renderFallback(hudRenderState);
+            return;
+        }
+
+        // Save MC's GL state before we take over
+        int[] savedProgram = new int[1];
+        glGetIntegerv(GL_CURRENT_PROGRAM, savedProgram);
+        int[] savedActiveTexture = new int[1];
+        glGetIntegerv(GL_ACTIVE_TEXTURE, savedActiveTexture);
+        boolean depthEnabled = glIsEnabled(GL_DEPTH_TEST);
+        boolean blendEnabled = glIsEnabled(GL_BLEND);
+        int[] savedBlendSrcRgb = new int[1], savedBlendDstRgb = new int[1];
+        int[] savedBlendSrcAlpha = new int[1], savedBlendDstAlpha = new int[1];
+        if (blendEnabled) {
+            glGetIntegerv(GL_BLEND_SRC_RGB, savedBlendSrcRgb);
+            glGetIntegerv(GL_BLEND_DST_RGB, savedBlendDstRgb);
+            glGetIntegerv(GL_BLEND_SRC_ALPHA, savedBlendSrcAlpha);
+            glGetIntegerv(GL_BLEND_DST_ALPHA, savedBlendDstAlpha);
+        }
+
+        try {
+            glUseProgram(program.getProgramId());
+            if (depthEnabled) glDisable(GL_DEPTH_TEST);
+            if (!blendEnabled) glEnable(GL_BLEND);
+            GlStateManager._blendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+
+            setBuiltinUniforms(program);
+
+            HudUniform[] uniforms = hudRenderState.uniforms();
+            if (uniforms != null) {
+                for (HudUniform uniform : uniforms) {
+                    uploadUniform(program, uniform);
+                }
+            }
+
+            @NonNull HudTextureSetup textures = hudRenderState.textureSetup();
+            int i = 0;
+            if (textures.primary() instanceof GpuTextureViewRef(int id)) {
+                glActiveTexture(GL_TEXTURE0 + i);
+                glBindTexture(GL_TEXTURE_2D, id);
+                int samplerLoc = program.getUniformOrSamplerLocation("Sampler" + i);
+                if (samplerLoc >= 0) {
+                    glUniform1i(samplerLoc, i);
+                }
+                i++;
+            }
+            if (textures.secondary() instanceof GpuTextureViewRef(int id)) {
+                glActiveTexture(GL_TEXTURE0 + i);
+                glBindTexture(GL_TEXTURE_2D, id);
+                int samplerLoc = program.getUniformOrSamplerLocation("Sampler" + i);
+                if (samplerLoc >= 0) {
+                    glUniform1i(samplerLoc, i);
+                }
+            }
+
+            drawQuad(hudRenderState.pose(), hudRenderState.width(), hudRenderState.height());
+        } finally {
+            glUseProgram(savedProgram[0]);
+            glActiveTexture(savedActiveTexture[0]);
+            if (blendEnabled) {
+                GlStateManager._blendFuncSeparate(
+                        savedBlendSrcRgb[0], savedBlendDstRgb[0],
+                        savedBlendSrcAlpha[0], savedBlendDstAlpha[0]);
+            } else {
+                glDisable(GL_BLEND);
+            }
+            if (depthEnabled) glEnable(GL_DEPTH_TEST);
+        }
+    }
+
+    private void renderFallback(HudRenderState hudRenderState) {
+        float left = graphics.guiWidth() / 2f + hudRenderState.pose().m20;
+        float top = graphics.guiHeight() / 2f + hudRenderState.pose().m21;
+        int x0 = (int)(left - hudRenderState.width() / 2f);
+        int y0 = (int)(top - hudRenderState.height() / 2f);
+        int x1 = (int)(left + hudRenderState.width() / 2f);
+        int y1 = (int)(top + hudRenderState.height() / 2f);
+
+        graphics.fill(x0, y0, x1, y1, 0x33FFFFFF);
+    }
+
+    private void setBuiltinUniforms(HudShaderProgram program) {
+        Matrix4f proj = new Matrix4f(RenderSystem.getProjectionMatrix());
+        Matrix4f mv = new Matrix4f().translate(0, 0, -1000);
+        int projLoc = program.getUniformOrSamplerLocation("ProjMat");
+        if (projLoc >= 0) {
+            float[] buf = new float[16];
+            proj.get(buf);
+            glUniformMatrix4fv(projLoc, false, buf);
+        }
+        int mvLoc = program.getUniformOrSamplerLocation("ModelViewMat");
+        if (mvLoc >= 0) {
+            float[] buf = new float[16];
+            mv.get(buf);
+            glUniformMatrix4fv(mvLoc, false, buf);
+        }
+    }
+
+    private void uploadUniform(HudShaderProgram program, HudUniform uniform) {
+        String uboName = uniform.getUBOName();
+        Integer bindingPoint = HudShaderManager.getBindingPoint(uboName);
+        if (bindingPoint == null) return;
+
+        int uboSize = uniform.getUBOSize();
+        String cacheKey = program.getProgramId() + "/" + uboName;
+
+        // Reuse buffer per UBO name to avoid allocation each frame
+        ByteBuffer buffer = uboBuffers.computeIfAbsent(cacheKey,
+                k -> ByteBuffer.allocateDirect(uboSize).order(ByteOrder.nativeOrder()));
+        buffer.clear();
+        uniform.write(buffer);
+        buffer.flip();
+
+        HudShaderProgram.UniformBufferHandle handle = uboHandles.computeIfAbsent(cacheKey,
+                k -> HudShaderProgram.UniformBufferHandle.createAndUpload(bindingPoint, buffer));
+        // upload updates buffer data + binds — no separate bind() needed
+        handle.upload(buffer);
+    }
+
+    private static final Matrix4f IDENTITY = new Matrix4f();
+
+    private void drawQuad(Matrix3x2f pose, float width, float height) {
+        float left = -width / 2f;
+        float right = width / 2f;
+        float top = -height / 2f;
+        float bottom = height / 2f;
+
+        BufferBuilder builder = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLES, DefaultVertexFormat.POSITION_COLOR);
+
+        float x1 = pose.m00 * left + pose.m10 * bottom;
+        float y1 = pose.m01 * left + pose.m11 * bottom;
+        float x2 = pose.m00 * right + pose.m10 * bottom;
+        float y2 = pose.m01 * right + pose.m11 * bottom;
+        float x3 = pose.m00 * right + pose.m10 * top;
+        float y3 = pose.m01 * right + pose.m11 * top;
+        float x4 = pose.m00 * left + pose.m10 * top;
+        float y4 = pose.m01 * left + pose.m11 * top;
+
+        // Use identity matrix — u_Translation UBO handles element position,
+        // ProjMat * ModelViewMat in the shader handles orthographic projection.
+        // Do NOT apply graphics.pose() here to avoid double-transforming.
+        builder.addVertex(IDENTITY, x1, y1, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x2, y2, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x3, y3, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x1, y1, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x3, y3, 0).setColor(-1);
+        builder.addVertex(IDENTITY, x4, y4, 0).setColor(-1);
+
+        // BufferUploader.draw() uploads + draws without touching the shader —
+        // our glUseProgram() sticks.
+        BufferUploader.draw(builder.buildOrThrow());
+    }
+
     @Override
     public void beginFrame(HudGraphics graphics) {
-        for (DynamicUniformStorage<?> storage : storageMap.values()) {
-            storage.endFrame();
-        }
-        elements.clear();
-        elementSlices.clear();
-        defaultSlices.clear();
         this.graphics = graphics;
     }
 
     @Override
-    public void endFrame() {
-        prepareUniforms();
-    }
+    public void endFrame() {}
 
     @Override
     public HudGraphics graphics() {
         return graphics;
     }
 
-    @Override
-    public void submitHudRenderState(HudRenderState state) {
-        TextureSetup textureSetup = toVanillaTextureSetup(state.textureSetup(), state.elementKey());
-        HudGuiElementRenderState element = new HudGuiElementRenderState(
-                ((RenderPipelineHudPipeline) state.pipeline()).renderPipeline(),
-                textureSetup,
-                state.pose(),
-                state.width(),
-                state.height(),
-                state.bounds(),
-                state.elementKey(),
-                state.uniforms()
+    /**
+     * Returns the current pose matrix without translation — element position is
+     * handled by the u_Translation uniform in the vertex shader (set via Layout UBO).
+     */
+    public @NonNull Matrix3x2f currentPose() {
+        PoseStack.Pose last = graphics.pose().last();
+        Matrix4f pose = last.pose();
+        return new Matrix3x2f(
+                pose.m00(), pose.m01(),
+                pose.m10(), pose.m11(),
+                0, 0
         );
-        UNIFORM_WRITER.submitGuiElementRenderState(((VanillaHudGraphics) graphics).vanilla(), element);
-        elementSlices.put(textureSetup, new HashMap<>());
-        elements.add(new ElementRecord(state.elementKey(), state.pipeline(), textureSetup, state.uniforms()));
     }
 
-    /**
-     * Distinct 1x1 texture view per logical element (elementKey). It is placed in
-     * {@code texure2} of the element's {@link TextureSetup} so that elements of different
-     * profiles are record-unequal and {@code GuiRenderer} never merges them into one draw,
-     * while elements of the same profile stay mergeable. No mod pipeline declares
-     * {@code Sampler2}, so binding this view is a no-op.
-     */
-    private final Map<String, GpuTextureView> discriminatorViews = new HashMap<>();
-
-    private GpuTextureView discriminatorView(String elementKey) {
-        if (elementKey == null) {
-            elementKey = "";
-        }
-        return discriminatorViews.computeIfAbsent(elementKey, key -> {
-            GpuDevice device = RenderSystem.getDevice();
-            GpuTexture texture = device.createTexture(
-                    "music_hud_" + key, GpuTexture.USAGE_TEXTURE_BINDING,
-                    TextureFormat.RGBA8, 1, 1, 1, 1);
-            return device.createTextureView(texture);
-        });
-    }
-
-    private TextureSetup toVanillaTextureSetup(HudTextureSetup setup, @Nullable String elementKey) {
-        GpuTextureView primary = setup.primary() == null ? null : ((GpuTextureViewRef) setup.primary()).view();
-        GpuTextureView secondary = setup.secondary() == null ? null : ((GpuTextureViewRef) setup.secondary()).view();
-        return new TextureSetup(primary, secondary, discriminatorView(elementKey));
-    }
-
-    public void prepareUniforms() {
-        for (ElementRecord element : elements) {
-            if (element.uniforms == null) continue;
-            Map<String, GpuBufferSlice> slices = elementSlices.get(element.textureSetup);
-            for (HudUniform uniform : element.uniforms) {
-                CacheKey cacheKey = new CacheKey(element.elementKey, element.pipeline, uniform.getUBOName());
-                GpuBufferSlice slice;
-                LastWritten last = lastWrittenUniforms.get(cacheKey);
-                if (last != null && last.uniform.shouldUseBuffer(uniform)
-                        && last.slice != null && !last.slice.buffer().isClosed()) {
-                    slice = last.slice;
-                } else {
-                    DynamicUniformStorage<UniformAdapter> storage = storageMap.computeIfAbsent(
-                            uniform.getUBOName(),
-                            k -> new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
-                    );
-                    slice = storage.writeUniform(new UniformAdapter(uniform));
-                }
-                lastWrittenUniforms.put(cacheKey, new LastWritten(uniform, slice));
-                if (slices != null) {
-                    slices.put(uniform.getUBOName(), slice);
-                }
-                defaultSlices.put(uniform.getUBOName(), slice);
-            }
-        }
-    }
-
-    /**
-     * Binds a default slice for every uniform name uploaded this frame. This guarantees the
-     * dev-mode validation of {@code GuiRenderer} always finds a value for every declared
-     * uniform; per-draw binding ({@link #bindElementUniforms}) then overrides the values
-     * that actually belong to the element being drawn.
-     */
-    public void bindAllUniforms(RenderPass pass) {
-        if (pass == null) return;
-        for (Map.Entry<String, GpuBufferSlice> entry : defaultSlices.entrySet()) {
-            pass.setUniform(entry.getKey(), entry.getValue());
-        }
-    }
-
-    /**
-     * Per-draw uniform upload, following the same contract as
-     * {@code RenderPass.UniformUploader}. The uploader is invoked once per uniform of the
-     * element that the given {@link TextureSetup} identity belongs to.
-     */
-    @FunctionalInterface
-    public interface UniformUploader {
-        void upload(String uboName, GpuBufferSlice slice);
-    }
-
-    public void bindElementUniforms(RenderPass pass, TextureSetup textureSetup, UniformUploader uploader) {
-        Map<String, GpuBufferSlice> slices = elementSlices.get(textureSetup);
-        if (slices == null) return;
-        for (Map.Entry<String, GpuBufferSlice> entry : slices.entrySet()) {
-            uploader.upload(entry.getKey(), entry.getValue());
-        }
-    }
-
-    @Override
-    public @NotNull Matrix3x2f currentPose() {
-        return new Matrix3x2f(graphics.pose());
-    }
-
-    @Override
     public Transforming transform() {
         return Transforming.on(graphics.pose());
     }
 
     @Override
     public void nextStratum() {
-        graphics.nextStratum();
+
     }
 
-    @Override
     public int guiWidth() {
         return graphics.guiWidth();
     }
 
-    @Override
     public int guiHeight() {
         return graphics.guiHeight();
     }
 
-    @Override
     public void pushScissor(int fromX, int fromY, int toX, int toY) {
         graphics.pushScissor(fromX, fromY, toX, toY);
     }
 
-    @Override
     public void popScissor() {
         graphics.popScissor();
     }
 
-    @Override
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
         graphics.drawString(font, text, x, y, color, dropShadow);
     }
 
-    @Override
     public void fill(int fromX, int fromY, int toX, int toY, int color) {
         graphics.fill(fromX, fromY, toX, toY, color);
-    }
-
-    private record CacheKey(String elementKey, HudPipeline pipeline, String uboName) {
-    }
-
-    private record LastWritten(HudUniform uniform, GpuBufferSlice slice) {
-    }
-
-    private record ElementRecord(String elementKey, HudPipeline pipeline, TextureSetup textureSetup, HudUniform[] uniforms) {
-    }
-
-    private record UniformAdapter(HudUniform uniform) implements DynamicUniformStorage.DynamicUniform {
-        @Override
-        public void write(ByteBuffer byteBuffer) {
-            uniform.write(byteBuffer);
-        }
     }
 }
