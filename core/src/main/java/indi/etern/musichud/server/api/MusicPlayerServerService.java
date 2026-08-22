@@ -124,8 +124,8 @@ public class MusicPlayerServerService {
                     Thread.sleep(Math.max(1000, switchedToPlay.getDurationMillis() - musicMixMillis));
                 } catch (InterruptedException ignored) {//When force switch
                     logger.info("Skip current, switch to nextIdle");
-                    if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT
-                            && !IClientDistUtil.getInstance().inSinglePlayer()) {
+                    if (MusicHud.getCurrentEnvironment().getSide() != Environment.Side.CLIENT
+                            || (IClientDistUtil.getInstance().inIntegratedServer() && ! IClientDistUtil.getInstance().inSinglePlayer())) {
                         message = MusicHud.MOD_ID + ".text.votePassed";
                     }
                 } catch (Exception e) {
