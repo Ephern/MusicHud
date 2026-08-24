@@ -49,6 +49,9 @@ public class SearchMusicResultView extends LinearLayout {
     }
 
     public void append(List<MusicDetail> musicDetails) {
+        if (musicDetails == null || musicDetails.isEmpty()) {
+            return;
+        }
         result.addAll(musicDetails);
         for (MusicDetail musicDetail : musicDetails) {
             addItem(getContext(), musicDetail);

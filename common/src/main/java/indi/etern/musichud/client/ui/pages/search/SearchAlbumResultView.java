@@ -37,6 +37,9 @@ public class SearchAlbumResultView extends WaterfallLayout {
     }
 
     public void append(List<Album> albums) {
+        if (albums == null || albums.isEmpty()) {
+            return;
+        }
         result.addAll(albums);
         for (Album album : albums) {
             addItem(getContext(), album);
