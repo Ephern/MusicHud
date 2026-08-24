@@ -1,8 +1,9 @@
 #version 150
 
+// u_Layout: (halfWidth, halfHeight, cornerRadius)
 layout(std140) uniform MHPosition {
     mat4 u_Translation;
-    vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
+    vec3 u_Layout;
 };
 layout(std140) uniform MHNowPlayingThemeColor {
     vec4 u_Primary;
@@ -10,8 +11,10 @@ layout(std140) uniform MHNowPlayingThemeColor {
     vec4 u_Bright;
     vec4 u_Dark;
 };
+
+// u_Dynamic1: (timestamp, playedProgress, switchProgress)
 layout(std140) uniform MHDynamicStatus {
-    vec4 u_Dynamic1; // (timestamp, playedProgress, switchProgress)
+    vec4 u_Dynamic1;
 };
 
 in vec2 f_Position;

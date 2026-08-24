@@ -37,6 +37,9 @@ public class SearchPlaylistResultView extends WaterfallLayout {
     }
 
     public void append(List<Playlist> playlists) {
+        if (playlists == null || playlists.isEmpty()) {
+            return;
+        }
         result.addAll(playlists);
         for (Playlist playlist : playlists) {
             addItem(getContext(), playlist);
