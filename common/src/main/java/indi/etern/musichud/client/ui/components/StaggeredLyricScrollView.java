@@ -278,16 +278,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     private void jumpToTop() {
         if (scrollController == null) return;
-        scrollController.abortAnimation();
+        resetStaggerState();
         int maxScroll = Math.max(0, container.getHeight() - getHeight());
-        boolean previousStaggeredActive = staggeredActive;
-        staggeredActive = false;
         scrollController.setMaxScroll(maxScroll);
         scrollController.scrollTo(0, 0);
         scrollController.setStartValue(currentScrollPosition);
         scrollController.abortAnimation();
         currentScrollPosition = 0;
-        staggeredActive = previousStaggeredActive;
     }
 
     private void jumpToLyric(LyricLineView target) {
@@ -302,15 +299,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
         targetScrollY = Math.clamp(targetScrollY, 0, maxScroll);
 
-        boolean previousStaggeredActive = staggeredActive;
-        staggeredActive = false;
-        scrollController.abortAnimation();
+        resetStaggerState();
         scrollController.setMaxScroll(maxScroll);
         scrollController.scrollTo(targetScrollY, 0);
         scrollController.setStartValue(currentScrollPosition);
         scrollController.abortAnimation();
         currentScrollPosition = targetScrollY;
-        staggeredActive = previousStaggeredActive;
     }
 
     private void scrollToLyric(LyricLineView target) {
@@ -450,6 +444,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     private void stopUpdateLoop() {
         continueUpdate = false;
+        resetStaggerState();
     }
 
     private void calcLoggedDelay(int targetIndex) {
@@ -682,6 +677,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (container == null || lyricLineViewList.isEmpty()) {
             return;
         }
+        resetStaggerState();
+        scrollStatus = ScrollStatus.IDLE;
+        lastAutoScrollTime = MuiModApi.getElapsedTime();
         post(() -> {
             requestLayout();
             if (!continueUpdate) {
@@ -700,6 +698,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     public void suspendLyricFollowing() {
         stopUpdateLoop();
         removeCallbacks(autoRecenterRunnable);
+        resetStaggerState();
+        scrollStatus = ScrollStatus.IDLE;
+    }
+
+    private void resetStaggerState() {
         staggeredActive = false;
         animatingLyricViews.clear();
         delayMillis = null;
@@ -709,7 +712,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         baseOffsetAtRedirect = 0;
         lyricAnimationStartAtMillis = 0;
         staggeringEndListener = null;
-        scrollStatus = ScrollStatus.IDLE;
         if (scrollController != null) {
             scrollController.abortAnimation();
         }

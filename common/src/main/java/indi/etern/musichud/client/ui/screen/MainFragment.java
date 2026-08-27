@@ -121,38 +121,38 @@ public class MainFragment extends Fragment {
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             MusicDetail current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
             MusicDetail nextToPlay = nowPlayingInfo.getNextToPlayIdleMusicDetail();
-            Queue<LyricLine> lyricLines = nowPlayingInfo.getLyricLines();
-            displayMusicInfo(current, nextToPlay, lyricLines);
+            Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
+            displayMusicInfo(current, nextToPlay, lines);
             if (homeView != null) {
-                homeView.switchMusic(current, nextToPlay, lyricLines);
+                homeView.switchMusic(current, nextToPlay, lines);
             }
             if (instance.lyricsScrollView != null) {
-                instance.lyricsScrollView.switchLyrics(current, lyricLines);
+                instance.lyricsScrollView.switchLyrics(current, lines);
             }
-            boolean hasLyrics = lyricLines != null && !lyricLines.isEmpty()
+            boolean hasLyrics = lines != null && !lines.isEmpty()
                     && current != null && !current.equals(MusicDetail.NONE)
-                    && lyricLines.stream().filter(lyricLine -> lyricLine.getType() == LyricLine.Type.NORMAL).count() > 1;
+                    && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
             instance.updateLyricsPanelForLyrics(hasLyrics);
             instance.refreshServerConnectStatus();
         }
     }
 
-    public static void switchMusic(MusicDetail musicDetail, MusicDetail nextToPlay, Queue<LyricLine> lyricLines) {
+    public static void switchMusic(MusicDetail musicDetail, MusicDetail nextToPlay, Queue<LyricLine> lines) {
         if (instance != null) {
-            displayMusicInfo(musicDetail, nextToPlay, lyricLines);
+            displayMusicInfo(musicDetail, nextToPlay, lines);
             if (musicDetail != null && !musicDetail.equals(MusicDetail.NONE)) {
                 startProgressUpdater(musicDetail);
             }
             HomeView homeView = HomeView.getInstance();
             if (homeView != null) {
-                homeView.switchMusic(musicDetail, nextToPlay, lyricLines);
+                homeView.switchMusic(musicDetail, nextToPlay, lines);
             }
             if (instance.lyricsScrollView != null) {
-                instance.lyricsScrollView.switchLyrics(musicDetail, lyricLines);
+                instance.lyricsScrollView.switchLyrics(musicDetail, lines);
             }
-            boolean hasLyrics = lyricLines != null && !lyricLines.isEmpty()
+            boolean hasLyrics = lines != null && !lines.isEmpty()
                     && musicDetail != null && !musicDetail.equals(MusicDetail.NONE)
-                    && lyricLines.stream().filter(lyricLine -> lyricLine.getType() == LyricLine.Type.NORMAL).count() > 1;
+                    && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
             instance.updateLyricsPanelForLyrics(hasLyrics);
         }
     }
@@ -594,7 +594,8 @@ public class MainFragment extends Fragment {
         MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
         Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
         return detail != null && !detail.equals(MusicDetail.NONE)
-                && lines != null && !lines.isEmpty();
+                && lines != null && !lines.isEmpty()
+                && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
     }
 
     private void updateLyricsPanelForLyrics(boolean hasLyrics) {
