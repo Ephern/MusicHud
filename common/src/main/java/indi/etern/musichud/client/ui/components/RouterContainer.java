@@ -6,10 +6,8 @@ import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
-import indi.etern.musichud.client.utils.ui.EasingInterpolator;
 import indi.etern.musichud.client.utils.ui.Easing;
 import lombok.Getter;
-import lombok.Setter;
 
 import java.util.*;
 import java.util.function.Function;
@@ -27,9 +25,10 @@ public class RouterContainer extends FrameLayout {
     private final Map<String, View> pageCache = new HashMap<>();
     private final Map<String, Function<Context, View>> pageFactories = new HashMap<>();
     private String currentPageKey = null;
-    @Setter
+    @Getter
     private int animationDuration = 300;
-    private TransitionType transitionType = TransitionType.FADE;
+    private AnimationStyle animationStyle = AnimationStyle.FADE;
+    private TransitionType transitionType = TransitionType.CROSS;
     private AnimatorSet currentAnimation = null;
     private OnPageChangeListener pageChangeListener;
 
@@ -44,6 +43,11 @@ public class RouterContainer extends FrameLayout {
     private final Easing defaultEasing = Easing.EASE_IN_OUT_QUINT;
 
     public enum TransitionType {
+        CROSS,
+        SERIAL
+    }
+
+    public enum AnimationStyle {
         FADE {
             @Override
             public List<Animator> createAnimators(View fromPage, View toPage,
@@ -182,6 +186,132 @@ public class RouterContainer extends FrameLayout {
             }
         },
 
+        SCALE_FADE_ROOT {
+            @Override
+            public List<Animator> createAnimators(View fromPage, View toPage,
+                                                  int duration, TimeInterpolator interpolator) {
+                List<Animator> animators = new ArrayList<>();
+
+                if (fromPage != null) {
+                    ObjectAnimator scaleOutX = ObjectAnimator.ofFloat(fromPage, View.SCALE_X, 1f, 0.97f);
+                    ObjectAnimator scaleOutY = ObjectAnimator.ofFloat(fromPage, View.SCALE_Y, 1f, 0.97f);
+                    ObjectAnimator fadeOut = ObjectAnimator.ofFloat(fromPage, View.ALPHA,
+                            fromPage.getAlpha(), 0f);
+                    scaleOutX.setDuration(duration);
+                    scaleOutY.setDuration(duration);
+                    fadeOut.setDuration(duration);
+                    scaleOutX.setInterpolator(interpolator);
+                    scaleOutY.setInterpolator(interpolator);
+                    fadeOut.setInterpolator(interpolator);
+                    animators.add(scaleOutX);
+                    animators.add(scaleOutY);
+                    animators.add(fadeOut);
+                }
+
+                toPage.setScaleX(0.97f);
+                toPage.setScaleY(0.97f);
+                toPage.setAlpha(0f);
+                ObjectAnimator scaleInX = ObjectAnimator.ofFloat(toPage, View.SCALE_X, 0.97f, 1f);
+                ObjectAnimator scaleInY = ObjectAnimator.ofFloat(toPage, View.SCALE_Y, 0.97f, 1f);
+                ObjectAnimator fadeIn = ObjectAnimator.ofFloat(toPage, View.ALPHA, 0f, 1f);
+                scaleInX.setDuration(duration);
+                scaleInY.setDuration(duration);
+                fadeIn.setDuration(duration);
+                scaleInX.setInterpolator(interpolator);
+                scaleInY.setInterpolator(interpolator);
+                fadeIn.setInterpolator(interpolator);
+                animators.add(scaleInX);
+                animators.add(scaleInY);
+                animators.add(fadeIn);
+
+                return animators;
+            }
+        },
+
+        SCALE_FADE_PUSH {
+            @Override
+            public List<Animator> createAnimators(View fromPage, View toPage,
+                                                  int duration, TimeInterpolator interpolator) {
+                List<Animator> animators = new ArrayList<>();
+
+                if (fromPage != null) {
+                    ObjectAnimator scaleOutX = ObjectAnimator.ofFloat(fromPage, View.SCALE_X, 1f, 1.02f);
+                    ObjectAnimator scaleOutY = ObjectAnimator.ofFloat(fromPage, View.SCALE_Y, 1f, 1.02f);
+                    ObjectAnimator fadeOut = ObjectAnimator.ofFloat(fromPage, View.ALPHA,
+                            fromPage.getAlpha(), 0f);
+                    scaleOutX.setDuration(duration);
+                    scaleOutY.setDuration(duration);
+                    fadeOut.setDuration(duration);
+                    scaleOutX.setInterpolator(interpolator);
+                    scaleOutY.setInterpolator(interpolator);
+                    fadeOut.setInterpolator(interpolator);
+                    animators.add(scaleOutX);
+                    animators.add(scaleOutY);
+                    animators.add(fadeOut);
+                }
+
+                toPage.setScaleX(1.02f);
+                toPage.setScaleY(1.02f);
+                toPage.setAlpha(0f);
+                ObjectAnimator scaleInX = ObjectAnimator.ofFloat(toPage, View.SCALE_X, 0.97f, 1f);
+                ObjectAnimator scaleInY = ObjectAnimator.ofFloat(toPage, View.SCALE_Y, 0.97f, 1f);
+                ObjectAnimator fadeIn = ObjectAnimator.ofFloat(toPage, View.ALPHA, 0f, 1f);
+                scaleInX.setDuration(duration);
+                scaleInY.setDuration(duration);
+                fadeIn.setDuration(duration);
+                scaleInX.setInterpolator(interpolator);
+                scaleInY.setInterpolator(interpolator);
+                fadeIn.setInterpolator(interpolator);
+                animators.add(scaleInX);
+                animators.add(scaleInY);
+                animators.add(fadeIn);
+
+                return animators;
+            }
+        },
+
+        SCALE_FADE_POP {
+            @Override
+            public List<Animator> createAnimators(View fromPage, View toPage,
+                                                  int duration, TimeInterpolator interpolator) {
+                List<Animator> animators = new ArrayList<>();
+
+                if (fromPage != null) {
+                    ObjectAnimator scaleOutX = ObjectAnimator.ofFloat(fromPage, View.SCALE_X, 1f, 0.97f);
+                    ObjectAnimator scaleOutY = ObjectAnimator.ofFloat(fromPage, View.SCALE_Y, 1f, 0.97f);
+                    ObjectAnimator fadeOut = ObjectAnimator.ofFloat(fromPage, View.ALPHA,
+                            fromPage.getAlpha(), 0f);
+                    scaleOutX.setDuration(duration);
+                    scaleOutY.setDuration(duration);
+                    fadeOut.setDuration(duration);
+                    scaleOutX.setInterpolator(interpolator);
+                    scaleOutY.setInterpolator(interpolator);
+                    fadeOut.setInterpolator(interpolator);
+                    animators.add(scaleOutX);
+                    animators.add(scaleOutY);
+                    animators.add(fadeOut);
+                }
+
+                toPage.setScaleX(0.97f);
+                toPage.setScaleY(0.97f);
+                toPage.setAlpha(0f);
+                ObjectAnimator scaleInX = ObjectAnimator.ofFloat(toPage, View.SCALE_X, 1.02f, 1f);
+                ObjectAnimator scaleInY = ObjectAnimator.ofFloat(toPage, View.SCALE_Y, 1.02f, 1f);
+                ObjectAnimator fadeIn = ObjectAnimator.ofFloat(toPage, View.ALPHA, 0f, 1f);
+                scaleInX.setDuration(duration);
+                scaleInY.setDuration(duration);
+                fadeIn.setDuration(duration);
+                scaleInX.setInterpolator(interpolator);
+                scaleInY.setInterpolator(interpolator);
+                fadeIn.setInterpolator(interpolator);
+                animators.add(scaleInX);
+                animators.add(scaleInY);
+                animators.add(fadeIn);
+
+                return animators;
+            }
+        },
+
         NONE {
             @Override
             public List<Animator> createAnimators(View fromPage, View toPage,
@@ -198,7 +328,7 @@ public class RouterContainer extends FrameLayout {
          * @param interpolator 缓动函数
          * @return 动画列表
          */
-        public abstract List<Animator> createAnimators(@ Nullable View fromPage, View toPage,
+        public abstract List<Animator> createAnimators(@Nullable View fromPage, View toPage,
                                                        int duration, TimeInterpolator interpolator);
     }
 
@@ -225,21 +355,13 @@ public class RouterContainer extends FrameLayout {
 
     public void registerPage(@NonNull String key, @NonNull Function<Context, View> factory) {
         pageFactories.put(key, factory);
-
-//        if (!pageCache.containsKey(key)) {
-//            View page = factory.apply(getContext());
-//            page.setVisibility(GONE);
-//            page.setAlpha(0f);
-//            pageCache.put(key, page);
-//            addView(page, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-//        }
     }
 
     public void navigateToRoot(@NonNull String key) {
         navigateToRoot(key, null);
     }
 
-    public void navigateToRoot(@NonNull String key, @Nullable TransitionType transitionType) {
+    public void navigateToRoot(@NonNull String key, @Nullable AnimationStyle animationStyle) {
         if (key.equals(currentPageKey) && routeStack.size() == 1 && !isTransitioning) {
             return;
         }
@@ -274,38 +396,25 @@ public class RouterContainer extends FrameLayout {
         View targetPage = getOrCreatePage(key);
         View currentPage = currentPageKey != null ? pageCache.get(currentPageKey) : null;
 
-        // 将根页面的 key 压入栈
         routeStack.push(key);
 
-        TransitionType effectiveTransition = transitionType != null ? transitionType : this.transitionType;
+        AnimationStyle effectiveStyle = animationStyle != null ? animationStyle : this.animationStyle;
 
-        performTransition(currentPage, targetPage, key, effectiveTransition, null);
+        performTransition(currentPage, targetPage, key, effectiveStyle, null);
     }
 
-    /**
-     * 推入一个动态 View 到路由栈
-     * @param view 要显示的 View
-     */
     public void pushNavigate(@NonNull View view) {
-        pushNavigate(view, TransitionType.SLIDE_LEFT);
+        pushNavigate(view, AnimationStyle.SCALE_FADE_PUSH);
     }
 
-    /**
-     * 推入一个动态 View 到路由栈,并指定动画类型
-     * @param view 要显示的 View
-     * @param transitionType 动画类型
-     */
-    public void pushNavigate(@NonNull View view, @Nullable TransitionType transitionType) {
+    public void pushNavigate(@NonNull View view, @Nullable AnimationStyle animationStyle) {
         if (isTransitioning) {
-            // 如果正在切换,延迟执行
-            post(() -> pushNavigate(view, transitionType));
+            post(() -> pushNavigate(view, animationStyle));
             return;
         }
 
-        // 生成唯一的 key
         String dynamicKey = "dynamic_" + (dynamicViewCounter++);
 
-        // 将 View 添加到容器中
         view.setVisibility(GONE);
         view.setAlpha(0f);
         addView(view, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -315,63 +424,54 @@ public class RouterContainer extends FrameLayout {
 
         View currentPage = getCurrentViewFromStack();
 
-        // 将动态 View 的 key 压入栈
+        if (pageChangeListener != null) {
+            pageChangeListener.onPageChangeStart(currentPageKey, dynamicKey);
+        }
+
         routeStack.push(dynamicKey);
 
-        TransitionType effectiveTransition = transitionType != null ? transitionType : TransitionType.SLIDE_LEFT;
+        AnimationStyle effectiveStyle = animationStyle != null ? animationStyle : AnimationStyle.SCALE_FADE_PUSH;
 
-        performTransition(currentPage, view, dynamicKey, effectiveTransition, null);
+        performTransition(currentPage, view, dynamicKey, effectiveStyle, null);
     }
 
-    /**
-     * 弹出当前页面,返回到上一个页面
-     */
     public void popNavigate() {
-        popNavigate(TransitionType.SLIDE_RIGHT);
+        popNavigate(AnimationStyle.SCALE_FADE_POP);
     }
 
-    /**
-     * 弹出当前页面,返回到上一个页面,并指定动画类型
-     * @param transitionType 动画类型
-     */
-    public void popNavigate(@Nullable TransitionType transitionType) {
+    public void popNavigate(@Nullable AnimationStyle animationStyle) {
         if (routeStack.size() <= 1) {
-            // 栈中只有一个页面,无法弹出
             return;
         }
 
         if (isTransitioning) {
-            // 如果正在切换,延迟执行
-            post(() -> popNavigate(transitionType));
+            post(() -> popNavigate(animationStyle));
             return;
         }
 
         isTransitioning = true;
 
-        // 弹出当前页面
         String currentKey = routeStack.pop();
         View currentPage = getViewByKey(currentKey);
 
-        // 获取父页面(不弹出)
         String parentKey = routeStack.peek();
         View parentPage = getViewByKey(parentKey);
 
         if (parentPage == null) {
-            // 父页面不存在,恢复栈状态
             routeStack.push(currentKey);
             isTransitioning = false;
             return;
         }
 
-        TransitionType effectiveTransition = transitionType != null ? transitionType : TransitionType.SLIDE_RIGHT;
+        if (pageChangeListener != null) {
+            pageChangeListener.onPageChangeStart(currentKey, parentKey);
+        }
 
-        // 从当前页面切换到父页面
-        performTransition(currentPage, parentPage, parentKey, effectiveTransition, null);
+        AnimationStyle effectiveStyle = animationStyle != null ? animationStyle : AnimationStyle.SCALE_FADE_POP;
+
+        performTransition(currentPage, parentPage, parentKey, effectiveStyle, null);
     }
 
-    /**
-     * 根据 key 获取对应的 View
-     */
     private View getViewByKey(Object key) {
         if (key instanceof String keyStr) {
             if (keyStr.startsWith("dynamic_")) {
@@ -383,9 +483,6 @@ public class RouterContainer extends FrameLayout {
         return null;
     }
 
-    /**
-     * 从栈顶获取当前显示的 View
-     */
     private View getCurrentViewFromStack() {
         if (routeStack.isEmpty()) {
             return null;
@@ -410,21 +507,18 @@ public class RouterContainer extends FrameLayout {
     }
 
     private void performTransition(@Nullable View fromPage, @NonNull View toPage,
-                                   String toKey, @Nullable TransitionType customType,
+                                   String toKey, @Nullable AnimationStyle customStyle,
                                    @Nullable Easing customEasing) {
         isTransitioning = true;
 
         toPage.setVisibility(VISIBLE);
 
-        TransitionType type = customType != null ? customType : transitionType;
+        AnimationStyle style = customStyle != null ? customStyle : animationStyle;
         Easing easing = customEasing != null ? customEasing : defaultEasing;
-        TimeInterpolator interpolator = EasingInterpolator.of(easing);
 
-        // 使用枚举的方法创建动画
-        List<Animator> animators = type.createAnimators(fromPage, toPage, animationDuration, interpolator);
+        List<Animator> animators = style.createAnimators(fromPage, toPage, animationDuration, easing);
 
         if (animators.isEmpty()) {
-            // NONE 类型:无动画,直接完成
             if (fromPage != null) {
                 fromPage.setVisibility(GONE);
                 fromPage.setAlpha(0f);
@@ -434,12 +528,32 @@ public class RouterContainer extends FrameLayout {
             return;
         }
 
-        // 创建动画集合
+        if (transitionType == TransitionType.SERIAL && fromPage != null) {
+            for (Animator animator : animators) {
+                if (animator instanceof ObjectAnimator oa) {
+                    Object target = oa.getTarget();
+                    if (target == toPage) {
+                        oa.setStartDelay(animationDuration);
+                    } else if (target == fromPage) {
+                        oa.addListener(new AnimatorListener() {
+                            @Override
+                            public void onAnimationEnd(@NonNull Animator animation) {
+                                fromPage.setVisibility(GONE);
+                                fromPage.setTranslationX(0f);
+                                fromPage.setScaleX(1f);
+                                fromPage.setScaleY(1f);
+                                fromPage.setAlpha(0f);
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
         currentAnimation = new AnimatorSet();
         currentAnimation.playTogether(animators);
 
         final View finalFromPage = fromPage;
-
         currentAnimation.addListener(new AnimatorListener() {
             @Override
             public void onAnimationEnd(@NonNull Animator animation) {
@@ -457,7 +571,6 @@ public class RouterContainer extends FrameLayout {
             fromPage.setScaleY(1f);
             fromPage.setAlpha(0f);
 
-            // 如果 fromPage 是动态 View 且不在栈中,移除它
             String fromKey = findKeyForView(fromPage);
             if (fromKey != null && fromKey.startsWith("dynamic_") && !routeStack.contains(fromKey)) {
                 dynamicViews.remove(fromKey);
@@ -465,7 +578,6 @@ public class RouterContainer extends FrameLayout {
             }
         }
 
-        // 确保目标页面的属性正确
         View toPage = toKey != null ? pageCache.get(toKey) : null;
         if (toPage == null && toKey != null && toKey.startsWith("dynamic_")) {
             toPage = dynamicViews.get(toKey);
@@ -483,13 +595,11 @@ public class RouterContainer extends FrameLayout {
         isTransitioning = false;
         if (toKey != null) {
             currentPageKey = toKey;
-            // 触发页面切换完成回调
             if (pageChangeListener != null) {
                 pageChangeListener.onPageChangeEnd(toKey);
             }
         }
 
-        // 处理待处理的导航请求
         if (pendingNavigationKey != null) {
             String pendingKey = pendingNavigationKey;
             pendingNavigationKey = null;
@@ -497,15 +607,12 @@ public class RouterContainer extends FrameLayout {
         }
     }
 
-    // 辅助方法:根据 View 查找对应的 key
     private String findKeyForView(View view) {
-        // 先在 pageCache 中查找
         for (Map.Entry<String, View> entry : pageCache.entrySet()) {
             if (entry.getValue() == view) {
                 return entry.getKey();
             }
         }
-        // 再在 dynamicViews 中查找
         for (Map.Entry<String, View> entry : dynamicViews.entrySet()) {
             if (entry.getValue() == view) {
                 return entry.getKey();
@@ -531,8 +638,21 @@ public class RouterContainer extends FrameLayout {
         return page;
     }
 
+    public void setAnimationStyle(@NonNull AnimationStyle style) {
+        animationStyle = style;
+    }
+
     public void setTransitionType(@NonNull TransitionType type) {
         transitionType = type;
+    }
+
+    @NonNull
+    public TransitionType getTransitionType() {
+        return transitionType;
+    }
+
+    public void setAnimationDuration(int duration) {
+        animationDuration = duration;
     }
 
     public void setOnPageChangeListener(@Nullable OnPageChangeListener listener) {

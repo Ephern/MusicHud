@@ -6,23 +6,19 @@ import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.core.Core;
-import icyllis.modernui.graphics.BlendMode;
-import icyllis.modernui.graphics.Canvas;
-import icyllis.modernui.graphics.LinearGradient;
-import icyllis.modernui.graphics.Paint;
-import icyllis.modernui.graphics.Shader;
+import icyllis.modernui.graphics.*;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ScrollController;
 import icyllis.modernui.mc.ui.ClampingScrollView;
-import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
+import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
@@ -35,7 +31,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Consumer;
-import java.util.function.Supplier;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -46,6 +41,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final float MAX_DELAY_MILLIS = 500;
     public static final float STAGGERED_BASE_DURATION_MILLIS = 600;
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
+    private static final float SPACER_HEIGHT_RATIO = 0.7f;
+    private View bottomSpacer;
     private static final SpringInterpolator STAGGER_INTERPOLATOR = new SpringInterpolator(STAGGERED_BASE_DURATION_MILLIS * 0.001f, 1);
     private static Logger logger;
     private final Set<LyricLineView> animatingLyricViews = new HashSet<>();
@@ -124,7 +121,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         nowPlayingInfo.getLyricLineUpdateListener().add(lyricLineUpdateListener);
 
         addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.MANUAL) {
+            int width = right - left;
+            int height = bottom - top;
+            int lastWidth = oldRight - oldLeft;
+            int lastHeight = oldBottom - oldTop;
+            if ((width != lastWidth || height != lastHeight)
+                && (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.MANUAL)) {
                 recenter();
             }
         });
@@ -199,14 +201,15 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             lyricLineViewList.add(row);
         }
 
-        container.addView(new RatedHeightView(context, 0.7f, () -> this));
+        bottomSpacer = new View(context);
+        container.addView(bottomSpacer, new LayoutParams(MATCH_PARENT, 0));
 
         post(() -> {
             requestLayout();
             for (LyricLineView line : lyricLineViewList) {
                 line.setTranslationY(line.getTargetOffset(nowPlayingInfo.getCurrentLyricLine()));
             }
-            initializeScrollToCurrentLyric();
+            post(this::initializeScrollToCurrentLyric);
         });
     }
 
@@ -277,11 +280,14 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (scrollController == null) return;
         scrollController.abortAnimation();
         int maxScroll = Math.max(0, container.getHeight() - getHeight());
+        boolean previousStaggeredActive = staggeredActive;
+        staggeredActive = false;
         scrollController.setMaxScroll(maxScroll);
         scrollController.scrollTo(0, 0);
         scrollController.setStartValue(currentScrollPosition);
         scrollController.abortAnimation();
         currentScrollPosition = 0;
+        staggeredActive = previousStaggeredActive;
     }
 
     private void jumpToLyric(LyricLineView target) {
@@ -296,12 +302,15 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
         targetScrollY = Math.clamp(targetScrollY, 0, maxScroll);
 
+        boolean previousStaggeredActive = staggeredActive;
+        staggeredActive = false;
         scrollController.abortAnimation();
         scrollController.setMaxScroll(maxScroll);
         scrollController.scrollTo(targetScrollY, 0);
         scrollController.setStartValue(currentScrollPosition);
         scrollController.abortAnimation();
         currentScrollPosition = targetScrollY;
+        staggeredActive = previousStaggeredActive;
     }
 
     private void scrollToLyric(LyricLineView target) {
@@ -356,8 +365,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             lastUserScrollTime = MuiModApi.getElapsedTime();
         }
     }
-
-
 
     private void markManual() {
         scrollStatus = ScrollStatus.MANUAL;
@@ -647,31 +654,68 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
     }
 
-    enum ScrollStatus {
-        IDLE, MANUAL, RECENTER, FOLLOW_LYRICS
-    }
-
-    public static class RatedHeightView extends View {
-        private final Supplier<View> targetSupplier;
-        private final float heightPercent;
-
-        public RatedHeightView(Context context, float heightRate, Supplier<View> targetSupplier) {
-            super(context);
-            this.heightPercent = heightRate;
-            this.targetSupplier = targetSupplier;
-        }
-
-        @Override
-        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-            View parent = targetSupplier.get();
-            if (parent != null) {
-                int parentHeight = parent.getHeight();
-                int targetHeight = (int) (parentHeight * heightPercent);
-                int width = MeasureSpec.getSize(widthMeasureSpec);
-                setMeasuredDimension(width, targetHeight);
-            } else {
-                super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        super.onLayout(changed, left, top, right, bottom);
+        int viewport = bottom - top;
+        if (viewport > 0 && bottomSpacer != null && bottomSpacer.getParent() == container) {
+            int target = (int) (viewport * SPACER_HEIGHT_RATIO);
+            ViewGroup.LayoutParams lp = bottomSpacer.getLayoutParams();
+            if (lp.height != target) {
+                lp.height = target;
+                bottomSpacer.requestLayout();
             }
         }
+    }
+
+    public void refreshLinesStyle() {
+        lyricLineViewList.forEach(LyricLineView::refreshSubLyricLine);
+        post(this::recenter);
+    }
+
+    /**
+     * Re-initialize layout and scroll position after the host panel becomes visible.
+     * The bottom spacer is sized in onLayout, so recomputing the scroll position here
+     * (after a re-layout) is sufficient.
+     */
+    public void reinitializeAfterShow() {
+        if (container == null || lyricLineViewList.isEmpty()) {
+            return;
+        }
+        post(() -> {
+            requestLayout();
+            if (!continueUpdate) {
+                startUpdateLoop();
+            }
+            post(this::initializeScrollToCurrentLyric);
+        });
+    }
+
+    /**
+     * Suspend lyric following while the host panel is hidden. The panel is only resized
+     * (width 0) instead of being detached, so without this the update loop and the lyric
+     * listener would keep driving the scroll/stagger on an invisible view, accumulating
+     * stale animation state that surfaces as glitches when the panel is shown again.
+     */
+    public void suspendLyricFollowing() {
+        stopUpdateLoop();
+        removeCallbacks(autoRecenterRunnable);
+        staggeredActive = false;
+        animatingLyricViews.clear();
+        delayMillis = null;
+        staggerFromOffsets = null;
+        cumulativeBaseOffset = 0;
+        prevScrollInitialized = false;
+        baseOffsetAtRedirect = 0;
+        lyricAnimationStartAtMillis = 0;
+        staggeringEndListener = null;
+        scrollStatus = ScrollStatus.IDLE;
+        if (scrollController != null) {
+            scrollController.abortAnimation();
+        }
+    }
+
+    enum ScrollStatus {
+        IDLE, MANUAL, RECENTER, FOLLOW_LYRICS
     }
 }

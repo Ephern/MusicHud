@@ -2,7 +2,7 @@ package indi.etern.musichud.client.ui.screen;
 
 import icyllis.modernui.ModernUI;
 import icyllis.modernui.R;
-import icyllis.modernui.animation.LayoutTransition;
+import icyllis.modernui.animation.*;
 import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
@@ -27,6 +27,7 @@ import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
@@ -89,6 +90,13 @@ public class MainFragment extends Fragment {
     private ToggleTrackLikeStateButton likeButton;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
     private int sideWidth = -1;
+    private static final int LYRICS_ANIMATION_DURATION = 300;
+    private StaggeredLyricScrollView lyricsScrollView;
+    private LinearLayout lyricsPanel;
+    private int lyricsPanelWidth = -1;
+    private boolean lyricsPanelShown = false;
+    private AnimatorSet lyricsAnimator = null;
+    private Runnable pendingLyricsToggleRunnable;
 
     public MainFragment() {
     }
@@ -118,6 +126,12 @@ public class MainFragment extends Fragment {
             if (homeView != null) {
                 homeView.switchMusic(current, nextToPlay, lyricLines);
             }
+            if (instance.lyricsScrollView != null) {
+                instance.lyricsScrollView.switchLyrics(current, lyricLines);
+            }
+            boolean hasLyrics = lyricLines != null && !lyricLines.isEmpty()
+                    && current != null && !current.equals(MusicDetail.NONE);
+            instance.updateLyricsPanelForLyrics(hasLyrics);
             instance.refreshServerConnectStatus();
         }
     }
@@ -132,6 +146,13 @@ public class MainFragment extends Fragment {
             if (homeView != null) {
                 homeView.switchMusic(musicDetail, nextToPlay, lyricLines);
             }
+            if (instance.lyricsScrollView != null) {
+                instance.lyricsScrollView.switchLyrics(musicDetail, lyricLines);
+            }
+            boolean hasLyrics = lyricLines != null && !lyricLines.isEmpty()
+                    && musicDetail != null && !musicDetail.equals(MusicDetail.NONE)
+                    && lyricLines.stream().filter(lyricLine -> lyricLine.getType() == LyricLine.Type.NORMAL).count() > 1;
+            instance.updateLyricsPanelForLyrics(hasLyrics);
         }
     }
 
@@ -260,6 +281,19 @@ public class MainFragment extends Fragment {
         });
     }
 
+    public static void refreshLyricViews() {
+        HomeView homeView = HomeView.getInstance();
+        if (homeView != null) {
+            StaggeredLyricScrollView staggeredLyricScrollView = homeView.getStaggeredLyricScrollView();
+            if (staggeredLyricScrollView != null) {
+                MuiModApi.postToUiThread(staggeredLyricScrollView::refreshLinesStyle);
+            }
+        }
+        if (instance != null && instance.lyricsScrollView != null) {
+            MuiModApi.postToUiThread(instance.lyricsScrollView::refreshLinesStyle);
+        }
+    }
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
@@ -269,13 +303,19 @@ public class MainFragment extends Fragment {
             var context = requireContext();
             var base = new LinearLayout(context);
             base.setPadding(base.dp(24), 0, base.dp(24), 0);
+//            LayoutTransition layoutTransition = new LayoutTransition();
+//            layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+//            layoutTransition.enableTransitionType(LayoutTransition.APPEARING);
+//            layoutTransition.enableTransitionType(LayoutTransition.DISAPPEARING);
+//            base.setLayoutTransition(layoutTransition);
 
             var baseParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
             base.setLayoutParams(baseParams);
             base.setOrientation(LinearLayout.HORIZONTAL);
 
             var routerContainer = new RouterContainer(context);
-            routerContainer.setTransitionType(RouterContainer.TransitionType.FADE);
+
+            routerContainer.setAnimationStyle(RouterContainer.AnimationStyle.SCALE_FADE_ROOT);
             routerContainer.setAnimationDuration(300);
 
             {
@@ -487,15 +527,152 @@ public class MainFragment extends Fragment {
 
                 switchMusic(currentlyPlayingMusicDetail, nextToPlayMusicDetail, playingInfo.getLyricLines());
             }
-            var params = new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT, 0);
-            params.setMargins(routerContainer.dp(80), 0, routerContainer.dp(48), 0);
+
+            lyricsPanelWidth = base.dp(320);
+            lyricsPanel = new LinearLayout(context);
+            lyricsPanel.setOrientation(LinearLayout.VERTICAL);
+            lyricsPanel.setVisibility(View.GONE);
+            lyricsPanel.setAlpha(0f);
+            lyricsPanel.setTranslationX(lyricsPanelWidth);
+
+            lyricsScrollView = new StaggeredLyricScrollView(context);
+            lyricsPanel.addView(lyricsScrollView, new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
+            MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
+            Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
+            if (currentMusic != null && currentLyrics != null && !currentMusic.equals(MusicDetail.NONE)) {
+                lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
+            }
+
+            routerContainer.setOnPageChangeListener(new RouterContainer.OnPageChangeListener() {
+                @Override
+                public void onPageChangeStart(@Nullable String fromKey, @NonNull String toKey) {
+                    boolean isHomeInvolved = "Home".equals(fromKey) || "Home".equals(toKey);
+                    routerContainer.setTransitionType(
+                            isHomeInvolved ? RouterContainer.TransitionType.SERIAL : RouterContainer.TransitionType.CROSS
+                    );
+
+                    long delay = "Home".equals(toKey) ? 0 : LYRICS_ANIMATION_DURATION;
+                    if (pendingLyricsToggleRunnable != null) {
+                        base.removeCallbacks(pendingLyricsToggleRunnable);
+                    }
+                    pendingLyricsToggleRunnable = () -> {
+                        pendingLyricsToggleRunnable = null;
+                        if ("Home".equals(toKey)) {
+                            hideLyricsPanel();
+                        } else {
+                            showLyricsPanel();
+                        }
+                    };
+                    base.postDelayed(pendingLyricsToggleRunnable, delay);
+                }
+
+                @Override
+                public void onPageChangeEnd(@NonNull String pageKey) {
+                    // animation is already triggered in onPageChangeStart
+                }
+            });
+
+            var params = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
+            params.setMargins(routerContainer.dp(80), 0, routerContainer.dp(24), 0);
             base.addView(routerContainer, params);
+
+            LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(lyricsPanelWidth, MATCH_PARENT);
+            params1.setMargins(base.dp(24), 0, 0, 0);
+            base.addView(lyricsPanel, params1);
 
             return base;
         } catch (Exception e) {
             instance = null;
             throw e;
         }
+    }
+
+    private boolean hasLyrics() {
+        NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+        MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+        Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
+        return detail != null && !detail.equals(MusicDetail.NONE)
+                && lines != null && !lines.isEmpty();
+    }
+
+    private void updateLyricsPanelForLyrics(boolean hasLyrics) {
+        RouterContainer rc = RouterContainer.getInstance();
+        if (rc == null) return;
+        String currentKey = rc.getCurrentPageKey();
+        if ("Home".equals(currentKey)) return;
+        if (hasLyrics) {
+            showLyricsPanel();
+        } else {
+            hideLyricsPanel();
+        }
+    }
+
+    private void showLyricsPanel() {
+        if (lyricsPanel == null || lyricsPanelShown) {
+            return;
+        }
+        if (!hasLyrics()) {
+            return;
+        }
+        lyricsPanelShown = true;
+        if (lyricsAnimator != null) {
+            lyricsAnimator.cancel();
+        }
+
+        ViewGroup.LayoutParams lp = lyricsPanel.getLayoutParams();
+        lp.width = lyricsPanelWidth;
+        lyricsPanel.setLayoutParams(lp);
+        lyricsPanel.setVisibility(View.VISIBLE);
+        lyricsPanel.setTranslationX(lyricsPanelWidth);
+        lyricsPanel.setAlpha(0f);
+
+        ObjectAnimator slideIn = ObjectAnimator.ofFloat(lyricsPanel, View.TRANSLATION_X, lyricsPanelWidth, 0);
+        slideIn.setDuration(LYRICS_ANIMATION_DURATION);
+        slideIn.setInterpolator(Easing.EASE_OUT_QUINT);
+        ObjectAnimator fadeIn = ObjectAnimator.ofFloat(lyricsPanel, View.ALPHA, 0f, 1f);
+        fadeIn.setDuration(LYRICS_ANIMATION_DURATION);
+        fadeIn.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
+
+        lyricsAnimator = new AnimatorSet();
+        lyricsAnimator.playTogether(slideIn, fadeIn);
+        lyricsAnimator.start();
+
+        if (lyricsScrollView != null) {
+            lyricsScrollView.reinitializeAfterShow();
+        }
+    }
+
+    private void hideLyricsPanel() {
+        if (lyricsPanel == null || !lyricsPanelShown) {
+            return;
+        }
+        lyricsPanelShown = false;
+        if (lyricsAnimator != null) {
+            lyricsAnimator.cancel();
+        }
+        if (lyricsScrollView != null) {
+            lyricsScrollView.suspendLyricFollowing();
+        }
+
+        ObjectAnimator slideOut = ObjectAnimator.ofFloat(lyricsPanel, View.TRANSLATION_X, 0, lyricsPanelWidth);
+        slideOut.setDuration(LYRICS_ANIMATION_DURATION);
+        slideOut.setInterpolator(Easing.EASE_IN_QUINT);
+        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(lyricsPanel, View.ALPHA, 1f, 0f);
+        fadeOut.setDuration(LYRICS_ANIMATION_DURATION);
+        fadeOut.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
+
+        lyricsAnimator = new AnimatorSet();
+        lyricsAnimator.playTogether(slideOut, fadeOut);
+        lyricsAnimator.addListener(new AnimatorListener() {
+            @Override
+            public void onAnimationEnd(@NonNull Animator animation) {
+                ViewGroup.LayoutParams lp = lyricsPanel.getLayoutParams();
+                lp.width = 0;
+                lyricsPanel.setLayoutParams(lp);
+            }
+        });
+        lyricsAnimator.start();
     }
 
     private void refreshServerConnectStatus() {

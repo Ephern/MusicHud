@@ -5,6 +5,7 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.KeyEvent;
+import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.EditText;
@@ -76,33 +77,52 @@ public class SearchView extends LinearLayout {
         }
 
         LinearLayout top = new LinearLayout(context);
+        top.setGravity(Gravity.CENTER);
         top.setOrientation(HORIZONTAL);
         LayoutParams topParams = new LayoutParams(MATCH_PARENT, dp(38));
         topParams.setMargins(0, dp(32), 0, 0);
         addView(top, topParams);
 
-        top.addView(new View(context), new LayoutParams(0, WRAP_CONTENT, 2));
+        LinearLayout searchWidget = new LinearLayout(context) {
+            @Override
+            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+                int maxWidth = dp(480);
+                int specWidth = MeasureSpec.getSize(widthMeasureSpec);
+                int targetWidth = Math.min(specWidth, maxWidth);
+
+                super.onMeasure(
+                        MeasureSpec.makeMeasureSpec(targetWidth, MeasureSpec.EXACTLY),
+                        heightMeasureSpec
+                );
+                setMeasuredDimension(targetWidth, getMeasuredHeight());
+            }
+        };
+        searchWidget.setOrientation(HORIZONTAL);
+
         searchTextInput = new EditText(context, null, R.attr.editTextOutlinedStyle);
         searchTextInput.setTextAlignment(SearchView.TEXT_ALIGNMENT_CENTER);
         searchTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".field.hint.searchMusic"));
         searchTextInput.setSingleLine();
-        LayoutParams params = new LayoutParams(0, WRAP_CONTENT, 6);
+        LayoutParams params = new LayoutParams(0, WRAP_CONTENT, 1);
         params.setMargins(dp(52), 0, 0, 0);
-        top.addView(searchTextInput, params);
+        searchWidget.addView(searchTextInput, params);
 
         Button searchButton = new Button(context);
         searchButton.setText(I18n.get(MusicHud.MOD_ID + ".button.searchMusic"));
         LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
         backgroundFactory.applyBackgroundTo(searchButton);
         buttonParams.setMargins(dp(8), 0, 0, 0);
-        top.addView(searchButton, buttonParams);
+        searchWidget.addView(searchButton, buttonParams);
 
-        top.addView(new View(context), new LayoutParams(0, WRAP_CONTENT, 2));
+        LayoutParams params1 = new LayoutParams(0, WRAP_CONTENT, 1);
+        top.addView(searchWidget, params1);
+
+//        top.addView(new View(context), new LayoutParams(0, WRAP_CONTENT, 2));
 
         searchResultTabPage = new SearchResultTabPage(context);
 
         LayoutParams resultAreaParams = new LayoutParams(MATCH_PARENT, 0, 1);
-        resultAreaParams.setMargins(dp(32), 0, dp(32), 0);
+//        resultAreaParams.setMargins(dp(32), 0, dp(32), 0);
         addView(searchResultTabPage, resultAreaParams);
 
         searchTextInput.setOnKeyListener((v, keyCode, event) -> {
