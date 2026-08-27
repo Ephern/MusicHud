@@ -130,7 +130,8 @@ public class MainFragment extends Fragment {
                 instance.lyricsScrollView.switchLyrics(current, lyricLines);
             }
             boolean hasLyrics = lyricLines != null && !lyricLines.isEmpty()
-                    && current != null && !current.equals(MusicDetail.NONE);
+                    && current != null && !current.equals(MusicDetail.NONE)
+                    && lyricLines.stream().filter(lyricLine -> lyricLine.getType() == LyricLine.Type.NORMAL).count() > 1;
             instance.updateLyricsPanelForLyrics(hasLyrics);
             instance.refreshServerConnectStatus();
         }
