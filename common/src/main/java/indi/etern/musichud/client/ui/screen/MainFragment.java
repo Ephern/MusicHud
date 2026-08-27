@@ -96,7 +96,6 @@ public class MainFragment extends Fragment {
     private int lyricsPanelWidth = -1;
     private boolean lyricsPanelShown = false;
     private AnimatorSet lyricsAnimator = null;
-    private Runnable pendingLyricsToggleRunnable;
 
     public MainFragment() {
     }
@@ -548,29 +547,41 @@ public class MainFragment extends Fragment {
             routerContainer.setOnPageChangeListener(new RouterContainer.OnPageChangeListener() {
                 @Override
                 public void onPageChangeStart(@Nullable String fromKey, @NonNull String toKey) {
-                    boolean isHomeInvolved = "Home".equals(fromKey) || "Home".equals(toKey);
+                    boolean useSerial = ("Home".equals(fromKey) || "Home".equals(toKey)) && hasLyrics();
                     routerContainer.setTransitionType(
-                            isHomeInvolved ? RouterContainer.TransitionType.SERIAL : RouterContainer.TransitionType.CROSS
+                            useSerial ? RouterContainer.TransitionType.SERIAL : RouterContainer.TransitionType.CROSS
                     );
-
-                    long delay = "Home".equals(toKey) ? 0 : LYRICS_ANIMATION_DURATION;
-                    if (pendingLyricsToggleRunnable != null) {
-                        base.removeCallbacks(pendingLyricsToggleRunnable);
-                    }
-                    pendingLyricsToggleRunnable = () -> {
-                        pendingLyricsToggleRunnable = null;
-                        if ("Home".equals(toKey)) {
-                            hideLyricsPanel();
-                        } else {
-                            showLyricsPanel();
-                        }
-                    };
-                    base.postDelayed(pendingLyricsToggleRunnable, delay);
                 }
 
                 @Override
                 public void onPageChangeEnd(@NonNull String pageKey) {
-                    // animation is already triggered in onPageChangeStart
+                    // animation is already triggered in onBeforeSwap
+                }
+
+                @Override
+                public void onTransitionStart(@Nullable String fromKey, @NonNull String toKey,
+                                              @NonNull RouterContainer.TransitionType type) {
+                    // 过渡刚开始就提前启动回家时右侧歌词栏的隐藏动画，
+                    // 让面板在 onBeforeSwap 置 GONE 时已基本离屏，避免页面 addView 同帧重排。
+                    if ("Home".equals(toKey)) {
+                        hideLyricsPanel();
+                    }
+                }
+
+                @Override
+                public void onBeforeSwap(@Nullable String fromKey, @NonNull String toKey,
+                                         @NonNull RouterContainer.TransitionType type) {
+                    // 回到 Home 时隐藏侧边栏（HomeView 自带歌词组件），离开 Home 时显示侧边栏。
+                    // 该钩子在页面结构变更前一帧由 RouterContainer 触发，与页面 addView 帧对齐，
+                    // 避免用固定 300ms 计时导致切换瞬间出现两次 reflow。
+                    if ("Home".equals(toKey)) {
+                        hideLyricsPanel();
+                        if (lyricsPanel != null) {
+                            lyricsPanel.setVisibility(View.GONE);
+                        }
+                    } else {
+                        showLyricsPanel();
+                    }
                 }
             });
 

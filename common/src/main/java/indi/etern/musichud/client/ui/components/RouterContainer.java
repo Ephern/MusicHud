@@ -8,6 +8,7 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import indi.etern.musichud.client.utils.ui.Easing;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.*;
 import java.util.function.Function;
@@ -25,6 +26,7 @@ public class RouterContainer extends FrameLayout {
     private final Map<String, View> pageCache = new HashMap<>();
     private final Map<String, Function<Context, View>> pageFactories = new HashMap<>();
     private String currentPageKey = null;
+    @Setter
     @Getter
     private int animationDuration = 300;
     private AnimationStyle animationStyle = AnimationStyle.FADE;
@@ -40,6 +42,7 @@ public class RouterContainer extends FrameLayout {
 
     private boolean isTransitioning = false;
     private String pendingNavigationKey = null;
+    private String transitionTargetKey = null;
     private final Easing defaultEasing = Easing.EASE_IN_OUT_QUINT;
 
     public enum TransitionType {
@@ -335,6 +338,18 @@ public class RouterContainer extends FrameLayout {
     public interface OnPageChangeListener {
         void onPageChangeStart(@Nullable String fromKey, @NonNull String toKey);
         void onPageChangeEnd(@NonNull String pageKey);
+
+        /**
+         * 在页面结构发生变更（旧页面退出/删除、新页面添加）的前一帧同步触发，
+         * 供外部对会影响布局的操作做帧对齐（例如侧边栏的 show/hide）。
+         */
+        default void onBeforeSwap(@Nullable String fromKey, @NonNull String toKey, @NonNull TransitionType type) {}
+
+        /**
+         * 过渡刚开始（两帧对齐钩子 {@link #onBeforeSwap} 之前、离场动画播放前）触发，
+         * 供外部提前启动某些动画（例如提前进行右侧歌词栏的隐藏动画）。
+         */
+        default void onTransitionStart(@Nullable String fromKey, @NonNull String toKey, @NonNull TransitionType type) {}
     }
 
     public RouterContainer(Context context) {
@@ -362,12 +377,17 @@ public class RouterContainer extends FrameLayout {
     }
 
     public void navigateToRoot(@NonNull String key, @Nullable AnimationStyle animationStyle) {
-        if (key.equals(currentPageKey) && routeStack.size() == 1 && !isTransitioning) {
+        if (key.equals(currentPageKey) && !isTransitioning) {
             return;
         }
 
         if (!pageFactories.containsKey(key)) {
             throw new IllegalArgumentException("Page not registered: " + key);
+        }
+
+        // 去重：已有到同一目标的过渡正在进行/排队时，忽略重复导航，避免打断并造成自过渡闪烁
+        if (isTransitioning && (key.equals(transitionTargetKey) || key.equals(pendingNavigationKey))) {
+            return;
         }
 
         while (!routeStack.empty()) {
@@ -380,6 +400,7 @@ public class RouterContainer extends FrameLayout {
 
         if (isTransitioning) {
             pendingNavigationKey = key;
+            transitionTargetKey = key;
             if (currentAnimation != null && currentAnimation.isRunning()) {
                 currentAnimation.end();
                 routeStack.push(key);
@@ -388,6 +409,7 @@ public class RouterContainer extends FrameLayout {
         }
 
         isTransitioning = true;
+        transitionTargetKey = key;
 
         if (pageChangeListener != null) {
             pageChangeListener.onPageChangeStart(currentPageKey, key);
@@ -400,7 +422,7 @@ public class RouterContainer extends FrameLayout {
 
         AnimationStyle effectiveStyle = animationStyle != null ? animationStyle : this.animationStyle;
 
-        performTransition(currentPage, targetPage, key, effectiveStyle, null);
+        driveTransition(currentPage, targetPage, key, effectiveStyle, null);
     }
 
     public void pushNavigate(@NonNull View view) {
@@ -417,7 +439,6 @@ public class RouterContainer extends FrameLayout {
 
         view.setVisibility(GONE);
         view.setAlpha(0f);
-        addView(view, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
         dynamicViews.put(dynamicKey, view);
 
         isTransitioning = true;
@@ -432,7 +453,7 @@ public class RouterContainer extends FrameLayout {
 
         AnimationStyle effectiveStyle = animationStyle != null ? animationStyle : AnimationStyle.SCALE_FADE_PUSH;
 
-        performTransition(currentPage, view, dynamicKey, effectiveStyle, null);
+        driveTransition(currentPage, view, dynamicKey, effectiveStyle, null);
     }
 
     public void popNavigate() {
@@ -469,7 +490,7 @@ public class RouterContainer extends FrameLayout {
 
         AnimationStyle effectiveStyle = animationStyle != null ? animationStyle : AnimationStyle.SCALE_FADE_POP;
 
-        performTransition(currentPage, parentPage, parentKey, effectiveStyle, null);
+        driveTransition(currentPage, parentPage, parentKey, effectiveStyle, null);
     }
 
     private View getViewByKey(Object key) {
@@ -500,104 +521,157 @@ public class RouterContainer extends FrameLayout {
                 page.setVisibility(GONE);
                 page.setAlpha(0f);
                 pageCache.put(key, page);
-                addView(page, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
             }
         }
         return page;
     }
 
-    private void performTransition(@Nullable View fromPage, @NonNull View toPage,
-                                   String toKey, @Nullable AnimationStyle customStyle,
-                                   @Nullable Easing customEasing) {
-        isTransitioning = true;
-
-        toPage.setVisibility(VISIBLE);
-
+    /**
+     * 帧对齐的页面结构变更驱动。
+     * <p>通过 {@link OnPageChangeListener#onBeforeSwap} 钩子做帧对齐，并把新视图的
+     * addView 用 post 推迟到下一帧，避免影响布局的切换与页面 addView 同帧重排：
+     * <ul>
+     *     <li>SERIAL：先播旧视图离场；离场结束、旧视图 GONE（删除）的前一帧触发钩子，
+     *         post 下一帧再 addView 并入场。</li>
+     *     <li>CROSS：第一帧触发钩子并让旧视图开始淡出，post 下一帧再 addView 并入场（重叠即交叉）。</li>
+     * </ul>
+     */
+    private void driveTransition(@Nullable View fromPage, @NonNull View toPage, String toKey,
+                                 @Nullable AnimationStyle customStyle, @Nullable Easing customEasing) {
         AnimationStyle style = customStyle != null ? customStyle : animationStyle;
         Easing easing = customEasing != null ? customEasing : defaultEasing;
+        TransitionType type = transitionType;
+        final String fromKey = currentPageKey;
 
-        List<Animator> animators = style.createAnimators(fromPage, toPage, animationDuration, easing);
-
-        if (animators.isEmpty()) {
-            if (fromPage != null) {
-                fromPage.setVisibility(GONE);
-                fromPage.setAlpha(0f);
-            }
-            toPage.setAlpha(1f);
-            onTransitionComplete(fromPage, toKey);
-            return;
+        if (pageChangeListener != null) {
+            pageChangeListener.onTransitionStart(fromKey, toKey, type);
         }
 
-        if (transitionType == TransitionType.SERIAL && fromPage != null) {
-            for (Animator animator : animators) {
-                if (animator instanceof ObjectAnimator oa) {
-                    Object target = oa.getTarget();
-                    if (target == toPage) {
-                        oa.setStartDelay(animationDuration);
-                    } else if (target == fromPage) {
-                        oa.addListener(new AnimatorListener() {
-                            @Override
-                            public void onAnimationEnd(@NonNull Animator animation) {
-                                fromPage.setVisibility(GONE);
-                                fromPage.setTranslationX(0f);
-                                fromPage.setScaleX(1f);
-                                fromPage.setScaleY(1f);
-                                fromPage.setAlpha(0f);
-                            }
-                        });
-                    }
+        List<Animator> all = style.createAnimators(fromPage, toPage, animationDuration, easing);
+        List<Animator> exitAnims = filterExit(all, fromPage);
+        List<Animator> enterAnims = filterEnter(all, toPage);
+
+        if (type == TransitionType.SERIAL) {
+            if (exitAnims.isEmpty()) {
+                fireBeforeSwap(fromKey, toKey, type);
+                runEnter(fromPage, toPage, toKey, enterAnims);
+                return;
+            }
+            AnimatorSet exitSet = new AnimatorSet();
+            exitSet.playTogether(exitAnims);
+            final View finalFromPage = fromPage;
+            exitSet.addListener(new AnimatorListener() {
+                @Override
+                public void onAnimationEnd(@NonNull Animator animation) {
+                    // SERIAL：钩子须在删除旧视图、添加新视图的前一帧触发（旧页离场结束后）
+                    fireBeforeSwap(fromKey, toKey, type);
+                    hideView(finalFromPage);
+                    post(() -> runEnter(finalFromPage, toPage, toKey, enterAnims));
                 }
+            });
+            exitSet.start();
+            currentAnimation = exitSet;
+        } else {
+            // CROSS：第一帧触发钩子并让旧视图开始淡出，addView 推迟到下一帧
+            fireBeforeSwap(fromKey, toKey, type);
+            if (!exitAnims.isEmpty()) {
+                AnimatorSet exitSet = new AnimatorSet();
+                exitSet.playTogether(exitAnims);
+                exitSet.start();
             }
+            post(() -> runEnter(fromPage, toPage, toKey, enterAnims));
         }
-
-        currentAnimation = new AnimatorSet();
-        currentAnimation.playTogether(animators);
-
-        final View finalFromPage = fromPage;
-        currentAnimation.addListener(new AnimatorListener() {
-            @Override
-            public void onAnimationEnd(@NonNull Animator animation) {
-                onTransitionComplete(finalFromPage, toKey);
-            }
-        });
-        currentAnimation.start();
     }
 
-    private void onTransitionComplete(@Nullable View fromPage, String toKey) {
-        if (fromPage != null) {
-            fromPage.setVisibility(GONE);
-            fromPage.setTranslationX(0f);
-            fromPage.setScaleX(1f);
-            fromPage.setScaleY(1f);
-            fromPage.setAlpha(0f);
+    private void fireBeforeSwap(@Nullable String fromKey, @NonNull String toKey, @NonNull TransitionType type) {
+        if (pageChangeListener != null) {
+            pageChangeListener.onBeforeSwap(fromKey, toKey, type);
+        }
+    }
 
-            String fromKey = findKeyForView(fromPage);
-            if (fromKey != null && fromKey.startsWith("dynamic_") && !routeStack.contains(fromKey)) {
-                dynamicViews.remove(fromKey);
-                removeView(fromPage);
+    private List<Animator> filterExit(List<Animator> animators, @Nullable View fromPage) {
+        if (fromPage == null) {
+            return Collections.emptyList();
+        }
+        List<Animator> result = new ArrayList<>();
+        for (Animator animator : animators) {
+            if (animator instanceof ObjectAnimator oa && oa.getTarget() == fromPage) {
+                result.add(animator);
             }
         }
+        return result;
+    }
 
-        View toPage = toKey != null ? pageCache.get(toKey) : null;
-        if (toPage == null && toKey != null && toKey.startsWith("dynamic_")) {
-            toPage = dynamicViews.get(toKey);
+    private List<Animator> filterEnter(List<Animator> animators, View toPage) {
+        List<Animator> result = new ArrayList<>();
+        for (Animator animator : animators) {
+            if (animator instanceof ObjectAnimator oa && oa.getTarget() == toPage) {
+                result.add(animator);
+            }
         }
+        return result;
+    }
 
-        if (toPage != null) {
-            toPage.setVisibility(VISIBLE);
-            toPage.setTranslationX(0f);
-            toPage.setScaleX(1f);
-            toPage.setScaleY(1f);
+    private void runEnter(@Nullable View fromPage, @NonNull View toPage, String toKey,
+                          List<Animator> enterAnims) {
+        addViewIfNeeded(toPage);
+        if (enterAnims.isEmpty()) {
             toPage.setAlpha(1f);
+            toPage.setVisibility(VISIBLE);
+            finishTransition(fromPage, toPage, toKey);
+            return;
         }
+        // 页面在缓存区被置为 GONE/alpha=0，必须在入场动画开始前设为 VISIBLE，
+        // 否则 alpha 0→1 的淡入会在不可见视图上进行，直到动画结束才闪现 → 入场动画"消失"。
+        toPage.setVisibility(VISIBLE);
+        AnimatorSet enterSet = new AnimatorSet();
+        enterSet.playTogether(enterAnims);
+        final View finalFromPage = fromPage;
+        enterSet.addListener(new AnimatorListener() {
+            @Override
+            public void onAnimationEnd(@NonNull Animator animation) {
+                finishTransition(finalFromPage, toPage, toKey);
+            }
+        });
+        enterSet.start();
+        currentAnimation = enterSet;
+    }
+
+    private void addViewIfNeeded(View view) {
+        if (view.getParent() == null) {
+            addView(view, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        }
+    }
+
+    private void hideView(@Nullable View view) {
+        if (view == null) return;
+        view.setVisibility(GONE);
+        view.setTranslationX(0f);
+        view.setScaleX(1f);
+        view.setScaleY(1f);
+        view.setAlpha(0f);
+    }
+
+    private void finishTransition(@Nullable View fromPage, @NonNull View toPage, String toKey) {
+        hideView(fromPage);
+        String fromKey = fromPage != null ? findKeyForView(fromPage) : null;
+        if (fromKey != null && fromKey.startsWith("dynamic_") && !routeStack.contains(fromKey)) {
+            dynamicViews.remove(fromKey);
+            removeView(fromPage);
+        }
+
+        toPage.setVisibility(VISIBLE);
+        toPage.setTranslationX(0f);
+        toPage.setScaleX(1f);
+        toPage.setScaleY(1f);
+        toPage.setAlpha(1f);
 
         currentAnimation = null;
         isTransitioning = false;
-        if (toKey != null) {
-            currentPageKey = toKey;
-            if (pageChangeListener != null) {
-                pageChangeListener.onPageChangeEnd(toKey);
-            }
+        transitionTargetKey = null;
+        currentPageKey = toKey;
+        if (pageChangeListener != null) {
+            pageChangeListener.onPageChangeEnd(toKey);
         }
 
         if (pendingNavigationKey != null) {
@@ -649,10 +723,6 @@ public class RouterContainer extends FrameLayout {
     @NonNull
     public TransitionType getTransitionType() {
         return transitionType;
-    }
-
-    public void setAnimationDuration(int duration) {
-        animationDuration = duration;
     }
 
     public void setOnPageChangeListener(@Nullable OnPageChangeListener listener) {
