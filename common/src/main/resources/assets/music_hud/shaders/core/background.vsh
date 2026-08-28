@@ -3,6 +3,7 @@
 uniform mat4 ModelViewMat;
 uniform mat4 ProjMat;
 
+// u_Layout: (halfWidth, halfHeight, cornerRadius)
 layout(std140) uniform MHPosition {
     mat4 u_Translation;
     vec3 u_Layout;

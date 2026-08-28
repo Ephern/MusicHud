@@ -29,6 +29,7 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> showTranslatedCnLyrics;
     private final ModConfigSpec.ConfigValue<Boolean> disableVanillaMusic;
     private final ModConfigSpec.ConfigValue<Boolean> enableHud;
+    private final ModConfigSpec.ConfigValue<Boolean> enableLyricsSidebar;
     private final ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
     private final ModConfigSpec.ConfigValue<Boolean> enableMarqueeText;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
@@ -75,6 +76,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Enable hud")
                 .translation(MusicHud.MOD_ID + ".config.common.enableHud")
                 .define("enableHud", true);
+        enableLyricsSidebar = builder
+                .comment("Enable lyrics sidebar in gui")
+                .translation(MusicHud.MOD_ID + ".config.common.enableLyricsSidebar")
+                .define("enableLyricsSidebar", true);
         enableMarqueeText = builder
                 .comment("Enable marquee animation on overflow text")
                 .translation(MusicHud.MOD_ID + ".config.common.enableMarqueeText")
@@ -330,6 +335,21 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setEnableHud(boolean enableHud) {
         this.enableHud.set(enableHud);
+    }
+
+    @Override
+    public boolean getEnableLyricsSidebar() {
+        return enableLyricsSidebar.get();
+    }
+
+    @Override
+    public boolean getDefaultEnableLyricsSidebar() {
+        return enableLyricsSidebar.getDefault();
+    }
+
+    @Override
+    public void setEnableLyricsSidebar(boolean enableLyricsSidebar) {
+        this.enableLyricsSidebar.set(enableLyricsSidebar);
     }
 
     @Override

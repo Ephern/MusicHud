@@ -1,10 +1,6 @@
 package indi.etern.musichud.client.ui.components;
 
-import icyllis.modernui.animation.Animator;
-import icyllis.modernui.animation.AnimatorListener;
-import icyllis.modernui.animation.AnimatorSet;
-import icyllis.modernui.animation.ObjectAnimator;
-import icyllis.modernui.animation.ValueAnimator;
+import icyllis.modernui.animation.*;
 import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.view.MeasureSpec;
@@ -12,19 +8,9 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.utils.ui.Easing;
-import indi.etern.musichud.client.utils.ui.EasingInterpolator;
 import lombok.Setter;
 
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.Deque;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -279,7 +265,7 @@ public class VirtualizedListLayout extends FrameLayout {
     private void animateInsertion(long id, MusicListItem view, int targetHeight) {
         ValueAnimator heightAnim = ValueAnimator.ofFloat(0, targetHeight);
         heightAnim.setDuration(ANIMATION_DURATION);
-        heightAnim.setInterpolator(EasingInterpolator.of(Easing.EASE_IN_OUT_QUINT));
+        heightAnim.setInterpolator(Easing.EASE_IN_OUT_QUINT);
         heightAnim.addUpdateListener(anim -> {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) view.getLayoutParams();
             lp.height = Math.round((float) anim.getAnimatedValue());
@@ -314,7 +300,7 @@ public class VirtualizedListLayout extends FrameLayout {
         int start = heightByItemId.getOrDefault(id, defaultItemHeight);
         ValueAnimator heightAnim = ValueAnimator.ofFloat(start, 0);
         heightAnim.setDuration(ANIMATION_DURATION);
-        heightAnim.setInterpolator(EasingInterpolator.of(Easing.EASE_IN_OUT_QUINT));
+        heightAnim.setInterpolator(Easing.EASE_IN_OUT_QUINT);
         heightAnim.addUpdateListener(anim -> {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) view.getLayoutParams();
             lp.height = Math.round((float) anim.getAnimatedValue());
