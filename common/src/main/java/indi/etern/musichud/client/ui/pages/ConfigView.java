@@ -21,9 +21,7 @@ import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.components.LyricLineView;
 import indi.etern.musichud.client.ui.components.Modal;
-import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
 import indi.etern.musichud.client.ui.screen.HudConfigFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
@@ -102,21 +100,18 @@ public class ConfigView extends LinearLayout {
                     })
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricsSidebar"),
+                    clientConfig::getEnableLyricsSidebar,
+                    clientConfig::setEnableLyricsSidebar)
+                    .setDefaultValue(clientConfig.getDefaultEnableLyricsSidebar())
+                    .setOnChanged(MainFragment::refreshLyricsSidebarVisibility)
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics"),
                     clientConfig::getShowTranslatedCnLyrics,
                     clientConfig::setShowTranslatedCnLyrics)
                     .setDefaultValue(clientConfig.getDefaultShowTranslatedCnLyrics())
-                    .setOnChanged(() -> {
-                        HomeView homeView = HomeView.getInstance();
-                        if (homeView != null) {
-                            StaggeredLyricScrollView staggeredLyricScrollView = homeView.getStaggeredLyricScrollView();
-                            if (staggeredLyricScrollView != null) {
-                                MuiModApi.postToUiThread(() -> {
-                                    staggeredLyricScrollView.getLyricLineViewList().forEach(LyricLineView::refreshSubLyricLine);
-                                });
-                            }
-                        }
-                    })
+                    .setOnChanged(MainFragment::refreshLyricViews)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying"),

@@ -3,9 +3,10 @@
 #moj_import <minecraft:dynamictransforms.glsl>
 #moj_import <minecraft:projection.glsl>
 
+// u_Layout: (halfWidth, halfHeight, cornerRadius)
 layout(std140) uniform MHPosition {
     mat4 u_Translation;
-    vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
+    vec3 u_Layout;
 };
 
 in vec3 Position;
