@@ -151,9 +151,9 @@ public class HomeView extends LinearLayout {
             LinearLayout scrollViewContainer = new LinearLayout(context);
             scrollViewContainer.setOrientation(VERTICAL);
             scrollView.addView(scrollViewContainer, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-            LayoutTransition transition1 = new LayoutTransition();
-            transition1.enableTransitionType(LayoutTransition.CHANGING);
-            scrollViewContainer.setLayoutTransition(transition1);
+//            LayoutTransition transition1 = new LayoutTransition();
+//            transition1.enableTransitionType(LayoutTransition.CHANGING);
+//            scrollViewContainer.setLayoutTransition(transition1);
 
             nextToPlayTitle = new TextView(context);
             nextToPlayTitle.setVisibility(GONE);
@@ -182,7 +182,6 @@ public class HomeView extends LinearLayout {
             transition.enableTransitionType(LayoutTransition.CHANGING);
             playQueueListView.setLayoutTransition(transition);
             scrollViewContainer.addView(playQueueListView, queueViewParams1);
-
 
             clientIdlePlaySourceView = new LinearLayout(context);
             clientIdlePlaySourceView.setVisibility(GONE);

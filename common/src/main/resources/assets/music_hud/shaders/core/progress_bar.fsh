@@ -1,17 +1,22 @@
 #version 150
 
+// u_Layout: (halfWidth, halfHeight, cornerRadius)
 layout(std140) uniform MHPosition {
     mat4 u_Translation;
-    vec3 u_Layout; // (halfWidth, halfHeight, cornerRadius)
+    vec3 u_Layout;
 };
+
+// u_Gradient: (gradientLength, rightOffset, transitionBorderRate)
 layout(std140) uniform MHProgressStyle {
-    vec3 u_Gradient; // (gradientLength, rightOffset, transitionBorderRate)
+    vec3 u_Gradient;
     vec4 u_PlayedColor;
     vec4 u_CurrentColor;
     vec4 u_BackgroundColor;
 };
+
+// u_Dynamic1: (timestamp, playedProgress, switchProgress)
 layout(std140) uniform MHDynamicStatus {
-    vec4 u_Dynamic1; // (timestamp, playedProgress, switchProgress)
+    vec4 u_Dynamic1;
 };
 
 in vec2 f_Position;

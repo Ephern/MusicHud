@@ -37,6 +37,9 @@ public class SearchArtistResultView extends FlexWrapLayout {
     }
 
     public void append(List<Artist> artists) {
+        if (artists == null || artists.isEmpty()) {
+            return;
+        }
         result.addAll(artists);
         for (Artist artist : artists) {
             addItem(getContext(), artist);
