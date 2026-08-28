@@ -64,8 +64,8 @@ public class MusicApiService implements IMusicApiService {
     private final ConcurrentHashMap<SearchKey, CompletableFuture<Object>> searchInFlight = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, CompletableFuture<LyricInfo>> lyricInfoInFlight = new ConcurrentHashMap<>();
 
-    @SneakyThrows
-    private static <K, T> T joinMerged(ConcurrentHashMap<K, CompletableFuture<T>> inFlight, K key, Supplier<T> loader) {
+    @SneakyThrows(ExecutionException.class)
+    private static <K, T> T joinMerged(ConcurrentHashMap<K, CompletableFuture<T>> inFlight, K key, Supplier<T> loader) throws InterruptedException, TimeoutException{
         CompletableFuture<T> future = inFlight.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(loader, MusicHud.EXECUTOR));
         try {
             T result = future.get(10, TimeUnit.SECONDS);
@@ -75,9 +75,12 @@ public class MusicApiService implements IMusicApiService {
             Thread.currentThread().interrupt();
             inFlight.remove(key, future);
             throw e;
-        } catch (Throwable e) {
+        } catch (ExecutionException e) {
             inFlight.remove(key, future);
             throw e;
+        } catch (Throwable e) {
+            inFlight.remove(key, future);
+            throw new RuntimeException(e);
         }
     }
 
@@ -156,7 +159,7 @@ public class MusicApiService implements IMusicApiService {
         return userSubscribedArtistResponse.data();
     }
 
-    private List<MusicDetail> appendArtistMusic(int offset, Artist artist, UUID playerUUID) {
+    private List<MusicDetail> appendArtistMusic(int offset, Artist artist, UUID playerUUID) throws InterruptedException, TimeoutException {
         String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
         GetArtistMusicResponse response = ApiClient.post(ApiServerEndpointsMeta.Artist.ALL_SONGS, new ArtistAllMusicRequest(artist.getId(), 50, offset, "time"), rawCookie, true);
         List<Long> musicDetailIds = response.songs.stream().map(MusicDetail::getId).toList();
@@ -281,7 +284,7 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
-    public List<MusicDetail> getMusicDetailByIds(List<Long> ids, UUID playerUUID) {
+    public List<MusicDetail> getMusicDetailByIds(List<Long> ids, UUID playerUUID) throws InterruptedException, TimeoutException {
         List<Long> uncachedIds = new ArrayList<>();
         List<MusicDetail> result = new ArrayList<>(ids.size());
         for (long id : ids) {
@@ -411,7 +414,7 @@ public class MusicApiService implements IMusicApiService {
                 boolean available;
                 do {
                     if (retryCount >= 5) {
-                        logger.warn("Failed to load music resource for \"{}\"(id:{}), as resource url is not available", musicDetail.getName(), musicDetail.getId());
+                        logger.warn("Failed to load music resource for \"{}\"(id:{}), as resource url is not available, trying substitute", musicDetail.getName(), musicDetail.getId());
                         try {
                             usingSubstitute = true;
                             musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
@@ -437,6 +440,10 @@ public class MusicApiService implements IMusicApiService {
                             logger.warn("Failed to get resource for music: {} (ID: {}), trying substitute", musicDetail.getName(), musicDetail.getId());
                             usingSubstitute = true;
                             musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
+                            if (musicResourceInfo == MusicResourceInfo.NONE) {
+                                return MusicResourceInfo.NONE;
+                            }
+                            logger.info("Succeed to get resource for music: {} (ID: {}) from substitute", musicDetail.getName(), musicDetail.getId());
                         }
                         completeLyricInfo(musicDetail);
                     } else {
@@ -444,6 +451,10 @@ public class MusicApiService implements IMusicApiService {
                         try {
                             usingSubstitute = true;
                             musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
+                            if (musicResourceInfo == MusicResourceInfo.NONE) {
+                                return MusicResourceInfo.NONE;
+                            }
+                            logger.info("Succeed to get resource for music: {} (ID: {}) from substitute", musicDetail.getName(), musicDetail.getId());
                             completeLyricInfo(musicDetail);
                         } catch (Exception e) {
                             logger.error("Failed to get resource for music from substitute: {} (ID: {})", musicDetail.getName(), musicDetail.getId());
@@ -548,7 +559,7 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
-    public LyricInfo getLyricInfo(MusicDetail musicDetail) {
+    public LyricInfo getLyricInfo(MusicDetail musicDetail) throws InterruptedException, TimeoutException {
         return joinMerged(lyricInfoInFlight, musicDetail.getId(), () -> {
             var response = ApiClient.post(ApiServerEndpointsMeta.Music.WORD_BY_WORD_LYRIC, new IdRequest(musicDetail.getId()), loginApiService.randomVipCookieOrElse(loginApiService::getAnonymousCookie), true);
             if (response.getCode() == 200) {
@@ -560,7 +571,7 @@ public class MusicApiService implements IMusicApiService {
     }
 
     @Override
-    public void addToPlaylist(long playlistId, long musicId, UUID playerUUID) {
+    public void addToPlaylist(long playlistId, long musicId, UUID playerUUID) throws InterruptedException, TimeoutException {
         Playlist playlist = playlistsCache.getIfPresent(playlistId);
         ObservableSequencedSet.EditHandle<MusicDetail> musicDetailEditHandle = null;
         if (playlist != null) {

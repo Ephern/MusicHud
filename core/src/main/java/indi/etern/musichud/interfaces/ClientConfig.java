@@ -53,6 +53,12 @@ public interface ClientConfig {
 
     void setEnableHud(boolean enableHud);
 
+    boolean getEnableLyricsSidebar();
+
+    boolean getDefaultEnableLyricsSidebar();
+
+    void setEnableLyricsSidebar(boolean enableLyricsSidebar);
+
     Quality getPrimaryChosenQuality();
 
     Quality getDefaultPrimaryChosenQuality();
