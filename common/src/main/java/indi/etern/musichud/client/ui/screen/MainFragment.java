@@ -92,7 +92,7 @@ public class MainFragment extends Fragment {
     private int sideWidth = -1;
     private static final int LYRICS_ANIMATION_DURATION = 300;
     private StaggeredLyricScrollView lyricsScrollView;
-    private LinearLayout lyricsPanel;
+    private LinearLayout lyricsSidebar;
     private int lyricsPanelWidth = -1;
     private boolean lyricsPanelShown = false;
     private AnimatorSet lyricsAnimator = null;
@@ -128,10 +128,7 @@ public class MainFragment extends Fragment {
             if (instance.lyricsScrollView != null) {
                 instance.lyricsScrollView.switchLyrics(current, lines);
             }
-            boolean hasLyrics = lines != null && !lines.isEmpty()
-                    && current != null && !current.equals(MusicDetail.NONE)
-                    && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
-            instance.updateLyricsPanelForLyrics(hasLyrics);
+            instance.updateLyricsPanelVisibility();
             instance.refreshServerConnectStatus();
         }
     }
@@ -149,10 +146,7 @@ public class MainFragment extends Fragment {
             if (instance.lyricsScrollView != null) {
                 instance.lyricsScrollView.switchLyrics(musicDetail, lines);
             }
-            boolean hasLyrics = lines != null && !lines.isEmpty()
-                    && musicDetail != null && !musicDetail.equals(MusicDetail.NONE)
-                    && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
-            instance.updateLyricsPanelForLyrics(hasLyrics);
+            instance.updateLyricsPanelVisibility();
         }
     }
 
@@ -291,6 +285,12 @@ public class MainFragment extends Fragment {
         }
         if (instance != null && instance.lyricsScrollView != null) {
             MuiModApi.postToUiThread(instance.lyricsScrollView::refreshLinesStyle);
+        }
+    }
+
+    public static void refreshLyricsSidebarVisibility() {
+        if (instance != null) {
+            instance.updateLyricsPanelVisibility();
         }
     }
 
@@ -529,14 +529,14 @@ public class MainFragment extends Fragment {
             }
 
             lyricsPanelWidth = base.dp(320);
-            lyricsPanel = new LinearLayout(context);
-            lyricsPanel.setOrientation(LinearLayout.VERTICAL);
-            lyricsPanel.setVisibility(View.GONE);
-            lyricsPanel.setAlpha(0f);
-            lyricsPanel.setTranslationX(lyricsPanelWidth);
+            lyricsSidebar = new LinearLayout(context);
+            lyricsSidebar.setOrientation(LinearLayout.VERTICAL);
+            lyricsSidebar.setVisibility(View.GONE);
+            lyricsSidebar.setAlpha(0f);
+            lyricsSidebar.setTranslationX(lyricsPanelWidth);
 
             lyricsScrollView = new StaggeredLyricScrollView(context);
-            lyricsPanel.addView(lyricsScrollView, new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+            lyricsSidebar.addView(lyricsScrollView, new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
             Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
@@ -547,7 +547,7 @@ public class MainFragment extends Fragment {
             routerContainer.setOnPageChangeListener(new RouterContainer.OnPageChangeListener() {
                 @Override
                 public void onPageChangeStart(@Nullable String fromKey, @NonNull String toKey) {
-                    boolean useSerial = ("Home".equals(fromKey) || "Home".equals(toKey)) && hasLyrics();
+                    boolean useSerial = ("Home".equals(fromKey) || "Home".equals(toKey)) && shouldShowLyricsPanel();
                     routerContainer.setTransitionType(
                             useSerial ? RouterContainer.TransitionType.SERIAL : RouterContainer.TransitionType.CROSS
                     );
@@ -576,8 +576,8 @@ public class MainFragment extends Fragment {
                     // 避免用固定 300ms 计时导致切换瞬间出现两次 reflow。
                     if ("Home".equals(toKey)) {
                         hideLyricsPanel();
-                        if (lyricsPanel != null) {
-                            lyricsPanel.setVisibility(View.GONE);
+                        if (lyricsSidebar != null) {
+                            lyricsSidebar.setVisibility(View.GONE);
                         }
                     } else {
                         showLyricsPanel();
@@ -591,7 +591,7 @@ public class MainFragment extends Fragment {
 
             LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(lyricsPanelWidth, MATCH_PARENT);
             params1.setMargins(base.dp(24), 0, 0, 0);
-            base.addView(lyricsPanel, params1);
+            base.addView(lyricsSidebar, params1);
 
             return base;
         } catch (Exception e) {
@@ -600,21 +600,27 @@ public class MainFragment extends Fragment {
         }
     }
 
-    private boolean hasLyrics() {
+    private boolean shouldShowLyricsPanel() {
+        if (!clientConfig.getEnableLyricsSidebar()) {
+            return false;
+        }
         NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
         MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+        boolean musicInvalid = detail == null || detail.equals(MusicDetail.NONE);
+        if (musicInvalid) {
+            return false;
+        }
         Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
-        return detail != null && !detail.equals(MusicDetail.NONE)
-                && lines != null && !lines.isEmpty()
+        return lines != null && !lines.isEmpty()
                 && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
     }
 
-    private void updateLyricsPanelForLyrics(boolean hasLyrics) {
+    private void updateLyricsPanelVisibility() {
         RouterContainer rc = RouterContainer.getInstance();
         if (rc == null) return;
         String currentKey = rc.getCurrentPageKey();
         if ("Home".equals(currentKey)) return;
-        if (hasLyrics) {
+        if (shouldShowLyricsPanel()) {
             showLyricsPanel();
         } else {
             hideLyricsPanel();
@@ -622,10 +628,10 @@ public class MainFragment extends Fragment {
     }
 
     private void showLyricsPanel() {
-        if (lyricsPanel == null || lyricsPanelShown) {
+        if (lyricsSidebar == null || lyricsPanelShown) {
             return;
         }
-        if (!hasLyrics()) {
+        if (!shouldShowLyricsPanel()) {
             return;
         }
         lyricsPanelShown = true;
@@ -633,17 +639,17 @@ public class MainFragment extends Fragment {
             lyricsAnimator.cancel();
         }
 
-        ViewGroup.LayoutParams lp = lyricsPanel.getLayoutParams();
+        ViewGroup.LayoutParams lp = lyricsSidebar.getLayoutParams();
         lp.width = lyricsPanelWidth;
-        lyricsPanel.setLayoutParams(lp);
-        lyricsPanel.setVisibility(View.VISIBLE);
-        lyricsPanel.setTranslationX(lyricsPanelWidth);
-        lyricsPanel.setAlpha(0f);
+        lyricsSidebar.setLayoutParams(lp);
+        lyricsSidebar.setVisibility(View.VISIBLE);
+        lyricsSidebar.setTranslationX(lyricsPanelWidth);
+        lyricsSidebar.setAlpha(0f);
 
-        ObjectAnimator slideIn = ObjectAnimator.ofFloat(lyricsPanel, View.TRANSLATION_X, lyricsPanelWidth, 0);
+        ObjectAnimator slideIn = ObjectAnimator.ofFloat(lyricsSidebar, View.TRANSLATION_X, lyricsPanelWidth, 0);
         slideIn.setDuration(LYRICS_ANIMATION_DURATION);
         slideIn.setInterpolator(Easing.EASE_OUT_QUINT);
-        ObjectAnimator fadeIn = ObjectAnimator.ofFloat(lyricsPanel, View.ALPHA, 0f, 1f);
+        ObjectAnimator fadeIn = ObjectAnimator.ofFloat(lyricsSidebar, View.ALPHA, 0f, 1f);
         fadeIn.setDuration(LYRICS_ANIMATION_DURATION);
         fadeIn.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
 
@@ -657,7 +663,7 @@ public class MainFragment extends Fragment {
     }
 
     private void hideLyricsPanel() {
-        if (lyricsPanel == null || !lyricsPanelShown) {
+        if (lyricsSidebar == null || !lyricsPanelShown) {
             return;
         }
         lyricsPanelShown = false;
@@ -668,10 +674,10 @@ public class MainFragment extends Fragment {
             lyricsScrollView.suspendLyricFollowing();
         }
 
-        ObjectAnimator slideOut = ObjectAnimator.ofFloat(lyricsPanel, View.TRANSLATION_X, 0, lyricsPanelWidth);
+        ObjectAnimator slideOut = ObjectAnimator.ofFloat(lyricsSidebar, View.TRANSLATION_X, 0, lyricsPanelWidth);
         slideOut.setDuration(LYRICS_ANIMATION_DURATION);
         slideOut.setInterpolator(Easing.EASE_IN_QUINT);
-        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(lyricsPanel, View.ALPHA, 1f, 0f);
+        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(lyricsSidebar, View.ALPHA, 1f, 0f);
         fadeOut.setDuration(LYRICS_ANIMATION_DURATION);
         fadeOut.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
 
@@ -680,9 +686,9 @@ public class MainFragment extends Fragment {
         lyricsAnimator.addListener(new AnimatorListener() {
             @Override
             public void onAnimationEnd(@NonNull Animator animation) {
-                ViewGroup.LayoutParams lp = lyricsPanel.getLayoutParams();
+                ViewGroup.LayoutParams lp = lyricsSidebar.getLayoutParams();
                 lp.width = 0;
-                lyricsPanel.setLayoutParams(lp);
+                lyricsSidebar.setLayoutParams(lp);
             }
         });
         lyricsAnimator.start();

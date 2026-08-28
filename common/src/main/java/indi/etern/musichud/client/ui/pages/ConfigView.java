@@ -100,6 +100,13 @@ public class ConfigView extends LinearLayout {
                     })
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricsSidebar"),
+                    clientConfig::getEnableLyricsSidebar,
+                    clientConfig::setEnableLyricsSidebar)
+                    .setDefaultValue(clientConfig.getDefaultEnableLyricsSidebar())
+                    .setOnChanged(MainFragment::refreshLyricsSidebarVisibility)
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics"),
                     clientConfig::getShowTranslatedCnLyrics,
                     clientConfig::setShowTranslatedCnLyrics)
