@@ -57,7 +57,7 @@ public class MusicPlayerServerService {
             String message = "";
             Map<UUID, LoginApiService.PlayerLoginInfo> loginedPlayerInfoMap = loginApiService.getPlayerInfoMap();
             boolean hasAvailableIdlePlaySourcesMusic = false;
-            while (MusicPlayerServerService.this.continuable) {
+            while (MusicPlayerServerService.this.continuable) {//TODO: better preload push to client
                 MusicDetail nextToPlay;
                 String nextToPlayName = "unknown";
                 long nextToPlayId = -1;
