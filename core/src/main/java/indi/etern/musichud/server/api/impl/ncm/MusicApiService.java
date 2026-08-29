@@ -419,6 +419,7 @@ public class MusicApiService implements IMusicApiService {
                             usingSubstitute = true;
                             musicResourceInfo = getMusicResourceInfoFromMatcher(musicDetail);
                             if (musicResourceInfo != MusicResourceInfo.NONE && ApiClient.checkUrlAvailable(musicResourceInfo.getUrl(), 5000)) {
+                                logger.info("Succeed to get resource for music: {} (ID: {}) from substitute", musicDetail.getName(), musicDetail.getId());
                                 completeLyricInfo(musicDetail);
                                 return musicResourceInfo;
                             }
