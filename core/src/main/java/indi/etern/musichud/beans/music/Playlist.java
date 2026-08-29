@@ -22,7 +22,7 @@ public class Playlist implements MusicCollection {
             Codecs.STRING_UTF8, Playlist::getCoverImgId_str,
             Codecs.STRING_UTF8, Playlist::getCoverImgUrl,
             Codecs.INT, Playlist::getMusicTrackCount,
-            Codecs.INT, Playlist::getPlayedCount,
+            Codecs.LONG, Playlist::getPlayedCount,
             Profile.CODEC, Playlist::getCreator,
             Codecs.ofEnum(Privacy.class), Playlist::getPrivacy,
             Codecs.ofCollection(ObservableSequencedSet::new, () -> MusicDetail.CODEC), Playlist::getTracks,
@@ -43,7 +43,7 @@ public class Playlist implements MusicCollection {
     int musicTrackCount;
     @SerializedName("playCount")
     @Getter
-    int playedCount;
+    long playedCount;
     String coverImgId_str = "";
     String coverImgUrl = MusicHud.ICON_BASE64;
     Profile creator = Profile.ANONYMOUS;
@@ -64,7 +64,7 @@ public class Playlist implements MusicCollection {
             String coverImgId_str,
             String coverImgUrl,
             int musicTrackCount,
-            int playedCount,
+            long playedCount,
             Profile creator,
             Privacy privacy,
             ObservableSequencedSet<MusicDetail> tracks,

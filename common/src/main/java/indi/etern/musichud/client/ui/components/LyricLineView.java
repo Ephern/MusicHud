@@ -149,9 +149,6 @@ public class LyricLineView extends LinearLayout {
                         : duration.minus(delta);
         stayEmphasizeDuration = stayEmphasizeDuration.minus(Duration.of(800, ChronoUnit.MILLIS));
         if (stayEmphasizeDuration.isNegative()) {
-            // 该行的高亮窗口可能已过（例如初始化/重新显示时恰好处在一行的末尾）。
-            // 若立刻 fade 会把刚启动的缩放动画在 startDelay 前取消，导致高亮"消失"，
-            // 因此至少保住一次完整的缩放脉冲后再回落。
             stayEmphasizeDuration = Duration.ofMillis(900);
         }
         switch (lyricLine.getType()) {
@@ -205,7 +202,7 @@ public class LyricLineView extends LinearLayout {
             }
         }
         if (stayEmphasizeDuration.isPositive()) {
-            postDelayed(this::fade, stayEmphasizeDuration.toMillis());
+            postDelayed(this::fade, stayEmphasizeDuration.toMillis() + 200);
         } else {
             post(this::fade);
         }

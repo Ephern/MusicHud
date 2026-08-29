@@ -109,10 +109,6 @@ public class MusicPlayerServerService {
 
                     nextIdleMusicDetail = preloadMusicDetail != null ? preloadMusicDetail : MusicDetail.NONE;
 
-                    MusicResourceInfo resourceInfo = musicApiService.getResourceInfo(nextToPlay, Quality.STANDARD, nextToPlay.getPusherInfo().getPlayerUUID());
-                    if (resourceInfo.equals(MusicResourceInfo.NONE)) {
-                        continue;
-                    }
                     if (nextToPlay.getLyricInfo() == null || nextToPlay.getLyricInfo().equals(LyricInfo.NONE)) {
                         nextToPlay.setLyricInfo(musicApiService.getLyricInfo(nextToPlay));
                     }
