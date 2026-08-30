@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.dto;
 
 import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.Matrix;
 import icyllis.modernui.graphics.text.FontMetricsInt;
 import icyllis.modernui.graphics.text.ShapedText;
 import icyllis.modernui.text.*;
@@ -42,8 +43,8 @@ public class LyricLine implements Comparable<LyricLine> {
     @Builder.Default
     private boolean phraseParsed = false;
 
-    private static HighlightSpan applySpan(SpannableString spannableString, int start, int end) {
-        HighlightSpan span = new HighlightSpan(0);
+    private static HighlightSpan applySpan(SpannableString spannableString, int start, int end, int charStartInPhrase) {
+        HighlightSpan span = new HighlightSpan(charStartInPhrase, Character.codePointCount(spannableString, start, end));
         spannableString.setSpan(
                 span,
                 start, end,
@@ -95,6 +96,7 @@ public class LyricLine implements Comparable<LyricLine> {
             phrases = new ArrayList<>(size);
             int lastPhraseEnd = 0;
             Duration lastEndTime = startTime;
+            int textLength = spannableString.length();
             //LinkedHashMap
             for (Map.Entry<Duration, Integer> entry : phraseEndingOffsetMap.entrySet()) {
                 Integer phraseEnd = entry.getValue();
@@ -103,14 +105,26 @@ public class LyricLine implements Comparable<LyricLine> {
                 int durationMillis = Math.toIntExact(endTime.minus(lastEndTime).toMillis());
 
                 if (durationMillis > DURABLE_PHRASE_MILLIS) {
-                    for (int i = lastPhraseEnd; i < phraseEnd; i++) {
-                        if (i + 1 <= spannableString.length()) {
-                            spans.add(applySpan(spannableString, i, i + 1));
+                    // Split the phrase into word-level spans: each word becomes one atomic
+                    // replacement run for the line breaker, so wrapping never happens
+                    // mid-word; per-char animation is handled inside the span's draw.
+                    // Whitespace is left unspanned to preserve word-boundary break points.
+                    int spanEnd = Math.min(phraseEnd, textLength);
+                    int wordStart = -1;
+                    for (int i = lastPhraseEnd; i <= spanEnd; i++) {
+                        boolean boundary = i >= spanEnd
+                                || Character.isWhitespace(spannableString.charAt(i));
+                        if (!boundary && wordStart < 0) {
+                            wordStart = i;
+                        } else if (boundary && wordStart >= 0) {
+                            spans.add(applySpan(spannableString, wordStart, i,
+                                    Character.codePointCount(spannableString, lastPhraseEnd, wordStart)));
+                            wordStart = -1;
                         }
                     }
                 } else {
-                    if (phraseEnd <= spannableString.length()) {
-                        spans.add(applySpan(spannableString, lastPhraseEnd, phraseEnd));
+                    if (phraseEnd <= textLength) {
+                        spans.add(applySpan(spannableString, lastPhraseEnd, phraseEnd, 0));
                     }
                 }
                 lastPhraseEnd = phraseEnd;
@@ -142,93 +156,169 @@ public class LyricLine implements Comparable<LyricLine> {
     }
 
     public record Phrase(int endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {
+
+        public int charCount() {
+            int total = 0;
+            for (HighlightSpan span : spans) {
+                total += span.getCharCount();
+            }
+            return total;
+        }
     }
 
     @ToString
-    @Getter
-    @Setter
     public static class HighlightSpan extends ReplacementSpan {
-        // Edging value for SkFont::kSubpixelAntiAlias_Edging in native Skia
-//        private static final byte SUBPIXEL_EDGING = (byte) 2;
-//        private static final VarHandle SHAPED_TEXT_NATIVE_FONT;
-//        private static final VarHandle FONT_EDGING;
+        // Near-identity projective matrix (persp0 = 1e-8): makes the position matrix
+        // report hasPerspective() so arc3d skips the direct-mask glyph path (which floors
+        // every glyph to whole device pixels) and uses the transformed-mask path, which
+        // keeps fractional positions and samples the atlas with bilinear filtering.
+        // The epsilon must live in m14 (persp0), NOT m44 (persp2): Device normalizes the
+        // CTM via Matrix.normalizePerspective(), which divides m44 back to exactly 1
+        // whenever m14/m24 are zero, silently undoing an m44-based flag. With m14 != 0
+        // the normalization is skipped entirely. The resulting w-distortion
+        // (~1e-8 * scale^2 * x) is far below one physical pixel.
+        private static final Matrix SUBPIXEL_MATRIX = new Matrix(
+                1f, 0f, 1e-8f,
+                0f, 1f, 0f,
+                0f, 0f, 1f
+        );
+        // Index of the first char (code point) of this span within its phrase, used by the
+        // view to compute per-char stagger delays for the karaoke raise animation.
+        @Getter
+        private final int charStartInPhrase;
+        // Per-char (code point) animation state
+        private final float[] charYOffsets;
+        private final float[] charScales;
+        // Lazily shaped per-char glyphs. The cache window is established by the first
+        // getSize call, which covers the full span range (MeasuredParagraph), and each
+        // slot is shaped independently (same kerning behavior as per-char spans).
+        private ShapedText[] charShapedTexts;
+        private int[] charWidths;
+        private int[] charCodeUnitLengths;
+        private int cacheStart;
+        private int cacheEnd;
 
-/*
-        static {
-            VarHandle nativeFontHandle = null;
-            VarHandle edgingHandle = null;
-            try {
-                MethodHandles.Lookup lookup = MethodHandles.privateLookupIn(ShapedText.class, MethodHandles.lookup());
-                nativeFontHandle = lookup.findVarHandle(
-                        ShapedText.class, "mNativeFont", icyllis.arc3d.sketch.Font.class);
-                lookup = MethodHandles.privateLookupIn(
-                        icyllis.arc3d.sketch.Font.class, MethodHandles.lookup());
-                edgingHandle = lookup.findVarHandle(
-                        icyllis.arc3d.sketch.Font.class, "mEdging", byte.class);
-            } catch (Exception ignored) {
-            }
-            SHAPED_TEXT_NATIVE_FONT = nativeFontHandle;
-            FONT_EDGING = edgingHandle;
+        public HighlightSpan(int charStartInPhrase, int charCount) {
+            this.charStartInPhrase = charStartInPhrase;
+            this.charYOffsets = new float[charCount];
+            this.charScales = new float[charCount];
+            Arrays.fill(charScales, 1f);
         }
-*/
 
-        // Large Y offset for far-pivot scale trick — encodes yOffset as a near-identity
-        // non-uniform Y scale, which Skia renders at sub-pixel precision unlike translate.
-        private static final float Y_OFFSET_PIVOT_DISTANCE = 100000.0f;
-        float yOffset;
-        float scale = 1;
-        ShapedText cachedShapedText;
-        int cachedWidth;
-        int textHeight;
+        public int getCharCount() {
+            return charYOffsets.length;
+        }
 
-        public HighlightSpan(float yOffset) {
-            this.yOffset = yOffset;
+        // Applies the same offset to every char of this span
+        public void setYOffset(float yOffset) {
+            Arrays.fill(charYOffsets, yOffset);
+        }
+
+        // Applies the same scale to every char of this span
+        public void setScale(float scale) {
+            Arrays.fill(charScales, scale);
+        }
+
+        public void setCharState(int index, float yOffset, float scale) {
+            charYOffsets[index] = yOffset;
+            charScales[index] = scale;
+        }
+
+        private void ensureShaped(@NonNull TextPaint paint, CharSequence text,
+                                  int start, int end) {
+            if (charShapedTexts != null && start >= cacheStart && end <= cacheEnd) {
+                return;
+            }
+            cacheStart = start;
+            cacheEnd = end;
+            int count = Math.min(Character.codePointCount(text, start, end), charYOffsets.length);
+            charShapedTexts = new ShapedText[count];
+            charWidths = new int[count];
+            charCodeUnitLengths = new int[count];
+            int cu = start;
+            for (int j = 0; j < count; j++) {
+                // cu is always within [start, end) here, so the 2-arg overload is safe
+                int cp = Character.codePointAt(text, cu);
+                int len = Character.charCount(cp);
+                ShapedText shaped = TextShaper.shapeText(
+                        text, cu, len,
+                        TextDirectionHeuristics.FIRSTSTRONG_LTR, paint
+                );
+                charShapedTexts[j] = shaped;
+                charWidths[j] = Math.round(shaped.getAdvance());
+                charCodeUnitLengths[j] = len;
+                cu += len;
+            }
         }
 
         @Override
         public int getSize(@NonNull TextPaint paint, CharSequence text,
                            int start, int end, @Nullable FontMetricsInt fm) {
-            if (cachedShapedText == null) {
-                String subText = text.subSequence(start, end).toString();
-                cachedShapedText = TextShaper.shapeText(
-                        subText, 0, subText.length(),
-                        TextDirectionHeuristics.FIRSTSTRONG_LTR, paint
-                );
-                cachedWidth = Math.round(cachedShapedText.getAdvance());
-//                float advance = cachedShapedText.getAdvance();
-//                MusicHud.LOGGER.info("text = {}, start = {}, end = {}, cachedShapedText.getAdvance() = {}" , text, start, end, advance);
-                textHeight = cachedShapedText.getDescent() - cachedShapedText.getAscent();
-
-                // Enable SkFont subpixel anti-aliasing edging via VarHandle.
-                // Must happen before getTextBlob() lazily builds the native TextBlob.
-/*
-                if (SHAPED_TEXT_NATIVE_FONT != null && FONT_EDGING != null) {
-                    try {
-                        if (SHAPED_TEXT_NATIVE_FONT.get(cachedShapedText) instanceof icyllis.arc3d.sketch.Font nativeFont) {
-                            FONT_EDGING.set(nativeFont, SUBPIXEL_EDGING);
-                        }
-                    } catch (Exception ignored) {
-                    }
-                }
-*/
-            }
+            ensureShaped(paint, text, start, end);
             if (fm != null) {
                 paint.getFontMetricsInt(fm);
             }
-            return cachedWidth;
+            int total = 0;
+            int cu = cacheStart;
+            for (int j = 0; j < charShapedTexts.length; j++) {
+                ShapedText shaped = charShapedTexts[j];
+                if (shaped == null) {
+                    break;
+                }
+                int len = charCodeUnitLengths[j];
+                if (cu + len > start && cu < end) {
+                    total += charWidths[j];
+                }
+                cu += len;
+                if (cu >= end) {
+                    break;
+                }
+            }
+            return total;
         }
 
         @Override
         public void draw(@NonNull Canvas canvas, CharSequence text,
                          int start, int end, float x, int top, int y, int bottom,
                          @NonNull TextPaint paint) {
-            float pivotX = x + 0.5f * cachedWidth;
+            ensureShaped(paint, text, start, end);
+            // Per-char draw: the raise offset rides the float draw origin, while scaling
+            // pivots on the baseline. The near-identity perspective concat routes glyphs
+            // through arc3d's transformed-mask path: the direct-mask path floors every
+            // glyph position to whole device pixels (Y has no subpixel bins), which
+            // quantizes animation into visible steps; the transformed path keeps
+            // fractional positions and samples the glyph atlas with bilinear filtering,
+            // giving subpixel-smooth motion.
             canvas.save();
-//            canvas.translate(0, yOffset);
-            float sy = 1.0f + yOffset / Y_OFFSET_PIVOT_DISTANCE;
-            canvas.scale(1.0f, sy, pivotX, y - Y_OFFSET_PIVOT_DISTANCE);
-            canvas.scale(scale, scale, pivotX, y + 0.4f * textHeight);
-            canvas.drawShapedText(cachedShapedText, x, y, paint);
+            canvas.concat(SUBPIXEL_MATRIX);
+            float cx = x;
+            int cu = cacheStart;
+            for (int j = 0; j < charShapedTexts.length; j++) {
+                ShapedText shaped = charShapedTexts[j];
+                if (shaped == null) {
+                    break;
+                }
+                int len = charCodeUnitLengths[j];
+                if (cu + len > start && cu < end) {
+                    float w = charWidths[j];
+                    float s = charScales[j];
+                    float yOff = charYOffsets[j];
+                    if (s == 1f) {
+                        canvas.drawShapedText(shaped, cx, y + yOff, paint);
+                    } else {
+                        float pivotX = cx + 0.5f * w;
+                        canvas.save();
+                        canvas.scale(s, s, pivotX, y);
+                        canvas.drawShapedText(shaped, cx, y + yOff, paint);
+                        canvas.restore();
+                    }
+                    cx += w;
+                }
+                cu += len;
+                if (cu >= end) {
+                    break;
+                }
+            }
             canvas.restore();
         }
     }
