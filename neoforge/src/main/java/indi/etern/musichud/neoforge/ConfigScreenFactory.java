@@ -12,7 +12,7 @@ public class ConfigScreenFactory implements IConfigScreenFactory {
     @Override
     @NotNull
     public Screen createScreen(@NotNull ModContainer container, @NotNull Screen modListScreen) {
-        var fragment = new MainFragment();
+        var fragment = MainFragment.getInstance();
         fragment.setDefaultSelectedIndex(3); // Setting page
         return MusicHudScreen.createScreen(fragment, null, modListScreen, "Music HUD");
     }

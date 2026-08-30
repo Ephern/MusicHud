@@ -60,19 +60,19 @@ public class MainFragment extends Fragment {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final ConnectionManager connectionManager = ConnectionManager.getInstance();
     private static final AtomicInteger progressUpdaterToken = new AtomicInteger(0);
+    private static final int LYRICS_ANIMATION_DURATION = 300;
     private static volatile MainFragment instance = null;
+
 
     static {
         ConnectionStateMachine.getConnectStatusListeners().add(status -> {
-            if (instance != null) {
-                MuiModApi.postToUiThread(() -> {
-                    instance.refreshServerConnectStatus();
-                });
+            if (instance != null && instance.visible) {
+                MuiModApi.postToUiThread(() -> instance.refreshServerConnectStatus());
             }
         });
     }
-
     private final NowPlayingInfo playingInfo = NowPlayingInfo.getInstance();
+    private boolean visible = false;
     private UrlImageView albumImage;
     private TextView titleText;
     private FlexWrapLayout artists;
@@ -90,14 +90,18 @@ public class MainFragment extends Fragment {
     private ToggleTrackLikeStateButton likeButton;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
     private int sideWidth = -1;
-    private static final int LYRICS_ANIMATION_DURATION = 300;
     private StaggeredLyricScrollView lyricsScrollView;
     private LinearLayout lyricsSidebar;
     private int lyricsPanelWidth = -1;
     private boolean lyricsPanelShown = false;
     private AnimatorSet lyricsAnimator = null;
 
-    public MainFragment() {
+    private MainFragment() {}
+
+    private void reset() {
+        visible = false;
+        defaultSelectedIndex = 0;
+        lyricsPanelShown = false;
     }
 
     public static void refresh() {
@@ -113,7 +117,7 @@ public class MainFragment extends Fragment {
         if (accountBaseView != null) {
             accountBaseView.refresh();
         }
-        if (instance != null && instance.titleText != null) {
+        if (instance != null && instance.visible && instance.titleText != null) {
             // Restore the current playback instead of blanking it to "idle": a failed connect
             // attempt no longer stops the ongoing playback, so a blanket clear would wrongly
             // wipe the GUI while the HUD keeps playing.
@@ -121,7 +125,7 @@ public class MainFragment extends Fragment {
             MusicDetail current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
             MusicDetail nextToPlay = nowPlayingInfo.getNextToPlayIdleMusicDetail();
             Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
-            displayMusicInfo(current, nextToPlay, lines);
+            displayMusicInfo(current);
             if (homeView != null) {
                 homeView.switchMusic(current, nextToPlay, lines);
             }
@@ -134,8 +138,8 @@ public class MainFragment extends Fragment {
     }
 
     public static void switchMusic(MusicDetail musicDetail, MusicDetail nextToPlay, Queue<LyricLine> lines) {
-        if (instance != null) {
-            displayMusicInfo(musicDetail, nextToPlay, lines);
+        if (instance != null && instance.visible) {
+            displayMusicInfo(musicDetail);
             if (musicDetail != null && !musicDetail.equals(MusicDetail.NONE)) {
                 startProgressUpdater(musicDetail);
             }
@@ -150,7 +154,7 @@ public class MainFragment extends Fragment {
         }
     }
 
-    private static void displayMusicInfo(MusicDetail musicDetail, MusicDetail nextToPlay, Queue<LyricLine> lyricLines) {
+    private static void displayMusicInfo(MusicDetail musicDetail) {
         if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
             instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
             instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
@@ -258,7 +262,7 @@ public class MainFragment extends Fragment {
                 Duration playedDuration = nowPlayingInfo.getPlayedDuration();
                 String playedTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()));
                 MuiModApi.postToUiThread(() -> {
-                    if (instance != null && instance.progressBar != null) {
+                    if (instance != null && instance.visible && instance.progressBar != null) {
                         instance.progressBar.setProgress((int) (nowPlayingInfo.getProgressRate() * instance.sideWidth));
                         instance.playedTimeText.setText(playedTimeString);
                         instance.totalTimeText.setText(totalTimeString);
@@ -283,15 +287,26 @@ public class MainFragment extends Fragment {
                 MuiModApi.postToUiThread(staggeredLyricScrollView::refreshLinesStyle);
             }
         }
-        if (instance != null && instance.lyricsScrollView != null) {
+        if (instance != null && instance.visible && instance.lyricsScrollView != null) {
             MuiModApi.postToUiThread(instance.lyricsScrollView::refreshLinesStyle);
         }
     }
 
     public static void refreshLyricsSidebarVisibility() {
-        if (instance != null) {
+        if (instance != null && instance.visible) {
             instance.updateLyricsPanelVisibility();
         }
+    }
+
+    public static @NonNull MainFragment getInstance() {
+        if (instance == null) {
+            synchronized (MainFragment.class) {
+                if (instance == null) {
+                    instance = new MainFragment();
+                }
+            }
+        }
+        return instance;
     }
 
     @Override
@@ -299,15 +314,10 @@ public class MainFragment extends Fragment {
                              @Nullable ViewGroup container,
                              @Nullable DataSet savedInstanceState) {
         try {
-            instance = this;
+            visible = true;
             var context = requireContext();
             var base = new LinearLayout(context);
             base.setPadding(base.dp(24), 0, base.dp(24), 0);
-//            LayoutTransition layoutTransition = new LayoutTransition();
-//            layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
-//            layoutTransition.enableTransitionType(LayoutTransition.APPEARING);
-//            layoutTransition.enableTransitionType(LayoutTransition.DISAPPEARING);
-//            base.setLayoutTransition(layoutTransition);
 
             var baseParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
             base.setLayoutParams(baseParams);
@@ -397,9 +407,9 @@ public class MainFragment extends Fragment {
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 StreamAudioPlayer.Status status = streamAudioPlayer.getStatus();
                 checkAudioPlayerStatus(status);
-                Consumer<StreamAudioPlayer.Status> statusListener = newStatus -> MuiModApi.postToUiThread(() -> {
-                    checkAudioPlayerStatus(newStatus);
-                });
+                Consumer<StreamAudioPlayer.Status> statusListener = newStatus -> MuiModApi.postToUiThread(
+                        () -> checkAudioPlayerStatus(newStatus)
+                );
                 streamAudioPlayer.getStatusChangeListener().add(statusListener);
                 base.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
                     @Override
@@ -502,9 +512,7 @@ public class MainFragment extends Fragment {
                 switchServerConnectButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
                 switchServerConnectButton.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
                 backgroundFactory.applyBackgroundTo(switchServerConnectButton);
-                switchServerConnectButton.setOnClickListener(b -> {
-                    connectionManager.toggleConnection();
-                });
+                switchServerConnectButton.setOnClickListener(b -> connectionManager.toggleConnection());
                 serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(36)));
                 refreshServerConnectStatus();
                 LinearLayout.LayoutParams params4 = new LinearLayout.LayoutParams(sideWidth, WRAP_CONTENT);
@@ -593,9 +601,13 @@ public class MainFragment extends Fragment {
             params1.setMargins(base.dp(24), 0, 0, 0);
             base.addView(lyricsSidebar, params1);
 
+            if (defaultSelectedIndex != 0) {
+                showLyricsPanel();
+            }
+
             return base;
         } catch (Exception e) {
-            instance = null;
+            visible = false;
             throw e;
         }
     }
@@ -755,6 +767,6 @@ public class MainFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        instance = null;
+        reset();
     }
 }
