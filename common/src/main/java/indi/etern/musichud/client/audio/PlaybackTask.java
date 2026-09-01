@@ -9,8 +9,11 @@ import indi.etern.musichud.client.audio.decoder.*;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
+import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.ScrobbleMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceResponse;
 import lombok.Getter;
@@ -60,9 +63,11 @@ public class PlaybackTask {
     private static final long FULLY_RETRY_SLEEP_MS = 1000;// 全量重试前的等待
     private static final long DOWNLOAD_RETRY_DELAY_ADDITIONAL_MS = 1000;
     private static final long UNDERFLOW_BUFFERING_DELAY_MS = 300;// 预取队列连续欠载超过该值才上报 BUFFERING
+    private static final int SCROBBLE_MIN_PLAY_DURATION_SEC = 30;
     private static final Logger LOGGER = MusicHud.getLogger(PlaybackTask.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
 
     @Getter
     private final MusicDetail musicDetail;
@@ -104,6 +109,7 @@ public class PlaybackTask {
     private volatile Future<?> downloadThreadFuture;
     private volatile Future<?> playThreadFuture;
     private long lastJmtcTickMs = 0;
+    private MusicResourceInfo musicResourceInfo;
 
     private PlaybackTask(MusicDetail musicDetail, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
         this.musicDetail = musicDetail;
@@ -231,7 +237,7 @@ public class PlaybackTask {
         Thread.currentThread().setName("MHWorker-Downloader");
         int localRetryCount = 0;
         boolean forceSync = serverStartTime != null;
-        MusicResourceInfo musicResourceInfo = MusicResourceInfo.NONE;
+        musicResourceInfo = MusicResourceInfo.NONE;
         while (!cancelled && !restartRequested) {
             int trial = localRetryCount + 1;
             try {
@@ -734,9 +740,34 @@ public class PlaybackTask {
     }
 
     private void finish() {
+        scrobble();
         cleanup();
         setState(PlaybackState.FINISHED);
         finishFuture.complete(null);
+    }
+
+    private void scrobble() {
+        switch (clientConfig.getScrobbleOption()) {
+            case ALL -> sendScrobbleOptionally();
+            case ONLY_SELF -> {
+                if (musicDetail.getPusherInfo().getPlayerUUID().equals(PlayerInfoUtil.getSelfUUID())) {
+                    sendScrobbleOptionally();
+                }
+            }
+        }
+    }
+
+    private void sendScrobbleOptionally() {
+        if (musicResourceInfo != null) {
+            Quality quality = musicResourceInfo.getQuality();
+            if (quality != Quality.NONE) {
+                int durationSec = musicDetail.getDurationMillis() / 1000;
+                int playedSec = serverStartTime == null ? durationSec : Math.toIntExact(Duration.between(serverStartTime, ZonedDateTime.now()).toSeconds());
+                if (playedSec >= SCROBBLE_MIN_PLAY_DURATION_SEC) {
+                    clientNetworkService.sendToServer(new ScrobbleMessage(musicDetail.getId(), playedSec, durationSec, musicResourceInfo.getBitrate(), quality));
+                }
+            }
+        }
     }
 
     private void cleanup() {

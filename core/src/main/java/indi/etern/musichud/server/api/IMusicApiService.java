@@ -5,7 +5,6 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.music.actions.SubscribableType;
 import indi.etern.musichud.beans.music.actions.SubscribeAction;
 import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
-import indi.etern.musichud.throwable.MusicResourceLoadingException;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashSet;
@@ -58,4 +57,6 @@ public interface IMusicApiService {
     void removeFromPlaylist(long playlistId, long musicId, UUID uuid);
 
     void userSubscribe(long id, SubscribableType subscribableType, SubscribeAction action, UUID playerUUID);
+
+    void scrobble(long musicId, int playedInSecond, int durationInSecond, int bitrate, Quality quality, UUID playerUUID);
 }

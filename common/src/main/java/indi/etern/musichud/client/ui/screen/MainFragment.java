@@ -197,6 +197,7 @@ public class MainFragment extends Fragment {
                     split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                     split.setTextSize(Theme.TEXT_SIZE_SMALL);
                     split.setText(" / ");
+                    split.setSingleLine();
                     instance.artists.addView(split);
                 }
                 index++;
