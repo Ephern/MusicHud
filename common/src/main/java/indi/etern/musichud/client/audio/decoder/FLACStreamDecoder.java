@@ -6,6 +6,7 @@ import org.jflac.frame.Frame;
 import org.jflac.metadata.StreamInfo;
 import org.jflac.util.ByteData;
 import org.lwjgl.openal.AL10;
+import org.lwjgl.openal.EXTFloat32;
 
 import java.io.*;
 
@@ -16,8 +17,10 @@ public class FLACStreamDecoder implements AudioDecoder {
     private final int sampleRate;
     private final int frameSize;
     private final IResampler resampler;
+    private final boolean float32Output;
+    private final int inputBytesPerSample;
 
-    public FLACStreamDecoder(BufferedInputStream inputStream) throws IOException {
+    public FLACStreamDecoder(BufferedInputStream inputStream, boolean useFloat32) throws IOException {
         this.inputStream = inputStream;
         this.decoder = new FLACDecoder(inputStream);
 
@@ -28,6 +31,7 @@ public class FLACStreamDecoder implements AudioDecoder {
             int channels = streamInfo.getChannels();
             int bitsPerSample = streamInfo.getBitsPerSample();
             int effectiveBitsPerSample = bitsPerSample;
+            boolean floatOutput = useFloat32 && channels == 2 && (bitsPerSample == 24 || bitsPerSample == 32);
 
             // determine OpenAL format based on channels and bit depth
             if (channels == 1) {
@@ -45,8 +49,13 @@ public class FLACStreamDecoder implements AudioDecoder {
                     case 8 -> this.format = AL10.AL_FORMAT_STEREO8;
                     case 16 -> this.format = AL10.AL_FORMAT_STEREO16;
                     case 24, 32 -> {
-                        this.format = AL10.AL_FORMAT_STEREO16;
-                        effectiveBitsPerSample = 16;
+                        if (floatOutput) {
+                            this.format = EXTFloat32.AL_FORMAT_STEREO_FLOAT32;
+                            effectiveBitsPerSample = 32;
+                        } else {
+                            this.format = AL10.AL_FORMAT_STEREO16;
+                            effectiveBitsPerSample = 16;
+                        }
                     }
                     default -> throw new UnsupportedEncodingException("Unsupported bits per sample: " + bitsPerSample);
                 }
@@ -55,11 +64,13 @@ public class FLACStreamDecoder implements AudioDecoder {
             }
 
             this.resampler = switch (bitsPerSample) {
-                case 24 -> new Bit24To16Resampler();
-                case 32 -> new Bit32To16Resampler();
+                case 24 -> floatOutput ? new Bit24ToFloat32Converter() : new Bit24To16Resampler();
+                case 32 -> floatOutput ? new Bit32ToFloat32Converter() : new Bit32To16Resampler();
                 default -> null;
             };
 
+            this.float32Output = floatOutput;
+            this.inputBytesPerSample = bitsPerSample / 8;
             frameSize = effectiveBitsPerSample * channels * sampleRate / 8;
         } catch (Exception e) {
             throw new IOException("Failed to initialize FLAC decoder", e);
@@ -71,7 +82,13 @@ public class FLACStreamDecoder implements AudioDecoder {
     public byte[] readChunk(long maxSize) {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
 
-        while (output.size() < maxSize) {
+        // For float32 output, stop accumulating raw PCM earlier so the converted
+        // chunk stays near maxSize (24-bit raw -> 4/3 expansion, 32-bit -> 1:1).
+        long rawTarget = float32Output
+                ? Math.max(1, (long) (maxSize * inputBytesPerSample / 4.0))
+                : maxSize;
+
+        while (output.size() < rawTarget) {
             Frame frame = decoder.readNextFrame();
             if (frame == null)
                 break;

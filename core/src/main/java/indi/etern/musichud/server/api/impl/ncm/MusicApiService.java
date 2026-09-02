@@ -14,6 +14,7 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.throwable.MusicResourceLoadingException;
@@ -65,7 +66,7 @@ public class MusicApiService implements IMusicApiService {
     private final ConcurrentHashMap<Long, CompletableFuture<LyricInfo>> lyricInfoInFlight = new ConcurrentHashMap<>();
 
     @SneakyThrows(ExecutionException.class)
-    private static <K, T> T joinMerged(ConcurrentHashMap<K, CompletableFuture<T>> inFlight, K key, Supplier<T> loader) throws InterruptedException, TimeoutException{
+    private static <K, T> T joinMerged(ConcurrentHashMap<K, CompletableFuture<T>> inFlight, K key, Supplier<T> loader) throws InterruptedException, TimeoutException {
         CompletableFuture<T> future = inFlight.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(loader, MusicHud.EXECUTOR));
         try {
             T result = future.get(10, TimeUnit.SECONDS);
@@ -75,7 +76,7 @@ public class MusicApiService implements IMusicApiService {
             Thread.currentThread().interrupt();
             inFlight.remove(key, future);
             throw e;
-        } catch (ExecutionException e) {
+        } catch (ExecutionException | TimeoutException e) {
             inFlight.remove(key, future);
             throw e;
         } catch (Throwable e) {
@@ -671,6 +672,21 @@ public class MusicApiService implements IMusicApiService {
         cache.invalidate(id);
     }
 
+    @Override
+    public void scrobble(long musicId, int playedInSecond, int durationInSecond, int bitrate, Quality quality, UUID playerUUID) {
+        if (playerUUID != null) {
+            ILoginApiService.PlayerLoginInfo loginInfoByPlayerUUID = loginApiService.getLoginInfoByPlayerUUID(playerUUID);
+            if (loginInfoByPlayerUUID != null) {
+                String s = ApiClient.post(
+                        ApiServerEndpointsMeta.User.SCROBBLE,
+                        new ScrobbleRequest(musicId, playedInSecond, durationInSecond, bitrate, quality.getAlias()),
+                        loginInfoByPlayerUUID.getLoginCookieInfo().rawCookie(),
+                        true);
+                logger.debug("Scrobble result:\n{}", s);
+            }
+        }
+    }
+
     record IdAndUUIDKey(long id, UUID uuid) {
     }
 
@@ -800,4 +816,15 @@ public class MusicApiService implements IMusicApiService {
             long beanId
     ) {
     }
+
+    public record ScrobbleRequest(
+            long id,
+            @SerializedName("time")
+            int playedInSecond,
+            @SerializedName("total")
+            int durationInSecond,
+            int bitrate,
+            @SerializedName("level")
+            String quality
+    ){}
 }
