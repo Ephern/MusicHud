@@ -14,6 +14,7 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.server.api.ILoginApiService;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.throwable.MusicResourceLoadingException;
@@ -673,12 +674,17 @@ public class MusicApiService implements IMusicApiService {
 
     @Override
     public void scrobble(long musicId, int playedInSecond, int durationInSecond, int bitrate, Quality quality, UUID playerUUID) {
-        String s = ApiClient.post(
-                ApiServerEndpointsMeta.User.SCROBBLE,
-                new ScrobbleRequest(musicId, playedInSecond, durationInSecond, bitrate, quality.getAlias()),
-                loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo().rawCookie(),
-                true);
-        logger.debug("Scrobble result:\n{}", s);
+        if (playerUUID != null) {
+            ILoginApiService.PlayerLoginInfo loginInfoByPlayerUUID = loginApiService.getLoginInfoByPlayerUUID(playerUUID);
+            if (loginInfoByPlayerUUID != null) {
+                String s = ApiClient.post(
+                        ApiServerEndpointsMeta.User.SCROBBLE,
+                        new ScrobbleRequest(musicId, playedInSecond, durationInSecond, bitrate, quality.getAlias()),
+                        loginInfoByPlayerUUID.getLoginCookieInfo().rawCookie(),
+                        true);
+                logger.debug("Scrobble result:\n{}", s);
+            }
+        }
     }
 
     record IdAndUUIDKey(long id, UUID uuid) {

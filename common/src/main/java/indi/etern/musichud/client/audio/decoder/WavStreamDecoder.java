@@ -2,6 +2,7 @@ package indi.etern.musichud.client.audio.decoder;
 
 import lombok.SneakyThrows;
 import org.lwjgl.openal.AL10;
+import org.lwjgl.openal.EXTFloat32;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -11,6 +12,10 @@ import java.nio.ByteOrder;
 /**
  * WAV audio decoder, supporting PCM (8/16/24/32-bit signed, mono/stereo).
  * Automatically resamples 24-bit and 32-bit to 16-bit.
+ * <p>
+ * When {@code useFloat32} is set and the source is stereo with 24/32-bit
+ * samples, the decoded PCM is emitted losslessly as float32
+ * ({@code AL_FORMAT_STEREO_FLOAT32}) instead of being dithered down to 16-bit.
  */
 public class WavStreamDecoder implements AudioDecoder {
     private final InputStream inputStream;
@@ -19,15 +24,19 @@ public class WavStreamDecoder implements AudioDecoder {
     private final int format;          // OpenAL format constant
     private final long dataSize;       // total audio data bytes in file
     private final int frameSize;
+    private final boolean float32Output;
+    private final int inputBytesPerSample;
     private long bytesRead;      // raw bytes read from stream
 
     /**
      * Construct WAV decoder from an input stream, parse header and seek to data chunk.
      *
      * @param inputStream input stream (usually BufferedInputStream)
+     * @param useFloat32  whether float32 buffer formats ({@code AL_EXT_FLOAT32})
+     *                    are available; enables lossless 24/32-bit stereo output
      */
     @SneakyThrows
-    public WavStreamDecoder(InputStream inputStream) {
+    public WavStreamDecoder(InputStream inputStream, boolean useFloat32) {
         this.inputStream = inputStream;
 
         try {
@@ -104,6 +113,7 @@ public class WavStreamDecoder implements AudioDecoder {
             bytesRead = 0;
 
             int effectiveBitsPerSample = bitsPerSample;
+            boolean floatOutput = useFloat32 && channels == 2 && (bitsPerSample == 24 || bitsPerSample == 32);
 
             // determine OpenAL format and resampler
             if (channels == 1) {
@@ -121,8 +131,13 @@ public class WavStreamDecoder implements AudioDecoder {
                     case 8 -> this.format = AL10.AL_FORMAT_STEREO8;
                     case 16 -> this.format = AL10.AL_FORMAT_STEREO16;
                     case 24, 32 -> {
-                        this.format = AL10.AL_FORMAT_STEREO16;
-                        effectiveBitsPerSample = 16;
+                        if (floatOutput) {
+                            this.format = EXTFloat32.AL_FORMAT_STEREO_FLOAT32;
+                            effectiveBitsPerSample = 32;
+                        } else {
+                            this.format = AL10.AL_FORMAT_STEREO16;
+                            effectiveBitsPerSample = 16;
+                        }
                     }
                     default -> throw new IOException("Unsupported bits per sample: " + bitsPerSample);
                 }
@@ -131,11 +146,13 @@ public class WavStreamDecoder implements AudioDecoder {
             }
 
             this.resampler = switch (bitsPerSample) {
-                case 24 -> new Bit24To16Resampler();
-                case 32 -> new Bit32To16Resampler();
+                case 24 -> floatOutput ? new Bit24ToFloat32Converter() : new Bit24To16Resampler();
+                case 32 -> floatOutput ? new Bit32ToFloat32Converter() : new Bit32To16Resampler();
                 default -> null;
             };
 
+            this.float32Output = floatOutput;
+            this.inputBytesPerSample = bitsPerSample / 8;
             frameSize = effectiveBitsPerSample * channels * sampleRate / 8;
         } catch (Exception e) {
             inputStream.close();
@@ -155,7 +172,13 @@ public class WavStreamDecoder implements AudioDecoder {
             return null;
         }
         long remaining = dataSize - bytesRead;
-        long toRead = Math.min(maxSize, remaining);
+        long inputTarget = maxSize;
+        if (float32Output) {
+            // float32 output is 4 bytes/sample: scale the raw read so the converted
+            // chunk stays near maxSize (e.g. 24-bit: read 3/4, 32-bit: 1:1).
+            inputTarget = (long) (maxSize * inputBytesPerSample / 4.0);
+        }
+        long toRead = Math.min(inputTarget, remaining);
         if (toRead > Integer.MAX_VALUE) {
             toRead = Integer.MAX_VALUE;
         }

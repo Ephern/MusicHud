@@ -6,11 +6,13 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.client.audio.decoder.*;
+import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.ScrobbleMessage;
@@ -35,7 +37,6 @@ import java.time.ZonedDateTime;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -110,6 +111,8 @@ public class PlaybackTask {
     private volatile Future<?> playThreadFuture;
     private long lastJmtcTickMs = 0;
     private MusicResourceInfo musicResourceInfo;
+    private Unregister scrobbleOnQuitUnregister;
+    private volatile boolean scrobbled = false;
 
     private PlaybackTask(MusicDetail musicDetail, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
         this.musicDetail = musicDetail;
@@ -177,6 +180,7 @@ public class PlaybackTask {
     void submitThreads() {
         downloadThreadFuture = MusicHud.EXECUTOR.submit(this::downloadLoop);
         playThreadFuture = MusicHud.EXECUTOR.submit(this::playLoop);
+        scrobbleOnQuitUnregister = IClientEventService.getInstance().registerClientPlayerQuit((player) -> scrobble());
     }
 
     /**
@@ -740,6 +744,7 @@ public class PlaybackTask {
     }
 
     private void finish() {
+        scrobbleOnQuitUnregister.unregister();
         scrobble();
         cleanup();
         setState(PlaybackState.FINISHED);
@@ -747,18 +752,21 @@ public class PlaybackTask {
     }
 
     private void scrobble() {
-        switch (clientConfig.getScrobbleOption()) {
-            case ALL -> sendScrobbleOptionally();
-            case ONLY_SELF -> {
-                if (musicDetail.getPusherInfo().getPlayerUUID().equals(PlayerInfoUtil.getSelfUUID())) {
-                    sendScrobbleOptionally();
+        if (!scrobbled) {
+            scrobbled = true;
+            switch (clientConfig.getScrobbleOption()) {
+                case ALL -> sendScrobbleOptionally();
+                case ONLY_SELF -> {
+                    if (musicDetail.getPusherInfo().getPlayerUUID().equals(PlayerInfoUtil.getSelfUUID())) {
+                        sendScrobbleOptionally();
+                    }
                 }
             }
         }
     }
 
     private void sendScrobbleOptionally() {
-        if (musicResourceInfo != null) {
+        if (musicDetail != null && !MusicDetail.NONE.equals(musicDetail) && musicResourceInfo != null && !musicResourceInfo.equals(MusicResourceInfo.NONE)) {
             Quality quality = musicResourceInfo.getQuality();
             if (quality != Quality.NONE) {
                 int durationSec = musicDetail.getDurationMillis() / 1000;
@@ -811,14 +819,15 @@ public class PlaybackTask {
 
     @SneakyThrows
     private AudioDecoder getAudioDecoder(FormatType formatType, BufferedInputStream inputStream) {
+        boolean useFloat32 = OpenAlSource.isFloat32Supported();
         FormatType formatType1 = formatType;
         if (formatType1 == FormatType.AUTO) {
             formatType1 = AudioFormatDetector.detectFormat(inputStream);
         }
         return switch (formatType1) {
-            case WAV -> new WavStreamDecoder(inputStream);
+            case WAV -> new WavStreamDecoder(inputStream, useFloat32);
             case MP3 -> new MP3StreamDecoder(inputStream);
-            case FLAC -> new FLACStreamDecoder(inputStream);
+            case FLAC -> new FLACStreamDecoder(inputStream, useFloat32);
             case AUTO -> throw new IllegalArgumentException();
         };
     }

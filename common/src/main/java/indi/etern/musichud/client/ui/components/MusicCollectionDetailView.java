@@ -21,6 +21,7 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
+import indi.etern.musichud.client.utils.CountFormatter;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.Unregister;
@@ -128,7 +129,7 @@ public class MusicCollectionDetailView extends LinearLayout {
             {
                 TextView playedCountView = new TextView(context);
                 playedCountView.setTextSize(Theme.TEXT_SIZE_LARGE);
-                SpannableString text = new SpannableString("  " + playlist.getPlayedCount());
+                SpannableString text = new SpannableString("  " + CountFormatter.formatCount(playlist.getPlayedCount()));
                 Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/audio_lines.png");
                 if (icon != null) {
                     ImageSpan iconSpan = ImageUtils.getIconSpan(icon);

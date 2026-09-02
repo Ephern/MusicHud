@@ -172,6 +172,8 @@
   "music_hud.text.confirmSkip": "Press again in 3s to skip",
   "music_hud.text.confirmSwitchConnection": "Press again in 3s to switch connection",
   "music_hud.text.confirmVoteForSkip": "Press again in 3s to vote for skip",
+  "music_hud.text.countBase": "1000",
+  "music_hud.text.countUnit": "K,M,B",
   "music_hud.text.connected": "Already connected to serverside",
   "music_hud.text.connected.integrated": "Already connected to integrated serverside",
   "music_hud.text.connecting": "Connecting to server...",

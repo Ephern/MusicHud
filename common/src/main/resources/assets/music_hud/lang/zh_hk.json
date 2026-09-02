@@ -172,6 +172,8 @@
   "music_hud.text.confirmSkip": "3 秒內再次按下以切歌",
   "music_hud.text.confirmSwitchConnection": "3 秒內再次按下以切換連接",
   "music_hud.text.confirmVoteForSkip": "3 秒內再次按下以投票切歌",
+  "music_hud.text.countBase": "10000",
+  "music_hud.text.countUnit": "萬,億",
   "music_hud.text.connected": "已連接到遠程伺服器端",
   "music_hud.text.connected.integrated": "已連接到集成伺服器端",
   "music_hud.text.connecting": "連接到伺服器端...",
