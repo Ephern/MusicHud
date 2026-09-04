@@ -493,6 +493,16 @@ public class ApiServerEndpointsMeta {
                 false,
                 Set.of(200),
                 String.class);
+        public static final UrlMeta<MusicApiService.IntelligentListResponse> INTELLIGENT_LIST = new UrlMeta<>(
+                "/playmode/intelligence/list",
+                Set.of("id"/*musicId*/, "pid"/*playlistId*/),
+                Set.of("sid"/*startId(track to start)*/),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200, 400/*Unsupported playlist, handle manually*/),
+                MusicApiService.IntelligentListResponse.class);
     }
 
     public static class Music {

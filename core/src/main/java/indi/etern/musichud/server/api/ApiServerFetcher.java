@@ -50,7 +50,7 @@ import java.util.regex.Pattern;
 public class ApiServerFetcher {
     private static final Logger LOGGER = MusicHud.getLogger(ApiServerFetcher.class);
 
-    public static final String REPO_OWNER = "MOPELotus";
+    public static final String REPO_OWNER = "NeteaseCloudMusicApiEnhanced";
     public static final String REPO_NAME = "api-enhanced";
     public static final String BASE = "https://github.com/" + REPO_OWNER + "/" + REPO_NAME;
     public static final String API_RELEASES = "https://api.github.com/repos/" + REPO_OWNER + "/" + REPO_NAME + "/releases";

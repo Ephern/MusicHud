@@ -5,6 +5,7 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.music.actions.SubscribableType;
 import indi.etern.musichud.beans.music.actions.SubscribeAction;
 import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
+import indi.etern.musichud.throwable.PlaylistTypeUnsupportedException;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.LinkedHashSet;
@@ -58,5 +59,9 @@ public interface IMusicApiService {
 
     void userSubscribe(long id, SubscribableType subscribableType, SubscribeAction action, UUID playerUUID);
 
-    void scrobble(long musicId, int playedInSecond, int durationInSecond, int bitrate, Quality quality, UUID playerUUID);
+    void scrobble(long musicId, int playedInSecond, int durationInSecond, int bitrate, Quality quality,
+                  @Nullable SourceMeta source, UUID playerUUID);
+
+    /** @throws PlaylistTypeUnsupportedException if the playlist type is not supported (HTTP 400) */
+    List<MusicDetail> getIntelligentList(long musicId, long playlistId, @Nullable Long sid, @Nullable UUID playerUUID);
 }

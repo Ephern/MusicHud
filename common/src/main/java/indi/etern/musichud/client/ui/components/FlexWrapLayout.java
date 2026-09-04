@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.components;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
@@ -25,14 +26,13 @@ public class FlexWrapLayout extends LinearLayout {
     private final Map<View, Integer> childWidthSnapshot = new HashMap<>();
     private int lastRebuildWidth = -1;
     private LinkedHashSet<Consumer<LinearLayout>> lineStylers;
+    private boolean rebuildPending = false;
 
     private static LayoutTransition createDefaultTransition() {
         LayoutTransition layoutTransition = new LayoutTransition();
         layoutTransition.setDuration(300);
         layoutTransition.enableTransitionType(LayoutTransition.APPEARING);
         layoutTransition.enableTransitionType(LayoutTransition.DISAPPEARING);
-        // 禁止 CHANGE_* 动画向上设置到父链(直到窗口): 否则过渡期间布局会被抑制,
-        // 且窗口可能在遍历期间被过渡逻辑移除, 导致 WindowGroup.onMeasure 遍历到 null
         layoutTransition.setAnimateParentHierarchy(false);
         return layoutTransition;
     }
@@ -43,14 +43,32 @@ public class FlexWrapLayout extends LinearLayout {
         setLayoutTransition(defaultTransition);
         addOnLayoutChangeListener((v1, left, top, right, bottom,
                                    oldLeft, oldTop, oldRight, oldBottom) -> {
-            int newWidth = right - left;
-            int oldWidth = oldRight - oldLeft;
+            if (right - left != oldRight - oldLeft && right - left > 0) {
+                scheduleRebuild();
+            }
+        });
+    }
 
-            if (newWidth != oldWidth && newWidth > 0) {
-                // Layout is finished here, so newWidth is the current real width
-                // (no stale previous-frame data). Rebuild synchronously and let
-                // the next layout pass render the new rows.
-                rebuildRows(newWidth);
+    /**
+     * Structural rebuilds must never run inside measure/layout: the framework
+     * closes windows (e.g. tooltips) synchronously from detach callbacks, and
+     * WindowGroup.onMeasure iterates windows with a stale count, so any child
+     * removal that races that iteration crashes with an NPE. Rebuilds are
+     * therefore deferred to the next UI message.
+     */
+    private void scheduleRebuild() {
+        if (rebuildPending) {
+            return;
+        }
+        rebuildPending = true;
+        MuiModApi.postToUiThread(() -> {
+            rebuildPending = false;
+            int width = getWidth() > 0 ? getWidth() : lastRebuildWidth;
+            if (width > 0) {
+                rebuildRows(width);
+                lastRebuildWidth = width;
+                updateChildWidthSnapshot();
+                rowsDirty = false;
                 requestLayout();
             }
         });
@@ -59,40 +77,13 @@ public class FlexWrapLayout extends LinearLayout {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         boolean childSizesChanged = detectChildSizeChanges();
-        if (rowsDirty || childSizesChanged) {
-            rowsDirty = false;
-            int width = resolveContainerWidth(widthMeasureSpec);
-            if (width > 0) {
-                rebuildRows(width);
-                lastRebuildWidth = width;
-                updateChildWidthSnapshot();
-            }
-        } else if (getWidth() > 0 && getWidth() != lastRebuildWidth) {
-            rebuildRows(getWidth());
-            lastRebuildWidth = getWidth();
-            updateChildWidthSnapshot();
+        if (rowsDirty || childSizesChanged
+                || (getWidth() > 0 && getWidth() != lastRebuildWidth)) {
+            scheduleRebuild();
         }
+        // Measured with the current (possibly one frame stale) row structure;
+        // the deferred rebuild triggers another pass once it applies.
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-    }
-
-    private int resolveContainerWidth(int widthMeasureSpec) {
-        if (getWidth() > 0) {
-            // Already laid out: only child data changed (addView/removeView),
-            // the container width is stable, use the actual laid-out width.
-            return getWidth();
-        }
-        // First pass, no layout yet. Use the current frame's size when
-        // constrained; otherwise (WRAP_CONTENT chain / scroll view) the
-        // spec size is meaningless (huge), so put every child on a
-        // single overflowing row to render immediately. The row is then
-        // measured with UNSPECIFIED, so children keep their natural
-        // width and are never squeezed (which would inflate their
-        // height). The layout listener rewraps once the real width is
-        // known.
-        int mode = MeasureSpec.getMode(widthMeasureSpec);
-        return (mode == MeasureSpec.EXACTLY || mode == MeasureSpec.AT_MOST)
-                ? MeasureSpec.getSize(widthMeasureSpec)
-                : Integer.MAX_VALUE / 2;
     }
 
     /**
@@ -151,7 +142,7 @@ public class FlexWrapLayout extends LinearLayout {
     public void addView(@NotNull View view) {
         allChildren.add(view);
         rowsDirty = true;
-        requestLayout();
+        scheduleRebuild();
     }
 
     @Override
@@ -159,7 +150,7 @@ public class FlexWrapLayout extends LinearLayout {
         view.setLayoutParams(params);
         allChildren.add(view);
         rowsDirty = true;
-        requestLayout();
+        scheduleRebuild();
     }
 
     /**
@@ -174,6 +165,9 @@ public class FlexWrapLayout extends LinearLayout {
     }
 
     private void rebuildRows(int width) {
+        // Runs as an independent UI message (see scheduleRebuild), never inside
+        // measure/layout, so layout transitions here cannot re-enter window
+        // iteration in WindowGroup.onMeasure
         List<View> children = List.copyOf(allChildren);
         WrapLineAllocator allocator = new WrapLineAllocator(width);
         Map<View, LinearLayout> targetRows = new HashMap<>();
@@ -195,6 +189,7 @@ public class FlexWrapLayout extends LinearLayout {
                     row.removeView(child);
                 } else if (targetRow != row) {
                     movedViews.add(child);
+                    // 移动期间禁动画, 避免重排闪烁
                     LayoutTransition transition = row.getLayoutTransition();
                     if (transition != null) {
                         row.setLayoutTransition(null);
@@ -210,12 +205,8 @@ public class FlexWrapLayout extends LinearLayout {
         for (View child : children) {
             LinearLayout targetRow = targetRows.get(child);
             if (child.getParent() != targetRow) {
-                if (child.getParent() != null) {
-                    ((ViewGroup) child.getParent()).endViewTransition(child);
-                }
                 int insertIndex = computeInsertIndex(targetRow, child, childIndexes);
                 if (movedViews.contains(child)) {
-                    // 移动: 无动画加入, 避免重排闪烁
                     LayoutTransition transition = targetRow.getLayoutTransition();
                     if (transition != null) {
                         targetRow.setLayoutTransition(null);
@@ -237,7 +228,6 @@ public class FlexWrapLayout extends LinearLayout {
             if (row.getChildCount() == 0) {
                 rowsToRemove.add(row);
                 super.removeView(row);
-                endViewTransition(row);
             }
         }
         rows.removeAll(rowsToRemove);
@@ -296,9 +286,10 @@ public class FlexWrapLayout extends LinearLayout {
     @Override
     public void removeView(@NotNull View view) {
         allChildren.remove(view);
-        rows.forEach(row -> row.removeView(view));
+        childWidthSnapshot.remove(view);
+        // Physical removal from rows happens in the deferred rebuildRows
         rowsDirty = true;
-        requestLayout();
+        scheduleRebuild();
     }
 
     public Unregister applyLineStyle(Consumer<LinearLayout> styler) {

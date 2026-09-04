@@ -5,6 +5,7 @@ import indi.etern.musichud.beans.music.FormatType;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.MusicResourceInfo;
 import indi.etern.musichud.beans.music.Quality;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.audio.decoder.*;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.music.MusicService;
@@ -71,6 +72,8 @@ public class PlaybackTask {
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
 
     @Getter
+    private final Traceable<MusicDetail> musicTrace;
+    @Getter
     private final MusicDetail musicDetail;
     private final Fade fadeIn;
     private final Fade fadeOut;
@@ -114,8 +117,9 @@ public class PlaybackTask {
     private Unregister scrobbleOnQuitUnregister;
     private volatile boolean scrobbled = false;
 
-    private PlaybackTask(MusicDetail musicDetail, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
-        this.musicDetail = musicDetail;
+    private PlaybackTask(Traceable<MusicDetail> musicTrace, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
+        this.musicTrace = musicTrace;
+        this.musicDetail = musicTrace.value();
         this.serverStartTime = serverStartTime;
         this.fadeIn = fadeIn;
         this.fadeOut = fadeOut;
@@ -124,16 +128,9 @@ public class PlaybackTask {
     /**
      * Create a task using the default fade durations.
      */
-    public static PlaybackTask of(MusicDetail musicDetail, ZonedDateTime serverStartTime) {
-        return new PlaybackTask(musicDetail, serverStartTime,
+    public static PlaybackTask of(Traceable<MusicDetail> musicTrace, ZonedDateTime serverStartTime) {
+        return new PlaybackTask(musicTrace, serverStartTime,
                 Fade.of(StreamAudioPlayer.DEFAULT_FADE_IN_MS), Fade.of(StreamAudioPlayer.DEFAULT_FADE_OUT_MS));
-    }
-
-    /**
-     * Create a task with explicit fade in/out settings.
-     */
-    public static PlaybackTask of(MusicDetail musicDetail, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
-        return new PlaybackTask(musicDetail, serverStartTime, fadeIn, fadeOut);
     }
 
     public Fade fadeIn() {
@@ -772,7 +769,7 @@ public class PlaybackTask {
                 int durationSec = musicDetail.getDurationMillis() / 1000;
                 int playedSec = serverStartTime == null ? durationSec : Math.toIntExact(Duration.between(serverStartTime, ZonedDateTime.now()).toSeconds());
                 if (playedSec >= SCROBBLE_MIN_PLAY_DURATION_SEC) {
-                    clientNetworkService.sendToServer(new ScrobbleMessage(musicDetail.getId(), playedSec, durationSec, musicResourceInfo.getBitrate(), quality));
+                    clientNetworkService.sendToServer(new ScrobbleMessage(musicDetail.getId(), playedSec, durationSec, musicResourceInfo.getBitrate(), quality, musicTrace.source()));
                 }
             }
         }
@@ -867,7 +864,7 @@ public class PlaybackTask {
                 .thenApply(GetMusicResourceResponse::getMusicResourceInfo)
                 .thenCompose(value -> {
                     if (value == MusicResourceInfo.NONE) {
-                        MusicService.getInstance().switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
+                        MusicService.getInstance().switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                         setState(PlaybackState.ERROR);
                         return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
                     }
