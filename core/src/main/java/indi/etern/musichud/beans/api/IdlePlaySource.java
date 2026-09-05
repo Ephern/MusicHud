@@ -39,7 +39,7 @@ public final class IdlePlaySource {
     @Setter
     private PlayMode playMode;
     @Setter
-    transient private PusherInfo pusherInfo;
+    private transient PusherInfo pusherInfo;
     @Getter
     transient private boolean dataLoaded = false;
     @Setter
@@ -109,6 +109,14 @@ public final class IdlePlaySource {
                 .getLoginInfoByPlayerUUID(pusherInfo.getPlayerUUID());
         sampledTrack.setPusherInfo(loginInfo != null ? pusherInfo : PusherInfo.EMPTY);
         return Traceable.of(sampledTrack, new SourceMeta(id, type));
+    }
+
+    public PlayMode getPlayMode() {
+        return Objects.requireNonNullElse(playMode, PlayMode.RANDOM);
+    }
+
+    public PusherInfo getPusherInfo() {
+        return Objects.requireNonNullElse(pusherInfo, PusherInfo.EMPTY);
     }
 
     @Override

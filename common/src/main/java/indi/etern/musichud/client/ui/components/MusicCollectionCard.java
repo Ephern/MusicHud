@@ -72,7 +72,7 @@ public class MusicCollectionCard extends LinearLayout {
         addView(imageView, imageParams);
 
         onChangeUnregister = musicCollection.getMusicDetails().registerOnChange(() -> {
-            if (!(musicCollection instanceof Playlist playlist) || playlist.getSpecialType() != PlaylistSpecialType.OFFICIAL) {
+            if (!(musicCollection instanceof Playlist playlist) || playlist.getSpecialType() != PlaylistSpecialType.USER_SPECIFIC) {
                 MuiModApi.postToUiThread(() -> {
                     imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp160));
                 });
@@ -113,7 +113,7 @@ public class MusicCollectionCard extends LinearLayout {
         LinearLayout texts = new LinearLayout(context);
         texts.setOrientation(HORIZONTAL);
         LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params2.setMargins(dp(2), dp(3), 0, 0);
+        params2.setMargins(dp(2), dp(2.5f), 0, 0);
         row1.addView(texts, params2);
         if (musicCollection instanceof Playlist playlist) {
             {
@@ -121,7 +121,7 @@ public class MusicCollectionCard extends LinearLayout {
                 musicTrackCountView.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 String iconPath = switch (playlist.getSpecialType()) {
                     case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
-                    case OFFICIAL -> ICON_RECOMMEND_LIST_MUSIC;
+                    case USER_SPECIFIC -> ICON_RECOMMEND_LIST_MUSIC;
                     default -> ICON_LIST_MUSIC;
                 };
                 musicTrackCountView.setText(buildIconText(String.valueOf(playlist.getMusicTrackCount()), iconPath));
@@ -276,13 +276,13 @@ public class MusicCollectionCard extends LinearLayout {
     private void refreshCollectionInfo() {
         MusicCollection collection = musicCollection;
         if (collection == null) return;
-        if (!(musicCollection instanceof Playlist playlist) || playlist.getSpecialType() != PlaylistSpecialType.OFFICIAL) {
+        if (!(musicCollection instanceof Playlist playlist) || playlist.getSpecialType() != PlaylistSpecialType.USER_SPECIFIC) {
             imageView.loadUrl(collection.getImageThumbnailUrl(dp(160)));
         }
         if (collection instanceof Playlist playlist) {
             String iconPath = switch (playlist.getSpecialType()) {
                 case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
-                case OFFICIAL -> ICON_RECOMMEND_LIST_MUSIC;
+                case USER_SPECIFIC -> ICON_RECOMMEND_LIST_MUSIC;
                 default -> ICON_LIST_MUSIC;
             };
             musicTrackCountView.setText(buildIconText(String.valueOf(playlist.getMusicTrackCount()), iconPath));
