@@ -21,7 +21,7 @@ public enum Quality implements AliasEnum {
      * standard => 标准        标准
      *
      */
-    STANDARD, HIGHER, EX_HIGH, LOSSLESS, HIRES, JY_EFFECT, SKY, DOLBY, JY_MASTER, NONE;
+    STANDARD, HIGHER, EX_HIGH, LOSSLESS, HIRES, JY_EFFECT, DOLBY, JY_MASTER, SKY, NONE;
 
     public static final ByteBufCodec<Quality> CODEC = Codecs.ofEnum(Quality.class);
 

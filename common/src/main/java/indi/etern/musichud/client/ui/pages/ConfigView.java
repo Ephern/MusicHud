@@ -18,12 +18,11 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.music.Quality;
+import indi.etern.musichud.beans.user.ScrobbleOption;
 import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.components.LyricLineView;
 import indi.etern.musichud.client.ui.components.Modal;
-import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
 import indi.etern.musichud.client.ui.screen.HudConfigFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
@@ -102,21 +101,18 @@ public class ConfigView extends LinearLayout {
                     })
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricsSidebar"),
+                    clientConfig::getEnableLyricsSidebar,
+                    clientConfig::setEnableLyricsSidebar)
+                    .setDefaultValue(clientConfig.getDefaultEnableLyricsSidebar())
+                    .setOnChanged(MainFragment::refreshLyricsSidebarVisibility)
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics"),
                     clientConfig::getShowTranslatedCnLyrics,
                     clientConfig::setShowTranslatedCnLyrics)
                     .setDefaultValue(clientConfig.getDefaultShowTranslatedCnLyrics())
-                    .setOnChanged(() -> {
-                        HomeView homeView = HomeView.getInstance();
-                        if (homeView != null) {
-                            StaggeredLyricScrollView staggeredLyricScrollView = homeView.getStaggeredLyricScrollView();
-                            if (staggeredLyricScrollView != null) {
-                                MuiModApi.postToUiThread(() -> {
-                                    staggeredLyricScrollView.getLyricLineViewList().forEach(LyricLineView::refreshSubLyricLine);
-                                });
-                            }
-                        }
-                    })
+                    .setOnChanged(MainFragment::refreshLyricViews)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying"),
@@ -157,6 +153,17 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setPrimaryChosenQuality)
                     .setDefaultValue(clientConfig.getDefaultPrimaryChosenQuality())
                     .create(commonCategory);
+            ScrobbleOption[] scrobbleOptions = {ScrobbleOption.NONE, ScrobbleOption.ONLY_SELF, ScrobbleOption.ALL};
+            List<ScrobbleOption> scrobbleOptionsList = Arrays.stream(scrobbleOptions).toList();
+            new PreferencesFragment.DropDownOption<>(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.scrobbleOption"),
+                    scrobbleOptions,
+                    scrobbleOptionsList::indexOf,
+                    clientConfig::getScrobbleOption,
+                    clientConfig::setScrobbleOption)
+                    .setDefaultValue(clientConfig.getDefaultScrobbleOption())
+                    .create(commonCategory);
             new PreferencesFragment.FloatOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken"),
@@ -164,9 +171,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setMainScreenAdditionalBackgroundDarken)
                     .setRange(0, 1)
                     .setDefaultValue(clientConfig.getDefaultMainScreenAdditionalBackgroundDarken())
-                    .setOnChanged(() -> {
-                        MusicHudScreen.setDarken(clientConfig.getMainScreenAdditionalBackgroundDarken());
-                    })
+                    .setOnChanged(() -> MusicHudScreen.setDarken(clientConfig.getMainScreenAdditionalBackgroundDarken()))
                     .setDefaultValue(0.5)
                     .create(commonCategory);
 
@@ -178,12 +183,10 @@ public class ConfigView extends LinearLayout {
             openHudBgFactory.applyBackgroundTo(openHudConfigButton);
             openHudConfigButton.setOnClickListener((v) -> {
                 Minecraft minecraft = Minecraft.getInstance();
-                minecraft.execute(() -> {
-                    minecraft.setScreen(HudConfigScreen.createScreen(
-                            new HudConfigFragment(),
-                            minecraft.screen,
-                            I18n.get(MusicHud.MOD_ID + ".config.hudScreenTitle")));
-                });
+                minecraft.execute(() -> minecraft.setScreen(HudConfigScreen.createScreen(
+                        new HudConfigFragment(),
+                        minecraft.screen,
+                        I18n.get(MusicHud.MOD_ID + ".config.hudScreenTitle"))));
             });
             commonCategory.addView(openHudConfigButton, new LayoutParams(MATCH_PARENT, dp(40)));
             view.addView(commonCategory);
@@ -409,18 +412,14 @@ public class ConfigView extends LinearLayout {
             stopApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             stopApiServerButton.setTextSize(14);
             backgroundFactory.applyBackgroundTo(stopApiServerButton);
-            stopApiServerButton.setOnClickListener((v1) -> {
-                apiServerManager.stopApiServer();
-            });
+            stopApiServerButton.setOnClickListener((v1) -> apiServerManager.stopApiServer());
 
             Button restartApiServerButton = new Button(context);
             restartApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.restartApiServer"));
             restartApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
             restartApiServerButton.setTextSize(14);
             backgroundFactory.applyBackgroundTo(restartApiServerButton);
-            restartApiServerButton.setOnClickListener((v1) -> {
-                apiServerManager.restartApiServer();
-            });
+            restartApiServerButton.setOnClickListener((v1) -> apiServerManager.restartApiServer());
 
             apiServerStatusLayout.addView(apiStatusLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
             apiServerStatusLayout.addView(downloadApiServerButton);
@@ -472,9 +471,7 @@ public class ConfigView extends LinearLayout {
             refreshApiLogButton.setTextColor(Theme.PRIMARY_COLOR);
             refreshApiLogButton.setTextSize(14);
             backgroundFactory.applyBackgroundTo(refreshApiLogButton);
-            refreshApiLogButton.setOnClickListener(v -> {
-                updateApiLogLabel(apiLogLabel);
-            });
+            refreshApiLogButton.setOnClickListener(v -> updateApiLogLabel(apiLogLabel));
 
             Button openApiLogDirButton = new Button(context);
             openApiLogDirButton.setText(I18n.get(MusicHud.MOD_ID + ".button.openApiLogDir"));
@@ -547,13 +544,13 @@ public class ConfigView extends LinearLayout {
             envVarParams.setMargins(0, dp(6), 0, dp(128));
             view.addView(envVarCategory, envVarParams);
 
-            Consumer<ApiServerManager.BinaryApiServerStatus> listener = (apiServerStatus) -> {
-                MuiModApi.postToUiThread(() -> {
-                    apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerStatus.i18nKey())));
-                    apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
-                    updateApiLogLabel(apiLogLabel);
-                });
-            };
+            Consumer<ApiServerManager.BinaryApiServerStatus> listener = apiServerStatus -> MuiModApi.postToUiThread(
+                    () -> {
+                        apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerStatus.i18nKey())));
+                        apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
+                        updateApiLogLabel(apiLogLabel);
+                    }
+            );
             List<Consumer<ApiServerManager.BinaryApiServerStatus>> apiStatusListeners = apiServerManager.getApiStatusListeners();
             apiStatusListeners.add(listener);
             addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
@@ -738,9 +735,9 @@ public class ConfigView extends LinearLayout {
         refreshReleaseButton.setTextColor(Theme.PRIMARY_COLOR);
         refreshReleaseButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         backgroundFactory.applyBackgroundTo(refreshReleaseButton);
-        refreshReleaseButton.setOnClickListener(v -> {
-            refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning);
-        });
+        refreshReleaseButton.setOnClickListener(
+                v -> refreshReleaseInfo(releaseNameLabel, latestRelease, targetDir, existingVersionWarning)
+        );
 
         releaseInfoLayout.addView(releaseNameLabel, new LayoutParams(0, WRAP_CONTENT, 1));
         releaseInfoLayout.addView(refreshReleaseButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
@@ -878,31 +875,35 @@ public class ConfigView extends LinearLayout {
 
                 ApiServerFetcher.DownloadProxy selectedProxy = ApiServerFetcher.DownloadProxy.values()[proxySpinner.getSelectedItemPosition()];
 
-                CompletableFuture<Path> future = updateService.downloadToTemp(targetDir[0], releaseTag[0], selectedProxy, (downloaded, total) -> {
-                    MuiModApi.postToUiThread(() -> {
-                        if (cancelled.get()) return;
-                        int pct = (int) (((double) downloaded / total) * 100);
-                        progressBar.setProgress(pct);
-                        progressText.setText(formatBytes(downloaded) + " / " + formatBytes(total));
-                    });
-                }, cancelled);
+                CompletableFuture<Path> future = updateService.downloadToTemp(
+                        targetDir[0], releaseTag[0], selectedProxy,
+                        (downloaded, total) -> MuiModApi.postToUiThread(
+                                () -> {
+                                    if (cancelled.get()) return;
+                                    int pct = (int) (((double) downloaded / total) * 100);
+                                    progressBar.setProgress(pct);
+                                    progressText.setText(formatBytes(downloaded) + " / " + formatBytes(total));
+                                }
+                        ),
+                        cancelled
+                );
                 downloadFuture[0] = future;
-                future.thenRun(() -> {
-                    MuiModApi.postToUiThread(() -> {
-                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done"));
-                        state[0] = Page.DONE;
-                        downloadedTempFile[0] = tempFile;
-                        doneDesc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.description").replace("{path}", tempFile.toString()));
-                        setPage.accept(Page.DONE);
-                        btn.setText(button1YesText);
-                        btn.setEnabled(true);
-                        cancelBtn.setText(button2NoText);
-                        cancelBtn.getButton().setVisibility(VISIBLE);
-                        cancelBtn.getButton().setScaleX(1f);
-                        cancelBtn.getButton().setAlpha(1f);
-                        downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServerDone"));
-                    });
-                }).exceptionally(ex -> {
+                future.thenRun(() ->
+                        MuiModApi.postToUiThread(() -> {
+                            ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done"));
+                            state[0] = Page.DONE;
+                            downloadedTempFile[0] = tempFile;
+                            doneDesc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.done.description").replace("{path}", tempFile.toString()));
+                            setPage.accept(Page.DONE);
+                            btn.setText(button1YesText);
+                            btn.setEnabled(true);
+                            cancelBtn.setText(button2NoText);
+                            cancelBtn.getButton().setVisibility(VISIBLE);
+                            cancelBtn.getButton().setScaleX(1f);
+                            cancelBtn.getButton().setAlpha(1f);
+                            downloadApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.downloadApiServerDone"));
+                        })
+                ).exceptionally(ex -> {
                     MuiModApi.postToUiThread(() -> {
                         if (ex instanceof CancellationException || ex.getCause() instanceof CancellationException) {
                             ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.cancelled"));
@@ -1027,6 +1028,30 @@ public class ConfigView extends LinearLayout {
             mParent = parent;
         }
 
+        private static void createEnvVarInputBox(Context context, LinearLayout parent, String i18nKey,
+                                                 String currentValue, Consumer<String> setter) {
+            LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(i18nKey));
+            EditText input = inputBox.findViewById(R.id.input);
+            if (input != null) {
+                input.setMinimumWidth(input.dp(256));
+                input.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
+                input.setText(currentValue);
+                input.setOnKeyListener((v, c, e) -> {
+                    if (c == GLFW.GLFW_KEY_ENTER) {
+                        input.clearFocus();
+                        return true;
+                    }
+                    return false;
+                });
+                input.setOnFocusChangeListener((v, b) -> {
+                    if (!b) {
+                        setter.accept(input.getText().toString());
+                    }
+                });
+            }
+            parent.addView(inputBox);
+        }
+
         @Override
         public void onClick(View v) {
             if (mContent != null) {
@@ -1101,30 +1126,6 @@ public class ConfigView extends LinearLayout {
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params.setMargins(0, mContent.dp(6), 0, 0);
             mParent.addView(mContent, params);
-        }
-
-        private static void createEnvVarInputBox(Context context, LinearLayout parent, String i18nKey,
-                                                 String currentValue, Consumer<String> setter) {
-            LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(i18nKey));
-            EditText input = inputBox.findViewById(R.id.input);
-            if (input != null) {
-                input.setMinimumWidth(input.dp(256));
-                input.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
-                input.setText(currentValue);
-                input.setOnKeyListener((v, c, e) -> {
-                    if (c == GLFW.GLFW_KEY_ENTER) {
-                        input.clearFocus();
-                        return true;
-                    }
-                    return false;
-                });
-                input.setOnFocusChangeListener((v, b) -> {
-                    if (!b) {
-                        setter.accept(input.getText().toString());
-                    }
-                });
-            }
-            parent.addView(inputBox);
         }
     }
 }

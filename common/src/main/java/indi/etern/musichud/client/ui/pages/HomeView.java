@@ -9,9 +9,11 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.QueueItem;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
@@ -42,13 +44,20 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class HomeView extends LinearLayout {
+    /** Card identity: collection id+type per layer; both play modes share one card. */
+    private record CardKey(boolean local, long id, Class<?> type) {
+        static CardKey of(boolean local, IdlePlaySource idlePlaySource) {
+            return new CardKey(local, idlePlaySource.getId(), idlePlaySource.getType());
+        }
+    }
+
     private static final MusicService musicService = MusicService.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     @Getter
     private static HomeView instance;
-    private final Set<MusicCollection> serverIdlePlaySources = musicService.getIdlePlaySourceState().external().getSources();
-    private final Set<MusicCollection> clientIdlePlaySources = musicService.getIdlePlaySourceState().local().getSources();
-    private final Map<MusicCollection, MusicCollectionCard> idlePlaySourceCardMap = new ConcurrentHashMap<>();
+    private final Set<IdlePlaySource> serverIdlePlaySources = musicService.getIdlePlaySourceState().external().getSources();
+    private final Set<IdlePlaySource> clientIdlePlaySources = musicService.getIdlePlaySourceState().local().getSources();
+    private final Map<CardKey, MusicCollectionCard> idlePlaySourceCardMap = new ConcurrentHashMap<>();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
     private MusicListItem nextToPlayItem;
@@ -58,17 +67,21 @@ public class HomeView extends LinearLayout {
     private LinearLayout clientIdlePlaySourceView;
     private LinearLayout serverIdlePlaySourceView;
     private FlexWrapLayout clientIdlePlaySourceCardsList;
-    private final Consumer<MusicCollection> localAddListener = collection -> {
+    private final Consumer<IdlePlaySource> localAddListener = collection -> {
         MuiModApi.postToUiThread(() -> {
-            if (!idlePlaySourceCardMap.containsKey(collection)) {
-                addIdlePlaySourceTo(collection, getContext(), clientIdlePlaySourceCardsList);
+            CardKey key = CardKey.of(true, collection);
+            if (!idlePlaySourceCardMap.containsKey(key)) {
+                addIdlePlaySourceTo(collection, clientIdlePlaySourceCardsList, true);
                 checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
             }
         });
     };
-    private final Consumer<MusicCollection> localRemoveListener = collection -> {
+    private final Consumer<IdlePlaySource> localRemoveListener = collection -> {
         MuiModApi.postToUiThread(() -> {
-            MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
+            if (hasSourceWithKey(clientIdlePlaySources, collection)) {
+                return;
+            }
+            MusicCollectionCard view = idlePlaySourceCardMap.remove(CardKey.of(true, collection));
             if (view != null) {
                 clientIdlePlaySourceCardsList.removeView(view);
                 checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
@@ -76,9 +89,12 @@ public class HomeView extends LinearLayout {
         });
     };
     private FlexWrapLayout serverIdlePlaySourceCardsList;
-    private final Consumer<MusicCollection> serverRemoveListener = collection -> {
+    private final Consumer<IdlePlaySource> serverRemoveListener = idlePlaySource -> {
         MuiModApi.postToUiThread(() -> {
-            MusicCollectionCard view = idlePlaySourceCardMap.remove(collection);
+            if (hasSourceWithKey(serverIdlePlaySources, idlePlaySource)) {
+                return;
+            }
+            MusicCollectionCard view = idlePlaySourceCardMap.remove(CardKey.of(false, idlePlaySource));
             if (view != null) {
                 serverIdlePlaySourceCardsList.removeView(view);
                 checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
@@ -92,15 +108,20 @@ public class HomeView extends LinearLayout {
     private Unregister serverAddRegister;
     private Unregister serverRemoveRegister;
     private LocalPlayer localPlayer = Minecraft.getInstance().player;
-    private final Consumer<MusicCollection> serverAddListener = collection -> {
+    private final Consumer<IdlePlaySource> serverAddListener = collection -> {
         MuiModApi.postToUiThread(() -> {
+            CardKey key = CardKey.of(false, collection);
             if ((localPlayer != null && collection.getPusherInfo().getPlayerUUID() != localPlayer.getUUID())
-                    && !idlePlaySourceCardMap.containsKey(collection)) {
-                addIdlePlaySourceTo(collection, getContext(), serverIdlePlaySourceCardsList);
+                    && !idlePlaySourceCardMap.containsKey(key)) {
+                addIdlePlaySourceTo(collection, serverIdlePlaySourceCardsList, false);
                 checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
             }
         });
     };
+
+    private static boolean hasSourceWithKey(Set<IdlePlaySource> sources, IdlePlaySource idlePlaySource) {
+        return sources.stream().anyMatch(c -> c.getId() == idlePlaySource.getId() && c.getType() == idlePlaySource.getType());
+    }
 
     public HomeView(Context context) {
         super(context);
@@ -183,7 +204,6 @@ public class HomeView extends LinearLayout {
             playQueueListView.setLayoutTransition(transition);
             scrollViewContainer.addView(playQueueListView, queueViewParams1);
 
-
             clientIdlePlaySourceView = new LinearLayout(context);
             clientIdlePlaySourceView.setVisibility(GONE);
             clientIdlePlaySourceView.setOrientation(VERTICAL);
@@ -237,18 +257,14 @@ public class HomeView extends LinearLayout {
 
             localPlayer = Minecraft.getInstance().player;
 
-            clientIdlePlaySources.forEach(collection -> {
-                if (!idlePlaySourceCardMap.containsKey(collection)) {
-                    MusicCollectionCard child = new MusicCollectionCard(context, collection);
-                    clientIdlePlaySourceCardsList.addView(child);
-                    idlePlaySourceCardMap.put(collection, child);
+            clientIdlePlaySources.forEach(idlePlaySource -> {
+                if (!idlePlaySourceCardMap.containsKey(CardKey.of(true, idlePlaySource))) {
+                    addIdlePlaySourceTo(idlePlaySource, clientIdlePlaySourceCardsList, true);
                 }
             });
-            serverIdlePlaySources.forEach(collection -> {
-                if (localPlayer != null && !collection.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()) && !idlePlaySourceCardMap.containsKey(collection)) {
-                    MusicCollectionCard child = new MusicCollectionCard(context, collection);
-                    serverIdlePlaySourceCardsList.addView(child);
-                    idlePlaySourceCardMap.put(collection, child);
+            serverIdlePlaySources.forEach(idlePlaySource -> {
+                if (localPlayer != null && !idlePlaySource.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()) && !idlePlaySourceCardMap.containsKey(CardKey.of(false, idlePlaySource))) {
+                    addIdlePlaySourceTo(idlePlaySource, serverIdlePlaySourceCardsList, false);
                 }
             });
             checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
@@ -304,26 +320,38 @@ public class HomeView extends LinearLayout {
         }
     }
 
-    private void addIdlePlaySourceTo(MusicCollection idlePlaySource, Context context, FlexWrapLayout targetView) {
-        MusicCollectionCard child = new MusicCollectionCard(context, idlePlaySource);
+    private void addIdlePlaySourceTo(IdlePlaySource idlePlaySource, FlexWrapLayout targetView, boolean local) {
+        CardKey key = CardKey.of(local, idlePlaySource);
+        MusicCollection musicCollection = idlePlaySource.getMusicCollection();
+        if (musicCollection != null) {
+            addInternal(idlePlaySource, musicCollection, targetView, key);
+        } else {
+            musicService.loadMusicCollectionDetail(idlePlaySource.getId(), idlePlaySource.getType()).thenAccept(collection -> {
+                addInternal(idlePlaySource, collection, targetView, key);
+            });
+        }
+    }
+
+    private void addInternal(IdlePlaySource idlePlaySource, MusicCollection musicCollection, FlexWrapLayout targetView, CardKey key) {
+        MusicCollectionCard child = new MusicCollectionCard(getContext(), musicCollection, idlePlaySource.getPusherInfo());
         targetView.addView(child);
-        idlePlaySourceCardMap.put(idlePlaySource, child);
+        idlePlaySourceCardMap.put(key, child);
     }
 
     private void checkQueue(Queue<QueueItem> queue) {
         if (queue.isEmpty()) {
             queueTitle.setVisibility(View.GONE);
             playQueueListView.setVisibility(View.GONE);
-            checkNextToPlay(NowPlayingInfo.getInstance().getNextToPlayIdleMusicDetail());
+            checkNextToPlay(NowPlayingInfo.getInstance().getNextToPlayIdleMusic());
         } else {
             queueTitle.setVisibility(View.VISIBLE);
             playQueueListView.setVisibility(View.VISIBLE);
             QueueItem peek = queue.peek();
-            checkNextToPlay(peek == null ? MusicDetail.NONE : peek.musicDetail());
+            checkNextToPlay(peek == null ? Traceable.of(MusicDetail.NONE) : peek.musicDetail());
         }
     }
 
-    private void checkIdlePlaySources(Set<MusicCollection> idlePlaySources, View targetView) {
+    private void checkIdlePlaySources(Set<IdlePlaySource> idlePlaySources, View targetView) {
         if (idlePlaySources.isEmpty()) {
             targetView.setVisibility(View.GONE);
         } else {
@@ -332,11 +360,11 @@ public class HomeView extends LinearLayout {
         checkQueue(MusicService.getInstance().getMusicQueue());
     }
 
-    private void checkNextToPlay(MusicDetail nextIdle) {
+    private void checkNextToPlay(Traceable<MusicDetail> nextIdle) {
         MusicService musicService = MusicService.getInstance();
         Queue<QueueItem> musicQueue = musicService.getMusicQueue();
         boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty() || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();
-        MusicDetail next = hasIdlePlaySources ? nextIdle : null;
+        MusicDetail next = hasIdlePlaySources && nextIdle != null ? nextIdle.value() : null;
         if (musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE)) {
             nextToPlayTitle.setVisibility(VISIBLE);
             nextToPlayItem.setVisibility(VISIBLE);
@@ -348,9 +376,10 @@ public class HomeView extends LinearLayout {
     }
 
     private void addMusicQueueItem(QueueItem item, LinearLayout playQueueView) {
-        MusicDetail musicDetail = item.musicDetail();
+        Traceable<MusicDetail> musicTrace = item.musicDetail();
+        MusicDetail musicDetail = musicTrace.value();
         var musicListItem = new MusicListItem(getContext());
-        musicListItem.bindData(musicDetail);
+        musicListItem.bindData(musicTrace);
         LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, WRAP_CONTENT);
         layoutParams.setMargins(0, 0, 0, dp(16));
 
@@ -378,7 +407,7 @@ public class HomeView extends LinearLayout {
         MuiModApi.postToUiThread(() -> {
             if (staggeredLyricScrollView != null) {
                 staggeredLyricScrollView.switchLyrics(musicDetail, lyricLines);
-                checkNextToPlay(next);
+                checkNextToPlay(Traceable.of(next));
             }
         });
     }

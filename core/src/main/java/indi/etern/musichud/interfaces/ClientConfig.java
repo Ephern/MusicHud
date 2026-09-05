@@ -5,6 +5,7 @@ import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.beans.user.ProfileConfigData;
+import indi.etern.musichud.beans.user.ScrobbleOption;
 import indi.etern.musichud.platform.Environment;
 
 import java.util.List;
@@ -52,6 +53,12 @@ public interface ClientConfig {
     boolean getDefaultEnableHud();
 
     void setEnableHud(boolean enableHud);
+
+    boolean getEnableLyricsSidebar();
+
+    boolean getDefaultEnableLyricsSidebar();
+
+    void setEnableLyricsSidebar(boolean enableLyricsSidebar);
 
     Quality getPrimaryChosenQuality();
 
@@ -192,4 +199,10 @@ public interface ClientConfig {
     boolean isConfigured();
 
     void setConfigured(boolean configured);
+
+    ScrobbleOption getScrobbleOption();
+
+    ScrobbleOption getDefaultScrobbleOption();
+
+    void setScrobbleOption(ScrobbleOption scrobbleOption);
 }

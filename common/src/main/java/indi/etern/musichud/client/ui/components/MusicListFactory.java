@@ -6,6 +6,7 @@ import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
@@ -35,7 +36,7 @@ public class MusicListFactory {
         item.setOnClickListener(view -> {
             MusicDetail musicDetail = item.getMusicDetail();
             if (musicDetail == null) return;
-            MusicService.getInstance().sendPushMusicToQueue(musicDetail);
+            MusicService.getInstance().sendPushMusicToQueue(Traceable.of(musicDetail.getId()));
             String artistsName = musicDetail.getArtists().stream()
                     .map(Artist::getName).collect(Collectors.joining(" / "));
             ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));

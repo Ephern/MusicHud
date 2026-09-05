@@ -15,6 +15,7 @@ public class MusicResourceInfo {
             Codecs.LONG, MusicResourceInfo::getId,
             Codecs.STRING_UTF8, MusicResourceInfo::getUrl,
             Codecs.INT, MusicResourceInfo::getBitrate,
+            Quality.CODEC, MusicResourceInfo::getQuality,
             Codecs.LONG, MusicResourceInfo::getSize,
             Codecs.ofEnum(FormatType.class), MusicResourceInfo::getType,
             Codecs.STRING_UTF8, MusicResourceInfo::getMd5,
@@ -29,6 +30,8 @@ public class MusicResourceInfo {
     @SerializedName("br")
     @Getter
     int bitrate;
+    @SerializedName("level")
+    Quality quality = Quality.NONE;
     @Getter
     long size;//byte
     FormatType type = FormatType.AUTO;
@@ -49,6 +52,10 @@ public class MusicResourceInfo {
 
     public String getUrl() {
         return Objects.requireNonNullElse(url, "");
+    }
+
+    public Quality getQuality() {
+        return Objects.requireNonNullElse(quality, Quality.NONE);
     }
 
     public FormatType getType() {

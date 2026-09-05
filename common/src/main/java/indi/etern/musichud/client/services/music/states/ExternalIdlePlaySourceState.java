@@ -1,8 +1,6 @@
 package indi.etern.musichud.client.services.music.states;
 
-import indi.etern.musichud.beans.music.Album;
-import indi.etern.musichud.beans.music.MusicCollection;
-import indi.etern.musichud.beans.music.Playlist;
+import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.PusherInfo;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.player.Player;
@@ -13,25 +11,19 @@ import java.util.Set;
 
 public class ExternalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
     @Override
-    public synchronized void updateAll(List<Playlist> playlistSources, List<Album> albumSources) {
-        Set<MusicCollection> toRemove = new HashSet<>();
-        Set<MusicCollection> toAdd = new HashSet<>();
-        Set<MusicCollection> serverIdlePlaySources = Set.copyOf(sources);
-        for (MusicCollection musicCollection : serverIdlePlaySources) {
-            //noinspection SuspiciousMethodCalls
-            if (!playlistSources.contains(musicCollection) && !albumSources.contains(musicCollection)) {
-                toRemove.add(musicCollection);
+    public synchronized void updateAll(List<IdlePlaySource> playSources) {
+        Set<IdlePlaySource> toRemove = new HashSet<>();
+        Set<IdlePlaySource> toAdd = new HashSet<>();
+        Set<IdlePlaySource> serverIdlePlaySources = Set.copyOf(sources);
+        for (IdlePlaySource idlePlaySource : serverIdlePlaySources) {
+            if (!playSources.contains(idlePlaySource)) {
+                toRemove.add(idlePlaySource);
             }
         }
         Player player = Minecraft.getInstance().player;
-        for (MusicCollection musicCollection : playlistSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !isLocalOrOwnSource(musicCollection.getPusherInfo(), player)) {
-                toAdd.add(musicCollection);
-            }
-        }
-        for (MusicCollection musicCollection : albumSources) {
-            if (!serverIdlePlaySources.contains(musicCollection) && !isLocalOrOwnSource(musicCollection.getPusherInfo(), player)) {
-                toAdd.add(musicCollection);
+        for (IdlePlaySource idlePlaySource : playSources) {
+            if (!serverIdlePlaySources.contains(idlePlaySource) && !isLocalOrOwnSource(idlePlaySource.getPusherInfo(), player)) {
+                toAdd.add(idlePlaySource);
             }
         }
         sources.removeAll(toRemove);

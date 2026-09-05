@@ -1,13 +1,16 @@
 package indi.etern.musichud.client.services.music.states;
 
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.actions.SubscribableType;
 import indi.etern.musichud.beans.music.actions.SubscribeAction;
 import indi.etern.musichud.client.services.music.MusicService;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SubscribeRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.SubscribeResponse;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
+import net.minecraft.client.resources.language.I18n;
 
 import java.time.Duration;
 
@@ -23,6 +26,7 @@ public class AlbumSubscribeState extends SubscribeState<Album> {
                     musicService.loadUserCollections(false)
                             .thenAccept(userCollections -> {
                                 ObservableSequencedSet<Album> subscribedAlbums = userCollections.getSubscribedAlbums();
+                                ObservableSequencedSet.EditHandle<Album> editHandle = subscribedAlbums.beginEdit();
                                 SubscribeAction action;
                                 if (subscribed) {
                                     action = SubscribeAction.SUBSCRIBE;
@@ -35,7 +39,12 @@ public class AlbumSubscribeState extends SubscribeState<Album> {
                                         new SubscribeRequest(id, SubscribableType.ALBUM, action),
                                         SubscribeResponse.class, Duration.ofSeconds(5)
                                 ).thenAccept(subscribeResponse -> {
-                                    //TODO
+                                    if (subscribeResponse.isSuccess()) {
+                                        editHandle.commit();
+                                    } else {
+                                        editHandle.rollback();
+                                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".error.subscribe"));
+                                    }
                                 });
                             });
                 })
