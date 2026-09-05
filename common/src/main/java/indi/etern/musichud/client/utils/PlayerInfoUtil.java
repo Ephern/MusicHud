@@ -19,7 +19,9 @@ public class PlayerInfoUtil {
         Minecraft minecraft = Minecraft.getInstance();
         ClientPacketListener connection = minecraft.getConnection();
         if (connection == null) {
-            throw new IllegalStateException();
+            // Not in a world (main menu / disconnect transition): callers handle a null
+            // result with their own fallback instead of crashing render/UI threads
+            return null;
         }
         return connection.getPlayerInfo(uuid);
     }
