@@ -19,8 +19,8 @@ public class MusicListFactory {
      * 创建并配置一个 MusicListItem (含背景、点击推歌逻辑)。
      * 视图回收/复用由 VirtualizedListLayout 管理, 复用前需 clearData。
      */
-    public static MusicListItem createItem(ViewGroup parent) {
-        MusicListItem item = new MusicListItem(parent.getContext());
+    public static MusicTrackItem createItem(ViewGroup parent) {
+        MusicTrackItem item = new MusicTrackItem(parent.getContext());
         item.setRowAnimationsEnabled(false);
         item.setShowPusherInfo(false);
         if (item.getBackground() == null) {

@@ -1,6 +1,11 @@
 package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.Image;
+import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
@@ -12,7 +17,9 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.server.api.playmode.PlayMode;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -28,7 +35,7 @@ import java.util.Objects;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class MusicListItem extends LinearLayout {
+public class MusicTrackItem extends LinearLayout {
     public static final int imageSize = 56;
     private static final MusicService musicService = MusicService.getInstance();
     private final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -51,8 +58,9 @@ public class MusicListItem extends LinearLayout {
     @Getter
     private LinearLayout buttonsLayout;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
+    private Button sourceButton;
 
-    public MusicListItem(Context context) {
+    public MusicTrackItem(Context context) {
         super(context);
         initView(context);
     }
@@ -134,7 +142,35 @@ public class MusicListItem extends LinearLayout {
         params5.setMargins(pusherText.dp(4), 0, 0, 0);
         pusherInfo.addView(pusherText, params5);
 
-        row3.addView(pusherInfo, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        params2.setMargins(0, 0, dp(12), 0);
+        row3.addView(pusherInfo, params2);
+
+        sourceButton = new Button(context);
+        sourceButton.setVisibility(View.GONE);
+        sourceButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        sourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        sourceButton.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+        sourceButton.setSingleLine();
+        sourceButton.setOnClickListener(view -> {
+            Object tag = sourceButton.getTag();
+            if (tag instanceof SourceMeta sourceMeta) {
+                Class<?> type = sourceMeta.type();
+                if (MusicCollection.class.isAssignableFrom(type)) {
+                    //noinspection unchecked
+                    MusicService.getInstance().loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
+                            .thenAccept((musicCollection) ->
+                                    MuiModApi.postToUiThread(() -> RouterContainer.getInstance().pushNavigate(
+                                            new MusicCollectionDetailView(context, musicCollection)))
+                            );
+                }
+            }
+        });
+        InsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .padding(new InsetBackgroundFactory.Padding(0, sourceButton.dp(1), 0, sourceButton.dp(1)))
+                .cornerRadius(sourceButton.dp(4)).build().applyBackgroundTo(sourceButton);
+        row3.addView(sourceButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         buttonsLayout = new LinearLayout(context);
         buttonsLayout.setOrientation(HORIZONTAL);
@@ -282,9 +318,49 @@ public class MusicListItem extends LinearLayout {
                     return null;
                 });
             }
+
+            SourceMeta source = musicTrace.source();
+            if (source != null) {
+                sourceButton.setTag(source);
+                SpannableString text = new SpannableString("    " + source.name());
+                {
+                    String iconPath;
+                    Class<?> type = source.type();
+                    if (Album.class.isAssignableFrom(type)) {
+                        iconPath = "/assets/music_hud/textures/gui/icons/disc_album.png";
+                    } else {
+                        iconPath = "/assets/music_hud/textures/gui/icons/list_music.png";
+                    }
+                    Image icon = ImageUtils.getImageFromResource(iconPath);
+                    if (icon != null) {
+                        ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
+                        text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    }
+                }
+                {
+                    PlayMode playMode = source.playMode();
+                    String playModeIconPath = switch (playMode) {
+                        case RANDOM -> "/assets/music_hud/textures/gui/icons/shuffle.png";
+                        case SEQUENTIAL -> "/assets/music_hud/textures/gui/icons/repeat.png";
+                        case INTELLIGENT -> "/assets/music_hud/textures/gui/icons/heart_pulse.png";
+                    };
+                    Image icon = ImageUtils.getImageFromResource(playModeIconPath);
+                    if (icon != null) {
+                        ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
+                        text.setSpan(iconSpan, 2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    }
+                }
+
+
+                sourceButton.setText(text);
+                sourceButton.setVisibility(View.VISIBLE);
+            } else {
+                sourceButton.setVisibility(View.GONE);
+            }
         } else {
             pusherHeadView.setVisibility(View.GONE);
             pusherHeadView.setPlayerSkinSupplier(null);
+            sourceButton.setVisibility(View.GONE);
         }
 
         addToPlaylistButton.bindMusicDetail(musicDetail);
