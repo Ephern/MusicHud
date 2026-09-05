@@ -1,9 +1,14 @@
 package indi.etern.musichud.client.ui.components;
 
-import icyllis.modernui.animation.LayoutTransition;
+import icyllis.modernui.animation.Animator;
+import icyllis.modernui.animation.AnimatorListener;
+import icyllis.modernui.animation.ObjectAnimator;
+import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.util.IntProperty;
 import icyllis.modernui.view.Gravity;
+import icyllis.modernui.view.View;
 import icyllis.modernui.widget.LinearLayout;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
@@ -16,6 +21,7 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.server.api.playmode.PlayMode;
@@ -32,21 +38,33 @@ public class IdlePlaySourceWidget extends LinearLayout {
     private final ToggleIdlePlaySourceButton toggleButton;
     private final CycleIconButton cycleButton;
     private final List<PlayMode> cycleModes = new ArrayList<>();
+    private final int cycleTargetSize;
+    private final int cycleCollapseSize = 0;
+    private int cycleCurrentWidth = 0;
+    private Animator cycleShowAnimator;
     private Unregister addRegister;
     private Unregister removeRegister;
+
+    /** Animates the cycle button's LayoutParams width; the row reflows each frame. */
+    private static final IntProperty<IdlePlaySourceWidget> CYCLE_WIDTH = new IntProperty<>("cycleWidth") {
+        @Override
+        public void setValue(IdlePlaySourceWidget widget, int width) {
+            widget.setCycleWidth(width);
+        }
+
+        @Override
+        public Integer get(IdlePlaySourceWidget widget) {
+            return widget.cycleCurrentWidth;
+        }
+    };
 
     public IdlePlaySourceWidget(Context context, MusicCollection collection, int buttonSize) {
         super(context);
         this.collection = collection;
         this.modeState = layer.collection(collection, PlayMode.RANDOM);
+        this.cycleTargetSize = buttonSize;
         setOrientation(HORIZONTAL);
         setGravity(Gravity.CENTER_VERTICAL);
-        LayoutTransition transition = new LayoutTransition();
-        transition.setDuration(200);
-        transition.setStartDelay(LayoutTransition.APPEARING, 0);
-        transition.setStartDelay(LayoutTransition.CHANGE_DISAPPEARING, 0);
-        transition.enableTransitionType(LayoutTransition.CHANGING);
-        setLayoutTransition(transition);
 
         var backgroundFactory = InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
@@ -59,10 +77,13 @@ public class IdlePlaySourceWidget extends LinearLayout {
         backgroundFactory.applyBackgroundTo(toggleButton);
         addView(toggleButton, new LayoutParams(buttonSize, buttonSize));
 
+        // Shown/hidden purely by animated width+alpha (no GONE/VISIBLE flips, no
+        // LayoutTransition): starts collapsed and fully transparent, which is visually
+        // identical to GONE but keeps the animation fully under our control
         cycleButton = new CycleIconButton(context);
         backgroundFactory.applyBackgroundTo(cycleButton);
-        cycleButton.setVisibility(GONE);
-        addView(cycleButton, new LayoutParams(buttonSize, buttonSize));
+        addView(cycleButton, new LayoutParams(cycleCollapseSize, buttonSize));
+        cycleButton.setAlpha(0f);
 
         buildCycleStates();
         bindToggle();
@@ -152,13 +173,83 @@ public class IdlePlaySourceWidget extends LinearLayout {
 
     private void syncCycleState() {
         IdlePlaySource current = currentSource();
-        if (current == null) {
-            cycleButton.setVisibility(GONE);
-            return;
+        if (current != null) {
+            int index = cycleModes.indexOf(current.getPlayMode());
+            // Swap the drawable while collapsed/transparent so it never invalidates a
+            // fully visible view mid-layout
+            cycleButton.apply(Math.max(index, 0));
         }
-        int index = cycleModes.indexOf(current.getPlayMode());
-        cycleButton.apply(Math.max(index, 0));
-        cycleButton.setVisibility(VISIBLE);
+        setCycleShown(current != null);
+    }
+
+    /** Two-phase show/hide, fully self-driven. Show: width 0→target (150ms, QUAD) then
+     *  alpha 0→1 (100ms, SINE). Hide: alpha 1→0 (100ms, SINE) then width target→0
+     *  (150ms, QUAD). Restarting from the current width/alpha keeps rapid toggles smooth;
+     *  a canceled phase never chains into the next one. */
+    private void setCycleShown(boolean shown) {
+        cancelCycleShowAnimator();
+        ObjectAnimator first;
+        ObjectAnimator second;
+        if (shown) {
+            if (cycleCurrentWidth == cycleTargetSize && cycleButton.getAlpha() == 1f) {
+                return;
+            }
+            first = ObjectAnimator.ofInt(this, CYCLE_WIDTH, cycleCurrentWidth, cycleTargetSize);
+            first.setDuration(150);
+            first.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
+            second = ObjectAnimator.ofFloat(cycleButton, View.ALPHA, cycleButton.getAlpha(), 1f);
+            second.setDuration(100);
+            second.setInterpolator(Easing.EASE_IN_OUT_SINE);
+        } else {
+            if (cycleCurrentWidth == cycleCollapseSize && cycleButton.getAlpha() == 0f) {
+                return;
+            }
+            first = ObjectAnimator.ofFloat(cycleButton, View.ALPHA, cycleButton.getAlpha(), 0f);
+            first.setDuration(100);
+            first.setInterpolator(Easing.EASE_IN_OUT_SINE);
+            second = ObjectAnimator.ofInt(this, CYCLE_WIDTH, cycleCurrentWidth, cycleCollapseSize);
+            second.setDuration(150);
+            second.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
+        }
+        second.addListener(new AnimatorListener() {
+            @Override
+            public void onAnimationEnd(@NonNull Animator animation) {
+                if (cycleShowAnimator == animation) {
+                    cycleShowAnimator = null;
+                }
+            }
+        });
+        first.addListener(new AnimatorListener() {
+            @Override
+            public void onAnimationEnd(@NonNull Animator animation) {
+                // A canceled phase must not chain into the next one: cancelCycleShowAnimator
+                // nulls the field before canceling, so a stale end callback is ignored
+                if (cycleShowAnimator != animation) {
+                    return;
+                }
+                cycleShowAnimator = second;
+                second.start();
+            }
+        });
+        cycleShowAnimator = first;
+        first.start();
+    }
+
+    private void cancelCycleShowAnimator() {
+        if (cycleShowAnimator != null) {
+            Animator active = cycleShowAnimator;
+            cycleShowAnimator = null;
+            active.cancel();
+        }
+    }
+
+    private void setCycleWidth(int width) {
+        cycleCurrentWidth = width;
+        LayoutParams lp = (LayoutParams) cycleButton.getLayoutParams();
+        if (lp.width != width) {
+            lp.width = width;
+            cycleButton.setLayoutParams(lp);
+        }
     }
 
     @Override
@@ -180,6 +271,7 @@ public class IdlePlaySourceWidget extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        cancelCycleShowAnimator();
         if (addRegister != null) {
             addRegister.unregister();
             addRegister = null;
