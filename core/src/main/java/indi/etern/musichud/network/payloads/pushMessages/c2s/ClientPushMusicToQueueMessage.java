@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.beans.music.PusherInfo;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -10,10 +11,10 @@ import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
 
-public record ClientPushMusicToQueueMessage(long id) implements C2SPayload {
+public record ClientPushMusicToQueueMessage(Traceable<Long> music) implements C2SPayload {
     public static final ByteBufCodec<ClientPushMusicToQueueMessage> CODEC = ByteBufCodec.composite(
-            Codecs.LONG,
-            ClientPushMusicToQueueMessage::id,
+            Traceable.codec(Codecs.LONG),
+            ClientPushMusicToQueueMessage::music,
             ClientPushMusicToQueueMessage::new
     );
 
@@ -23,7 +24,7 @@ public record ClientPushMusicToQueueMessage(long id) implements C2SPayload {
             INetworkRegister.getInstance().autoRegisterPayload(
                     ClientPushMusicToQueueMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
-                        MusicPlayerServerService.getInstance().pushMusicToQueue(message.id, PusherInfo.ofPlayer(player));
+                        MusicPlayerServerService.getInstance().pushMusicToQueue(message.music, PusherInfo.ofPlayer(player));
                     })
             );
         }

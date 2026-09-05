@@ -1,53 +1,44 @@
 package indi.etern.musichud.client.services.music.states;
 
-import indi.etern.musichud.beans.music.Album;
+import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.MusicCollection;
-import indi.etern.musichud.beans.music.Playlist;
-import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.beans.state.IIdlePlaySourceCollectionState;
 import indi.etern.musichud.beans.state.IIdlePlaySourceLayerState;
 import indi.etern.musichud.interfaces.Unregister;
+import indi.etern.musichud.server.api.playmode.PlayMode;
 
+import java.util.List;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public abstract class AbstractIdlePlaySourceLayerState implements IIdlePlaySourceLayerState {
-    protected final Set<MusicCollection> sources = ConcurrentHashMap.newKeySet();
-    private final Set<Consumer<MusicCollection>> addListeners = ConcurrentHashMap.newKeySet();
-    private final Set<Consumer<MusicCollection>> removeListeners = ConcurrentHashMap.newKeySet();
-    private final Set<Consumer<MusicCollection>> changeListeners = ConcurrentHashMap.newKeySet();
+    protected final Set<IdlePlaySource> sources = ConcurrentHashMap.newKeySet();
+    private final Set<Consumer<IdlePlaySource>> addListeners = ConcurrentHashMap.newKeySet();
+    private final Set<Consumer<IdlePlaySource>> removeListeners = ConcurrentHashMap.newKeySet();
+    private final Set<Consumer<IdlePlaySource>> changeListeners = ConcurrentHashMap.newKeySet();
 
-    protected static MusicCollection normalize(MusicCollection collection) {
-        PusherInfo pusherInfo = collection.getPusherInfo();
-        if (pusherInfo != null && pusherInfo != PusherInfo.EMPTY) {
-            return collection.copyWithPusherInfo(PusherInfo.EMPTY);
-        }
-        return collection;
+    protected void notifyAdd(IdlePlaySource idlePlaySource) {
+        addListeners.forEach(l -> l.accept(idlePlaySource));
     }
 
-    protected void notifyAdd(MusicCollection collection) {
-        addListeners.forEach(l -> l.accept(collection));
+    protected void notifyRemove(IdlePlaySource idlePlaySource) {
+        removeListeners.forEach(l -> l.accept(idlePlaySource));
     }
 
-    protected void notifyRemove(MusicCollection collection) {
-        removeListeners.forEach(l -> l.accept(collection));
-    }
-
-    protected void notifyChange(MusicCollection collection) {
-        changeListeners.forEach(l -> l.accept(collection));
+    protected void notifyChange(IdlePlaySource idlePlaySource) {
+        changeListeners.forEach(l -> l.accept(idlePlaySource));
     }
 
     @Override
-    public Set<MusicCollection> getSources() {
+    public Set<IdlePlaySource> getSources() {
         return sources;
     }
 
     @Override
-    public void add(MusicCollection idlePlaySourceCollection) {
-        MusicCollection collection = normalize(idlePlaySourceCollection);
-        if (sources.stream().noneMatch(s -> s.equalsLoose(collection))) {
+    public void add(IdlePlaySource collection) {
+        if (sources.stream().noneMatch(s -> s.equals(collection))) {
             sources.add(collection);
             notifyAdd(collection);
             notifyChange(collection);
@@ -55,33 +46,33 @@ public abstract class AbstractIdlePlaySourceLayerState implements IIdlePlaySourc
     }
 
     @Override
-    public void remove(MusicCollection collection) {
-        boolean removed = sources.removeIf(c -> c.getId() == collection.getId());
+    public void remove(IdlePlaySource idlePlaySource) {
+        boolean removed = sources.remove(idlePlaySource);
         if (removed) {
-            notifyRemove(collection);
-            notifyChange(collection);
+            notifyRemove(idlePlaySource);
+            notifyChange(idlePlaySource);
         }
     }
 
     @Override
-    public IIdlePlaySourceCollectionState collection(MusicCollection collection) {
-        return new IdlePlaySourceCollectionState(this, collection);
+    public IIdlePlaySourceCollectionState collection(MusicCollection collection, PlayMode playMode) {
+        return new IdlePlaySourceCollectionState(this, collection, playMode);
     }
 
     @Override
-    public Unregister onAdd(Consumer<MusicCollection> listener) {
+    public Unregister onAdd(Consumer<IdlePlaySource> listener) {
         addListeners.add(listener);
         return () -> addListeners.remove(listener);
     }
 
     @Override
-    public Unregister onRemove(Consumer<MusicCollection> listener) {
+    public Unregister onRemove(Consumer<IdlePlaySource> listener) {
         removeListeners.add(listener);
         return () -> removeListeners.remove(listener);
     }
 
     @Override
-    public Unregister onChange(Consumer<MusicCollection> listener) {
+    public Unregister onChange(Consumer<IdlePlaySource> listener) {
         changeListeners.add(listener);
         return () -> changeListeners.remove(listener);
     }
@@ -97,7 +88,12 @@ public abstract class AbstractIdlePlaySourceLayerState implements IIdlePlaySourc
     }
 
     @Override
-    public void updateAll(java.util.List<Playlist> playlistSources, java.util.List<Album> albumSources) {
+    public void updateAll(List<IdlePlaySource> playlistSources) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public void removeMissingFromServer(List<IdlePlaySource> serverSources) {
         throw new UnsupportedOperationException();
     }
 }

@@ -22,7 +22,6 @@ public class Album implements MusicCollection {
             Codecs.INT, Album::getMusicTrackCount,
             Codecs.ofCollection(ObservableSequencedSet::new, () -> MusicDetail.CODEC), Album::getMusicDetails,
             Codecs.ofCollection(LinkedHashSet::new, () -> Artist.CODEC), Album::getArtists,
-            PusherInfo.CODEC, Album::getPusherInfo,
             Album::new
     );
     public static final Album NONE = new Album();
@@ -39,9 +38,6 @@ public class Album implements MusicCollection {
     @Setter
     ObservableSequencedSet<MusicDetail> musicDetails = new ObservableSequencedSet<>(0);
     LinkedHashSet<Artist> artists = new LinkedHashSet<>();
-    // Not contained in the original API response, set separately
-    @Getter
-    transient PusherInfo pusherInfo = PusherInfo.EMPTY;
 
     private boolean nullFiltered = false;
 
@@ -53,8 +49,7 @@ public class Album implements MusicCollection {
             String company,
             Integer musicTrackCount,
             ObservableSequencedSet<MusicDetail> musicDetails,
-            LinkedHashSet<Artist> artists,
-            PusherInfo pusherInfo
+            LinkedHashSet<Artist> artists
     ) {
         this.id = id;
         this.name = name;
@@ -64,7 +59,6 @@ public class Album implements MusicCollection {
         this.musicTrackCount = musicTrackCount;
         this.musicDetails = musicDetails;
         this.artists = artists;
-        this.pusherInfo = pusherInfo;
     }
 
     public String getName() {
@@ -127,19 +121,11 @@ public class Album implements MusicCollection {
     }
 
     @Override
-    public Album copyWithPusherInfo(PusherInfo pusherInfo) {
-        Album album = shallowCopyBriefInfo();
-        album.pusherInfo = pusherInfo;
-        return album;
-    }
-
-    @Override
     public boolean equals(Object obj) {
         return obj instanceof Album album
                 && album.id == id
                 && album.name.equals(name)
-                && album.picUrl.equals(picUrl)
-                && album.pusherInfo.equals(pusherInfo);
+                && album.picUrl.equals(picUrl);
     }
 
     @Override
@@ -149,14 +135,13 @@ public class Album implements MusicCollection {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name, picUrl, pusherInfo.getPlayerUUID());
+        return Objects.hash(id, name, picUrl);
     }
 
     public void updateFrom(Album album, boolean triggerObservable) {
         this.id = album.id;
         this.name = album.name;
         this.picUrl = album.picUrl;
-        this.pusherInfo = album.pusherInfo;
         this.musicTrackCount = album.musicTrackCount;
         this.artists = album.artists;
         if (this.musicDetails == null) {

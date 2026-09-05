@@ -7,6 +7,7 @@ import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.Version;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.network.vanilla.VanillaPlayerProxy;
@@ -303,15 +304,15 @@ public class ConnectionManager implements IConnectionManager {
                         }
                         MusicService.getInstance().refreshQueue(response.getQueue());
                         MusicService.getInstance().getIdlePlaySourceState().external().updateAll(
-                                response.getPlaylistSources(), response.getAlbumSources());
+                                response.getPlaylistSources());
                         // Always apply the fetched state; switchMusic itself skips restarting
                         // the audio stream when the same track is still playing.
-                        if (response.getCurrentPlaying() != MusicDetail.NONE) {
+                        if (!MusicDetail.NONE.equals(response.getCurrentPlaying().value())) {
                             MusicService.getInstance().switchMusic(
                                     response.getCurrentPlaying(), response.getNextIdle(), response.getStartTime(), "");
                         } else {
                             MusicService.getInstance().switchMusic(
-                                    MusicDetail.NONE, response.getNextIdle(), response.getStartTime(), "");
+                                    Traceable.of(MusicDetail.NONE), response.getNextIdle(), response.getStartTime(), "");
                         }
                     })
                     .exceptionally(e -> {

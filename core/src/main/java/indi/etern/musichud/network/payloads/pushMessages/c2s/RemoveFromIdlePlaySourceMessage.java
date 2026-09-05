@@ -24,7 +24,7 @@ public record RemoveFromIdlePlaySourceMessage(IdlePlaySource idlePlaySource) imp
                     RemoveFromIdlePlaySourceMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
                         IdlePlaySource idlePlaySource = message.idlePlaySource;
-                        MusicPlayerServerService.getInstance().removeIdlePlaySource(idlePlaySource.getId(), idlePlaySource.getType(), PusherInfo.ofPlayer(player));
+                        MusicPlayerServerService.getInstance().removeIdlePlaySource(idlePlaySource, PusherInfo.ofPlayer(player));
                     })
             );
         }

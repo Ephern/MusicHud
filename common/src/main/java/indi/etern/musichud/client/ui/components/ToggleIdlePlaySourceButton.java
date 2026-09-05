@@ -11,18 +11,19 @@ import net.minecraft.client.resources.language.I18n;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class ToggleIdlePlaySourceButton extends ToggleIconButton {
+    public static final Appearance APPEARANCE_NORMAL = new Appearance(
+            () -> I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"),
+            () -> I18n.get(MusicHud.MOD_ID + ".button.addToIdlePlaySource"),
+            () -> ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/star_filled.png"),
+            () -> ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/star.png")
+    );
     private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 800;
     private final AtomicInteger toggleVersion = new AtomicInteger(0);
     private IIdlePlaySourceCollectionState collectionState;
     private Unregister unregister = null;
 
     public ToggleIdlePlaySourceButton(Context context) {
-        super(context, new Appearance(
-                () -> I18n.get(MusicHud.MOD_ID + ".button.removeFromIdlePlaySource"),
-                () -> I18n.get(MusicHud.MOD_ID + ".button.addToIdlePlaySource"),
-                () -> ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/star_filled.png"),
-                () -> ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/star.png")
-        ));
+        super(context, APPEARANCE_NORMAL);
     }
 
     @Override

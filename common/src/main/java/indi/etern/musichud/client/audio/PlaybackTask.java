@@ -1,16 +1,17 @@
 package indi.etern.musichud.client.audio;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.FormatType;
-import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.MusicResourceInfo;
-import indi.etern.musichud.beans.music.Quality;
+import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.audio.decoder.*;
-import indi.etern.musichud.client.services.music.MusicService;
+import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
+import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.Unregister;
+import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.ScrobbleMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetMusicResourceResponse;
 import lombok.Getter;
@@ -32,7 +33,6 @@ import java.time.ZonedDateTime;
 import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -60,10 +60,14 @@ public class PlaybackTask {
     private static final long FULLY_RETRY_SLEEP_MS = 1000;// 全量重试前的等待
     private static final long DOWNLOAD_RETRY_DELAY_ADDITIONAL_MS = 1000;
     private static final long UNDERFLOW_BUFFERING_DELAY_MS = 300;// 预取队列连续欠载超过该值才上报 BUFFERING
+    private static final int SCROBBLE_MIN_PLAY_DURATION_SEC = 30;
     private static final Logger LOGGER = MusicHud.getLogger(PlaybackTask.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+    private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
 
+    @Getter
+    private final Traceable<MusicDetail> musicTrace;
     @Getter
     private final MusicDetail musicDetail;
     private final Fade fadeIn;
@@ -104,9 +108,13 @@ public class PlaybackTask {
     private volatile Future<?> downloadThreadFuture;
     private volatile Future<?> playThreadFuture;
     private long lastJmtcTickMs = 0;
+    private MusicResourceInfo musicResourceInfo;
+    private Unregister scrobbleOnQuitUnregister;
+    private volatile boolean scrobbled = false;
 
-    private PlaybackTask(MusicDetail musicDetail, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
-        this.musicDetail = musicDetail;
+    private PlaybackTask(Traceable<MusicDetail> musicTrace, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
+        this.musicTrace = musicTrace;
+        this.musicDetail = musicTrace.value();
         this.serverStartTime = serverStartTime;
         this.fadeIn = fadeIn;
         this.fadeOut = fadeOut;
@@ -115,16 +123,9 @@ public class PlaybackTask {
     /**
      * Create a task using the default fade durations.
      */
-    public static PlaybackTask of(MusicDetail musicDetail, ZonedDateTime serverStartTime) {
-        return new PlaybackTask(musicDetail, serverStartTime,
+    public static PlaybackTask of(Traceable<MusicDetail> musicTrace, ZonedDateTime serverStartTime) {
+        return new PlaybackTask(musicTrace, serverStartTime,
                 Fade.of(StreamAudioPlayer.DEFAULT_FADE_IN_MS), Fade.of(StreamAudioPlayer.DEFAULT_FADE_OUT_MS));
-    }
-
-    /**
-     * Create a task with explicit fade in/out settings.
-     */
-    public static PlaybackTask of(MusicDetail musicDetail, ZonedDateTime serverStartTime, Fade fadeIn, Fade fadeOut) {
-        return new PlaybackTask(musicDetail, serverStartTime, fadeIn, fadeOut);
     }
 
     public Fade fadeIn() {
@@ -171,6 +172,7 @@ public class PlaybackTask {
     void submitThreads() {
         downloadThreadFuture = MusicHud.EXECUTOR.submit(this::downloadLoop);
         playThreadFuture = MusicHud.EXECUTOR.submit(this::playLoop);
+        scrobbleOnQuitUnregister = IClientEventService.getInstance().registerClientPlayerQuit((player) -> scrobble());
     }
 
     /**
@@ -231,7 +233,7 @@ public class PlaybackTask {
         Thread.currentThread().setName("MHWorker-Downloader");
         int localRetryCount = 0;
         boolean forceSync = serverStartTime != null;
-        MusicResourceInfo musicResourceInfo = MusicResourceInfo.NONE;
+        musicResourceInfo = MusicResourceInfo.NONE;
         while (!cancelled && !restartRequested) {
             int trial = localRetryCount + 1;
             try {
@@ -734,9 +736,38 @@ public class PlaybackTask {
     }
 
     private void finish() {
+        scrobbleOnQuitUnregister.unregister();
+        scrobble();
         cleanup();
         setState(PlaybackState.FINISHED);
         finishFuture.complete(null);
+    }
+
+    private void scrobble() {
+        if (!scrobbled) {
+            scrobbled = true;
+            switch (clientConfig.getScrobbleOption()) {
+                case ALL -> sendScrobbleOptionally();
+                case ONLY_SELF -> {
+                    if (musicDetail.getPusherInfo().getPlayerUUID().equals(PlayerInfoUtil.getSelfUUID())) {
+                        sendScrobbleOptionally();
+                    }
+                }
+            }
+        }
+    }
+
+    private void sendScrobbleOptionally() {
+        if (musicDetail != null && !MusicDetail.NONE.equals(musicDetail) && musicResourceInfo != null && !musicResourceInfo.equals(MusicResourceInfo.NONE)) {
+            Quality quality = musicResourceInfo.getQuality();
+            if (quality != Quality.NONE) {
+                int durationSec = musicDetail.getDurationMillis() / 1000;
+                int playedSec = serverStartTime == null ? durationSec : Math.toIntExact(Duration.between(serverStartTime, ZonedDateTime.now()).toSeconds());
+                if (playedSec >= SCROBBLE_MIN_PLAY_DURATION_SEC) {
+                    clientNetworkService.sendToServer(new ScrobbleMessage(musicDetail.getId(), playedSec, durationSec, musicResourceInfo.getBitrate(), quality, musicTrace.source()));
+                }
+            }
+        }
     }
 
     private void cleanup() {
@@ -780,14 +811,15 @@ public class PlaybackTask {
 
     @SneakyThrows
     private AudioDecoder getAudioDecoder(FormatType formatType, BufferedInputStream inputStream) {
+        boolean useFloat32 = OpenAlSource.isFloat32Supported();
         FormatType formatType1 = formatType;
         if (formatType1 == FormatType.AUTO) {
             formatType1 = AudioFormatDetector.detectFormat(inputStream);
         }
         return switch (formatType1) {
-            case WAV -> new WavStreamDecoder(inputStream);
+            case WAV -> new WavStreamDecoder(inputStream, useFloat32);
             case MP3 -> new MP3StreamDecoder(inputStream);
-            case FLAC -> new FLACStreamDecoder(inputStream);
+            case FLAC -> new FLACStreamDecoder(inputStream, useFloat32);
             case AUTO -> throw new IllegalArgumentException();
         };
     }
@@ -827,7 +859,7 @@ public class PlaybackTask {
                 .thenApply(GetMusicResourceResponse::getMusicResourceInfo)
                 .thenCompose(value -> {
                     if (value == MusicResourceInfo.NONE) {
-                        MusicService.getInstance().switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
+                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                         setState(PlaybackState.ERROR);
                         return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
                     }

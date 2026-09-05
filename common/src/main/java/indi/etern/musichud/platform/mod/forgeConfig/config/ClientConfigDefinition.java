@@ -5,6 +5,7 @@ import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.beans.user.ProfileConfigData;
+import indi.etern.musichud.beans.user.ScrobbleOption;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -37,6 +38,7 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
     private final ModConfigSpec.ConfigValue<Boolean> muted;
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
+    private final ModConfigSpec.ConfigValue<String> scrobbleOption;
     private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundMixAlpha;
 
@@ -92,6 +94,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Primary chosen quality")
                 .translation(MusicHud.MOD_ID + ".config.common.primaryChosenQuality")
                 .define("primaryChosenQuality", Quality.LOSSLESS.name());
+        scrobbleOption = builder
+                .comment("Scrobbling scope")
+                .translation(MusicHud.MOD_ID + ".config.common.scrobbleOption")
+                .define("scrobbleOption", ScrobbleOption.ONLY_SELF.name());
         mainScreenAdditionalBackgroundDarken = builder
                 .comment("Main Screen Additional Background Darken Rate")
                 .translation(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken")
@@ -510,6 +516,21 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public synchronized void save() {
         configure.getRight().save();
+    }
+
+    @Override
+    public ScrobbleOption getScrobbleOption() {
+        return ScrobbleOption.valueOf(scrobbleOption.get());
+    }
+
+    @Override
+    public ScrobbleOption getDefaultScrobbleOption() {
+        return ScrobbleOption.valueOf(scrobbleOption.getDefault());
+    }
+
+    @Override
+    public void setScrobbleOption(ScrobbleOption scrobbleOption) {
+        this.scrobbleOption.set(scrobbleOption.name());
     }
 
     @Override
