@@ -4,7 +4,7 @@ import indi.etern.musichud.interfaces.IntegerCodeEnum;
 import lombok.Getter;
 
 public enum PlaylistSpecialType implements IntegerCodeEnum {
-    NORMAL(0), LIKE_LIST(5), OFFICIAL(100);
+    NORMAL(0), LIKE_LIST(5), USER_SPECIFIC(100);
 
     @Getter
     private final int code;

@@ -47,13 +47,14 @@ public class Playlist implements MusicCollection {
     long playedCount;
     String coverImgId_str = "";
     String coverImgUrl = MusicHud.ICON_BASE64;
-    @Getter
     PlaylistSpecialType specialType;
     Profile creator = Profile.ANONYMOUS;
     Privacy privacy = Privacy.PUBLIC;
     @Setter
     ObservableSequencedSet<MusicDetail> tracks = new ObservableSequencedSet<>(0);
-    /** Intelligent play mode recommendations of one player; null until first fetch. Synced via CODEC, not synced by updateFrom. */
+    /**
+     * Intelligent play mode recommendations of one player; null until first fetch. Synced via CODEC, not synced by updateFrom.
+     */
     @Getter
     @Setter
     ObservableSequencedSet<MusicDetail> intelligentList;
@@ -93,6 +94,7 @@ public class Playlist implements MusicCollection {
         playlist.id = id;
         playlist.privacy = Privacy.PRIVATE;
         playlist.creator = creator;
+        playlist.specialType = PlaylistSpecialType.NORMAL;
         return playlist;
     }
 
@@ -110,7 +112,7 @@ public class Playlist implements MusicCollection {
     public String getNameI18nKey() {
         return switch (specialType) {
             case LIKE_LIST -> MusicHud.MOD_ID + ".text.likeList";
-            case OFFICIAL -> MusicHud.MOD_ID + ".text.recommendlist";
+            case USER_SPECIFIC -> MusicHud.MOD_ID + ".text.recommendlist";
             default -> MusicHud.MOD_ID + ".text.playlist";
         };
     }
@@ -204,7 +206,7 @@ public class Playlist implements MusicCollection {
         this.name = playlist.name;
         getTracks().syncWith(playlist.getTracks(), triggerObservable);
         this.specialType = playlist.specialType;
-        if (specialType != PlaylistSpecialType.OFFICIAL) {
+        if (specialType != PlaylistSpecialType.USER_SPECIFIC) {
             this.coverImgId = playlist.coverImgId;
             this.coverImgUrl = playlist.coverImgUrl;
         }
@@ -239,7 +241,7 @@ public class Playlist implements MusicCollection {
             specialType = brief.specialType;
             changed = true;
         }
-        if (specialType != PlaylistSpecialType.OFFICIAL) {
+        if (specialType != PlaylistSpecialType.USER_SPECIFIC) {
             if (coverImgId != brief.coverImgId) {
                 coverImgId = brief.coverImgId;
                 changed = true;
@@ -262,5 +264,9 @@ public class Playlist implements MusicCollection {
             changed = true;
         }
         return changed;
+    }
+
+    public PlaylistSpecialType getSpecialType() {
+        return Objects.requireNonNullElse(specialType, PlaylistSpecialType.NORMAL);
     }
 }

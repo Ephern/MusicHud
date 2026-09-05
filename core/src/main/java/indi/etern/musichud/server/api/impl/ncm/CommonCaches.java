@@ -22,7 +22,7 @@ public class CommonCaches {
         long userId;
 
         public static PlaylistCacheKey of(Playlist playlist, long userId) {
-            return new PlaylistCacheKey(playlist.getId(), playlist.getSpecialType() == PlaylistSpecialType.OFFICIAL ? userId : -1);
+            return new PlaylistCacheKey(playlist.getId(), playlist.getSpecialType() == PlaylistSpecialType.USER_SPECIFIC ? userId : -1);
         }
 
         public static PlaylistCacheKey of(long playlistId) {

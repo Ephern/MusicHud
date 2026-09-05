@@ -16,13 +16,17 @@ public class ExternalIdlePlaySourceState extends AbstractIdlePlaySourceLayerStat
         Set<IdlePlaySource> toAdd = new HashSet<>();
         Set<IdlePlaySource> serverIdlePlaySources = Set.copyOf(sources);
         for (IdlePlaySource idlePlaySource : serverIdlePlaySources) {
-            if (!playSources.contains(idlePlaySource)) {
+            boolean stillOnServer = playSources.stream().anyMatch(s ->
+                    s.equals(idlePlaySource) && s.getPusherInfo().equals(idlePlaySource.getPusherInfo()));
+            if (!stillOnServer) {
                 toRemove.add(idlePlaySource);
             }
         }
         Player player = Minecraft.getInstance().player;
         for (IdlePlaySource idlePlaySource : playSources) {
-            if (!serverIdlePlaySources.contains(idlePlaySource) && !isLocalOrOwnSource(idlePlaySource.getPusherInfo(), player)) {
+            boolean known = serverIdlePlaySources.stream().anyMatch(s ->
+                    s.equals(idlePlaySource) && s.getPusherInfo().equals(idlePlaySource.getPusherInfo()));
+            if (!known && !isLocalOrOwnSource(idlePlaySource.getPusherInfo(), player)) {
                 toAdd.add(idlePlaySource);
             }
         }
