@@ -26,8 +26,9 @@ public abstract class SpanSetMixin {
      * @author Etern
      * @reason Fixes which allocates new arrays without copying old data,
      * causing all previously stored span boundaries to be lost on reallocation.
-     * This bug manifests when a SpannableString has 11+ MetricAffectingSpans (e.g. per-character
-     * HighlightSpans in slow lyric phrases), which exceeds the default buffer size of 10.
+     * This bug manifests when a SpannableString has 11+ MetricAffectingSpans (e.g. word-level
+     * HighlightSpans in word-by-word lyric lines, one per word, plus other spans), which
+     * exceeds the default buffer size of 10.
      */
     @Overwrite(remap = false)
     private void grow(int length) {

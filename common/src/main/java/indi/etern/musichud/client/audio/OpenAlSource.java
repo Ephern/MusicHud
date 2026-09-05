@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.AL11;
+import org.lwjgl.openal.EXTFloat32;
 import org.lwjgl.openal.SOFTDirectChannels;
 
 import java.nio.ByteBuffer;
@@ -51,6 +52,22 @@ public final class OpenAlSource implements AutoCloseable {
 
     public static Set<Integer> ownedSourceIds() {
         return Set.copyOf(OWNED);
+    }
+
+    /**
+     * Whether the current OpenAL context supports float32 PCM buffers
+     * ({@code AL_EXT_FLOAT32}, i.e. {@link EXTFloat32#AL_FORMAT_STEREO_FLOAT32}).
+     * OpenAL Soft (bundled with LWJGL/Minecraft) exposes it natively, so 24/32-bit
+     * sources can be fed losslessly instead of being dithered down to 16-bit.
+     */
+    public static boolean isFloat32Supported() {
+        try {
+            return AL.getCapabilities().AL_EXT_FLOAT32;
+        } catch (RuntimeException e) {
+            // OpenAL not ready yet (e.g. download thread racing engine init);
+            // fall back to the 16-bit resampling pipeline.
+            return false;
+        }
     }
 
     private final PlaybackLedger ledger;
@@ -275,7 +292,8 @@ public final class OpenAlSource implements AutoCloseable {
         return switch (format) {
             case AL10.AL_FORMAT_MONO8 -> 1;
             case AL10.AL_FORMAT_MONO16, AL10.AL_FORMAT_STEREO8 -> 2;
-            case AL10.AL_FORMAT_STEREO16 -> 4;
+            case AL10.AL_FORMAT_STEREO16, EXTFloat32.AL_FORMAT_MONO_FLOAT32 -> 4;
+            case EXTFloat32.AL_FORMAT_STEREO_FLOAT32 -> 8;
             default -> 4;
         };
     }

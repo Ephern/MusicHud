@@ -44,6 +44,8 @@ public class MusicListItem extends LinearLayout {
     private boolean showPusherInfo = true;
     @Getter
     private MusicDetail musicDetail;
+    @Getter
+    private Traceable<MusicDetail> musicTrace;
     private PlayerHeadView pusherHeadView;
     private ToggleTrackLikeStateButton likeButton;
     @Getter
@@ -172,14 +174,21 @@ public class MusicListItem extends LinearLayout {
         likeButton.bindMusicList(null);
         setTag(null);
         musicDetail = null;
+        musicTrace = null;
     }
 
     public void bindData(MusicDetail musicDetail) {
-        if (Objects.equals(this.musicDetail, musicDetail)) {
+        bindData(Traceable.of(musicDetail));
+    }
+
+    public void bindData(Traceable<MusicDetail> musicTrace) {
+        MusicDetail musicDetail = musicTrace == null ? null : musicTrace.value();
+        if (Objects.equals(this.musicDetail, musicDetail) && Objects.equals(this.musicTrace, musicTrace)) {
             return;
         }
-        setTag(musicDetail.getId());
+        setTag(musicDetail == null ? null : musicDetail.getId());
         this.musicDetail = musicDetail;
+        this.musicTrace = musicTrace;
         Album album = musicDetail.getAlbum();
         albumImage.loadUrl(album.getImageThumbnailUrl(dp(imageSize)));
 

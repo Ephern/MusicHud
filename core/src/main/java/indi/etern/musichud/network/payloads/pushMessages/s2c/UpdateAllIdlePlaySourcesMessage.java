@@ -1,8 +1,8 @@
 package indi.etern.musichud.network.payloads.pushMessages.s2c;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.Album;
-import indi.etern.musichud.beans.music.Playlist;
+import indi.etern.musichud.beans.api.IdlePlaySource;
+import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import indi.etern.musichud.interfaces.RegisterMark;
@@ -15,13 +15,10 @@ import indi.etern.musichud.platform.Environment;
 
 import java.util.List;
 
-public record UpdateAllIdlePlaySourcesMessage(List<Playlist> playlistSources,
-                                              List<Album> albumSources) implements S2CPayload {
+public record UpdateAllIdlePlaySourcesMessage(List<IdlePlaySource> idlePlaySources) implements S2CPayload {
     public static final ByteBufCodec<UpdateAllIdlePlaySourcesMessage> CODEC = ByteBufCodec.composite(
-            Codecs.ofList(() -> Playlist.CODEC),
-            UpdateAllIdlePlaySourcesMessage::playlistSources,
-            Codecs.ofList(() -> Album.CODEC),
-            UpdateAllIdlePlaySourcesMessage::albumSources,
+            Codecs.ofList(() -> IdlePlaySource.CODEC),
+            UpdateAllIdlePlaySourcesMessage::idlePlaySources,
             UpdateAllIdlePlaySourcesMessage::new
     );
 
@@ -31,11 +28,11 @@ public record UpdateAllIdlePlaySourcesMessage(List<Playlist> playlistSources,
         public void register() {
             NetworkReceiver<UpdateAllIdlePlaySourcesMessage> receiver = NetworkReceiver.noop();
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
-                receiver = (playSourcesMessage, packetContext) ->
-                        IClientMusicService.getInstance().getIdlePlaySourceState().external().updateAll(
-                                playSourcesMessage.playlistSources,
-                                playSourcesMessage.albumSources
-                        );
+                receiver = (playSourcesMessage, packetContext) -> {
+                    IIdlePlaySourceState idlePlaySourceState = IClientMusicService.getInstance().getIdlePlaySourceState();
+                    idlePlaySourceState.external().updateAll(playSourcesMessage.idlePlaySources);
+                    idlePlaySourceState.local().removeMissingFromServer(playSourcesMessage.idlePlaySources);
+                };
             }
             INetworkRegister.getInstance().autoRegisterPayload(
                     UpdateAllIdlePlaySourcesMessage.class,
