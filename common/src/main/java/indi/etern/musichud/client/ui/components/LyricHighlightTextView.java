@@ -242,32 +242,40 @@ public class LyricHighlightTextView extends TextView {
         long progressMillis = nowMillis - startAtMillis;
         if (totalDuration <= 0) return;
 
-        int spanCount = phrase.spans().size();
-        if (spanCount == 1) {
-            LyricLine.HighlightSpan span = phrase.spans().getFirst();
+        List<LyricLine.HighlightSpan> spans = phrase.spans();
+        if (spans.isEmpty()) return;
+        int charCount = phrase.charCount();
+        // Non-durable phrases (single span covering the whole phrase) animate as one unit;
+        // durable phrases stagger per char across their word-level spans.
+        if (phrase.durationMillis() <= LyricLine.DURABLE_PHRASE_MILLIS || charCount <= 1) {
+            LyricLine.HighlightSpan span = spans.getFirst();
             float t = Math.clamp((float) progressMillis / totalDuration, 0, 1);
             span.setYOffset(-phraseRaiseY * Easing.EASE_IN_OUT_QUAD.getInterpolation(t));
         } else {
-            float staggerRate = 0.2f; // 错开比例，最后一个比第一个晚 totalDuration * staggerRate 毫秒
-            long staggerDuration = (long) (totalDuration * staggerRate); // 错开总时长
-            long animDuration = totalDuration - staggerDuration; // 每个 span 的动画时长
+            float staggerRate = 0.2f; // stagger ratio: the last char starts totalDuration * staggerRate later
+            long staggerDuration = (long) (totalDuration * staggerRate); // total stagger time
+            long animDuration = totalDuration - staggerDuration; // per-char animation duration
             if (animDuration <= 0) animDuration = 1;
 
-            for (int i = 0; i < spanCount; i++) {
-                LyricLine.HighlightSpan span = phrase.spans().get(i);
-                // 错开偏移量：i / (spanCount-1) * staggerDuration，最后一个偏移 staggerDuration
-                long delay = (i == spanCount - 1) ? staggerDuration : (long) ((double) i / (spanCount - 1) * staggerDuration);
-                long animStart = startAtMillis + delay;
-                if (nowMillis <= animStart) {
-                    span.setYOffset(0);
-                    span.setScale(1);
-                } else if (nowMillis >= animStart + animDuration) {
-                    span.setYOffset(-phraseRaiseY);
-                    span.setScale(1);
-                } else {
-                    float t = (float) (nowMillis - animStart) / animDuration;
-                    span.setYOffset(-phraseRaiseY * Easing.EASE_IN_OUT_QUAD.getInterpolation(t));
-                    span.setScale(1 + 0.35f * Math.min(phrase.durationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
+            int globalIndex = 0;
+            for (LyricLine.HighlightSpan span : spans) {
+                for (int j = 0; j < span.getCharCount(); j++, globalIndex++) {
+                    // stagger offset: globalIndex / (charCount - 1) * staggerDuration,
+                    // the last char gets the full staggerDuration
+                    long delay = (globalIndex == charCount - 1)
+                            ? staggerDuration
+                            : (long) ((double) globalIndex / (charCount - 1) * staggerDuration);
+                    long animStart = startAtMillis + delay;
+                    if (nowMillis <= animStart) {
+                        span.setCharState(j, 0, 1);
+                    } else if (nowMillis >= animStart + animDuration) {
+                        span.setCharState(j, -phraseRaiseY, 1);
+                    } else {
+                        float t = (float) (nowMillis - animStart) / animDuration;
+                        span.setCharState(j,
+                                -phraseRaiseY * Easing.EASE_IN_OUT_QUAD.getInterpolation(t),
+                                1 + 0.5f * Math.min(phrase.durationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
+                    }
                 }
             }
         }

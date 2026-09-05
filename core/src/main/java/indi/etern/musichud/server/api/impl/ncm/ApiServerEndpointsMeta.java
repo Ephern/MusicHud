@@ -282,10 +282,20 @@ public class ApiServerEndpointsMeta {
                 true,
                 Set.of(200),
                 String.class);
+        public static final UrlMeta<String> RECORD = new UrlMeta<>(
+                "/user/record",
+                Set.of("uid"),
+                Set.of("type"/*1:week, 0:all*/),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                String.class);
         public static final UrlMeta<String> SCROBBLE = new UrlMeta<>(
                 "/scrobble/v1",
-                Set.of("id", "time"),
-                Set.of("sourceid", "source"/*list*/, "name", "artist", "bitrate"/*320*/, "level"/*exhigh*/, "total"/*in sec*/),
+                Set.of("id", "time"/*in seccond*/),
+                Set.of("sourceid", "source"/*list*/, "name", "artist", "bitrate"/*320*/, "level"/*exhigh*/, "total"/*in second*/),
                 true,
                 false,
                 false,
@@ -483,6 +493,16 @@ public class ApiServerEndpointsMeta {
                 false,
                 Set.of(200),
                 String.class);
+        public static final UrlMeta<MusicApiService.IntelligentListResponse> INTELLIGENT_LIST = new UrlMeta<>(
+                "/playmode/intelligence/list",
+                Set.of("id"/*musicId*/, "pid"/*playlistId*/),
+                Set.of("sid"/*startId(track to start)*/),
+                true,
+                false,
+                false,
+                true,
+                Set.of(200, 400/*Unsupported playlist, handle manually*/),
+                MusicApiService.IntelligentListResponse.class);
     }
 
     public static class Music {

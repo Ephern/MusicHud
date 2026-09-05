@@ -6,9 +6,10 @@ import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.components.MusicListItem;
+import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
@@ -59,7 +60,7 @@ public class SearchMusicResultView extends LinearLayout {
     }
 
     private void addItem(Context context, MusicDetail musicDetail) {
-        var musicLayout = new MusicListItem(context);
+        var musicLayout = new MusicTrackItem(context);
         musicLayout.bindData(musicDetail);
         backgroundFactory.applyBackgroundTo(musicLayout);
 
@@ -67,7 +68,7 @@ public class SearchMusicResultView extends LinearLayout {
         String artistsName = musicDetail.getArtists().stream()
                 .map(Artist::getName).collect(Collectors.joining(" / "));
         musicLayout.setOnClickListener((view) -> {
-            MusicService.getInstance().sendPushMusicToQueue(musicDetail);
+            MusicService.getInstance().sendPushMusicToQueue(Traceable.of(musicDetail.getId()));
             ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
         addView(musicLayout, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));

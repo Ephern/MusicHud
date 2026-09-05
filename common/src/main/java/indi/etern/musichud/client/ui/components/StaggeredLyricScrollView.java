@@ -411,9 +411,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     private void startUpdateLoop() {
-        continueUpdate = true;
-        scrollFinished = false;
-        updateLoop();
+        if (!continueUpdate) {
+            continueUpdate = true;
+            scrollFinished = false;
+            updateLoop();
+        }
     }
 
     private void updateLoop() {

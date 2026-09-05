@@ -47,7 +47,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, VanillaServerNe
     private <T extends IPayload> void registerPayloadInternal(RegistrationInfo<T> info) {
         if (C2SPayload.class.isAssignableFrom(info.clazz)) { // C2S
             registrar.playToServer(info.type(), StreamCodecWrapper.of(info.codec()), (payload, context) -> {
-                if (payload instanceof IPayload payload1) {
+                if (payload.getPayload() instanceof IPayload payload1) {
                     NetworkReceiver receiver = info.serverReceiver();
                     receiver.receive(payload1, VanillaPlayerProxy.ofPlayer(context.player()));
                 } else {
@@ -57,7 +57,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, VanillaServerNe
         } else if (S2CPayload.class.isAssignableFrom(info.clazz)) { // S2C
             if (side == Environment.Side.CLIENT) {
                 registrar.playToClient(info.type(), StreamCodecWrapper.of(info.codec()), (payload, context) -> {
-                    if (payload instanceof IPayload payload1) {
+                    if (payload.getPayload() instanceof IPayload payload1) {
                         NetworkReceiver receiver = info.clientReceiver();
                         receiver.receive(payload1, VanillaPlayerProxy.ofPlayer(context.player()));
                     } else {

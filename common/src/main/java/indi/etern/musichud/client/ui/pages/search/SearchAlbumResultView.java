@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.beans.music.Album;
+import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.WaterfallLayout;
 import lombok.Getter;
@@ -47,7 +48,7 @@ public class SearchAlbumResultView extends WaterfallLayout {
     }
 
     private void addItem(Context context, Album album) {
-        MusicCollectionCard child = new MusicCollectionCard(context, album);
+        MusicCollectionCard child = new MusicCollectionCard(context, album, PusherInfo.EMPTY);
         addView(child);
     }
 }

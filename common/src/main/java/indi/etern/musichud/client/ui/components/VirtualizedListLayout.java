@@ -20,19 +20,19 @@ public class VirtualizedListLayout extends FrameLayout {
 
     private List<MusicDetail> items = List.of();
     private Map<Long, Integer> indexById = Map.of();
-    private final Map<Long, MusicListItem> activeViews = new HashMap<>();
-    private final Deque<MusicListItem> viewPool = new ArrayDeque<>();
+    private final Map<Long, MusicTrackItem> activeViews = new HashMap<>();
+    private final Deque<MusicTrackItem> viewPool = new ArrayDeque<>();
     private final Map<Long, Integer> heightByItemId = new HashMap<>();
     private final List<PendingRemoval> pendingRemovals = new ArrayList<>();
     private final Map<Long, AnimatorSet> runningAnimations = new HashMap<>();
-    private final Deque<MusicListItem> pendingRecycle = new ArrayDeque<>();
+    private final Deque<MusicTrackItem> pendingRecycle = new ArrayDeque<>();
     private boolean recyclePosted;
     private int scrollY;
     private int viewportHeight;
     @Setter
     private int defaultItemHeight;
 
-    private record PendingRemoval(long id, MusicListItem view, int index) {
+    private record PendingRemoval(long id, MusicTrackItem view, int index) {
     }
 
     public VirtualizedListLayout(Context context) {
@@ -43,11 +43,11 @@ public class VirtualizedListLayout extends FrameLayout {
     public void resetItems(List<MusicDetail> newItems) {
         cancelAllAnimations();
         pendingRemovals.clear();
-        for (MusicListItem view : activeViews.values()) {
+        for (MusicTrackItem view : activeViews.values()) {
             removeView(view);
         }
         while (!pendingRecycle.isEmpty()) {
-            MusicListItem view = pendingRecycle.poll();
+            MusicTrackItem view = pendingRecycle.poll();
             if (view.getParent() != null) {
                 removeView(view);
             }
@@ -157,10 +157,10 @@ public class VirtualizedListLayout extends FrameLayout {
         return false;
     }
 
-    private MusicListItem obtainView(long id) {
+    private MusicTrackItem obtainView(long id) {
         Integer idx = indexById.get(id);
         MusicDetail data = idx != null ? items.get(idx) : null;
-        MusicListItem view = pendingRecycle.pollFirst();
+        MusicTrackItem view = pendingRecycle.pollFirst();
         if (view == null) {
             view = viewPool.poll();
             if (view == null) {
@@ -183,7 +183,7 @@ public class VirtualizedListLayout extends FrameLayout {
      * 延迟回收: 视图加入待回收队列, 在消息循环独立时机 (post) 执行 removeView,
      * 避免在滚动/布局/绘制遍历中触发 detach -> tooltip 隐藏的嵌套 removeView。
      */
-    private void recycleView(MusicListItem view) {
+    private void recycleView(MusicTrackItem view) {
         pendingRecycle.add(view);
         if (!recyclePosted) {
             recyclePosted = true;
@@ -193,7 +193,7 @@ public class VirtualizedListLayout extends FrameLayout {
 
     private void flushPendingRecycle() {
         recyclePosted = false;
-        MusicListItem view;
+        MusicTrackItem view;
         while ((view = pendingRecycle.poll()) != null) {
             if (view.getParent() != null) {
                 removeView(view);
@@ -203,7 +203,7 @@ public class VirtualizedListLayout extends FrameLayout {
     }
 
     private void removeItem(long id, int index) {
-        MusicListItem view = activeViews.remove(id);
+        MusicTrackItem view = activeViews.remove(id);
         if (view == null) {
             heightByItemId.remove(id);
             return;
@@ -224,7 +224,7 @@ public class VirtualizedListLayout extends FrameLayout {
             return;
         }
         MusicDetail data = items.get(index);
-        MusicListItem view = viewPool.poll();
+        MusicTrackItem view = viewPool.poll();
         if (view == null) {
             view = MusicListFactory.createItem(this);
         } else {
@@ -262,7 +262,7 @@ public class VirtualizedListLayout extends FrameLayout {
         return false;
     }
 
-    private void animateInsertion(long id, MusicListItem view, int targetHeight) {
+    private void animateInsertion(long id, MusicTrackItem view, int targetHeight) {
         ValueAnimator heightAnim = ValueAnimator.ofFloat(0, targetHeight);
         heightAnim.setDuration(ANIMATION_DURATION);
         heightAnim.setInterpolator(Easing.EASE_IN_OUT_QUINT);
@@ -296,7 +296,7 @@ public class VirtualizedListLayout extends FrameLayout {
         set.start();
     }
 
-    private void animateRemoval(long id, MusicListItem view) {
+    private void animateRemoval(long id, MusicTrackItem view) {
         int start = heightByItemId.getOrDefault(id, defaultItemHeight);
         ValueAnimator heightAnim = ValueAnimator.ofFloat(start, 0);
         heightAnim.setDuration(ANIMATION_DURATION);
@@ -329,7 +329,7 @@ public class VirtualizedListLayout extends FrameLayout {
         set.start();
     }
 
-    private void recycleViewIfAttached(MusicListItem view) {
+    private void recycleViewIfAttached(MusicTrackItem view) {
         if (view.getParent() != null) {
             recycleView(view);
         }
@@ -350,8 +350,8 @@ public class VirtualizedListLayout extends FrameLayout {
         return ids;
     }
 
-    private MusicListItem viewForId(long id) {
-        MusicListItem view = activeViews.get(id);
+    private MusicTrackItem viewForId(long id) {
+        MusicTrackItem view = activeViews.get(id);
         if (view != null) {
             return view;
         }
@@ -364,7 +364,7 @@ public class VirtualizedListLayout extends FrameLayout {
     }
 
     private int layoutHeight(long id) {
-        MusicListItem view = viewForId(id);
+        MusicTrackItem view = viewForId(id);
         if (view != null && view.getLayoutParams() != null && runningAnimations.containsKey(id)) {
             return view.getLayoutParams().height;
         }
@@ -374,7 +374,7 @@ public class VirtualizedListLayout extends FrameLayout {
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
-        for (MusicListItem view : activeViews.values()) {
+        for (MusicTrackItem view : activeViews.values()) {
             MusicDetail detail = view.getMusicDetail();
             if (detail != null && !runningAnimations.containsKey(detail.getId())
                     && view.getMeasuredHeight() > 0) {
@@ -394,7 +394,7 @@ public class VirtualizedListLayout extends FrameLayout {
         int y = 0;
         for (long id : layoutIds()) {
             int h = layoutHeight(id);
-            MusicListItem view = viewForId(id);
+            MusicTrackItem view = viewForId(id);
             if (view != null) {
                 view.layout(0, y, width, y + h);
             }

@@ -5,9 +5,9 @@ import indi.etern.musichud.network.Codecs;
 
 import java.util.UUID;
 
-public record QueueItem(MusicDetail musicDetail, UUID queueUniqueID) {
+public record QueueItem(Traceable<MusicDetail> musicDetail, UUID queueUniqueID) {
     public static final ByteBufCodec<QueueItem> CODEC = ByteBufCodec.composite(
-            MusicDetail.CODEC,
+            Traceable.codec(MusicDetail.CODEC),
             QueueItem::musicDetail,
             Codecs.UUID,
             QueueItem::queueUniqueID,

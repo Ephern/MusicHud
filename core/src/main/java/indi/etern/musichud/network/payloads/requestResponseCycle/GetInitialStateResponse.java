@@ -1,16 +1,12 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
-import indi.etern.musichud.beans.music.Album;
+import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.QueueItem;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.ByteBufCodec;
-import indi.etern.musichud.network.Codecs;
-import indi.etern.musichud.network.RequestResponseCodecs;
-import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.*;
 import indi.etern.musichud.network.payloads.ApiResponsePayload;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -25,28 +21,25 @@ public class GetInitialStateResponse extends ApiResponsePayload {
     public static final ByteBufCodec<GetInitialStateResponse> CODEC =
             RequestResponseCodecs.withCycleId(
                     ByteBufCodec.composite(
-                            MusicDetail.CODEC,
+                            Traceable.codec(MusicDetail.CODEC),
                             GetInitialStateResponse::getCurrentPlaying,
-                            MusicDetail.CODEC,
+                            Traceable.codec(MusicDetail.CODEC),
                             GetInitialStateResponse::getNextIdle,
                             Codecs.ZONED_DATE_TIME,
                             GetInitialStateResponse::getStartTime,
                             Codecs.ofQueue(() -> QueueItem.CODEC),
                             GetInitialStateResponse::getQueue,
-                            Codecs.ofList(() -> Playlist.CODEC),
+                            Codecs.ofList(() -> IdlePlaySource.CODEC),
                             GetInitialStateResponse::getPlaylistSources,
-                            Codecs.ofList(() -> Album.CODEC),
-                            GetInitialStateResponse::getAlbumSources,
                             GetInitialStateResponse::new
                     )
             );
 
-    private final MusicDetail currentPlaying;
-    private final MusicDetail nextIdle;
+    private final Traceable<MusicDetail> currentPlaying;
+    private final Traceable<MusicDetail> nextIdle;
     private final ZonedDateTime startTime;
     private final Queue<QueueItem> queue;
-    private final List<Playlist> playlistSources;
-    private final List<Album> albumSources;
+    private final List<IdlePlaySource> playlistSources;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {
