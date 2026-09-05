@@ -2,6 +2,7 @@ package indi.etern.musichud.network.payloads.pushMessages.s2c;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.IClientMusicService;
@@ -14,11 +15,11 @@ import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.utils.IClientDistUtil;
 
-public record SwitchMusicMessage(MusicDetail musicDetail, MusicDetail nextIdle, String message) implements S2CPayload {
+public record SwitchMusicMessage(Traceable<MusicDetail> musicDetail, Traceable<MusicDetail> nextIdle, String message) implements S2CPayload {
     public static final ByteBufCodec<SwitchMusicMessage> CODEC = ByteBufCodec.composite(
-            MusicDetail.CODEC,
+            Traceable.codec(MusicDetail.CODEC),
             SwitchMusicMessage::musicDetail,
-            MusicDetail.CODEC,
+            Traceable.codec(MusicDetail.CODEC),
             SwitchMusicMessage::nextIdle,
             Codecs.STRING_UTF8,
             SwitchMusicMessage::message,

@@ -48,4 +48,9 @@ public class PlayerInfoUtil {
         Identifier location = getPlayerSkin(playerInfo);
         return location == null ? null : location.toString();
     }
+
+    public static UUID getSelfUUID() {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player == null ? null : player.getUUID();
+    }
 }

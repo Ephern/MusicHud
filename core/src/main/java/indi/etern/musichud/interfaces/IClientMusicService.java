@@ -45,11 +45,11 @@ public interface IClientMusicService {
 
     void refreshQueue(Queue<QueueItem> queue);
 
-    void sendPushMusicToQueue(MusicDetail musicDetail);
+    void sendPushMusicToQueue(Traceable<Long> music);
 
     void sendRemoveMusicFromQueue(QueueItem item);
 
-    void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message);
+    void switchMusic(Traceable<MusicDetail> musicDetail, Traceable<MusicDetail> nextIdleMusicDetail, ZonedDateTime serverStartTime, String message);
 
     CompletableFuture<Artist> loadArtist(long id, boolean ignoreCache);
 

@@ -12,7 +12,7 @@ import java.util.function.Function;
 import java.util.function.Supplier;
 
 public class Codecs {
-    public static final ByteBufCodec<Void> VOID = new ByteBufCodec<Void>() {
+    public static final ByteBufCodec<Void> VOID = new ByteBufCodec<>() {
         @Override
         public void encode(ByteBuf byteBuf, Void value) {
         }
@@ -85,7 +85,7 @@ public class Codecs {
             byteBuf.writeLong(long_);
         }
     };
-    public static final ByteBufCodec<Long> VAR_LONG = new ByteBufCodec<Long>() {
+    public static final ByteBufCodec<Long> VAR_LONG = new ByteBufCodec<>() {
         @Override
         public void encode(ByteBuf byteBuf, Long value) {
             VanillaVarLong.write(byteBuf, value);
@@ -252,6 +252,24 @@ public class Codecs {
                 ByteBufCodec<T> codec = codecSupplier.get();
                 for (T t : nonNull) {
                     codec.encode(buf, t);
+                }
+            }
+        };
+    }
+
+    /** Encodes a one-byte presence flag before the payload to support null values. */
+    public static <T> ByteBufCodec<T> ofNullable(ByteBufCodec<T> inner) {
+        return new ByteBufCodec<>() {
+            @Override
+            public T decode(ByteBuf byteBuf) {
+                return BOOL.decode(byteBuf) ? inner.decode(byteBuf) : null;
+            }
+
+            @Override
+            public void encode(ByteBuf byteBuf, T value) {
+                BOOL.encode(byteBuf, value != null);
+                if (value != null) {
+                    inner.encode(byteBuf, value);
                 }
             }
         };

@@ -1,19 +1,18 @@
 package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.animation.LayoutTransition;
+import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.LinearLayout;
+import indi.etern.musichud.interfaces.Unregister;
 import org.jetbrains.annotations.NotNull;
 
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
+import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -24,14 +23,16 @@ public class FlexWrapLayout extends LinearLayout {
     private boolean rowsDirty = true;
     private final LayoutTransition defaultTransition = createDefaultTransition();
     private boolean animationsEnabled = true;
+    private final Map<View, Integer> childWidthSnapshot = new HashMap<>();
+    private int lastRebuildWidth = -1;
+    private LinkedHashSet<Consumer<LinearLayout>> lineStylers;
+    private boolean rebuildPending = false;
 
     private static LayoutTransition createDefaultTransition() {
         LayoutTransition layoutTransition = new LayoutTransition();
         layoutTransition.setDuration(300);
         layoutTransition.enableTransitionType(LayoutTransition.APPEARING);
         layoutTransition.enableTransitionType(LayoutTransition.DISAPPEARING);
-        // 禁止 CHANGE_* 动画向上设置到父链(直到窗口): 否则过渡期间布局会被抑制,
-        // 且窗口可能在遍历期间被过渡逻辑移除, 导致 WindowGroup.onMeasure 遍历到 null
         layoutTransition.setAnimateParentHierarchy(false);
         return layoutTransition;
     }
@@ -42,14 +43,32 @@ public class FlexWrapLayout extends LinearLayout {
         setLayoutTransition(defaultTransition);
         addOnLayoutChangeListener((v1, left, top, right, bottom,
                                    oldLeft, oldTop, oldRight, oldBottom) -> {
-            int newWidth = right - left;
-            int oldWidth = oldRight - oldLeft;
+            if (right - left != oldRight - oldLeft && right - left > 0) {
+                scheduleRebuild();
+            }
+        });
+    }
 
-            if (newWidth != oldWidth && newWidth > 0) {
-                // Layout is finished here, so newWidth is the current real width
-                // (no stale previous-frame data). Rebuild synchronously and let
-                // the next layout pass render the new rows.
-                rebuildRows(newWidth);
+    /**
+     * Structural rebuilds must never run inside measure/layout: the framework
+     * closes windows (e.g. tooltips) synchronously from detach callbacks, and
+     * WindowGroup.onMeasure iterates windows with a stale count, so any child
+     * removal that races that iteration crashes with an NPE. Rebuilds are
+     * therefore deferred to the next UI message.
+     */
+    private void scheduleRebuild() {
+        if (rebuildPending) {
+            return;
+        }
+        rebuildPending = true;
+        MuiModApi.postToUiThread(() -> {
+            rebuildPending = false;
+            int width = getWidth() > 0 ? getWidth() : lastRebuildWidth;
+            if (width > 0) {
+                rebuildRows(width);
+                lastRebuildWidth = width;
+                updateChildWidthSnapshot();
+                rowsDirty = false;
                 requestLayout();
             }
         });
@@ -57,32 +76,60 @@ public class FlexWrapLayout extends LinearLayout {
 
     @Override
     protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-        if (rowsDirty) {
-            rowsDirty = false;
-            int width;
-            if (getWidth() > 0) {
-                // Already laid out: only child data changed (addView/removeView),
-                // the container width is stable, use the actual laid-out width.
-                width = getWidth();
-            } else {
-                // First pass, no layout yet. Use the current frame's size when
-                // constrained; otherwise (WRAP_CONTENT chain / scroll view) the
-                // spec size is meaningless (huge), so put every child on a
-                // single overflowing row to render immediately. The row is then
-                // measured with UNSPECIFIED, so children keep their natural
-                // width and are never squeezed (which would inflate their
-                // height). The layout listener rewraps once the real width is
-                // known.
-                int mode = MeasureSpec.getMode(widthMeasureSpec);
-                width = (mode == MeasureSpec.EXACTLY || mode == MeasureSpec.AT_MOST)
-                        ? MeasureSpec.getSize(widthMeasureSpec)
-                        : Integer.MAX_VALUE / 2;
+        boolean childSizesChanged = detectChildSizeChanges();
+        if (rowsDirty || childSizesChanged
+                || (getWidth() > 0 && getWidth() != lastRebuildWidth)) {
+            scheduleRebuild();
+        }
+        // Measured with the current (possibly one frame stale) row structure;
+        // the deferred rebuild triggers another pass once it applies.
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    /**
+     * Detect whether any child's natural width has changed since the last
+     * rebuild. Only children that requested a layout are re-measured, which
+     * keeps this cheap for large fixed-size children (e.g. cards in a list).
+     */
+    private boolean detectChildSizeChanges() {
+        if (childWidthSnapshot.size() != allChildren.size()) {
+            return true;
+        }
+        for (View child : allChildren) {
+            if (!child.isLayoutRequested()) {
+                continue;
             }
-            if (width > 0) {
-                rebuildRows(width);
+            int naturalWidth = measureChildWidth(child);
+            Integer last = childWidthSnapshot.get(child);
+            if (last == null || last != naturalWidth) {
+                return true;
             }
         }
-        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        return false;
+    }
+
+    /**
+     * Measure a child with no width constraint and return its natural width
+     * including horizontal margins, matching what a horizontal row will consume.
+     */
+    private int measureChildWidth(View child) {
+        child.measure(
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
+        );
+        int childWidth = child.getMeasuredWidth();
+        ViewGroup.LayoutParams lp = child.getLayoutParams();
+        if (lp instanceof ViewGroup.MarginLayoutParams margins) {
+            childWidth += margins.leftMargin + margins.rightMargin;
+        }
+        return childWidth;
+    }
+
+    private void updateChildWidthSnapshot() {
+        childWidthSnapshot.clear();
+        for (View child : allChildren) {
+            childWidthSnapshot.put(child, measureChildWidth(child));
+        }
     }
 
     @Override
@@ -95,7 +142,15 @@ public class FlexWrapLayout extends LinearLayout {
     public void addView(@NotNull View view) {
         allChildren.add(view);
         rowsDirty = true;
-        requestLayout();
+        scheduleRebuild();
+    }
+
+    @Override
+    public void addView(@NonNull View view, @NonNull ViewGroup.LayoutParams params) {
+        view.setLayoutParams(params);
+        allChildren.add(view);
+        rowsDirty = true;
+        scheduleRebuild();
     }
 
     /**
@@ -109,44 +164,32 @@ public class FlexWrapLayout extends LinearLayout {
         }
     }
 
-    /**
-     * 增量重建行分配: 已在正确行的子元素保留不动, 只有新增/删除/换行时才操作,
-     * 避免全量 remove+add 与 LayoutTransition 冲突(被过渡接管的子元素 re-add 会抛
-     * "child already has a parent", 也会导致遍历期间容器数组被修改)
-     */
     private void rebuildRows(int width) {
+        // Runs as an independent UI message (see scheduleRebuild), never inside
+        // measure/layout, so layout transitions here cannot re-enter window
+        // iteration in WindowGroup.onMeasure
         List<View> children = List.copyOf(allChildren);
-        // 阶段 A: 纯计算新分配 (现有行视为空行, 只累计本次分配的宽度)
-        Map<LinearLayout, Integer> assignedWidths = new HashMap<>();
+        WrapLineAllocator allocator = new WrapLineAllocator(width);
         Map<View, LinearLayout> targetRows = new HashMap<>();
         Map<View, Integer> childIndexes = new HashMap<>();
         for (int i = 0; i < children.size(); i++) {
             View child = children.get(i);
             childIndexes.put(child, i);
-            child.measure(
-                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-            );
-            int childWidth = child.getMeasuredWidth();
-            LinearLayout targetRow = findOrCreateRowForChild(width, childWidth, assignedWidths);
+            int childWidth = measureChildWidth(child);
+            LinearLayout targetRow = findOrCreateRowForChild(width, childWidth, allocator);
             targetRows.put(child, targetRow);
         }
 
-        // 阶段 B: 移除不再存在的子元素(保留淡出动画), 移动的子元素立即完成移除
         Set<View> movedViews = new HashSet<>();
         for (LinearLayout row : rows) {
             for (int i = row.getChildCount() - 1; i >= 0; i--) {
                 View child = row.getChildAt(i);
                 LinearLayout targetRow = targetRows.get(child);
                 if (targetRow == null) {
-                    // 真正删除: 保留 DISAPPEARING 淡出动画, 且不会在本轮 re-add
                     row.removeView(child);
                 } else if (targetRow != row) {
-                    // 换行/移动: 禁用行过渡后移除, 避免启动 DISAPPEARING 动画。
-                    // ModernUI 的 runDisappearingTransition 把 View.ALPHA 动画到 0,
-                    // 但结束/取消时只恢复 transitionAlpha, 不恢复 alpha, 会导致
-                    // 重新加入的子元素永久透明
                     movedViews.add(child);
+                    // 移动期间禁动画, 避免重排闪烁
                     LayoutTransition transition = row.getLayoutTransition();
                     if (transition != null) {
                         row.setLayoutTransition(null);
@@ -159,17 +202,11 @@ public class FlexWrapLayout extends LinearLayout {
             }
         }
 
-        // 阶段 C: 添加/归位 (按 allChildren 顺序插入, 保证重排后行内顺序不乱)
         for (View child : children) {
             LinearLayout targetRow = targetRows.get(child);
             if (child.getParent() != targetRow) {
-                if (child.getParent() != null) {
-                    // 防御: 仍被过渡挂住的子元素, 完成其移除
-                    ((ViewGroup) child.getParent()).endViewTransition(child);
-                }
                 int insertIndex = computeInsertIndex(targetRow, child, childIndexes);
                 if (movedViews.contains(child)) {
-                    // 移动: 无动画加入, 避免重排闪烁
                     LayoutTransition transition = targetRow.getLayoutTransition();
                     if (transition != null) {
                         targetRow.setLayoutTransition(null);
@@ -178,25 +215,19 @@ public class FlexWrapLayout extends LinearLayout {
                     } else {
                         targetRow.addView(child, insertIndex);
                     }
-                    // 防御: 若过渡动画残留了透明度(ModernUI 取消 DISAPPEARING 后
-                    // alpha 可能停在 0), 显式恢复, 否则子元素会不可见
                     child.setAlpha(1f);
                     child.setTransitionAlpha(1f);
                 } else {
-                    // 新增: APPEARING 淡入动画
                     targetRow.addView(child, insertIndex);
                 }
             }
         }
 
-        // 阶段 D: 空行清理
         List<LinearLayout> rowsToRemove = new ArrayList<>();
         for (LinearLayout row : rows) {
             if (row.getChildCount() == 0) {
                 rowsToRemove.add(row);
                 super.removeView(row);
-                // 行自身也可能被本容器的 LayoutTransition 接管, 立即完成移除
-                endViewTransition(row);
             }
         }
         rows.removeAll(rowsToRemove);
@@ -220,20 +251,15 @@ public class FlexWrapLayout extends LinearLayout {
     }
 
     private LinearLayout findOrCreateRowForChild(int width, int childWidth,
-                                                 Map<LinearLayout, Integer> assignedWidths) {
-        for (LinearLayout row : rows) {
-            int currentRowWidth = assignedWidths.getOrDefault(row, 0);
-            int availableWidth = width - currentRowWidth;
-            if (availableWidth >= childWidth) {
-                assignedWidths.put(row, currentRowWidth + childWidth);
-                return row;
-            }
+                                                 WrapLineAllocator allocator) {
+        int rowIndex = allocator.allocate(childWidth);
+        while (rows.size() <= rowIndex) {
+            createNewRow();
         }
-
-        return createNewRow();
+        return rows.get(rowIndex);
     }
 
-    private LinearLayout createNewRow() {
+    private void createNewRow() {
         LinearLayout row = new LinearLayout(getContext());
         row.setOrientation(HORIZONTAL);
         if (animationsEnabled) {
@@ -241,11 +267,12 @@ public class FlexWrapLayout extends LinearLayout {
         }
 
         var params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-
-        super.addView(row, params);
+        row.setLayoutParams(params);
+        if (lineStylers != null && !lineStylers.isEmpty()) {
+            lineStylers.forEach(styler -> styler.accept(row));
+        }
+        super.addView(row);
         rows.add(row);
-
-        return row;
     }
 
     @Override
@@ -259,8 +286,17 @@ public class FlexWrapLayout extends LinearLayout {
     @Override
     public void removeView(@NotNull View view) {
         allChildren.remove(view);
-        rows.forEach(row -> row.removeView(view));
+        childWidthSnapshot.remove(view);
+        // Physical removal from rows happens in the deferred rebuildRows
         rowsDirty = true;
-        requestLayout();
+        scheduleRebuild();
+    }
+
+    public Unregister applyLineStyle(Consumer<LinearLayout> styler) {
+        if (lineStylers == null) {
+            lineStylers = new LinkedHashSet<>();
+        }
+        lineStylers.add(styler);
+        return () -> lineStylers.remove(styler);
     }
 }

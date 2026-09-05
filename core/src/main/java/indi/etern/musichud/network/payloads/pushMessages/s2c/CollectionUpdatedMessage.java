@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.pushMessages.s2c;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -9,6 +10,7 @@ import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.server.api.impl.ncm.CommonCaches;
 import indi.etern.musichud.utils.CollectionUpdateNotifier;
 
 import java.util.UUID;
@@ -44,7 +46,8 @@ public record CollectionUpdatedMessage(UUID operatorUUID, long collectionId, boo
                         albumsCache.invalidate(message.collectionId());
                         CollectionUpdateNotifier.notifyAlbumUpdated(message.operatorUUID, message.collectionId());
                     } else {
-                        playlistsCache.invalidate(message.collectionId());
+                        playlistsCache.invalidate(CommonCaches.PlaylistCacheKey.of(message.collectionId, Profile.getCurrent().getUserId()));
+                        playlistsCache.invalidate(CommonCaches.PlaylistCacheKey.of(message.collectionId));
                         CollectionUpdateNotifier.notifyPlaylistUpdated(message.operatorUUID, message.collectionId());
                     }
                 });

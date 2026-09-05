@@ -23,10 +23,11 @@ public class Playlist implements MusicCollection {
             Codecs.STRING_UTF8, Playlist::getCoverImgUrl,
             Codecs.INT, Playlist::getMusicTrackCount,
             Codecs.LONG, Playlist::getPlayedCount,
+            Codecs.ofEnum(PlaylistSpecialType.class), Playlist::getSpecialType,
             Profile.CODEC, Playlist::getCreator,
             Codecs.ofEnum(Privacy.class), Playlist::getPrivacy,
             Codecs.ofCollection(ObservableSequencedSet::new, () -> MusicDetail.CODEC), Playlist::getTracks,
-            PusherInfo.CODEC, Playlist::getPusherInfo,
+            Codecs.ofNullable(Codecs.ofCollection(ObservableSequencedSet::new, () -> MusicDetail.CODEC)), Playlist::getIntelligentList,
             Playlist::new
     );
 
@@ -46,14 +47,16 @@ public class Playlist implements MusicCollection {
     long playedCount;
     String coverImgId_str = "";
     String coverImgUrl = MusicHud.ICON_BASE64;
+    @Getter
+    PlaylistSpecialType specialType;
     Profile creator = Profile.ANONYMOUS;
     Privacy privacy = Privacy.PUBLIC;
     @Setter
     ObservableSequencedSet<MusicDetail> tracks = new ObservableSequencedSet<>(0);
-
-    // Not contained in the original API response, set separately
+    /** Intelligent play mode recommendations of one player; null until first fetch. Synced via CODEC, not synced by updateFrom. */
     @Getter
-    PusherInfo pusherInfo = PusherInfo.EMPTY;
+    @Setter
+    ObservableSequencedSet<MusicDetail> intelligentList;
 
     private boolean nullFiltered = false;
 
@@ -65,10 +68,11 @@ public class Playlist implements MusicCollection {
             String coverImgUrl,
             int musicTrackCount,
             long playedCount,
+            PlaylistSpecialType specialType,
             Profile creator,
             Privacy privacy,
             ObservableSequencedSet<MusicDetail> tracks,
-            PusherInfo pusherInfo
+            ObservableSequencedSet<MusicDetail> intelligentList
     ) {
         this.id = id;
         this.name = name;
@@ -77,10 +81,11 @@ public class Playlist implements MusicCollection {
         this.coverImgUrl = coverImgUrl;
         this.musicTrackCount = musicTrackCount;
         this.playedCount = playedCount;
+        this.specialType = specialType;
         this.creator = creator;
         this.privacy = privacy;
         this.tracks = tracks;
-        this.pusherInfo = pusherInfo;
+        this.intelligentList = intelligentList;
     }
 
     public static Playlist privacyBlocked(long id, Profile creator) {
@@ -103,7 +108,11 @@ public class Playlist implements MusicCollection {
 
     @Override
     public String getNameI18nKey() {
-        return MusicHud.MOD_ID + ".text.playlist";
+        return switch (specialType) {
+            case LIKE_LIST -> MusicHud.MOD_ID + ".text.likeList";
+            case OFFICIAL -> MusicHud.MOD_ID + ".text.recommendlist";
+            default -> MusicHud.MOD_ID + ".text.playlist";
+        };
     }
 
     @Override
@@ -158,8 +167,7 @@ public class Playlist implements MusicCollection {
         return obj instanceof Playlist playlist
                 && playlist.id == id
                 && playlist.name.equals(name)
-                && playlist.coverImgUrl.equals(coverImgUrl)
-                && playlist.pusherInfo.equals(pusherInfo);
+                && playlist.coverImgUrl.equals(coverImgUrl);
     }
 
     @Override
@@ -170,49 +178,39 @@ public class Playlist implements MusicCollection {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name, coverImgUrl, pusherInfo.getPlayerUUID());
+        return Objects.hash(id, name, coverImgUrl);
     }
 
-    @Override
-    public Playlist copyWithPusherInfo(PusherInfo pusherInfo) {
-        Playlist playlist = new Playlist();
-        playlist.id = id;
-        playlist.name = name;
-        playlist.coverImgId = coverImgId;
-        playlist.coverImgUrl = coverImgUrl;
-        playlist.tracks = tracks;
-        playlist.creator = creator;
-        playlist.privacy = privacy;
-        playlist.musicTrackCount = musicTrackCount;
-        playlist.playedCount = playedCount;
-        playlist.pusherInfo = pusherInfo;
-        return playlist;
-    }
-
-    public Playlist copyWithSensitiveErased() {
+    public Playlist sensitiveErased() {
         if (privacy == Privacy.PRIVATE) {
             Playlist playlist = new Playlist();
             playlist.id = id;
             playlist.name = "Private Playlist";
             playlist.coverImgId = -1;
             playlist.coverImgUrl = MusicHud.ICON_BASE64;
+            playlist.specialType = PlaylistSpecialType.NORMAL;
+            playlist.playedCount = -1;
+            playlist.musicTrackCount = -1;
             playlist.creator = creator == Profile.ANONYMOUS ? Profile.PRIVATE_MASK : creator;
             playlist.privacy = privacy;
-            playlist.pusherInfo = pusherInfo;
             return playlist;
         } else {
-            return copyWithPusherInfo(pusherInfo);
+            return this;
         }
     }
 
     public void updateFrom(Playlist playlist, boolean triggerObservable) {
         this.id = playlist.id;
         this.name = playlist.name;
-        this.coverImgId = playlist.coverImgId;
-        this.coverImgUrl = playlist.coverImgUrl;
         getTracks().syncWith(playlist.getTracks(), triggerObservable);
+        this.specialType = playlist.specialType;
+        if (specialType != PlaylistSpecialType.OFFICIAL) {
+            this.coverImgId = playlist.coverImgId;
+            this.coverImgUrl = playlist.coverImgUrl;
+        }
         this.creator = playlist.creator;
         this.privacy = playlist.privacy;
+        this.playedCount = playlist.playedCount;
         this.musicTrackCount = playlist.musicTrackCount;
     }
 
@@ -229,18 +227,6 @@ public class Playlist implements MusicCollection {
             name = brief.name;
             changed = true;
         }
-        if (coverImgId != brief.coverImgId) {
-            coverImgId = brief.coverImgId;
-            changed = true;
-        }
-        if (!Objects.equals(coverImgId_str, brief.coverImgId_str)) {
-            coverImgId_str = brief.coverImgId_str;
-            changed = true;
-        }
-        if (!Objects.equals(coverImgUrl, brief.coverImgUrl)) {
-            coverImgUrl = brief.coverImgUrl;
-            changed = true;
-        }
         if (musicTrackCount != brief.musicTrackCount) {
             musicTrackCount = brief.musicTrackCount;
             changed = true;
@@ -248,6 +234,24 @@ public class Playlist implements MusicCollection {
         if (playedCount != brief.playedCount) {
             playedCount = brief.playedCount;
             changed = true;
+        }
+        if (specialType != brief.specialType) {
+            specialType = brief.specialType;
+            changed = true;
+        }
+        if (specialType != PlaylistSpecialType.OFFICIAL) {
+            if (coverImgId != brief.coverImgId) {
+                coverImgId = brief.coverImgId;
+                changed = true;
+            }
+            if (!Objects.equals(coverImgId_str, brief.coverImgId_str)) {
+                coverImgId_str = brief.coverImgId_str;
+                changed = true;
+            }
+            if (!Objects.equals(coverImgUrl, brief.coverImgUrl)) {
+                coverImgUrl = brief.coverImgUrl;
+                changed = true;
+            }
         }
         if (!Objects.equals(creator, brief.creator)) {
             creator = brief.creator;
