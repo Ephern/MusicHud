@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.components;
 
-import icyllis.modernui.animation.LayoutTransition;
+import icyllis.modernui.animation.ValueAnimator;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
@@ -32,6 +32,8 @@ public class IdlePlaySourceWidget extends LinearLayout {
     private final ToggleIdlePlaySourceButton toggleButton;
     private final CycleIconButton cycleButton;
     private final List<PlayMode> cycleModes = new ArrayList<>();
+    private final int cycleTargetSize;
+    private ValueAnimator cycleShowAnimator;
     private Unregister addRegister;
     private Unregister removeRegister;
 
@@ -39,14 +41,9 @@ public class IdlePlaySourceWidget extends LinearLayout {
         super(context);
         this.collection = collection;
         this.modeState = layer.collection(collection, PlayMode.RANDOM);
+        this.cycleTargetSize = buttonSize;
         setOrientation(HORIZONTAL);
         setGravity(Gravity.CENTER_VERTICAL);
-        LayoutTransition transition = new LayoutTransition();
-        transition.setDuration(200);
-        transition.setStartDelay(LayoutTransition.APPEARING, 0);
-        transition.setStartDelay(LayoutTransition.CHANGE_DISAPPEARING, 0);
-        transition.enableTransitionType(LayoutTransition.CHANGING);
-        setLayoutTransition(transition);
 
         var backgroundFactory = InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
@@ -59,10 +56,13 @@ public class IdlePlaySourceWidget extends LinearLayout {
         backgroundFactory.applyBackgroundTo(toggleButton);
         addView(toggleButton, new LayoutParams(buttonSize, buttonSize));
 
+        // Shown/hidden purely by animated width+alpha (no GONE/VISIBLE flips, no
+        // LayoutTransition): starts collapsed and fully transparent, which is visually
+        // identical to GONE but keeps the animation fully under our control
         cycleButton = new CycleIconButton(context);
         backgroundFactory.applyBackgroundTo(cycleButton);
-        cycleButton.setVisibility(GONE);
-        addView(cycleButton, new LayoutParams(buttonSize, buttonSize));
+        addView(cycleButton, new LayoutParams(0, buttonSize));
+        cycleButton.setAlpha(0f);
 
         buildCycleStates();
         bindToggle();
@@ -152,13 +152,48 @@ public class IdlePlaySourceWidget extends LinearLayout {
 
     private void syncCycleState() {
         IdlePlaySource current = currentSource();
-        if (current == null) {
-            cycleButton.setVisibility(GONE);
+        if (current != null) {
+            int index = cycleModes.indexOf(current.getPlayMode());
+            // Swap the drawable while collapsed/transparent so it never invalidates a
+            // fully visible view mid-layout
+            cycleButton.apply(Math.max(index, 0));
+        }
+        setCycleShown(current != null);
+    }
+
+    /** Animates the cycle button between collapsed (width 0, alpha 0) and expanded
+     *  (width {@link #cycleTargetSize}, alpha 1). Restarting from the current width/alpha
+     *  keeps rapid toggles smooth; the animation is fully self-driven so no library
+     *  transition timing can flash a wrong first frame. */
+    private void setCycleShown(boolean shown) {
+        int targetWidth = shown ? cycleTargetSize : 0;
+        float targetAlpha = shown ? 1f : 0f;
+        if (cycleShowAnimator != null) {
+            cycleShowAnimator.cancel();
+            cycleShowAnimator = null;
+        }
+        int startWidth = cycleButton.getWidth();
+        float startAlpha = cycleButton.getAlpha();
+        if (startWidth == targetWidth && startAlpha == targetAlpha) {
             return;
         }
-        int index = cycleModes.indexOf(current.getPlayMode());
-        cycleButton.apply(Math.max(index, 0));
-        cycleButton.setVisibility(VISIBLE);
+        ValueAnimator animator = ValueAnimator.ofFloat(0f, 1f);
+        animator.setDuration(200);
+        animator.addUpdateListener(a -> {
+            float fraction = (Float) a.getAnimatedValue();
+            setCycleWidth(Math.round(startWidth + (targetWidth - startWidth) * fraction));
+            cycleButton.setAlpha(startAlpha + (targetAlpha - startAlpha) * fraction);
+        });
+        cycleShowAnimator = animator;
+        animator.start();
+    }
+
+    private void setCycleWidth(int width) {
+        LayoutParams lp = (LayoutParams) cycleButton.getLayoutParams();
+        if (lp.width != width) {
+            lp.width = width;
+            cycleButton.setLayoutParams(lp);
+        }
     }
 
     @Override
@@ -180,6 +215,10 @@ public class IdlePlaySourceWidget extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        if (cycleShowAnimator != null) {
+            cycleShowAnimator.cancel();
+            cycleShowAnimator = null;
+        }
         if (addRegister != null) {
             addRegister.unregister();
             addRegister = null;
