@@ -189,7 +189,7 @@ public class MusicApiService implements IMusicApiService {
             ILoginApiService.PlayerLoginInfo userLoginInfo = loginApiService.getLoginInfoByPlayerUUID(playerUUID);
             Playlist cached = playlistsCache.getIfPresent(PlaylistCacheKey.of(id, -1));
             long userId = userLoginInfo == null ? -1 : (userLoginInfo.getProfile() instanceof Profile profile ? profile.getUserId() : -1);
-            if (cached == null && userId != -1) {
+            if ((cached == null || cached.getSpecialType() == PlaylistSpecialType.USER_SPECIFIC) && userId != -1) {
                 cached = playlistsCache.getIfPresent(PlaylistCacheKey.of(id, userId));
             }
             Playlist finalCached = cached;
@@ -208,7 +208,11 @@ public class MusicApiService implements IMusicApiService {
                             finalCached.updateFrom(loaded, MusicHud.getCurrentEnvironment().getSide() == Environment.Side.SERVER || !IClientDistUtil.getInstance().inIntegratedServer());
                             return finalCached;
                         }
-                        playlistsCache.put(PlaylistCacheKey.of(loaded, userId), loaded);
+                        if (loaded.getSpecialType() == PlaylistSpecialType.USER_SPECIFIC) {
+                            playlistsCache.put(PlaylistCacheKey.of(loaded, userId), loaded);
+                        } else {
+                            playlistsCache.put(PlaylistCacheKey.of(loaded, -1), loaded);
+                        }
                         return loaded;
                     } else {
                         logger.error("Failed to get playlist detail of player: {} (response code: {})", Objects.requireNonNull(playerUUID), playlistResponse.getCode());

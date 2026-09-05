@@ -308,7 +308,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         SpannableString text = new SpannableString("  " + playlist.getMusicTrackCount());
         String iconPath = switch (playlist.getSpecialType()) {
             case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
-            case OFFICIAL -> ICON_RECOMMEND_LIST_MUSIC;
+            case USER_SPECIFIC -> ICON_RECOMMEND_LIST_MUSIC;
             default -> ICON_LIST_MUSIC;
         };
         Image icon = ImageUtils.getImageFromResource(iconPath);

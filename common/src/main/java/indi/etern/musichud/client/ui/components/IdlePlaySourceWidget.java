@@ -43,12 +43,6 @@ public class IdlePlaySourceWidget extends LinearLayout {
         setGravity(Gravity.CENTER_VERTICAL);
         LayoutTransition transition = new LayoutTransition();
         transition.setDuration(200);
-        // Animate only this widget's own layout; never propagate to the ancestor hierarchy
-        transition.setAnimateParentHierarchy(false);
-        transition.disableTransitionType(LayoutTransition.APPEARING);
-        transition.disableTransitionType(LayoutTransition.DISAPPEARING);
-        transition.disableTransitionType(LayoutTransition.CHANGE_APPEARING);
-        transition.disableTransitionType(LayoutTransition.CHANGE_DISAPPEARING);
         transition.enableTransitionType(LayoutTransition.CHANGING);
         setLayoutTransition(transition);
 

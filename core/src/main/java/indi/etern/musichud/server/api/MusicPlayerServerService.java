@@ -365,7 +365,9 @@ public class MusicPlayerServerService {
         for (Set<IdlePlaySource> playSources : idlePlaySources.values()) {
             for (IdlePlaySource idlePlaySource : playSources) {
                 if (idlePlaySource.getMusicCollection() instanceof Playlist playlist && !playlist.getCreator().equals(playerProfile)) {
-                    list.add(IdlePlaySource.of(playlist.sensitiveErased(), idlePlaySource.getPlayMode()));
+                    IdlePlaySource idlePlaySource1 = IdlePlaySource.of(playlist.sensitiveErased(), idlePlaySource.getPlayMode());
+                    idlePlaySource1.setPusherInfo(idlePlaySource.getPusherInfo());
+                    list.add(idlePlaySource1);
                 } else {
                     list.add(idlePlaySource);
                 }
