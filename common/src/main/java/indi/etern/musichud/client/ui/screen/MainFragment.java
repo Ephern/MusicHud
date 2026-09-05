@@ -126,7 +126,7 @@ public class MainFragment extends Fragment {
                 homeView.switchMusic(current, nextToPlay, lines);
             }
             if (instance.lyricsScrollView != null) {
-                instance.lyricsScrollView.switchLyrics(current.value(), lines);
+                instance.lyricsScrollView.switchLyrics(current == null ? MusicDetail.NONE : current.value(), lines);
             }
             instance.updateLyricsPanelVisibility();
             instance.refreshServerConnectStatus();
@@ -136,7 +136,7 @@ public class MainFragment extends Fragment {
     public static void switchMusic(Traceable<MusicDetail> musicDetailTrace, Traceable<MusicDetail> nextToPlayTrace, Queue<LyricLine> lines) {
         if (instance != null && instance.visible) {
             displayMusicInfo(musicDetailTrace);
-            MusicDetail musicDetail = musicDetailTrace.value();
+            MusicDetail musicDetail = musicDetailTrace == null ? MusicDetail.NONE : musicDetailTrace.value();
             if (musicDetail != null && !musicDetail.equals(MusicDetail.NONE)) {
                 startProgressUpdater(musicDetail);
             }
@@ -152,8 +152,7 @@ public class MainFragment extends Fragment {
     }
 
     private static void displayMusicInfo(Traceable<MusicDetail> musicDetailTrace) {
-        MusicDetail musicDetail = musicDetailTrace.value();
-        if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
+        if (musicDetailTrace == null || musicDetailTrace.value() == null || musicDetailTrace.value().equals(MusicDetail.NONE)) {
             instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
             instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
             instance.titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
@@ -169,6 +168,7 @@ public class MainFragment extends Fragment {
             instance.likeButton.bindMusicList(null);
             instance.addToPlaylistButton.bindMusicDetail(null);
         } else {
+            MusicDetail musicDetail = musicDetailTrace.value();
             instance.titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
             Album album = musicDetail.getAlbum();
             instance.albumImage.loadUrl(album.getImageThumbnailUrl(instance.sideWidth));

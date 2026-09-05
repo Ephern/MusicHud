@@ -88,14 +88,28 @@ public class MusicService implements IClientMusicService {
     }
 
     public static void resetCurrentMusicStatus() {
-        if (instance != null) {
-            instance.switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, "");
-            instance.getIdlePlaySourceState().local().reset();
-            instance.musicQueue.clear();
+        MusicService inst = instance;
+        if (inst != null) {
+            // Hold the instance monitor so the queue clear cannot interleave with the
+            // peek/iterate patterns in switchMusic/refreshQueue on network threads
+            synchronized (inst) {
+                inst.switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, "");
+                inst.getIdlePlaySourceState().local().reset();
+                inst.musicQueue.clear();
+            }
         }
         if (HudRendererManager.isLoaded()) {
             HudRendererManager.getInstance().reset();
         }
+    }
+
+    /**
+     * Atomically peeks the head of the music queue (null when empty). The queue is a plain
+     * ArrayDeque, so external readers must go through this instead of an unsynchronized
+     * isEmpty+peek pair.
+     */
+    public synchronized QueueItem peekQueueItem() {
+        return musicQueue.peek();
     }
 
     private static boolean sameItem(QueueItem a, QueueItem b) {
@@ -300,8 +314,9 @@ public class MusicService implements IClientMusicService {
     public synchronized void switchMusic(Traceable<MusicDetail> musicDetail, Traceable<MusicDetail> nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         if (clientConfig.getEnable()) {
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-            if (!musicQueue.isEmpty()) {// preload image
-                MusicDetail peek = musicQueue.peek().musicDetail().value();
+            QueueItem head = musicQueue.peek();
+            if (head != null) {// preload image
+                MusicDetail peek = head.musicDetail().value();
                 Album album = peek.getAlbum();
                 ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 HudRendererManager.getInstance().preloadAlbumImage(peek.getAlbum());
