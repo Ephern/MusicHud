@@ -43,6 +43,8 @@ public class IdlePlaySourceWidget extends LinearLayout {
         setGravity(Gravity.CENTER_VERTICAL);
         LayoutTransition transition = new LayoutTransition();
         transition.setDuration(200);
+        transition.setStartDelay(LayoutTransition.APPEARING, 0);
+        transition.setStartDelay(LayoutTransition.CHANGE_DISAPPEARING, 0);
         transition.enableTransitionType(LayoutTransition.CHANGING);
         setLayoutTransition(transition);
 
@@ -64,14 +66,13 @@ public class IdlePlaySourceWidget extends LinearLayout {
 
         buildCycleStates();
         bindToggle();
-        syncCycleState();
     }
 
     private void buildCycleStates() {
         cycleModes.clear();
         cycleButton.getStates().clear();
-        addCycleState(PlayMode.SEQUENTIAL, "/assets/music_hud/textures/gui/icons/repeat.png");
         addCycleState(PlayMode.RANDOM, "/assets/music_hud/textures/gui/icons/shuffle.png");
+        addCycleState(PlayMode.SEQUENTIAL, "/assets/music_hud/textures/gui/icons/repeat.png");
         if (supportsIntelligent()) {
             addCycleState(PlayMode.INTELLIGENT, "/assets/music_hud/textures/gui/icons/heart_pulse.png");
         }
@@ -156,8 +157,8 @@ public class IdlePlaySourceWidget extends LinearLayout {
             return;
         }
         int index = cycleModes.indexOf(current.getPlayMode());
-        cycleButton.setVisibility(VISIBLE);
         cycleButton.apply(Math.max(index, 0));
+        cycleButton.setVisibility(VISIBLE);
     }
 
     @Override

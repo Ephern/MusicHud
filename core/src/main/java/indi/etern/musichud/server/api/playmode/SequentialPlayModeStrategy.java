@@ -11,11 +11,15 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.atomic.AtomicInteger;
 
 class SequentialPlayModeStrategy implements PlayModeStrategy {
-    /** Keyed by source (equals = id+type+mode); counter shared across equal sources. */
-    private final Map<IdlePlaySource, AtomicInteger> positions = new ConcurrentHashMap<>();
+    /**
+     * Last played track per player+collection; survives re-adds, mode switches and
+     * reconnects within the server uptime (only {@link #reset()} clears it). Keyed by
+     * collection identity instead of the full source so a removed-then-re-added source
+     * resumes from where sequential playback left off.
+     */
+    private final Map<SeqKey, Long> lastPlayedTrackIds = new ConcurrentHashMap<>();
 
     @Override
     public boolean supports(MusicCollection collection) {
@@ -55,8 +59,22 @@ class SequentialPlayModeStrategy implements PlayModeStrategy {
         if (tracks.isEmpty()) {
             return null;
         }
-        AtomicInteger position = positions.computeIfAbsent(source, k -> new AtomicInteger());
-        return tracks.get(Math.floorMod(position.getAndIncrement(), tracks.size()));
+        SeqKey key = SeqKey.of(source);
+        long lastTrackId = lastPlayedTrackIds.getOrDefault(key, -1L);
+        // Continue after the last played track; fall back to the first one when the
+        // collection no longer contains it (e.g. tracks were removed from the playlist)
+        int nextIndex = 0;
+        if (lastTrackId >= 0) {
+            for (int i = 0; i < tracks.size(); i++) {
+                if (tracks.get(i).getId() == lastTrackId) {
+                    nextIndex = i + 1;
+                    break;
+                }
+            }
+        }
+        MusicDetail selected = tracks.get(Math.floorMod(nextIndex, tracks.size()));
+        lastPlayedTrackIds.put(key, selected.getId());
+        return selected;
     }
 
     @Override
@@ -65,16 +83,22 @@ class SequentialPlayModeStrategy implements PlayModeStrategy {
 
     @Override
     public void onRemoved(IdlePlaySource source, PusherInfo pusher) {
-        positions.keySet().removeIf(s -> s.equals(source) && s.getPusherInfo().equals(pusher));
+        // Position intentionally kept so a later re-add resumes from it
     }
 
     @Override
     public void onAllRemoved(UUID playerUUID) {
-        positions.keySet().removeIf(source -> source.getPusherInfo().getPlayerUUID().equals(playerUUID));
+        // Position intentionally kept so a reconnecting player resumes from it
     }
 
     @Override
     public void reset() {
-        positions.clear();
+        lastPlayedTrackIds.clear();
+    }
+
+    private record SeqKey(UUID playerUUID, Class<?> collectionType, long collectionId) {
+        static SeqKey of(IdlePlaySource source) {
+            return new SeqKey(source.getPusherInfo().getPlayerUUID(), source.getType(), source.getId());
+        }
     }
 }
