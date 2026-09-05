@@ -1,14 +1,9 @@
 package indi.etern.musichud.client.audio;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.FormatType;
-import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.MusicResourceInfo;
-import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.beans.music.Traceable;
+import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.audio.decoder.*;
 import indi.etern.musichud.client.interfaces.IClientEventService;
-import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
@@ -864,7 +859,7 @@ public class PlaybackTask {
                 .thenApply(GetMusicResourceResponse::getMusicResourceInfo)
                 .thenCompose(value -> {
                     if (value == MusicResourceInfo.NONE) {
-                        MusicService.getInstance().switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
+                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                         setState(PlaybackState.ERROR);
                         return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
                     }
