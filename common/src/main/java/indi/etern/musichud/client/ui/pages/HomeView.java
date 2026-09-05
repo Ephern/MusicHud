@@ -19,7 +19,7 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.FlexWrapLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
-import indi.etern.musichud.client.ui.components.MusicListItem;
+import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.dto.LyricLine;
@@ -60,7 +60,7 @@ public class HomeView extends LinearLayout {
     private final Map<CardKey, MusicCollectionCard> idlePlaySourceCardMap = new ConcurrentHashMap<>();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
-    private MusicListItem nextToPlayItem;
+    private MusicTrackItem nextToPlayItem;
     private TextView nextToPlayTitle;
     private TextView queueTitle;
     private LinearLayout playQueueListView;
@@ -173,6 +173,7 @@ public class HomeView extends LinearLayout {
             scrollViewContainer.setOrientation(VERTICAL);
             scrollView.addView(scrollViewContainer, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
             LayoutTransition transition1 = new LayoutTransition();
+            transition1.setAnimateParentHierarchy(false);
             transition1.enableTransitionType(LayoutTransition.CHANGING);
             scrollViewContainer.setLayoutTransition(transition1);
 
@@ -184,7 +185,7 @@ public class HomeView extends LinearLayout {
             nextToPlayTitleParams.setMargins(0, dp(32), 0, dp(16));
             scrollViewContainer.addView(nextToPlayTitle, nextToPlayTitleParams);
 
-            nextToPlayItem = new MusicListItem(context);
+            nextToPlayItem = new MusicTrackItem(context);
             nextToPlayItem.setVisibility(GONE);
             scrollViewContainer.addView(nextToPlayItem, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
@@ -368,7 +369,7 @@ public class HomeView extends LinearLayout {
         if (musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE)) {
             nextToPlayTitle.setVisibility(VISIBLE);
             nextToPlayItem.setVisibility(VISIBLE);
-            nextToPlayItem.bindData(next);
+            nextToPlayItem.bindData(nextIdle);
         } else {
             nextToPlayTitle.setVisibility(GONE);
             nextToPlayItem.setVisibility(GONE);
@@ -378,7 +379,7 @@ public class HomeView extends LinearLayout {
     private void addMusicQueueItem(QueueItem item, LinearLayout playQueueView) {
         Traceable<MusicDetail> musicTrace = item.musicDetail();
         MusicDetail musicDetail = musicTrace.value();
-        var musicListItem = new MusicListItem(getContext());
+        var musicListItem = new MusicTrackItem(getContext());
         musicListItem.bindData(musicTrace);
         LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, WRAP_CONTENT);
         layoutParams.setMargins(0, 0, 0, dp(16));
@@ -403,11 +404,11 @@ public class HomeView extends LinearLayout {
         playQueueView.addView(musicListItem, layoutParams);
     }
 
-    public void switchMusic(MusicDetail musicDetail, MusicDetail next, Queue<LyricLine> lyricLines) {
+    public void switchMusic(Traceable<MusicDetail> musicDetail, Traceable<MusicDetail> next, Queue<LyricLine> lyricLines) {
         MuiModApi.postToUiThread(() -> {
             if (staggeredLyricScrollView != null) {
-                staggeredLyricScrollView.switchLyrics(musicDetail, lyricLines);
-                checkNextToPlay(Traceable.of(next));
+                staggeredLyricScrollView.switchLyrics(musicDetail.value(), lyricLines);
+                checkNextToPlay(next);
             }
         });
     }
