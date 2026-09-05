@@ -9,6 +9,7 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.state.ISubscribeState;
+import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.PlaybackTask;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
@@ -88,7 +89,7 @@ public class MusicService implements IClientMusicService {
 
     public static void resetCurrentMusicStatus() {
         if (instance != null) {
-            instance.switchMusic(MusicDetail.NONE, MusicDetail.NONE, null, "");
+            instance.switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, "");
             instance.getIdlePlaySourceState().local().reset();
             instance.musicQueue.clear();
         }
@@ -147,19 +148,19 @@ public class MusicService implements IClientMusicService {
             UserCategoryPlaylists categoryPlaylists = userCollections.userCategoryPlaylists;
             Playlist likeList = categoryPlaylists.getLikeList();
             if (likeList != null) {
-                Playlist cached = playlistsCache.getIfPresent(likeList.getId());
+                Playlist cached = playlistsCache.getIfPresent(PlaylistCacheKey.of(likeList, Profile.getCurrent().getUserId()));
                 if (cached != null && !cached.getMusicDetails().isEmpty()) {
                     likeList.updateFrom(cached, true);
                 }
             }
             categoryPlaylists.getCreatedPlaylist().forEach(playlist -> {
-                Playlist cached = playlistsCache.getIfPresent(playlist.getId());
+                Playlist cached = playlistsCache.getIfPresent(PlaylistCacheKey.of(playlist, Profile.getCurrent().getUserId()));
                 if (cached != null && !cached.getMusicDetails().isEmpty()) {
                     playlist.updateFrom(cached, true);
                 }
             });
             categoryPlaylists.getSubscribedPlaylist().forEach(playlist -> {
-                Playlist cached = playlistsCache.getIfPresent(playlist.getId());
+                Playlist cached = playlistsCache.getIfPresent(PlaylistCacheKey.of(playlist, Profile.getCurrent().getUserId()));
                 if (cached != null && !cached.getMusicDetails().isEmpty()) {
                     playlist.updateFrom(cached, true);
                 }
@@ -181,10 +182,14 @@ public class MusicService implements IClientMusicService {
         if (inProgress != null) {
             return inProgress;
         }
-        Playlist cached = playlistsCache.getIfPresent(id);
-        if (!ignoreCache && cached != null && isPlaylistComplete(cached)) {
+        Playlist cached = playlistsCache.getIfPresent(PlaylistCacheKey.of(id, -1));
+        if (cached == null) {
+            cached = playlistsCache.getIfPresent(PlaylistCacheKey.of(id, Profile.getCurrent().getUserId()));
+        }
+        Playlist finalCached = cached;
+        if (!ignoreCache && finalCached != null && isPlaylistComplete(finalCached)) {
 //            pushDownToUserCollections(cached);
-            return CompletableFuture.completedFuture(cached);
+            return CompletableFuture.completedFuture(finalCached);
         }
         CompletableFuture<Playlist> future = RequestResponseManager.send(
                         new GetPlaylistDetailRequest(id, ignoreCache),
@@ -193,11 +198,11 @@ public class MusicService implements IClientMusicService {
                 .thenApply(response -> {
                     Playlist loaded = response.getPlaylist();
                     Playlist result;
-                    if (cached != null) {
-                        cached.updateFrom(loaded, true);
-                        result = cached;
+                    if (finalCached != null) {
+                        finalCached.updateFrom(loaded, true);
+                        result = finalCached;
                     } else {
-                        playlistsCache.put(id, loaded);
+                        playlistsCache.put(PlaylistCacheKey.of(loaded, Profile.getCurrent().getUserId()), loaded);
                         result = loaded;
                     }
                     pushDownToUserCollections(result);
@@ -282,28 +287,28 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
-    public void sendPushMusicToQueue(MusicDetail musicDetail) {
-        clientNetworkService.sendToServer(new ClientPushMusicToQueueMessage(musicDetail.getId()));
+    public void sendPushMusicToQueue(Traceable<Long> music) {
+        clientNetworkService.sendToServer(new ClientPushMusicToQueueMessage(music));
     }
 
     @Override
     public void sendRemoveMusicFromQueue(QueueItem item) {
-        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(item.musicDetail().getId(), item.queueUniqueID()));
+        clientNetworkService.sendToServer(new ClientRemoveMusicFromQueueMessage(item.musicDetail().value().getId(), item.queueUniqueID()));
     }
 
     @Override
-    public synchronized void switchMusic(MusicDetail musicDetail, MusicDetail nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
+    public synchronized void switchMusic(Traceable<MusicDetail> musicDetail, Traceable<MusicDetail> nextIdleMusicDetail, ZonedDateTime serverStartTime, String message) {
         if (clientConfig.getEnable()) {
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             if (!musicQueue.isEmpty()) {// preload image
-                MusicDetail peek = musicQueue.peek().musicDetail();
+                MusicDetail peek = musicQueue.peek().musicDetail().value();
                 Album album = peek.getAlbum();
                 ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 HudRendererManager.getInstance().preloadAlbumImage(peek.getAlbum());
-            } else if (nextIdleMusicDetail != null && !nextIdleMusicDetail.equals(MusicDetail.NONE)) {
-                Album album = nextIdleMusicDetail.getAlbum();
+            } else if (nextIdleMusicDetail != null && !nextIdleMusicDetail.value().equals(MusicDetail.NONE)) {
+                Album album = nextIdleMusicDetail.value().getAlbum();
                 ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
-                HudRendererManager.getInstance().preloadAlbumImage(nextIdleMusicDetail.getAlbum());
+                HudRendererManager.getInstance().preloadAlbumImage(nextIdleMusicDetail.value().getAlbum());
             }
             if (!message.isEmpty()) {
                 MuiModApi.postToUiThread(() -> {
@@ -312,18 +317,17 @@ public class MusicService implements IClientMusicService {
                     ToastUtil.show(Toast.makeText(context, message, Toast.LENGTH_SHORT));
                 });
             }
-            if (!musicDetail.equals(MusicDetail.NONE)) {
-                Album album = musicDetail.getAlbum();
+            if (!musicDetail.value().equals(MusicDetail.NONE)) {
+                Album album = musicDetail.value().getAlbum();
                 ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 streamAudioPlayer.play(PlaybackTask.of(musicDetail, serverStartTime))
                         .thenAccept(nowPlayingInfo::startAt)
                         .exceptionally(e -> null);
-            } else {//TODO optional account sync
+            } else {
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 nowPlayingInfo.startAt(null);
-//                nowPlayingInfo.switchMusic(MusicDetail.NONE,MusicDetail.NONE,null);
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 streamAudioPlayer.stop();
             }
@@ -557,6 +561,17 @@ public class MusicService implements IClientMusicService {
         return future;
     }
 
+    @SuppressWarnings("unchecked")
+    public <T extends MusicCollection> CompletableFuture<T> loadMusicCollectionDetail(long id, Class<T> type) {
+        if (type == Album.class) {
+            return (CompletableFuture<T>) loadAlbumDetail(id, false);
+        } else if (type == Playlist.class) {
+            return (CompletableFuture<T>) loadPlaylistDetail(id, false);
+        } else {
+            throw new IllegalArgumentException("Unrecognizable type");
+        }
+    }
+
     @EqualsAndHashCode
     @NoArgsConstructor(access = AccessLevel.PACKAGE)
     public static class UserCollections implements IUserCollections {
@@ -614,20 +629,20 @@ public class MusicService implements IClientMusicService {
                 MusicHud.EXECUTOR.submit(() -> {
                     if (userCategoryPlaylists != null) {
                         Playlist likeList = userCategoryPlaylists.getLikeList();
-                        if (playlistsCache.asMap().putIfAbsent(likeList.getId(), likeList) == null) {
+                        if (playlistsCache.asMap().putIfAbsent(PlaylistCacheKey.of(likeList, Profile.getCurrent().getUserId()), likeList) == null) {
                             CollectionUpdateNotifier.notifyPlaylistUpdated(likeList.getId(), true);
                         }
                         userCategoryPlaylists.getCreatedPlaylist()
                                 .forEach(playlist -> {
                                     if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
-                                            && playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist) == null) {
+                                            && playlistsCache.asMap().putIfAbsent(PlaylistCacheKey.of(playlist, Profile.getCurrent().getUserId()), playlist) == null) {
                                         CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), true);
                                     }
                                 });
                         userCategoryPlaylists.getSubscribedPlaylist()
                                 .forEach(playlist -> {
                                     if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
-                                            && playlistsCache.asMap().putIfAbsent(playlist.getId(), playlist) == null) {
+                                            && playlistsCache.asMap().putIfAbsent(PlaylistCacheKey.of(playlist, Profile.getCurrent().getUserId()), playlist) == null) {
                                         CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), true);
                                     }
                                 });

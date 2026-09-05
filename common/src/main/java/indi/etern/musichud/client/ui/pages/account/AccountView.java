@@ -8,10 +8,7 @@ import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.Album;
-import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.beans.music.Playlist;
-import indi.etern.musichud.beans.music.UserCategoryPlaylists;
+import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.MusicService;
@@ -62,7 +59,7 @@ public class AccountView extends LinearLayout {
             }
             long id = playlist.getId();
             elementMap.computeIfAbsent(new ElementKey(Playlist.class, id), (key) -> {
-                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist);
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY);
                 card.setTag(id);
                 mySubscribedPlaylistCards.addView(card);
                 return card;
@@ -76,7 +73,7 @@ public class AccountView extends LinearLayout {
             }
             long id = album.getId();
             elementMap.computeIfAbsent(new ElementKey(Album.class, id), (key) -> {
-                MusicCollectionCard card = new MusicCollectionCard(getContext(), album);
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY);
                 card.setTag(id);
                 albumCards.addView(card);
                 return card;
@@ -358,15 +355,17 @@ public class AccountView extends LinearLayout {
                 unregisterCollectionListeners();
                 UserCategoryPlaylists categoryPlaylists = userCollections.getUserCategoryPlaylists();
                 Playlist likeList = categoryPlaylists.getLikeList();
-                elementMap.computeIfAbsent(new ElementKey(Playlist.class, likeList.getId()), key -> {
-                    MusicCollectionCard card = new MusicCollectionCard(context, likeList);
-                    card.setTag(likeList.getId());
-                    myPlaylistCards.addView(card);
-                    return card;
-                });
+                if (likeList != Playlist.EMPTY) {
+                    elementMap.computeIfAbsent(new ElementKey(Playlist.class, likeList.getId()), key -> {
+                        MusicCollectionCard card = new MusicCollectionCard(context, likeList, PusherInfo.EMPTY);
+                        card.setTag(likeList.getId());
+                        myPlaylistCards.addView(card);
+                        return card;
+                    });
+                }
                 ObservableSequencedSet<Playlist> createdPlaylist = categoryPlaylists.getCreatedPlaylist();
                 createdPlaylist.forEach(playlist -> elementMap.computeIfAbsent(new ElementKey(Playlist.class, playlist.getId()), key -> {
-                    MusicCollectionCard card = new MusicCollectionCard(context, playlist);
+                    MusicCollectionCard card = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY);
                     card.setTag(playlist.getId());
                     myPlaylistCards.addView(card);
                     return card;

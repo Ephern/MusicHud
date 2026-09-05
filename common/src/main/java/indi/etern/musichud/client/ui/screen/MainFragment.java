@@ -21,6 +21,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.ConnectionManager;
@@ -122,24 +123,26 @@ public class MainFragment extends Fragment {
             // attempt no longer stops the ongoing playback, so a blanket clear would wrongly
             // wipe the GUI while the HUD keeps playing.
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-            MusicDetail current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+            Traceable<MusicDetail> current = nowPlayingInfo.getCurrentlyPlayingMusic();
             MusicDetail nextToPlay = nowPlayingInfo.getNextToPlayIdleMusicDetail();
             Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
             displayMusicInfo(current);
             if (homeView != null) {
-                homeView.switchMusic(current, nextToPlay, lines);
+                homeView.switchMusic(current.value(), nextToPlay, lines);
             }
             if (instance.lyricsScrollView != null) {
-                instance.lyricsScrollView.switchLyrics(current, lines);
+                instance.lyricsScrollView.switchLyrics(current.value(), lines);
             }
             instance.updateLyricsPanelVisibility();
             instance.refreshServerConnectStatus();
         }
     }
 
-    public static void switchMusic(MusicDetail musicDetail, MusicDetail nextToPlay, Queue<LyricLine> lines) {
+    public static void switchMusic(Traceable<MusicDetail> musicDetailTrace, Traceable<MusicDetail> nextToPlayTrace, Queue<LyricLine> lines) {
         if (instance != null && instance.visible) {
-            displayMusicInfo(musicDetail);
+            displayMusicInfo(musicDetailTrace);
+            MusicDetail musicDetail = musicDetailTrace.value();
+            MusicDetail nextToPlay = nextToPlayTrace.value();
             if (musicDetail != null && !musicDetail.equals(MusicDetail.NONE)) {
                 startProgressUpdater(musicDetail);
             }
@@ -154,7 +157,8 @@ public class MainFragment extends Fragment {
         }
     }
 
-    private static void displayMusicInfo(MusicDetail musicDetail) {
+    private static void displayMusicInfo(Traceable<MusicDetail> musicDetailTrace) {
+        MusicDetail musicDetail = musicDetailTrace.value();
         if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
             instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
             instance.titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
@@ -467,10 +471,6 @@ public class MainFragment extends Fragment {
                     buttonsLayout.addView(skipCurrentButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
                 }
 
-                NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-                MusicDetail currentlyPlayingMusicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-                MusicDetail nextToPlayMusicDetail = nowPlayingInfo.getNextToPlayIdleMusicDetail();
-
                 LinearLayout.LayoutParams buttonsParams = new LinearLayout.LayoutParams(MATCH_PARENT, buttonsLayout.dp(40));
                 buttonsParams.setMargins(0, sideContent.dp(2), 0, 0);
 
@@ -534,7 +534,11 @@ public class MainFragment extends Fragment {
                 transition3.enableTransitionType(LayoutTransition.CHANGING);
                 serverConnectPanel.setLayoutTransition(transition3);
 
-                switchMusic(currentlyPlayingMusicDetail, nextToPlayMusicDetail, playingInfo.getLyricLines());
+                NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+                Traceable<MusicDetail> currentlyPlaying = nowPlayingInfo.getCurrentlyPlayingMusic();
+                Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayIdleMusic();
+
+                switchMusic(currentlyPlaying, nextToPlay, playingInfo.getLyricLines());
             }
 
             lyricsPanelWidth = base.dp(320);

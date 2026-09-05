@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.pushMessages.c2s;
 
 import indi.etern.musichud.beans.music.Quality;
+import indi.etern.musichud.beans.music.SourceMeta;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -10,8 +11,10 @@ import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.IMusicApiService;
 import indi.etern.musichud.utils.ServerDataPacketVThreadExecutor;
+import org.jetbrains.annotations.Nullable;
 
-public record ScrobbleMessage(long id, int playedInSecond, int durationInSecond, int bitrate, Quality quality) implements C2SPayload {
+public record ScrobbleMessage(long id, int playedInSecond, int durationInSecond, int bitrate, Quality quality,
+                             @Nullable SourceMeta source) implements C2SPayload {
     public static final ByteBufCodec<ScrobbleMessage> CODEC = ByteBufCodec.composite(
             Codecs.LONG,
             ScrobbleMessage::id,
@@ -23,6 +26,8 @@ public record ScrobbleMessage(long id, int playedInSecond, int durationInSecond,
             ScrobbleMessage::bitrate,
             Quality.CODEC,
             ScrobbleMessage::quality,
+            Codecs.ofNullable(SourceMeta.CODEC),
+            ScrobbleMessage::source,
             ScrobbleMessage::new
     );
 
@@ -33,7 +38,7 @@ public record ScrobbleMessage(long id, int playedInSecond, int durationInSecond,
                     ScrobbleMessage.class, CODEC,
                     ServerDataPacketVThreadExecutor.execute((message, player) -> {
                         IMusicApiService.getInstance(ApiProvider.NCM)
-                                .scrobble(message.id, message.playedInSecond, message.durationInSecond, message.bitrate, message.quality, player.getUUID());
+                                .scrobble(message.id, message.playedInSecond, message.durationInSecond, message.bitrate, message.quality, message.source, player.getUUID());
                     })
             );
         }

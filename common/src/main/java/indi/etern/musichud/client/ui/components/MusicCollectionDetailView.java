@@ -41,6 +41,10 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicCollectionDetailView extends LinearLayout {
     private static final MusicService musicService = MusicService.getInstance();
+    private static final String ICON_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/list_music.png";
+    private static final String ICON_LIKE_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/heart_filled.png";
+    private static final String ICON_RECOMMEND_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/radio.png";
+    private static final String ICON_DISC_ALBUM = "/assets/music_hud/textures/gui/icons/disc_album.png";
     private final ProgressBar progressBar;
     private final VirtualizedListLayout virtualList;
     private final UrlImageView imageView;
@@ -152,7 +156,7 @@ public class MusicCollectionDetailView extends LinearLayout {
                 TextView albumTypeText = new TextView(context);
                 albumTypeText.setTextSize(Theme.TEXT_SIZE_LARGE);
                 SpannableString text = new SpannableString("  " + mappedAlbumType(type));
-                Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/layout_grid.png");
+                Image icon = ImageUtils.getImageFromResource(ICON_DISC_ALBUM);
                 if (icon != null) {
                     ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
                     text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -209,10 +213,10 @@ public class MusicCollectionDetailView extends LinearLayout {
                 toggleSubscribeButton.bindState(subscribeState);
             }
         }
-        ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
-        backgroundFactory.applyBackgroundTo(toggleIdleSourceButton);
-        toggleIdleSourceButton.bindState(musicService.getIdlePlaySourceState().local().collection(musicCollection));
-        row1.addView(toggleIdleSourceButton, new LayoutParams(dp28, dp28, 0));
+        {
+            var idlePlaySourceWidget = new IdlePlaySourceWidget(context, this.musicCollection, dp(28));
+            row1.addView(idlePlaySourceWidget, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        }
 
         LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBarParams.setMargins(0, dp(24), 0, 0);
@@ -240,7 +244,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         });
         scrollView.post(() -> virtualList.updateWindow(0, scrollView.getHeight()));
 
-        if (musicCollection instanceof Playlist playlist) {
+        if (musicCollection instanceof Playlist playlist) {//TODO intelligent recommendations list for like list
             collectionId = playlist.getId();
             albumCollection = false;
             updateNotifierUnregister = CollectionUpdateNotifier.registerPlaylist(collectionId, this::onCollectionUpdateNotified);
@@ -302,7 +306,12 @@ public class MusicCollectionDetailView extends LinearLayout {
 
     private void updatePlaylistTrackCountView(Playlist playlist) {
         SpannableString text = new SpannableString("  " + playlist.getMusicTrackCount());
-        Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_music.png");
+        String iconPath = switch (playlist.getSpecialType()) {
+            case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
+            case USER_SPECIFIC -> ICON_RECOMMEND_LIST_MUSIC;
+            default -> ICON_LIST_MUSIC;
+        };
+        Image icon = ImageUtils.getImageFromResource(iconPath);
         if (icon != null) {
             ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
             text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);

@@ -35,12 +35,16 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicCollectionCard extends LinearLayout {
     private static final String ICON_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/list_music.png";
+    private static final String ICON_LIKE_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/heart_filled.png";
+    private static final String ICON_RECOMMEND_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/radio.png";
     private static final String ICON_AUDIO_LINES = "/assets/music_hud/textures/gui/icons/audio_lines.png";
     private static final String ICON_DISC_ALBUM = "/assets/music_hud/textures/gui/icons/disc_album.png";
     private static final String ICON_LAYOUT_GRID = "/assets/music_hud/textures/gui/icons/layout_grid.png";
     private static final MusicService musicService = MusicService.getInstance();
     private final ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
     private final AtomicBoolean refreshPending = new AtomicBoolean();
+    private final LinearLayout buttons;
+    private final InsetBackgroundFactory backgroundFactory;
     @Getter
     MusicCollection musicCollection;
     private Unregister onChangeUnregister;
@@ -51,7 +55,7 @@ public class MusicCollectionCard extends LinearLayout {
     private TextView playedCountView;
     private TextView albumTypeView;
 
-    public MusicCollectionCard(Context context, MusicCollection musicCollection) {
+    public MusicCollectionCard(Context context, MusicCollection musicCollection, PusherInfo pusherInfo) {
         super(context);
         this.musicCollection = musicCollection;
 
@@ -68,9 +72,11 @@ public class MusicCollectionCard extends LinearLayout {
         addView(imageView, imageParams);
 
         onChangeUnregister = musicCollection.getMusicDetails().registerOnChange(() -> {
-            MuiModApi.postToUiThread(() -> {
-                imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp160));
-            });
+            if (!(musicCollection instanceof Playlist playlist) || playlist.getSpecialType() != PlaylistSpecialType.USER_SPECIFIC) {
+                MuiModApi.postToUiThread(() -> {
+                    imageView.loadUrl(musicCollection.getImageThumbnailUrl(dp160));
+                });
+            }
         });
         registerUpdateNotifier();
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
@@ -94,7 +100,7 @@ public class MusicCollectionCard extends LinearLayout {
         FlexWrapLayout row1 = new FlexWrapLayout(context);
         row1.applyLineStyle(line -> {
             line.setBaselineAligned(false);
-            line.setGravity(Gravity.CENTER_VERTICAL);
+            line.setGravity(Gravity.TOP);
         });
         addView(row1, new LayoutParams(dp160, WRAP_CONTENT));
 
@@ -107,13 +113,18 @@ public class MusicCollectionCard extends LinearLayout {
         LinearLayout texts = new LinearLayout(context);
         texts.setOrientation(HORIZONTAL);
         LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params2.setMargins(dp(2), 0, 0, 0);
+        params2.setMargins(dp(2), dp(2.5f), 0, 0);
         row1.addView(texts, params2);
         if (musicCollection instanceof Playlist playlist) {
             {
                 musicTrackCountView = new TextView(context);
                 musicTrackCountView.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                musicTrackCountView.setText(buildIconText(String.valueOf(playlist.getMusicTrackCount()), ICON_LIST_MUSIC));
+                String iconPath = switch (playlist.getSpecialType()) {
+                    case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
+                    case USER_SPECIFIC -> ICON_RECOMMEND_LIST_MUSIC;
+                    default -> ICON_LIST_MUSIC;
+                };
+                musicTrackCountView.setText(buildIconText(String.valueOf(playlist.getMusicTrackCount()), iconPath));
                 LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
                 params1.setMargins(0, 0, dp(8), 0);
                 texts.addView(musicTrackCountView, params1);
@@ -143,10 +154,13 @@ public class MusicCollectionCard extends LinearLayout {
         }
         row1.addView(new View(context), new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 1));
 
-        LinearLayout buttons = new LinearLayout(context);
+        buttons = new LinearLayout(context);
         buttons.setOrientation(HORIZONTAL);
-        row1.addView(buttons);
-        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
+        buttons.setGravity(Gravity.CENTER_VERTICAL);
+        LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        params3.setMargins(dp(-2), 0, 0, 0);
+        row1.addView(buttons, params3);
+        backgroundFactory = InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .inset(0)
                 .cornerRadius(dp(4))
@@ -155,7 +169,7 @@ public class MusicCollectionCard extends LinearLayout {
         {
             ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
             backgroundFactory.applyBackgroundTo(toggleSubscribeButton);
-            buttons.addView(toggleSubscribeButton, new LayoutParams(row2.dp(22), row2.dp(22), 0));
+            buttons.addView(toggleSubscribeButton, new LayoutParams(dp(22), dp(22), 0));
             if (musicCollection instanceof Playlist playlist) {
                 Profile current = Profile.getCurrent();
                 if (current == null || current.equals(Profile.ANONYMOUS) || playlist.getCreator().getUserId() == current.getUserId()) {
@@ -183,15 +197,14 @@ public class MusicCollectionCard extends LinearLayout {
         params1.setMargins(dp(2), 0, dp(2), 0);
         row2.addView(nameView, params1);
 
-        PusherInfo pusherInfo = musicCollection.getPusherInfo();
         LocalPlayer localPlayer = Minecraft.getInstance().player;
         if (pusherInfo == null || pusherInfo.equals(PusherInfo.EMPTY)
                 || (localPlayer != null && pusherInfo.getPlayerUUID().equals(localPlayer.getUUID()))) {
             nameView.setMinLines(2);
-            ToggleIdlePlaySourceButton toggleIdleSourceButton = new ToggleIdlePlaySourceButton(context);
-            backgroundFactory.applyBackgroundTo(toggleIdleSourceButton);
-            toggleIdleSourceButton.bindState(musicService.getIdlePlaySourceState().local().collection(musicCollection));
-            buttons.addView(toggleIdleSourceButton, new LayoutParams(row2.dp(22), row2.dp(22), 0));
+            {
+                var idlePlaySourceWidget = new IdlePlaySourceWidget(context, this.musicCollection, dp(22));
+                buttons.addView(idlePlaySourceWidget, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+            }
         } else {
             LinearLayout pusherRow = new LinearLayout(context);
             pusherRow.setOrientation(LinearLayout.HORIZONTAL);
@@ -206,7 +219,7 @@ public class MusicCollectionCard extends LinearLayout {
             PlayerHeadView pusherHeadView = new PlayerHeadView(context);
             int rowHeight = pusherText.dp(Theme.TEXT_SIZE_LARGER);
             //noinspection SuspiciousNameCombination
-            pusherHeadView.setLayoutParams(new LinearLayout.LayoutParams(rowHeight, rowHeight));
+            pusherHeadView.setLayoutParams(new LayoutParams(rowHeight, rowHeight));
             pusherHeadView.setPlayerSkinSupplier(() -> {
                 try {
                     return PlayerInfoUtil.getPlayerSkin(PlayerInfoUtil.getPlayerInfoByUUID(pusherInfo.getPlayerUUID()));
@@ -216,7 +229,7 @@ public class MusicCollectionCard extends LinearLayout {
             });
 
             pusherRow.addView(pusherHeadView);
-            LinearLayout.LayoutParams params5 = new LinearLayout.LayoutParams(WRAP_CONTENT, rowHeight);
+            LayoutParams params5 = new LayoutParams(WRAP_CONTENT, rowHeight);
             params5.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
             params5.setMargins(pusherText.dp(4), 0, 0, 0);
             pusherRow.addView(pusherText, params5);
@@ -263,9 +276,16 @@ public class MusicCollectionCard extends LinearLayout {
     private void refreshCollectionInfo() {
         MusicCollection collection = musicCollection;
         if (collection == null) return;
-        imageView.loadUrl(collection.getImageThumbnailUrl(dp(160)));
+        if (!(musicCollection instanceof Playlist playlist) || playlist.getSpecialType() != PlaylistSpecialType.USER_SPECIFIC) {
+            imageView.loadUrl(collection.getImageThumbnailUrl(dp(160)));
+        }
         if (collection instanceof Playlist playlist) {
-            musicTrackCountView.setText(buildIconText(String.valueOf(playlist.getMusicTrackCount()), ICON_LIST_MUSIC));
+            String iconPath = switch (playlist.getSpecialType()) {
+                case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
+                case USER_SPECIFIC -> ICON_RECOMMEND_LIST_MUSIC;
+                default -> ICON_LIST_MUSIC;
+            };
+            musicTrackCountView.setText(buildIconText(String.valueOf(playlist.getMusicTrackCount()), iconPath));
             if (playedCountView != null) {
                 playedCountView.setText(buildIconText(CountFormatter.formatCount(playlist.getPlayedCount()), ICON_AUDIO_LINES));
             }

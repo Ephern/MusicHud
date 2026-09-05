@@ -8,9 +8,7 @@ public interface MusicCollection extends IdentifiedBeans {
     String getNameI18nKey();
     String getImageThumbnailUrl(int size);
     int getMusicTrackCount();
-    PusherInfo getPusherInfo();
     ObservableSequencedSet<MusicDetail> getMusicDetails();
-    MusicCollection copyWithPusherInfo(PusherInfo pusherInfo);
 
     boolean equalsLoose(Object obj);
 }

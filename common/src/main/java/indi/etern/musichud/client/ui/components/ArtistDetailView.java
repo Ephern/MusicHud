@@ -14,6 +14,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
@@ -323,7 +324,7 @@ public class ArtistDetailView extends LinearLayout {
         String artistsName = musicDetail.getArtists().stream()
                 .map(Artist::getName).collect(Collectors.joining(" / "));
         musicLayout.setOnClickListener((view) -> {
-            MusicService.getInstance().sendPushMusicToQueue(musicDetail);
+            MusicService.getInstance().sendPushMusicToQueue(Traceable.of(musicDetail.getId()));
             ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
         musicList.addView(musicLayout);

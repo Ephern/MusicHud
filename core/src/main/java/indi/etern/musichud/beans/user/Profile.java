@@ -20,7 +20,6 @@ public class Profile {
             );
     public static final Profile ANONYMOUS = new Profile("anonymous", "", -1, VipType.NORMAL);
     public static final Profile PRIVATE_MASK = new Profile("private_mask", "", 0, VipType.NORMAL);
-    @Getter
     @Setter
     private static volatile Profile current;
     String nickname;
@@ -28,6 +27,10 @@ public class Profile {
     long userId;
     @Setter
     VipType vipType;
+
+    public static Profile getCurrent() {
+        return Objects.requireNonNullElse(current, Profile.ANONYMOUS);
+    }
 
     public String getNickname() {
         return Objects.requireNonNullElse(nickname, "");
