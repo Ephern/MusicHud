@@ -315,7 +315,7 @@ public class ArtistDetailView extends LinearLayout {
     }
 
     private void addItem(Context context, MusicDetail musicDetail) {
-        var musicLayout = new MusicListItem(context);
+        var musicLayout = new MusicTrackItem(context);
         musicLayout.setShowPusherInfo(false);
         musicLayout.bindData(musicDetail);
         itemBackgroundFactory.applyBackgroundTo(musicLayout);

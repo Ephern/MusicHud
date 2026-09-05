@@ -9,7 +9,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.components.MusicListItem;
+import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
@@ -60,7 +60,7 @@ public class SearchMusicResultView extends LinearLayout {
     }
 
     private void addItem(Context context, MusicDetail musicDetail) {
-        var musicLayout = new MusicListItem(context);
+        var musicLayout = new MusicTrackItem(context);
         musicLayout.bindData(musicDetail);
         backgroundFactory.applyBackgroundTo(musicLayout);
 
