@@ -88,8 +88,13 @@ public class HudRendererManager {
             });
         });
         PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
-            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-            return PlayerInfoUtil.getPlayerSkinPath(pusherPlayerInfo);
+            try {
+                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
+                return PlayerInfoUtil.getPlayerSkinPath(pusherPlayerInfo);
+            } catch (Exception e) {
+                // Render-thread supplier: a lookup failure must never break the HUD frame
+                return null;
+            }
         });
         updateLayoutFromConfig();
         refreshStyle();
@@ -332,6 +337,10 @@ public class HudRendererManager {
         }, MusicHud.EXECUTOR);
         voidCompletableFuture.thenRun(() -> {
             Duration musicDuration = nowPlayingInfo.getMusicDuration();
+            if (musicDuration == null) {
+                // The track was switched to idle (or stopped) while the album image was loading
+                return;
+            }
             DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
                     LONG_DATE_TIME_FORMATTER :
                     SHORT_DATE_TIME_FORMATTER;
