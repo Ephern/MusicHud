@@ -43,6 +43,8 @@ public class MusicPlayerServerService {
     private static final long INTELLIGENT_LOAD_WAIT_MILLIS = 10_000;
     private static volatile MusicPlayerServerService instance;
     final Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources = new ConcurrentHashMap<>();
+    /** Per (player, collection) monitors; entries live for the server uptime. */
+    private final ConcurrentHashMap<String, Object> idleSourceKeyLocks = new ConcurrentHashMap<>();
     private final IMusicApiService musicApiService = IMusicApiService.getInstance(ApiProvider.NCM);
     private final CurrentVoteInfo currentVoteInfo = new CurrentVoteInfo();
     private final Logger logger = MusicHud.getLogger(MusicPlayerServerService.class);
@@ -442,8 +444,20 @@ public class MusicPlayerServerService {
      * visible. An incoming source matching an existing entry of the same
      * collection (id+type) only updates the play mode; on failure the previous
      * entry is kept untouched.
+     *
+     * <p>Requests are serialized per (player, collection): handlers run on
+     * concurrent virtual threads, so two rapid mode switches could otherwise
+     * interleave between the existing-entry check and the write, leaving two
+     * modes of the same collection active at once. Serializing makes the last
+     * processed request win.</p>
      */
     public MessagedResult<Void> addIdlePlaySource(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
+        synchronized (idleSourceKeyLock(pusherInfo.getPlayerUUID(), idlePlaySource)) {
+            return addIdlePlaySourceLocked(idlePlaySource, pusherInfo);
+        }
+    }
+
+    private MessagedResult<Void> addIdlePlaySourceLocked(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
         try {
             idlePlaySource.setPusherInfo(pusherInfo);
             Set<IdlePlaySource> userSources = idlePlaySources.computeIfAbsent(pusherInfo, k -> ConcurrentHashMap.newKeySet());
@@ -489,16 +503,28 @@ public class MusicPlayerServerService {
         }
     }
 
+    /**
+     * Monitor serializing mutating access to one (player, collection) idle source entry.
+     * Virtual-thread friendly: blocking here parks the vthread instead of a carrier thread.
+     */
+    private Object idleSourceKeyLock(UUID playerUUID, IdlePlaySource idlePlaySource) {
+        return idleSourceKeyLocks.computeIfAbsent(
+                playerUUID + ":" + idlePlaySource.getType().getName() + ":" + idlePlaySource.getId(),
+                k -> new Object());
+    }
+
     public void removeIdlePlaySource(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
-        Set<IdlePlaySource> musicCollections = idlePlaySources.get(pusherInfo);
-        if (musicCollections != null) {
-            idlePlaySource.setPusherInfo(pusherInfo);
-            musicCollections.remove(idlePlaySource);
-            if (musicCollections.isEmpty()) {
-                idlePlaySources.remove(pusherInfo);
+        synchronized (idleSourceKeyLock(pusherInfo.getPlayerUUID(), idlePlaySource)) {
+            Set<IdlePlaySource> musicCollections = idlePlaySources.get(pusherInfo);
+            if (musicCollections != null) {
+                idlePlaySource.setPusherInfo(pusherInfo);
+                musicCollections.remove(idlePlaySource);
+                if (musicCollections.isEmpty()) {
+                    idlePlaySources.remove(pusherInfo);
+                }
+                idlePlaySource.getPlayMode().onRemoved(idlePlaySource, pusherInfo);
+                debouncedUpdateAllIdlePlaySources();
             }
-            idlePlaySource.getPlayMode().onRemoved(idlePlaySource, pusherInfo);
-            debouncedUpdateAllIdlePlaySources();
         }
     }
 

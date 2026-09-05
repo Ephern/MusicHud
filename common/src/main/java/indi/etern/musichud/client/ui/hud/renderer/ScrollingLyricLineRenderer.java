@@ -17,6 +17,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 public class ScrollingLyricLineRenderer implements HudRenderer {
     private final LineState currentLine1;
@@ -160,13 +161,21 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             try {
                 rawWidth = modernStringSplitter.stringWidth(text);
             } catch (Throwable e) {
-                modernStringSplitter = null;//fallback
-                rawWidth = font.width(text);
+                modernStringSplitter = null;//fallback;
+                rawWidth = submitVanillaCalcWidth(text, font);
             }
         } else {
-            rawWidth = font.width(text);
+            rawWidth = submitVanillaCalcWidth(text, font);
         }
         return rawWidth * lineHeight / font.lineHeight;
+    }
+
+    private float submitVanillaCalcWidth(String text, Font font) {
+        try {
+            return Minecraft.getInstance().submit(() -> font.width(text)).get();
+        } catch (InterruptedException | ExecutionException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private void updateAnimations() {
