@@ -11,6 +11,7 @@ import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.util.DataSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.LayoutInflater;
@@ -18,10 +19,7 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.Album;
-import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.Traceable;
+import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.services.ConnectionManager;
@@ -39,6 +37,7 @@ import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.server.api.playmode.PlayMode;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -64,7 +63,6 @@ public class MainFragment extends Fragment {
     private static final int LYRICS_ANIMATION_DURATION = 300;
     private static volatile MainFragment instance = null;
 
-
     static {
         ConnectionStateMachine.getConnectStatusListeners().add(status -> {
             if (instance != null && instance.visible) {
@@ -72,6 +70,7 @@ public class MainFragment extends Fragment {
             }
         });
     }
+
     private final NowPlayingInfo playingInfo = NowPlayingInfo.getInstance();
     private boolean visible = false;
     private UrlImageView albumImage;
@@ -96,13 +95,9 @@ public class MainFragment extends Fragment {
     private int lyricsPanelWidth = -1;
     private boolean lyricsPanelShown = false;
     private AnimatorSet lyricsAnimator = null;
+    private Button sourceButton;
 
-    private MainFragment() {}
-
-    private void reset() {
-        visible = false;
-        defaultSelectedIndex = 0;
-        lyricsPanelShown = false;
+    private MainFragment() {
     }
 
     public static void refresh() {
@@ -124,11 +119,11 @@ public class MainFragment extends Fragment {
             // wipe the GUI while the HUD keeps playing.
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             Traceable<MusicDetail> current = nowPlayingInfo.getCurrentlyPlayingMusic();
-            MusicDetail nextToPlay = nowPlayingInfo.getNextToPlayIdleMusicDetail();
+            Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayIdleMusic();
             Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
             displayMusicInfo(current);
             if (homeView != null) {
-                homeView.switchMusic(current.value(), nextToPlay, lines);
+                homeView.switchMusic(current, nextToPlay, lines);
             }
             if (instance.lyricsScrollView != null) {
                 instance.lyricsScrollView.switchLyrics(current.value(), lines);
@@ -142,13 +137,12 @@ public class MainFragment extends Fragment {
         if (instance != null && instance.visible) {
             displayMusicInfo(musicDetailTrace);
             MusicDetail musicDetail = musicDetailTrace.value();
-            MusicDetail nextToPlay = nextToPlayTrace.value();
             if (musicDetail != null && !musicDetail.equals(MusicDetail.NONE)) {
                 startProgressUpdater(musicDetail);
             }
             HomeView homeView = HomeView.getInstance();
             if (homeView != null) {
-                homeView.switchMusic(musicDetail, nextToPlay, lines);
+                homeView.switchMusic(musicDetailTrace, nextToPlayTrace, lines);
             }
             if (instance.lyricsScrollView != null) {
                 instance.lyricsScrollView.switchLyrics(musicDetail, lines);
@@ -167,6 +161,7 @@ public class MainFragment extends Fragment {
             instance.albumContainer.removeAllViews();
             instance.pusherHeadView.setVisibility(View.GONE);
             instance.pusherText.setText("");
+            instance.sourceButton.setVisibility(View.GONE);
             instance.progressBar.setVisibility(View.GONE);
             instance.playedTimeText.setText("");
             instance.totalTimeText.setText("");
@@ -186,6 +181,43 @@ public class MainFragment extends Fragment {
             } else {
                 instance.pusherHeadView.setVisibility(View.VISIBLE);
                 instance.pusherText.setText(name);
+            }
+            SourceMeta source = musicDetailTrace.source();
+            if (source != null) {
+                instance.sourceButton.setTag(source);
+                SpannableString text = new SpannableString("    " + source.name());
+                {
+                    String iconPath;
+                    Class<?> type = source.type();
+                    if (Album.class.isAssignableFrom(type)) {
+                        iconPath = "/assets/music_hud/textures/gui/icons/disc_album.png";
+                    } else {
+                        iconPath = "/assets/music_hud/textures/gui/icons/list_music.png";
+                    }
+                    Image icon = ImageUtils.getImageFromResource(iconPath);
+                    if (icon != null) {
+                        ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
+                        text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    }
+                }
+                {
+                    PlayMode playMode = source.playMode();
+                    String playModeIconPath = switch (playMode) {
+                        case RANDOM -> "/assets/music_hud/textures/gui/icons/shuffle.png";
+                        case SEQUENTIAL -> "/assets/music_hud/textures/gui/icons/repeat.png";
+                        case INTELLIGENT -> "/assets/music_hud/textures/gui/icons/heart_pulse.png";
+                    };
+                    Image icon = ImageUtils.getImageFromResource(playModeIconPath);
+                    if (icon != null) {
+                        ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
+                        text.setSpan(iconSpan, 2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                    }
+                }
+
+                instance.sourceButton.setVisibility(View.VISIBLE);
+                instance.sourceButton.setText(text);
+            } else {
+                instance.sourceButton.setVisibility(View.GONE);
             }
             Context context = ModernUI.getInstance();
             instance.artists.removeAllViews();
@@ -314,6 +346,12 @@ public class MainFragment extends Fragment {
         return instance;
     }
 
+    private void reset() {
+        visible = false;
+        defaultSelectedIndex = 0;
+        lyricsPanelShown = false;
+    }
+
     @Override
     public View onCreateView(@NonNull LayoutInflater inflater,
                              @Nullable ViewGroup container,
@@ -373,16 +411,12 @@ public class MainFragment extends Fragment {
                 albumContainer.setGravity(Gravity.TOP | Gravity.LEFT);
                 musicInfo.addView(albumContainer);
 
-                pusherText = new TextView(context);
-                pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                pusherText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-
                 LinearLayout pusherRow = new LinearLayout(context);
                 pusherRow.setOrientation(LinearLayout.HORIZONTAL);
                 pusherRow.setGravity(Gravity.CENTER_VERTICAL);
 
                 pusherHeadView = new PlayerHeadView(context);
-                int rowHeight = pusherText.dp(Theme.TEXT_SIZE_LARGER);
+                int rowHeight = pusherRow.dp(Theme.TEXT_SIZE_LARGER);
                 //noinspection SuspiciousNameCombination
                 pusherHeadView.setLayoutParams(new LinearLayout.LayoutParams(rowHeight, rowHeight));
                 pusherHeadView.setVisibility(View.GONE);
@@ -394,16 +428,48 @@ public class MainFragment extends Fragment {
                     }
                     return null;
                 });
-
                 pusherRow.addView(pusherHeadView);
+
+                pusherText = new TextView(context);
+                pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                pusherText.setTextSize(Theme.TEXT_SIZE_NORMAL);
                 LinearLayout.LayoutParams params5 = new LinearLayout.LayoutParams(WRAP_CONTENT, rowHeight);
                 params5.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
                 params5.setMargins(pusherText.dp(4), 0, 0, 0);
                 pusherRow.addView(pusherText, params5);
+
+
                 LinearLayout.LayoutParams params6 = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
                 int dp2 = musicInfo.dp(2);
                 params6.setMargins(0, dp2, 0, dp2);
                 musicInfo.addView(pusherRow, params6);
+
+
+                sourceButton = new Button(context);
+                sourceButton.setVisibility(View.GONE);
+                sourceButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                sourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                sourceButton.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
+                sourceButton.setSingleLine();
+                sourceButton.setOnClickListener(view -> {
+                    Object tag = sourceButton.getTag();
+                    if (tag instanceof SourceMeta sourceMeta) {
+                        Class<?> type = sourceMeta.type();
+                        if (MusicCollection.class.isAssignableFrom(type)) {
+                            //noinspection unchecked
+                            MusicService.getInstance().loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
+                                    .thenAccept((musicCollection) ->
+                                            MuiModApi.postToUiThread(() -> routerContainer.pushNavigate(
+                                                    new MusicCollectionDetailView(context, musicCollection)))
+                                    );
+                        }
+                    }
+                });
+                InsetBackgroundFactory.builder()
+                        .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                        .padding(new InsetBackgroundFactory.Padding(0, sourceButton.dp(1), 0, sourceButton.dp(1)))
+                        .cornerRadius(sourceButton.dp(4)).build().applyBackgroundTo(sourceButton);
+                musicInfo.addView(sourceButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
 
                 progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
                 progressBar.setMin(0);
@@ -636,7 +702,7 @@ public class MainFragment extends Fragment {
         RouterContainer rc = RouterContainer.getInstance();
         if (rc == null) return;
         String currentKey = rc.getCurrentPageKey();
-        if ("Home".equals(currentKey)) return;
+        if ("Home".equals(currentKey) || currentKey == null) return;
         if (shouldShowLyricsPanel()) {
             showLyricsPanel();
         } else {

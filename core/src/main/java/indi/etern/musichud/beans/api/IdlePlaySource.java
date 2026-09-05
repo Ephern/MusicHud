@@ -108,7 +108,7 @@ public final class IdlePlaySource {
         LoginApiService.PlayerLoginInfo loginInfo = ILoginApiService.getInstance(ApiProvider.NCM)
                 .getLoginInfoByPlayerUUID(pusherInfo.getPlayerUUID());
         sampledTrack.setPusherInfo(loginInfo != null ? pusherInfo : PusherInfo.EMPTY);
-        return Traceable.of(sampledTrack, new SourceMeta(id, type));
+        return Traceable.of(sampledTrack, new SourceMeta(id, musicCollection.getImageThumbnailUrl(-1), playMode, musicCollection.getName(), type));
     }
 
     public PlayMode getPlayMode() {
