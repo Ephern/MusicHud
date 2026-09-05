@@ -33,6 +33,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 
+import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
@@ -281,7 +282,9 @@ public class HomeView extends LinearLayout {
 
             playQueueListView.removeAllViews();
 
-            for (QueueItem item : queue) {
+            // Snapshot before iterating: the client queue is a plain ArrayDeque mutated on
+            // network threads and its iterator is fail-fast
+            for (QueueItem item : List.copyOf(queue)) {
                 addMusicQueueItem(item, playQueueListView);
             }
 
@@ -327,9 +330,10 @@ public class HomeView extends LinearLayout {
         if (musicCollection != null) {
             addInternal(idlePlaySource, musicCollection, targetView, key);
         } else {
-            musicService.loadMusicCollectionDetail(idlePlaySource.getId(), idlePlaySource.getType()).thenAccept(collection -> {
-                addInternal(idlePlaySource, collection, targetView, key);
-            });
+            // View construction and addView must happen on the UI thread; the future may
+            // complete on a network virtual thread (observed: GetPlaylistDetailResponse)
+            musicService.loadMusicCollectionDetail(idlePlaySource.getId(), idlePlaySource.getType()).thenAccept(collection ->
+                    MuiModApi.postToUiThread(() -> addInternal(idlePlaySource, collection, targetView, key)));
         }
     }
 
@@ -407,7 +411,7 @@ public class HomeView extends LinearLayout {
     public void switchMusic(Traceable<MusicDetail> musicDetail, Traceable<MusicDetail> next, Queue<LyricLine> lyricLines) {
         MuiModApi.postToUiThread(() -> {
             if (staggeredLyricScrollView != null) {
-                staggeredLyricScrollView.switchLyrics(musicDetail.value(), lyricLines);
+                staggeredLyricScrollView.switchLyrics(musicDetail == null ? MusicDetail.NONE : musicDetail.value(), lyricLines);
                 checkNextToPlay(next);
             }
         });

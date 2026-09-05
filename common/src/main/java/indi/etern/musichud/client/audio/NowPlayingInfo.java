@@ -58,8 +58,8 @@ public class NowPlayingInfo {
     @Getter
     private Duration updateInAdvanceDuration = Duration.of(500, ChronoUnit.MILLIS);
     @Getter
-    private Traceable<MusicDetail> currentlyPlaying;
-    private Traceable<MusicDetail> nextToPlayIdleMusic;
+    private volatile Traceable<MusicDetail> currentlyPlaying = Traceable.of(MusicDetail.NONE);
+    private volatile Traceable<MusicDetail> nextToPlayIdleMusic = Traceable.of(MusicDetail.NONE);
     @Getter
     private volatile Duration musicDuration = null;
     @Getter
@@ -274,7 +274,7 @@ public class NowPlayingInfo {
 
     public void switchMusicInfo(Traceable<MusicDetail> musicTrace, Traceable<MusicDetail> idleNextToPlayTrace) {
         MusicDetail previous = getCurrentlyPlayingMusicDetail();
-        currentlyPlaying = musicTrace;
+        currentlyPlaying = Objects.requireNonNullElse(musicTrace, Traceable.of(MusicDetail.NONE));
         MusicDetail musicDetail = musicTrace.value();
         MusicDetail idleNextToPlay = idleNextToPlayTrace == null ? MusicDetail.NONE : idleNextToPlayTrace.value();
         nextToPlayIdleMusic = idleNextToPlayTrace == null ? Traceable.of(MusicDetail.NONE) : idleNextToPlayTrace;
@@ -389,9 +389,9 @@ public class NowPlayingInfo {
         }
     }
 
-    /** Traceable view of the currently playing track. */
+    /** Traceable view of the currently playing track; never null (NONE when idle). */
     public Traceable<MusicDetail> getCurrentlyPlayingMusic() {
-        return currentlyPlaying;
+        return Objects.requireNonNullElse(currentlyPlaying, Traceable.of(MusicDetail.NONE));
     }
 
     /** Derived accessor for consumers that only need the track itself. */
@@ -400,17 +400,15 @@ public class NowPlayingInfo {
         return traceable == null ? null : traceable.value();
     }
 
-    /** Traceable view of the next idle track (queue peek preferred). */
+    /** Traceable view of the next idle track (queue peek preferred); never null. */
     public Traceable<MusicDetail> getNextToPlayIdleMusic() {
-        if (!MusicService.getInstance().getMusicQueue().isEmpty()) {
-            QueueItem peek = MusicService.getInstance().getMusicQueue().peek();
-            if (peek == null) {
-                return Traceable.of(MusicDetail.NONE);
-            }
+        // Single synchronized peek: the client queue is a plain ArrayDeque mutated on
+        // network threads, so an isEmpty+peek pair here would race its clear()
+        QueueItem peek = MusicService.getInstance().peekQueueItem();
+        if (peek != null) {
             return peek.musicDetail();
-        } else {
-            return nextToPlayIdleMusic;
         }
+        return Objects.requireNonNullElse(nextToPlayIdleMusic, Traceable.of(MusicDetail.NONE));
     }
 
     /** Derived accessor for consumers that only need the track itself. */
