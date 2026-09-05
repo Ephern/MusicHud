@@ -110,6 +110,7 @@
   "music_hud.error.cause.timeout": "請求超時",
   "music_hud.error.downloadingAudioStream": "重新載入音頻流（{trial}）\n{message}",
   "music_hud.error.getAccountInfo": "取得帳戶資訊出錯",
+  "music_hud.error.subscribe": "收藏 / 取消收藏失敗",
   "music_hud.field.hint.code": "驗證碼",
   "music_hud.field.hint.phone": "手機號碼",
   "music_hud.field.hint.searchMusic": "搜尋音樂 ...",

@@ -110,6 +110,7 @@
   "music_hud.error.cause.timeout": "请求超时",
   "music_hud.error.downloadingAudioStream": "重载音频流（{trial}）\n{message}",
   "music_hud.error.getAccountInfo": "获取账户信息出错",
+  "music_hud.error.subscribe": "收藏 / 取消收藏失败",
   "music_hud.field.hint.code": "验证码",
   "music_hud.field.hint.phone": "手机号码",
   "music_hud.field.hint.searchMusic": "搜索音乐 ...",

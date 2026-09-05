@@ -110,6 +110,7 @@
   "music_hud.error.cause.timeout": "Request timeout",
   "music_hud.error.downloadingAudioStream": "Reload audio stream ({trial})\n{message}",
   "music_hud.error.getAccountInfo": "Failed to get account info",
+  "music_hud.error.subscribe": "Failed to subscribe / unsubscribe",
   "music_hud.field.hint.code": "Validation Code",
   "music_hud.field.hint.phone": "Phone",
   "music_hud.field.hint.searchMusic": "Search music ...",
