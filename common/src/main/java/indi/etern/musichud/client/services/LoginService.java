@@ -46,7 +46,7 @@ public class LoginService implements IClientLoginService {
     private static final Period refreshInterval = Period.of(0, 0, 1);
     private static volatile LoginService instance = null;
     private final List<Consumer<LoginState>> loginStateListeners = new CopyOnWriteArrayList<>();
-    private volatile LoginState loginState = refreshLoginState();
+    private volatile LoginState loginState = getLoginState();
     @Getter
     private volatile String lastLoginErrorMessage;
     @Getter
@@ -68,7 +68,7 @@ public class LoginService implements IClientLoginService {
                 logger.warn("Login failed");
                 lastLoginErrorMessage = resolveLoginErrorMessage(loginResult.message());
             }
-            notifyLoginStateChanged((this::refreshLoginState));
+            notifyLoginStateChanged((this::getLoginState));
             if (loginResult.success()) {
                 // Every successful login starts a new server session; re-sync the local idle
                 // play sources so they are pushed to whichever server-side component is active
@@ -125,11 +125,11 @@ public class LoginService implements IClientLoginService {
 
     @Override
     public boolean isLogined() {
-        return refreshLoginState() == LoginState.LOGGED_IN;
+        return getLoginState() == LoginState.LOGGED_IN;
     }
 
     @Override
-    public LoginState refreshLoginState() {
+    public LoginState getLoginState() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         LoginType type = loginCookieInfo.type();
         Profile current = Profile.getCurrent();
@@ -198,8 +198,6 @@ public class LoginService implements IClientLoginService {
     @Override
     public void logoutAndReloginAsAnonymous() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
-        Profile.setCurrent(Profile.ANONYMOUS);
-        notifyLoginStateChanged(this::refreshLoginState);
         loginAsAnonymousToServer();
     }
 

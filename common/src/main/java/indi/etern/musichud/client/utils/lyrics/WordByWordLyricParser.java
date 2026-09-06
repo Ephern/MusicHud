@@ -17,7 +17,7 @@ public class WordByWordLyricParser {
     private static final Pattern mainPattern = Pattern.compile("((?:\\[[0-9]+,[0-9]+])+)(.*)");
     private static final Pattern timestampPattern = Pattern.compile("\\[([0-9]+),([0-9]+)]");
     private static final Pattern phrasePattern = Pattern.compile("\\((\\d+),(\\d+),(\\d+)\\)([\\s\\S]*?)(?=\\(\\d+,\\d+,(\\d+)\\)|$)");
-    private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(5);
+    private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(10);
     private static final Logger logger = MusicHud.getLogger(FullLineLyricParser.class);
 
     public static ArrayDeque<LyricLine> parse(MusicDetail musicDetail) {

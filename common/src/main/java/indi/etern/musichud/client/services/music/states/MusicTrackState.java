@@ -147,20 +147,17 @@ public class MusicTrackState implements IMusicTrackState {
                 var edit = tracks.beginEdit();
                 tracks.addFirst(musicDetail);
                 ModifyPlaylistRequest request = new ModifyPlaylistRequest(musicDetail.getId(), playlist1.getId(), ModifyType.ADD);
-                return RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
+                return RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(10))
                         .handle((response, throwable) -> {
                             if (throwable != null) {
                                 edit.rollback();
-//                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(throwable);
                             }
                             if (!response.isSuccess()) {
                                 edit.rollback();
-//                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(response.getMessage());
                             }
                             edit.commit();
-//                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                             return null;
                         });
             });
@@ -183,20 +180,17 @@ public class MusicTrackState implements IMusicTrackState {
                 var edit = tracks.beginEdit();
                 tracks.remove(musicDetail);
                 ModifyPlaylistRequest request = new ModifyPlaylistRequest(musicDetail.getId(), playlist1.getId(), ModifyType.REMOVE);
-                return RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(5))
+                return RequestResponseManager.send(request, ModifyPlaylistResponse.class, Duration.ofSeconds(10))
                         .handle((response, throwable) -> {
                             if (throwable != null) {
                                 edit.rollback();
-//                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(throwable);
                             }
                             if (!response.isSuccess()) {
                                 edit.rollback();
-//                                CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                                 throw new RuntimeException(response.getMessage());
                             }
                             edit.commit();
-//                            CollectionUpdateNotifier.notifyPlaylistUpdated(playlist1.getId(), true);
                             return null;
                         });
             });

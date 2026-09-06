@@ -87,9 +87,19 @@ public class QRLoginView extends LinearLayout implements ILoginView {
                     StartQRLoginRequest.REQUEST,
                     StartQRLoginResponse.class,
                     Duration.ofSeconds(10)).whenComplete((response, e) -> {
-                        MuiModApi.postToUiThread(() -> {
-                            urlImageView.loadUrl(response.getBase64QRImg());
-                        });
+                        if (e == null && response != null) {
+                            String base64QRImg = response.getBase64QRImg();
+                            if (!base64QRImg.isEmpty()) {
+                                MuiModApi.postToUiThread(() -> urlImageView.loadUrl(base64QRImg));
+                            }
+                        } else {
+                            String messageTemplate = I18n.get(MusicHud.MOD_ID + ".error.qrLoading");
+                            messageTemplate = messageTemplate.replace("{exceptionClass}", e == null ? "Unknown Exception" : e.getClass().getName());
+                            String eMessage = e == null ? "" : e.getMessage();
+                            messageTemplate = messageTemplate.replace("{exceptionMessage}", eMessage == null ? "" : eMessage);
+                            String finalMessageTemplate = messageTemplate;
+                            MuiModApi.postToUiThread(() -> errorText(finalMessageTemplate));
+                        }
                     }
             );
         });

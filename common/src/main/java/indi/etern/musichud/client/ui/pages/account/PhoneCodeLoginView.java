@@ -5,10 +5,12 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.widget.*;
+import icyllis.modernui.widget.Button;
+import icyllis.modernui.widget.EditText;
+import icyllis.modernui.widget.LinearLayout;
+import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -154,8 +156,8 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
                             int timeout = response.getTimeout();
                             if (!response.isSuccess()) {
                                 MuiModApi.postToUiThread(() -> {
-                                    Toast toast = Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.failedToSendCode"), Toast.LENGTH_SHORT);
-                                    ToastUtil.show(toast);
+                                    errorText(I18n.get(MusicHud.MOD_ID + ".text.failedToSendCode"));
+                                    setSendingButtonEnable();
                                 });
                             }
                             scheduledRefreshTask = MusicHud.scheduleWithFixedDelay(() -> {

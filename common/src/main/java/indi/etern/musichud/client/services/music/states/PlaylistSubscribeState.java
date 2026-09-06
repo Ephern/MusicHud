@@ -47,7 +47,7 @@ public class PlaylistSubscribeState extends SubscribeState<Playlist> {
                                 }
                                 RequestResponseManager.send(
                                         new SubscribeRequest(id, SubscribableType.PLAYLIST, action),
-                                        SubscribeResponse.class, Duration.ofSeconds(5)
+                                        SubscribeResponse.class, Duration.ofSeconds(10)
                                 ).thenAccept(subscribeResponse -> {
                                     if (subscribeResponse.isSuccess()) {
                                         editHandle.commit();
@@ -55,6 +55,10 @@ public class PlaylistSubscribeState extends SubscribeState<Playlist> {
                                         editHandle.rollback();
                                         ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".error.subscribe"));
                                     }
+                                }).exceptionally(e -> {
+                                    editHandle.rollback();
+                                    ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".error.subscribe"));
+                                    return null;
                                 });
                             });
                 })
