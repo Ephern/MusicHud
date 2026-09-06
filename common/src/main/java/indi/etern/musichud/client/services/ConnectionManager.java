@@ -294,7 +294,7 @@ public class ConnectionManager implements IConnectionManager {
             RequestResponseManager.send(
                             new GetInitialStateRequest(),
                             GetInitialStateResponse.class,
-                            Duration.ofSeconds(5))
+                            Duration.ofSeconds(10))
                     .thenAccept(response -> {
                         synchronized (ConnectionManager.this) {
                             if (ConnectionStateMachine.getState() != requestedState) {

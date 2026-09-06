@@ -208,7 +208,7 @@ public class MusicService implements IClientMusicService {
         CompletableFuture<Playlist> future = RequestResponseManager.send(
                         new GetPlaylistDetailRequest(id, ignoreCache),
                         GetPlaylistDetailResponse.class,
-                        Duration.ofSeconds(5))
+                        Duration.ofSeconds(10))
                 .thenApply(response -> {
                     Playlist loaded = response.getPlaylist();
                     Playlist result;
@@ -221,7 +221,7 @@ public class MusicService implements IClientMusicService {
                     }
                     pushDownToUserCollections(result);
                     return result;
-                });
+                }).exceptionally(e -> Playlist.EMPTY);
         loadingPlaylists.put(id, future);
         future.whenComplete((r, e) -> loadingPlaylists.remove(id, future));
         return future;
@@ -241,7 +241,7 @@ public class MusicService implements IClientMusicService {
         CompletableFuture<Album> future = RequestResponseManager.send(
                         new GetAlbumDetailRequest(id, ignoreCache),
                         GetAlbumDetailResponse.class,
-                        Duration.ofSeconds(5))
+                        Duration.ofSeconds(10))
                 .thenApply(response -> {
                     Album loaded = response.getAlbum();
                     Album result;
@@ -254,7 +254,7 @@ public class MusicService implements IClientMusicService {
                     }
                     pushDownToUserCollections(result);
                     return result;
-                });
+                }).exceptionally(e -> Album.NONE);
         loadingAlbums.put(id, future);
         future.whenComplete((r, e) -> loadingAlbums.remove(id, future));
         return future;
@@ -364,8 +364,9 @@ public class MusicService implements IClientMusicService {
         CompletableFuture<Artist> future = RequestResponseManager.send(
                         new GetArtistDetailRequest(id),
                         GetArtistDetailResponse.class,
-                        Duration.ofSeconds(5))
-                .thenApply(GetArtistDetailResponse::getArtist);
+                        Duration.ofSeconds(10))
+                .thenApply(GetArtistDetailResponse::getArtist)
+                .exceptionally(e -> Artist.UNKNOWN);
         loadingArtists.put(id, future);
         future.whenComplete((r, e) -> loadingArtists.remove(id, future));
         return future;
@@ -376,8 +377,9 @@ public class MusicService implements IClientMusicService {
         return RequestResponseManager.send(
                         new GetArtistMoreMusicRequest(id, offset),
                         GetArtistMoreMusicResponse.class,
-                        Duration.ofSeconds(5))
-                .thenApply(GetArtistMoreMusicResponse::getMusicDetails);
+                        Duration.ofSeconds(10))
+                .thenApply(GetArtistMoreMusicResponse::getMusicDetails)
+                .exceptionally(e -> List.of());
     }
 
     @Override
@@ -427,7 +429,7 @@ public class MusicService implements IClientMusicService {
         return RequestResponseManager.send(
                         new GetUserPlaylistRequest(ignoreCache),
                         GetUserPlaylistResponse.class,
-                        Duration.ofSeconds(5))
+                        Duration.ofSeconds(10))
                 .thenApply(GetUserPlaylistResponse::getPlaylists)
                 .thenApply(playlists -> {
                     UserCollections userCollections = currentUserCollections;
@@ -435,7 +437,8 @@ public class MusicService implements IClientMusicService {
                         userCollections.syncUserCategoryPlaylists(playlists);
                     }
                     return playlists;
-                });
+                })
+                .exceptionally(e -> UserCategoryPlaylists.EMPTY);
     }
 
     protected CompletableFuture<LinkedHashSet<Album>> loadUserAlbums(boolean ignoreCache) {
@@ -446,7 +449,7 @@ public class MusicService implements IClientMusicService {
         return RequestResponseManager.send(
                         new GetUserAlbumsRequest(ignoreCache),
                         GetUserAlbumsResponse.class,
-                        Duration.ofSeconds(5))
+                        Duration.ofSeconds(10))
                 .thenApply(GetUserAlbumsResponse::getAlbums)
                 .thenApply(albums -> {
                     UserCollections userCollections = currentUserCollections;
@@ -454,7 +457,8 @@ public class MusicService implements IClientMusicService {
                         userCollections.syncSubscribedAlbums(albums);
                     }
                     return albums;
-                });
+                })
+                .exceptionally(e -> new LinkedHashSet<>(0));
     }
 
     protected CompletableFuture<LinkedHashSet<Artist>> loadUserArtists(boolean ignoreCache) {
@@ -465,7 +469,7 @@ public class MusicService implements IClientMusicService {
         return RequestResponseManager.send(
                         new GetUserArtistsRequest(ignoreCache),
                         GetUserArtistsResponse.class,
-                        Duration.ofSeconds(5))
+                        Duration.ofSeconds(10))
                 .thenApply(GetUserArtistsResponse::getArtists)
                 .thenApply(artists -> {
                     UserCollections userCollections = currentUserCollections;
@@ -473,7 +477,8 @@ public class MusicService implements IClientMusicService {
                         userCollections.syncSubscribedArtists(artists);
                     }
                     return artists;
-                });
+                })
+                .exceptionally(e -> new LinkedHashSet<>(0));
     }
 
     @Override
