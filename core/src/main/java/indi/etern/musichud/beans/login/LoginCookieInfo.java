@@ -43,7 +43,10 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
             }
             try {
                 LoginCookieInfo loginCookieInfo = clientConfig.getClientCookie();
-                if (loginCookieInfo == null) {
+                if (loginCookieInfo == null
+                        || loginCookieInfo.rawCookie == null
+                        || loginCookieInfo.generateTime == null
+                        || loginCookieInfo.type == null) {
                     return UNLOGGED;
                 }
                 return loginCookieInfo;
