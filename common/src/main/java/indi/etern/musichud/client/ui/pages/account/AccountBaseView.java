@@ -8,6 +8,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -179,10 +180,14 @@ public class AccountBaseView extends LinearLayout {
      * switches the loading ring to an error hint with retry/logout actions.
      */
     public void onLoginFailed(String message) {
-        if (status != Status.LOADING) {
-            return;
+        if (LoginService.getInstance().isLogined()) {
+            ToastUtil.show(message);
+        } else {
+            if (status != Status.LOADING) {
+                return;
+            }
+            showLoadingError(message);
         }
-        showLoadingError(message);
     }
 
 
