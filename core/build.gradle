@@ -32,10 +32,6 @@ dependencies {
     implementation "com.google.guava:guava:33.3.1-jre"
     implementation "io.netty:netty-buffer:4.1.118.Final"
     implementation "io.netty:netty-codec:4.1.118.Final"
-    implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
-    implementation "org.jflac:jflac-codec:$rootProject.jflac_version"
-    implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
-    implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"
 }
 
 java {

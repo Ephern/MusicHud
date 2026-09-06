@@ -1,0 +1,144 @@
+plugins {
+    id 'java'
+    id 'com.gradleup.shadow'
+    id 'xyz.jpenilla.run-velocity' version '3.0.2'
+}
+
+base {
+    archivesName = "$rootProject.archives_name-$project.name"
+}
+
+configurations {
+    core {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+    compileClasspath.extendsFrom core
+    runtimeClasspath.extendsFrom core
+    shadowBundle {
+        canBeResolved = true
+        canBeConsumed = false
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        name = "papermc-repo"
+        url = "https://repo.papermc.io/repository/maven-public/"
+    }
+}
+
+dependencies {
+    compileOnly "com.velocitypowered:velocity-api:3.4.0-SNAPSHOT"
+    annotationProcessor "com.velocitypowered:velocity-api:3.4.0-SNAPSHOT"
+
+    core(project(path: ':core'))
+    shadowBundle(project(path: ':core')) { transitive = false }
+
+    // Provided by the Velocity proxy at runtime
+    compileOnly "io.netty:netty-buffer:4.1.118.Final"
+    compileOnly "io.netty:netty-codec:4.1.118.Final"
+    compileOnly "org.apache.logging.log4j:log4j-api:2.24.1"
+
+    // YAML parser for config.yml, not provided by the Velocity proxy at runtime
+    shadowBundle 'org.yaml:snakeyaml:2.2'
+
+    compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
+}
+
+java {
+    sourceCompatibility = JavaVersion.VERSION_21
+    targetCompatibility = JavaVersion.VERSION_21
+}
+
+tasks.withType(JavaCompile).configureEach {
+    options.encoding = 'UTF-8'
+    options.release.set(21)
+}
+
+def templateSource = file('src/main/template')
+def templateDest = layout.buildDirectory.dir('generated/sources/templates')
+def generateTemplates = tasks.register('generateTemplates', Copy) { task ->
+    def props = [
+            'version': project.version
+    ]
+    task.inputs.properties props
+
+    task.from templateSource
+    task.into templateDest
+    task.expand props
+}
+
+sourceSets.main.java.srcDir(generateTemplates.map { it.outputs })
+
+tasks.processResources {
+    duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+}
+
+tasks.shadowJar {
+    configurations = [project.configurations.shadowBundle]
+    archiveClassifier = ''
+}
+
+tasks.assemble {
+    dependsOn tasks.shadowJar
+}
+
+// ---------------------------------------------------------------------------
+// Local dev network: Velocity proxy + 3 Paper servers (see paper/build.gradle)
+// ---------------------------------------------------------------------------
+
+def velocityRunDir = layout.projectDirectory.dir('run')
+// Fixed dev-only secret; matches paper/build.gradle server runs
+def devForwardingSecret = 'musichud-dev-secret'
+
+tasks.register('prepareRunConfig') {
+    group = 'run'
+    description = 'Generates velocity.toml and forwarding.secret for the dev proxy (existing files are kept)'
+    doLast {
+        def runDir = velocityRunDir.asFile
+        runDir.mkdirs()
+        def tomlFile = new File(runDir, 'velocity.toml')
+        if (!tomlFile.exists()) {
+            // Minimal template; Velocity merges missing defaults and rewrites the
+            // file on first start. Paper servers are wired to the ports defined
+            // in paper/build.gradle.
+            // NOTE: [forced-hosts] must exist (even empty) - otherwise Velocity
+            // fills in its default example entries which reference servers we
+            // don't have, failing config validation on startup.
+            tomlFile.text = '''config-version = "2.7"
+bind = "0.0.0.0:25577"
+motd = "MusicHud Dev Proxy"
+show-max-players = 100
+online-mode = false
+player-info-forwarding-mode = "modern"
+forwarding-secret-file = "forwarding.secret"
+kick-existing-players = true
+
+[servers]
+lobby = "127.0.0.1:25565"
+survival = "127.0.0.1:25566"
+creative = "127.0.0.1:25567"
+try = [
+    "lobby",
+]
+
+[forced-hosts]
+'''
+        }
+        def secretFile = new File(runDir, 'forwarding.secret')
+        if (!secretFile.exists()) {
+            secretFile.text = devForwardingSecret
+        }
+    }
+}
+
+tasks.named('runVelocity') {
+    group = 'run'
+    velocityVersion('3.4.0-SNAPSHOT')
+    runDirectory(velocityRunDir.asFile)
+    pluginJars(tasks.named('shadowJar'))
+    dependsOn tasks.named('prepareRunConfig')
+}

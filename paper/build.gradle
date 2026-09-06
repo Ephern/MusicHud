@@ -95,6 +95,68 @@ tasks.runServer {
     minecraftVersion("${rootProject.minecraft_version}")
 }
 
+// ---------------------------------------------------------------------------
+// Local dev network: 3 Paper servers behind the Velocity proxy
+// (see velocity/build.gradle). MusicHud runs on the proxy only - the proxy
+// intercepts all MusicHud plugin messages, so backend servers stay vanilla.
+// ---------------------------------------------------------------------------
+
+def devForwardingSecret = 'musichud-dev-secret'
+def serverRuns = [
+        Lobby   : [port: 25565],
+        Survival: [port: 25566],
+        Creative: [port: 25567],
+]
+
+tasks.register('prepareRunConfigs') {
+    group = 'run'
+    description = 'Generates eula/server.properties/paper-global.yml for all dev servers (existing files are kept)'
+    doLast {
+        serverRuns.each { name, cfg ->
+            def runDir = layout.projectDirectory.dir("runs/${name.toLowerCase()}").asFile
+            runDir.mkdirs()
+            def eula = new File(runDir, 'eula.txt')
+            if (!eula.exists()) {
+                eula.text = 'eula=true\n'
+            }
+            def props = new File(runDir, 'server.properties')
+            if (!props.exists()) {
+                props.text = """server-port=${cfg.port}
+online-mode=false
+enforce-secure-profile=false
+"""
+            }
+            def globalConfig = new File(runDir, 'config/paper-global.yml')
+            if (!globalConfig.exists()) {
+                globalConfig.parentFile.mkdirs()
+                // Minimal fragment; Paper merges missing defaults on first start
+                globalConfig.text = """proxies:
+  velocity:
+    enabled: true
+    online-mode: false
+    secret: '${devForwardingSecret}'
+"""
+            }
+        }
+    }
+}
+
+serverRuns.each { name, cfg ->
+    tasks.register("runServer${name}", xyz.jpenilla.runpaper.task.RunServer) {
+        group = 'run'
+        description = "Runs a Paper ${rootProject.minecraft_version} backend (${name.toLowerCase()}, port ${cfg.port})"
+        dependsOn tasks.named('prepareRunConfigs')
+        minecraftVersion("${rootProject.minecraft_version}")
+        runDirectory(layout.projectDirectory.dir("runs/${name.toLowerCase()}").asFile)
+    }
+}
+
+tasks.register('runNetwork') {
+    group = 'run'
+    description = 'Runs the full dev network: Velocity proxy + 3 Paper servers'
+    dependsOn ':velocity:runVelocity', 'runServerLobby', 'runServerSurvival', 'runServerCreative'
+}
+
 publishing {
     publications {
         mavenJava(MavenPublication) {
