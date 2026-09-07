@@ -17,9 +17,14 @@ public interface VanillaServerNetworkService extends IServerNetworkService {
             NetworkReceiver<T> receiver = (NetworkReceiver<T>) IVanillaNetworkRegister
                     .getMetaDataOrNew(payload.getClass(), null).receiver();
             if (receiver != null) {
-                MusicHud.EXECUTOR.execute(() -> {
-                    receiver.receive(payload, player);
-                });
+                // Deliver inline on the caller's thread. Loopback sends are made in causal
+                // order (a response precedes the pushes it triggers, a snapshot is built
+                // right before it is sent), and synchronous delivery preserves that order.
+                // A per-message async hop on the shared executor allowed out-of-order
+                // processing, which let a stale snapshot be reconciled against the client's
+                // local idle-source layer after newer adds had already completed, wiping
+                // sources the server still held.
+                receiver.receive(payload, player);
             } else {
                 throw new IllegalStateException();
             }

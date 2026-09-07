@@ -60,8 +60,10 @@ public class LoginApiService implements ILoginApiService {
     }
 
     private static void sendSuccessLoginResultTo(IPlayerClient player, LoginCookieInfo loginCookieInfo, Profile profile) {
+        // No immediate idle-source snapshot here: it is always stale for the recipient
+        // (their own sources are only re-pushed after the client's post-login re-sync)
+        // and the recipient's view of other players' sources comes from GetInitialState.
         serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, profile));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
     }
 
     void sendLoginFailResult(IPlayerClient player, String message) {
@@ -110,7 +112,9 @@ public class LoginApiService implements ILoginApiService {
     public void joinUnlogged(IPlayerClient player) {
         playerInfoMap.put(player.getUUID(), ILoginApiService.PlayerLoginInfo.of(player, LoginCookieInfo.UNLOGGED));
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
+        // No immediate idle-source snapshot: it cannot contain the just-connected client's
+        // own sources yet and would be reconciled as a stale snapshot. The client fetches
+        // the current view via GetInitialStateRequest instead.
     }
 
     @Override
@@ -423,7 +427,9 @@ public class LoginApiService implements ILoginApiService {
                 handleLoginExceptions(player, e);
             }
         }
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(getLoginInfoByPlayerUUID(player.getUUID())));
+        // No immediate idle-source snapshot for the same reason as sendSuccessLoginResultTo:
+        // the recipient re-pushes its own sources after the login result and fetches the
+        // other players' view via GetInitialStateRequest.
     }
 
     record ValidationCodeRequest(int ctcode, long phone) {

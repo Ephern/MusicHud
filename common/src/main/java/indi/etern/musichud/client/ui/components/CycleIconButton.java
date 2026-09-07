@@ -17,12 +17,22 @@ public class CycleIconButton extends ImageButton {
     List<State> states = new ArrayList<>();
     int index = 0;
     State current = null;
+    private boolean warned = false;
+    private Runnable warnedClickHandler = null;
 
     public CycleIconButton(Context context) {
         super(context);
         setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         setOnClickListener((button) -> {
             if (states.isEmpty()) {
+                return;
+            }
+            if (warned) {
+                // Warning mode replaces the cycle behavior with a custom handler
+                // (e.g. a re-sync attempt for a load-errored idle play source)
+                if (warnedClickHandler != null) {
+                    warnedClickHandler.run();
+                }
                 return;
             }
             State previous = current;
@@ -44,6 +54,22 @@ public class CycleIconButton extends ImageButton {
         current = states.get(normalized);
         setTooltipText(current.tooltip.get());
         setImageDrawable(new InsetDrawable(new ScaledImageDrawable(getContext().getResources(), current.image.get(), dp(12), dp(16)), dp(3)));
+    }
+
+    /**
+     * Warning mode: replaces the current state's icon/tooltip and routes clicks to
+     * {@code clickHandler} instead of cycling. The selected index is preserved, so
+     * {@code setWarned(false, ...)} restores the previously selected state's visuals.
+     */
+    public void setWarned(boolean warned, CharSequence tooltip, Image icon, Runnable clickHandler) {
+        this.warned = warned;
+        this.warnedClickHandler = warned ? clickHandler : null;
+        if (warned) {
+            setTooltipText(tooltip);
+            setImageDrawable(new InsetDrawable(new ScaledImageDrawable(getContext().getResources(), icon, dp(12), dp(16)), dp(3)));
+        } else {
+            apply(index);
+        }
     }
 
     public record State(
