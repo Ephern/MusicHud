@@ -71,7 +71,7 @@ public class MusicApiService implements IMusicApiService {
     private static <K, T> T joinMerged(ConcurrentHashMap<K, CompletableFuture<T>> inFlight, K key, Supplier<T> loader) throws InterruptedException, TimeoutException {
         CompletableFuture<T> future = inFlight.computeIfAbsent(key, k -> CompletableFuture.supplyAsync(loader, MusicHud.EXECUTOR));
         try {
-            T result = future.get(10, TimeUnit.SECONDS);
+            T result = future.get(20, TimeUnit.SECONDS);
             inFlight.remove(key, future);
             return result;
         } catch (InterruptedException e) {
@@ -114,9 +114,7 @@ public class MusicApiService implements IMusicApiService {
                     .ifPresentOrElse((playlist) -> {
                         userCategoryPlaylists.setLikeList(playlist);
                         playlists.remove(playlist);
-                    }, () -> {
-                        userCategoryPlaylists.setLikeList(Playlist.EMPTY);
-                    });
+                    }, () -> userCategoryPlaylists.setLikeList(Playlist.EMPTY));
             userCategoryPlaylists.setCreatedPlaylist(new ObservableSequencedSet<>(playlists));
             createdPlaylistFuture.complete(null);
         });
