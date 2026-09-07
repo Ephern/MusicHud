@@ -44,6 +44,8 @@ public class IdlePlaySourceWidget extends LinearLayout {
     private Animator cycleShowAnimator;
     private Unregister addRegister;
     private Unregister removeRegister;
+    private Unregister loadErrorRegister;
+    private Unregister loadErrorClearedRegister;
 
     /** Animates the cycle button's LayoutParams width; the row reflows each frame. */
     private static final IntProperty<IdlePlaySourceWidget> CYCLE_WIDTH = new IntProperty<>("cycleWidth") {
@@ -173,6 +175,17 @@ public class IdlePlaySourceWidget extends LinearLayout {
 
     private void syncCycleState() {
         IdlePlaySource current = currentSource();
+        if (current != null && layer.isInLoadError(collection.getClass(), collection.getId())) {
+            // Load-errored entry: the cycle button turns into a warning with a tooltip and
+            // a click triggers a manual re-sync (pre-error mode first, then RANDOM)
+            cycleButton.setWarned(true,
+                    I18n.get(MusicHud.MOD_ID + ".button.idleSourceSyncFailed"),
+                    ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/triangle_alert.png"),
+                    this::startRecovery);
+            setCycleShown(true);
+            return;
+        }
+        cycleButton.setWarned(false, null, null, null);
         if (current != null) {
             int index = cycleModes.indexOf(current.getPlayMode());
             // Swap the drawable while collapsed/transparent so it never invalidates a
@@ -180,6 +193,25 @@ public class IdlePlaySourceWidget extends LinearLayout {
             cycleButton.apply(Math.max(index, 0));
         }
         setCycleShown(current != null);
+    }
+
+    /** User-initiated re-sync of a load-errored entry; the layer serializes concurrent requests. */
+    private void startRecovery() {
+        layer.requestRecovery(collection.getClass(), collection.getId(), new IIdlePlaySourceLayerState.RecoveryUi() {
+            @Override
+            public void onStart() {
+                // Keep both buttons disabled for the whole sync task; re-enabled in onFinished
+                cycleButton.setEnabled(false);
+                toggleButton.setEnabled(false);
+            }
+
+            @Override
+            public void onFinished(boolean success, PlayMode confirmedMode) {
+                cycleButton.setEnabled(true);
+                toggleButton.setEnabled(true);
+                postSync();
+            }
+        });
     }
 
     /** Two-phase show/hide, fully self-driven. Show: width 0→target (150ms, QUAD) then
@@ -265,6 +297,16 @@ public class IdlePlaySourceWidget extends LinearLayout {
                 postSync();
             }
         });
+        loadErrorRegister = layer.onLoadError(c -> {
+            if (c.getId() == collection.getId() && c.getType().isInstance(collection)) {
+                postSync();
+            }
+        });
+        loadErrorClearedRegister = layer.onLoadErrorCleared(c -> {
+            if (c.getId() == collection.getId() && c.getType().isInstance(collection)) {
+                postSync();
+            }
+        });
         syncCycleState();
     }
 
@@ -279,6 +321,14 @@ public class IdlePlaySourceWidget extends LinearLayout {
         if (removeRegister != null) {
             removeRegister.unregister();
             removeRegister = null;
+        }
+        if (loadErrorRegister != null) {
+            loadErrorRegister.unregister();
+            loadErrorRegister = null;
+        }
+        if (loadErrorClearedRegister != null) {
+            loadErrorClearedRegister.unregister();
+            loadErrorClearedRegister = null;
         }
     }
 
