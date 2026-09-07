@@ -117,6 +117,10 @@ public class ConnectionManager implements IConnectionManager {
         // A failed connect attempt must not disturb an already running local session
         // (isolated mode / integrated client): keep its playback, login and sources.
         if (!isLocalSessionInitialized()) {
+            // The (re)login below re-syncs the local layer inside its receiver; reset here
+            // as well so pushes arriving before that receiver cannot reconcile against the
+            // previous session's settled state.
+            MusicService.getInstance().getIdlePlaySourceState().local().reset();
             IClientLoginService.getInstance().loginToServer();
             requestInitialState();
         }
@@ -268,6 +272,11 @@ public class ConnectionManager implements IConnectionManager {
                 NowPlayingInfo.getInstance().stop();
                 StreamAudioPlayer.getInstance().stop();
             }
+            // Arm the local layer's !loaded guard BEFORE ConfirmConnect: the server answers
+            // the handshake with idle-source pushes that cannot contain this client's own
+            // sources yet; reconciliation must stay disabled until the post-login re-sync
+            // (armed again inside the login result receiver) settles.
+            MusicService.getInstance().getIdlePlaySourceState().local().reset();
             connectGeneration.incrementAndGet();
             clientNetworkService.sendToServer(ConfirmConnectMessage.MESSAGE);
             ConnectionStateMachine.enterConnected();
@@ -290,35 +299,72 @@ public class ConnectionManager implements IConnectionManager {
 
     private void requestInitialState() {
         ConnectionState requestedState = ConnectionStateMachine.getState();
-        MusicHud.EXECUTOR.execute(() -> {
+        int generation = connectGeneration.get();
+        MusicHud.EXECUTOR.execute(() -> sendInitialStateRequest(requestedState, generation, 3));
+    }
+
+    /**
+     * Sends the initial-state request, retrying on timeout/transport failure only. Each
+     * attempt re-validates the connection state and the session generation so a stale
+     * response can never be applied to a newer session (a quick toggle-away-and-back
+     * issues a fresh request from the new session's generation instead).
+     */
+    private void sendInitialStateRequest(ConnectionState requestedState, int generation, int attemptsLeft) {
+        try {
             RequestResponseManager.send(
                             new GetInitialStateRequest(),
                             GetInitialStateResponse.class,
-                            Duration.ofSeconds(5))
+                            Duration.ofSeconds(10))
                     .thenAccept(response -> {
                         synchronized (ConnectionManager.this) {
-                            if (ConnectionStateMachine.getState() != requestedState) {
-                                logger.debug("Initial state response ignored, state changed from {} to {}", requestedState, ConnectionStateMachine.getState());
+                            if (ConnectionStateMachine.getState() != requestedState
+                                    || connectGeneration.get() != generation) {
+                                logger.debug("Initial state response ignored, state/generation changed ({} -> {})",
+                                        requestedState, ConnectionStateMachine.getState());
                                 return;
                             }
                         }
-                        MusicService.getInstance().refreshQueue(response.getQueue());
-                        MusicService.getInstance().getIdlePlaySourceState().external().updateAll(
-                                response.getPlaylistSources());
-                        // Always apply the fetched state; switchMusic itself skips restarting
-                        // the audio stream when the same track is still playing.
-                        if (!MusicDetail.NONE.equals(response.getCurrentPlaying().value())) {
-                            MusicService.getInstance().switchMusic(
-                                    response.getCurrentPlaying(), response.getNextIdle(), response.getStartTime(), "");
-                        } else {
-                            MusicService.getInstance().switchMusic(
-                                    Traceable.of(MusicDetail.NONE), response.getNextIdle(), response.getStartTime(), "");
-                        }
+                        applyInitialState(response);
                     })
                     .exceptionally(e -> {
-                        logger.warn("Failed to get initial state", e);
+                        if (attemptsLeft > 1) {
+                            MusicHud.EXECUTOR.execute(() -> {
+                                try {
+                                    Thread.sleep(1000);
+                                } catch (InterruptedException interruptedException) {
+                                    Thread.currentThread().interrupt();
+                                    logger.warn("Failed to get initial state", e);
+                                    return;
+                                }
+                                if (ConnectionStateMachine.getState() == requestedState
+                                        && connectGeneration.get() == generation) {
+                                    sendInitialStateRequest(requestedState, generation, attemptsLeft - 1);
+                                } else {
+                                    logger.debug("Initial state retry skipped, session changed");
+                                }
+                            });
+                        } else {
+                            logger.warn("Failed to get initial state", e);
+                        }
                         return null;
                     });
-        });
+        } catch (Exception e) {
+            logger.warn("Failed to send initial state request", e);
+        }
+    }
+
+    private void applyInitialState(GetInitialStateResponse response) {
+        MusicService.getInstance().refreshQueue(response.getQueue());
+        MusicService.getInstance().getIdlePlaySourceState().external().updateAll(
+                response.getPlaylistSources());
+        // Always apply the fetched state; switchMusic itself skips restarting
+        // the audio stream when the same track is still playing.
+        if (!MusicDetail.NONE.equals(response.getCurrentPlaying().value())) {
+            MusicService.getInstance().switchMusic(
+                    response.getCurrentPlaying(), response.getNextIdle(), response.getStartTime(), "");
+        } else {
+            MusicService.getInstance().switchMusic(
+                    Traceable.of(MusicDetail.NONE), response.getNextIdle(), response.getStartTime(), "");
+        }
     }
 }
