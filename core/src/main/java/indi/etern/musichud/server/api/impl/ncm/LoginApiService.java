@@ -60,8 +60,10 @@ public class LoginApiService implements ILoginApiService {
     }
 
     private static void sendSuccessLoginResultTo(IPlayerClient player, LoginCookieInfo loginCookieInfo, Profile profile) {
+        // No immediate idle-source snapshot here: it is always stale for the recipient
+        // (their own sources are only re-pushed after the client's post-login re-sync)
+        // and the recipient's view of other players' sources comes from GetInitialState.
         serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, profile));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
     }
 
     void sendLoginFailResult(IPlayerClient player, String message) {
@@ -110,7 +112,9 @@ public class LoginApiService implements ILoginApiService {
     public void joinUnlogged(IPlayerClient player) {
         playerInfoMap.put(player.getUUID(), ILoginApiService.PlayerLoginInfo.of(player, LoginCookieInfo.UNLOGGED));
         loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(loginApiService.getLoginInfoByPlayerUUID(player.getUUID())));
+        // No immediate idle-source snapshot: it cannot contain the just-connected client's
+        // own sources yet and would be reconciled as a stale snapshot. The client fetches
+        // the current view via GetInitialStateRequest instead.
     }
 
     @Override
@@ -129,9 +133,14 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public void loginAsAnonymous(IPlayerClient player, boolean sendFail) {
         try {
-            LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, getAnonymousCookie(), ZonedDateTime.now());
-            Profile profile = loadUserProfile(player, loginCookieInfo);
-            sendSuccessLoginResultTo(player, loginCookieInfo, profile);
+            String anonymousCookie = getAnonymousCookie();
+            if (anonymousCookie == null) {
+                sendLoginFailResult(player, MusicHud.MOD_ID + ".error.loginAnonymous");
+            } else {
+                LoginCookieInfo loginCookieInfo = new LoginCookieInfo(LoginType.ANONYMOUS, anonymousCookie, ZonedDateTime.now());
+                Profile profile = loadUserProfile(player, loginCookieInfo);
+                sendSuccessLoginResultTo(player, loginCookieInfo, profile);
+            }
         } catch (Exception e) {
             logger.error(e);
             if (sendFail) {
@@ -316,25 +325,29 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public SendPhoneValidationCodeResponse requestValidationCodeFor(int regionCode, long phone, IPlayerClient player) {
-        SendValidationCodeResponse response = ApiClient.post(ApiServerEndpointsMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null, true);
-        ZonedDateTime lastSentTime = lastSentTimes.getIfPresent(player);
-        ZonedDateTime now = ZonedDateTime.now();
+        try {
+            SendValidationCodeResponse response = ApiClient.post(ApiServerEndpointsMeta.Login.DeviceCode.SENT, new ValidationCodeRequest(regionCode, phone), null, true);
+            ZonedDateTime lastSentTime = lastSentTimes.getIfPresent(player);
+            ZonedDateTime now = ZonedDateTime.now();
 
-        Duration duration = null;
-        if (lastSentTime != null) {
-            duration = Duration.between(lastSentTime, now);
-        }
-        if (lastSentTime == null || duration.compareTo(Duration.ofSeconds(30)) > 0) {
-            lastSentTimes.put(player, now);
-            if (response.done) {
-                logger.info("Successfully send code to player: {}", player.getName());
-            } else {
-                logger.error("Failed to send code to player: {}", player.getName());
+            Duration duration = null;
+            if (lastSentTime != null) {
+                duration = Duration.between(lastSentTime, now);
             }
-            return new SendPhoneValidationCodeResponse(response.done, 30);
-        } else {
-            logger.warn("Refuse to send code to player: {}, as frequency limit", player.getName());
-            return new SendPhoneValidationCodeResponse(response.done, 30 - (int) duration.getSeconds());
+            if (lastSentTime == null || duration.compareTo(Duration.ofSeconds(30)) > 0) {
+                lastSentTimes.put(player, now);
+                if (response.done) {
+                    logger.info("Successfully send code to player: {}", player.getName());
+                } else {
+                    logger.error("Failed to send code to player: {}", player.getName());
+                }
+                return new SendPhoneValidationCodeResponse(response.done, 30);
+            } else {
+                logger.warn("Refuse to send code to player: {}, as frequency limit", player.getName());
+                return new SendPhoneValidationCodeResponse(response.done, 30 - (int) duration.getSeconds());
+            }
+        } catch (Exception e) {
+            return new SendPhoneValidationCodeResponse(false, -1);
         }
     }
 
@@ -414,7 +427,9 @@ public class LoginApiService implements ILoginApiService {
                 handleLoginExceptions(player, e);
             }
         }
-        MusicPlayerServerService.getInstance().sendUpdateAllIdlePlaySourcesMessageTo(Collections.singleton(getLoginInfoByPlayerUUID(player.getUUID())));
+        // No immediate idle-source snapshot for the same reason as sendSuccessLoginResultTo:
+        // the recipient re-pushes its own sources after the login result and fetches the
+        // other players' view via GetInitialStateRequest.
     }
 
     record ValidationCodeRequest(int ctcode, long phone) {

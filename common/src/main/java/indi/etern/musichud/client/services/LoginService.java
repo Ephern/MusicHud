@@ -46,11 +46,24 @@ public class LoginService implements IClientLoginService {
     private static final Period refreshInterval = Period.of(0, 0, 1);
     private static volatile LoginService instance = null;
     private final List<Consumer<LoginState>> loginStateListeners = new CopyOnWriteArrayList<>();
-    private volatile LoginState loginState = refreshLoginState();
+    private volatile LoginState loginState = getLoginState();
     @Getter
     private volatile String lastLoginErrorMessage;
     @Getter
     NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, player) -> {
+        if (loginResult.success()) {
+            // Must run synchronously inside the receiver: it arms the local layer's !loaded
+            // guard BEFORE the snapshot pushes that follow a login can be processed
+            // (deferring it to the executor re-opens the stale-guard wipe window). Every
+            // successful login starts a new server session; the local idle play sources are
+            // re-synced so they are pushed to whichever server-side component is active
+            // (network channel when connected, local loopback in isolated mode). This must
+            // not depend on the login state listeners, which are deduplicated and may not
+            // fire when the state is unchanged across a connection switch.
+            IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
+            localState.reset();
+            localState.loadFromConfig();
+        }
         MusicHud.EXECUTOR.submit(() -> {
             Thread.currentThread().setName("MHWorker-Login-V");
             LoginCookieInfo loginCookieInfo = loginResult.loginCookieInfo();
@@ -68,17 +81,7 @@ public class LoginService implements IClientLoginService {
                 logger.warn("Login failed");
                 lastLoginErrorMessage = resolveLoginErrorMessage(loginResult.message());
             }
-            notifyLoginStateChanged((this::refreshLoginState));
-            if (loginResult.success()) {
-                // Every successful login starts a new server session; re-sync the local idle
-                // play sources so they are pushed to whichever server-side component is active
-                // (network channel when connected, local loopback in isolated mode). This must
-                // not depend on the login state listeners, which are deduplicated and may not
-                // fire when the state is unchanged across a connection switch.
-                IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
-                localState.reset();
-                localState.loadFromConfig();
-            }
+            notifyLoginStateChanged((this::getLoginState));
             AccountBaseView accountBaseView = AccountBaseView.getInstance();
             if (accountBaseView != null) {
                 if (loginResult.success()) {
@@ -125,11 +128,11 @@ public class LoginService implements IClientLoginService {
 
     @Override
     public boolean isLogined() {
-        return refreshLoginState() == LoginState.LOGGED_IN;
+        return getLoginState() == LoginState.LOGGED_IN;
     }
 
     @Override
-    public LoginState refreshLoginState() {
+    public LoginState getLoginState() {
         LoginCookieInfo loginCookieInfo = LoginCookieInfo.clientCurrentCookie();
         LoginType type = loginCookieInfo.type();
         Profile current = Profile.getCurrent();
@@ -198,8 +201,6 @@ public class LoginService implements IClientLoginService {
     @Override
     public void logoutAndReloginAsAnonymous() {
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
-        Profile.setCurrent(Profile.ANONYMOUS);
-        notifyLoginStateChanged(this::refreshLoginState);
         loginAsAnonymousToServer();
     }
 
