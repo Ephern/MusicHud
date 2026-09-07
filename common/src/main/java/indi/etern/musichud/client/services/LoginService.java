@@ -51,6 +51,19 @@ public class LoginService implements IClientLoginService {
     private volatile String lastLoginErrorMessage;
     @Getter
     NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, player) -> {
+        if (loginResult.success()) {
+            // Must run synchronously inside the receiver: it arms the local layer's !loaded
+            // guard BEFORE the snapshot pushes that follow a login can be processed
+            // (deferring it to the executor re-opens the stale-guard wipe window). Every
+            // successful login starts a new server session; the local idle play sources are
+            // re-synced so they are pushed to whichever server-side component is active
+            // (network channel when connected, local loopback in isolated mode). This must
+            // not depend on the login state listeners, which are deduplicated and may not
+            // fire when the state is unchanged across a connection switch.
+            IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
+            localState.reset();
+            localState.loadFromConfig();
+        }
         MusicHud.EXECUTOR.submit(() -> {
             Thread.currentThread().setName("MHWorker-Login-V");
             LoginCookieInfo loginCookieInfo = loginResult.loginCookieInfo();
@@ -69,16 +82,6 @@ public class LoginService implements IClientLoginService {
                 lastLoginErrorMessage = resolveLoginErrorMessage(loginResult.message());
             }
             notifyLoginStateChanged((this::getLoginState));
-            if (loginResult.success()) {
-                // Every successful login starts a new server session; re-sync the local idle
-                // play sources so they are pushed to whichever server-side component is active
-                // (network channel when connected, local loopback in isolated mode). This must
-                // not depend on the login state listeners, which are deduplicated and may not
-                // fire when the state is unchanged across a connection switch.
-                IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
-                localState.reset();
-                localState.loadFromConfig();
-            }
             AccountBaseView accountBaseView = AccountBaseView.getInstance();
             if (accountBaseView != null) {
                 if (loginResult.success()) {

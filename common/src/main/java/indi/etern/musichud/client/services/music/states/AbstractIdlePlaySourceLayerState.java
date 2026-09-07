@@ -96,4 +96,24 @@ public abstract class AbstractIdlePlaySourceLayerState implements IIdlePlaySourc
     public void removeMissingFromServer(List<IdlePlaySource> serverSources) {
         throw new UnsupportedOperationException();
     }
+
+    @Override
+    public boolean isInLoadError(Class<?> type, long id) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Unregister onLoadError(Consumer<IdlePlaySource> listener) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public Unregister onLoadErrorCleared(Consumer<IdlePlaySource> listener) {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
+    public boolean requestRecovery(Class<?> type, long id, RecoveryUi ui) {
+        throw new UnsupportedOperationException();
+    }
 }

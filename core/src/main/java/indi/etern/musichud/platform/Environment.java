@@ -68,6 +68,19 @@ public class Environment {
                 null,
                 null,
                 null,
+                null),
+        VELOCITY(
+                () -> load("indi.etern.musichud.platform.plugin.velocity.config.VelocityServerConfigDefinition", ServerConfig.class),
+                () -> load("indi.etern.musichud.platform.plugin.velocity.network.VelocityNetworkManager", INetworkRegister.class),
+                () -> load("indi.etern.musichud.platform.plugin.velocity.network.VelocityNetworkManager", IServerNetworkService.class),
+                () -> load("indi.etern.musichud.platform.plugin.velocity.event.VelocityEventService", ICommonEventService.class),
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
                 null);
 
         private final Supplier<ServerConfig> serverConfigSupplier;
