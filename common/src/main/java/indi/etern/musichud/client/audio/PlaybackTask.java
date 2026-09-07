@@ -856,14 +856,18 @@ public class PlaybackTask {
                         new GetMusicResourceRequest(musicDetail.getId(), quality, url),
                         GetMusicResourceResponse.class,
                         Duration.ofSeconds(10))
-                .thenApply(GetMusicResourceResponse::getMusicResourceInfo)
-                .thenCompose(value -> {
-                    if (value == MusicResourceInfo.NONE) {
+                .thenCompose(response -> {
+                    MusicResourceInfo resourceInfo = response.getMusicResourceInfo();
+                    if (resourceInfo == MusicResourceInfo.NONE) {
                         ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                         setState(PlaybackState.ERROR);
                         return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
                     }
-                    return CompletableFuture.completedFuture(value);
+                    return CompletableFuture.completedFuture(resourceInfo);
+                }).exceptionallyCompose(e -> {
+                    ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
+                    setState(PlaybackState.ERROR);
+                    return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
                 });
     }
 

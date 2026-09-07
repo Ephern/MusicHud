@@ -24,6 +24,12 @@ public record CommonNotificationMessage(MessagedResult<Void> messagedResult) imp
                     CommonNotificationMessage.class, CODEC,
                     ((payload, player) -> {
                         String message = payload.messagedResult.message();
+                        if ((MusicHud.MOD_ID + ".text.idleSourceLoadFailed").equals(message)) {
+                            // The client names the failed source itself when the snapshot
+                            // reconciliation removes it; the keyless generic toast would be
+                            // redundant and unactionable.
+                            return;
+                        }
                         IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
                         if (message.startsWith(MusicHud.MOD_ID + ".")) {
                             message = clientDistUtil.getI18n(message);

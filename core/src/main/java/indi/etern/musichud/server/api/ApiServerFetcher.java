@@ -105,7 +105,7 @@ public class ApiServerFetcher {
 
     /** Platform constants matching api-enhanced asset naming. */
     public enum Platform {
-        WINDOWS_X64("ncm-api-windows-x64.exe"),
+        WINDOWS_X64("ncm-api-win-x64.exe"),
         LINUX_X64("ncm-api-linux-x64"),
         MACOS_X64("ncm-api-macos-x64");
 

@@ -21,8 +21,12 @@ public class StartQRLoginRequest extends ApiRequestPayload {
             RequestHandlerRegistry.autoRegisterPayload(
                     StartQRLoginRequest.class, CODEC,
                     (request, player) -> {
-                        var qrLoginInfo = ILoginApiService.getInstance(ApiProvider.NCM).startQRLoginByPlayer(player);
-                        return ResponseResult.of(new StartQRLoginResponse(qrLoginInfo.data().qrimg()));
+                        try {
+                            var qrLoginInfo = ILoginApiService.getInstance(ApiProvider.NCM).startQRLoginByPlayer(player);
+                            return ResponseResult.of(new StartQRLoginResponse(qrLoginInfo.data().qrimg()));
+                        } catch (Throwable e) {
+                            return ResponseResult.of(new StartQRLoginResponse(""));
+                        }
                     }
             );
         }

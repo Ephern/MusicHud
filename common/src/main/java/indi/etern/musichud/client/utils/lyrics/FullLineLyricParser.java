@@ -24,7 +24,7 @@ public class FullLineLyricParser {
             .appendPattern("HH:mm:ss")
             .appendFraction(java.time.temporal.ChronoField.MILLI_OF_SECOND, 1, 3, true)
             .toFormatter();
-    private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(5);
+    private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(10);
     private static final Logger logger = MusicHud.getLogger(FullLineLyricParser.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
