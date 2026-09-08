@@ -10,8 +10,17 @@ import java.util.Map;
 import static indi.etern.musichud.client.utils.ui.UniformDataUtils.interpolateARGB;
 
 public class ColorExtractor {
+    // Duplicate threshold for theme colors (normalized redmean distance).
+    // Priority on collision: primary -> secondary -> bright -> dark.
+    private static final float DUPLICATE_DIST = 0.02f;
+    // Floor for each color share so no channel vanishes in the shader.
+    private static final float MIN_SHARE = 0.02f;
+
     /**
      * 从 DynamicTexture 提取四种颜色
+     * <p>
+     * RGB 为提取到的主题色，alpha 为该色在四色中的整体占比，
+     * 四个 alpha 之和为 1.0（归一化到 0~255）。
      *
      * @return int[4] {主色, 次主色, 亮色, 暗色} 均为 ARGB
      */
@@ -148,7 +157,7 @@ public class ColorExtractor {
             float weight = entry.getValue();
             if (weight < minWeight) continue;
             int rgb = quantToRgb.get(quant);
-            if (rgb == primary) continue;
+            if (isDuplicate(rgb, primary)) continue;
             float sat = getSaturation(rgb);
             float lum = getLuminance(rgb);
             float vivid = (float) (Math.pow(sat, SECONDARY_SAT_WEIGHT) * Math.pow(lum, LUM_WEIGHT));
@@ -167,14 +176,178 @@ public class ColorExtractor {
                 secondaryFallback = rgb;
             }
         }
-        if (secondary == primary) secondary = secondaryFallback;
+        if (isDuplicate(secondary, primary)) secondary = secondaryFallback;
 
+        // Deduplicate lower-priority colors against higher-priority ones.
+        // Priority: primary -> secondary -> bright -> dark.
+        if (isDuplicate(bright, primary, secondary)) {
+            int reselected = reselectBright(colorWeight, quantToRgb, minWeight, primary, secondary);
+            if (reselected != Integer.MIN_VALUE) bright = reselected;
+        }
+        if (isDuplicate(dark, primary, secondary, bright)) {
+            int reselected = reselectDark(colorWeight, quantToRgb, minWeight, primary, secondary, bright);
+            if (reselected != Integer.MIN_VALUE) dark = reselected;
+        }
+
+        // Winner-takes-all cluster vote: each bucket counts toward its nearest
+        // theme color, so shares reflect true area proportions in the image.
+        float[] cluster = clusterWeights(primary, secondary, bright, dark, colorWeight, quantToRgb, minWeight);
+        float sum = cluster[0] + cluster[1] + cluster[2] + cluster[3];
+        if (sum <= 1e-6f) return getDefaultColors();
+
+        // Normalize to shares, apply floor, then renormalize so the sum is 1.0.
+        float aP = cluster[0] / sum;
+        float aS = cluster[1] / sum;
+        float aB = cluster[2] / sum;
+        float aD = cluster[3] / sum;
+        aP = Math.max(aP, MIN_SHARE);
+        aS = Math.max(aS, MIN_SHARE);
+        aB = Math.max(aB, MIN_SHARE);
+        aD = Math.max(aD, MIN_SHARE);
+        float sum2 = aP + aS + aB + aD;
+        aP /= sum2;
+        aS /= sum2;
+        aB /= sum2;
+        aD /= sum2;
+
+        int[] alphas = sharesToAlphaBytes(aP, aS, aB, aD);
         return new ThemedColors(
-                0xFF000000 | primary,
-                0xFF000000 | secondary,
-                0xFF000000 | bright,
-                0xFF000000 | dark
+                (alphas[0] << 24) | (primary & 0x00FFFFFF),
+                (alphas[1] << 24) | (secondary & 0x00FFFFFF),
+                (alphas[2] << 24) | (bright & 0x00FFFFFF),
+                (alphas[3] << 24) | (dark & 0x00FFFFFF)
         );
+    }
+
+    // Check whether rgb is a perceptual duplicate of any taken color.
+    private static boolean isDuplicate(int rgb, int... taken) {
+        for (int t : taken) {
+            if (colorDistance(rgb, t) < DUPLICATE_DIST) return true;
+        }
+        return false;
+    }
+
+    // Winner-takes-all cluster vote over quantized buckets.
+    // Every bucket with weight >= minWeight counts once toward its nearest theme
+    // color. Ties resolve by priority primary > secondary > bright > dark via
+    // strict-less comparison. Order: {primary, secondary, bright, dark}.
+    private static float[] clusterWeights(int primary, int secondary, int bright, int dark,
+                                          Map<Integer, Float> colorWeight, Map<Integer, Integer> quantToRgb,
+                                          float minWeight) {
+        float[] cluster = new float[4];
+        int[] themes = new int[]{primary, secondary, bright, dark};
+        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
+            float weight = entry.getValue();
+            if (weight < minWeight) continue;
+            Integer mapped = quantToRgb.get(entry.getKey());
+            if (mapped == null) continue;
+            int rgb = mapped;
+            int best = 0;
+            float bestDist = colorDistance(rgb, themes[0]);
+            for (int i = 1; i < 4; i++) {
+                float d = colorDistance(rgb, themes[i]);
+                if (d < bestDist - 1e-6f) {
+                    bestDist = d;
+                    best = i;
+                }
+            }
+            cluster[best] += weight;
+        }
+        return cluster;
+    }
+
+    // Convert four normalized shares to alpha bytes with exact total 255.
+    // Uses largest-remainder so rounding never breaks the sum.
+    public static int[] sharesToAlphaBytes(float... shares) {
+        int n = shares.length;
+        int[] out = new int[n];
+        float[] frac = new float[n];
+        int sum = 0;
+        for (int i = 0; i < n; i++) {
+            int floored = (int) Math.floor(shares[i] * 255f);
+            floored = Math.clamp(floored, 1, 255);
+            out[i] = floored;
+            frac[i] = shares[i] * 255f - floored;
+            sum += out[i];
+        }
+        int diff = 255 - sum;
+        while (diff != 0) {
+            int idx = -1;
+            if (diff > 0) {
+                float best = Float.NEGATIVE_INFINITY;
+                for (int i = 0; i < n; i++) {
+                    if (out[i] >= 255) continue;
+                    if (frac[i] > best) {
+                        best = frac[i];
+                        idx = i;
+                    }
+                }
+                if (idx < 0) break;
+                out[idx]++;
+                frac[idx] = Float.NEGATIVE_INFINITY;
+                diff--;
+            } else {
+                float worst = Float.POSITIVE_INFINITY;
+                for (int i = 0; i < n; i++) {
+                    if (out[i] <= 1) continue;
+                    if (frac[i] < worst) {
+                        worst = frac[i];
+                        idx = i;
+                    }
+                }
+                if (idx < 0) break;
+                out[idx]--;
+                frac[idx] = Float.POSITIVE_INFINITY;
+                diff++;
+            }
+        }
+        return out;
+    }
+
+    // Re-select bright excluding taken colors; MIN_VALUE if no candidate.
+    private static int reselectBright(Map<Integer, Float> colorWeight, Map<Integer, Integer> quantToRgb,
+                                      float minWeight, int... taken) {
+        final float satTarget = 0.15f;
+        final float satSpread = 0.7f;
+        int best = Integer.MIN_VALUE;
+        float bestScore = -1f;
+        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
+            if (entry.getValue() < minWeight) continue;
+            int rgb = quantToRgb.get(entry.getKey());
+            if (isDuplicate(rgb, taken)) continue;
+            float lum = getLuminance(rgb);
+            float sat = getSaturation(rgb);
+            float penalty = (sat - satTarget) * (sat - satTarget) / (satSpread * satSpread);
+            float score = lum * Math.max(0.1f, 1.0f - penalty);
+            if (score > bestScore) {
+                bestScore = score;
+                best = rgb;
+            }
+        }
+        return best;
+    }
+
+    // Re-select dark excluding taken colors; MIN_VALUE if no candidate.
+    private static int reselectDark(Map<Integer, Float> colorWeight, Map<Integer, Integer> quantToRgb,
+                                    float minWeight, int... taken) {
+        final float satTarget = 0.15f;
+        final float satSpread = 0.7f;
+        int best = Integer.MIN_VALUE;
+        float bestScore = -1f;
+        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
+            if (entry.getValue() < minWeight) continue;
+            int rgb = quantToRgb.get(entry.getKey());
+            if (isDuplicate(rgb, taken)) continue;
+            float darkness = 1.0f - getLuminance(rgb);
+            float sat = getSaturation(rgb);
+            float penalty = (sat - satTarget) * (sat - satTarget) / (satSpread * satSpread);
+            float score = darkness * Math.max(0.1f, 1.0f - penalty);
+            if (score > bestScore) {
+                bestScore = score;
+                best = rgb;
+            }
+        }
+        return best;
     }
 
     private static float getSaturation(int rgb) {
@@ -210,8 +383,8 @@ public class ColorExtractor {
 
         return (float) Math.sqrt(
                 ((512 + rMean) * dR * dR) / 256.0 +
-                4 * dG * dG +
-                ((767 - rMean) * dB * dB) / 256.0
+                        4 * dG * dG +
+                        ((767 - rMean) * dB * dB) / 256.0
         ) / 765.0f;
     }
 
@@ -223,21 +396,24 @@ public class ColorExtractor {
     }
 
     public static ThemedColors getDefaultColors() {
+        // Alpha values are shares summing to 255 (64 + 64 + 64 + 63), i.e. total 1.0.
         return new ThemedColors(
-                0xFF1A1A1A, 0xFF202020,
-                0XFF202020, 0xFF2A2A2A
+                0x401A1A1A, 0x40202020,
+                0x40202020, 0x3F2A2A2A
         );
     }
 
 
     /**
      * 对颜色数组进行饱和度、亮度、Gamma调整
+     * <p>
+     * 只调整 RGB，alpha（占比权重）原样保留。
      *
-     * @param colors     长度为4的ARGB颜色数组（不透明，alpha将被忽略并重置为0xFF）
+     * @param colors     长度为4的ARGB颜色数组
      * @param saturation 饱和度乘数（0~2，0=灰度，1=不变，>1增强）
      * @param brightness 亮度乘数（0~2，0=全黑，1=不变，>1提亮）
      * @param contrast   对比度
-     * @return 调整后的新颜色数组（ARGB，alpha=0xFF）
+     * @return 调整后的新颜色数组（ARGB，alpha 保留输入值）
      */
     public static ThemedColors adjustColors(ThemedColors colors, float saturation, float brightness, float contrast) {
         if (colors == null) return null;
@@ -292,16 +468,29 @@ public class ColorExtractor {
         int rOut = (int) (Math.clamp(rLin, 0.0f, 1.0f) * 255);
         int gOut = (int) (Math.clamp(gLin, 0.0f, 1.0f) * 255);
         int bOut = (int) (Math.clamp(bLin, 0.0f, 1.0f) * 255);
-        return 0xFF000000 | (rOut << 16) | (gOut << 8) | bOut;
+        // Preserve the share stored in alpha.
+        return (argb & 0xFF000000) | (rOut << 16) | (gOut << 8) | bOut;
     }
 
+    /**
+     * Mix each theme color towards baseColor in RGB only.
+     * Alpha channels hold share weights and keep their original distribution.
+     */
     public static ThemedColors mixBaseColorsWithAlpha(ThemedColors colors, int baseColor, float alpha) {
         if (colors == null) return null;
         return new ThemedColors(
-                interpolateARGB(baseColor, colors.primary, alpha),
-                interpolateARGB(baseColor, colors.secondary, alpha),
-                interpolateARGB(baseColor, colors.bright, alpha),
-                interpolateARGB(baseColor, colors.dark, alpha)
+                mixRgbKeepAlpha(baseColor, colors.primary, alpha),
+                mixRgbKeepAlpha(baseColor, colors.secondary, alpha),
+                mixRgbKeepAlpha(baseColor, colors.bright, alpha),
+                mixRgbKeepAlpha(baseColor, colors.dark, alpha)
         );
+    }
+
+    // Interpolate RGB channels only, keep alpha from dst (the theme color).
+    private static int mixRgbKeepAlpha(int baseColor, int themeColor, float alpha) {
+        int opaqueBase = 0xFF000000 | (baseColor & 0x00FFFFFF);
+        int opaqueTheme = 0xFF000000 | (themeColor & 0x00FFFFFF);
+        int mixed = interpolateARGB(opaqueBase, opaqueTheme, alpha);
+        return (themeColor & 0xFF000000) | (mixed & 0x00FFFFFF);
     }
 }

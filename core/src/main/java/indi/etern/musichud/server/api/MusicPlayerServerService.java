@@ -139,16 +139,16 @@ public class MusicPlayerServerService {
                         message = MusicHud.MOD_ID + ".text.votePassed";
                     }
                 } catch (Exception e) {
-                    String message1;
-                    if (e instanceof MusicResourceLoadingException e1 && e1.isUsingSubstitute()) {
-                        message1 = MusicHud.MOD_ID + ".text.substituteMusicPushError";
+                    String message1 = MusicHud.MOD_ID + ".text.musicPushError";
+                    if (e instanceof MusicResourceLoadingException e1) {
+                        if (e1.isUsingSubstitute()) {
+                            message1 = MusicHud.MOD_ID + ".text.substituteMusicPushError";
+                        }
                         MusicDetail musicDetail = e1.getMusicDetail();
                         if (musicDetail != null) {
                             nextToPlayName = musicDetail.getName();
                         }
                         nextToPlayId = e1.getId();
-                    } else {
-                        message1 = MusicHud.MOD_ID + ".text.musicPushError";
                     }
                     serverNetworkService.sendToPlayerInfos(
                             loginedPlayerInfoMap.values(),
@@ -251,7 +251,6 @@ public class MusicPlayerServerService {
                     }
                     if (loading != null) {
                         try {
-                            //noinspection BusyWait
                             loading.get(Math.max(1, waitDeadline - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                             Thread.currentThread().interrupt();

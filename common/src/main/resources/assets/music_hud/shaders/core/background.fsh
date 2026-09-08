@@ -112,13 +112,25 @@ void main() {
     float w2 = fbm(warped * (a + 0.002) + scrollVec * 0.5 + vec2(7.1, 2.9));
     float w3 = fbm(warped * (a + 0.006) + scrollVec * 0.4 + vec2(1.8, 6.4));
 
-    w0 = smoothstep(0.05, 0.6, w0);
-    w1 = smoothstep(0.15, 0.85, w1);
-    w2 = smoothstep(0.15, 0.85, w2);
-    w3 = smoothstep(0.3, 0.95, w3);
+    // u_* alpha holds the color share (sum 1.0, mean 0.25).
+    // Shift smoothstep edges so dominant colors cover more area.
+    // Zero shift at mean keeps the original coverage.
+    float sD = clamp((u_Dark.a - 0.25) * 0.5, -0.3, 0.3);
+    float sP = clamp((u_Primary.a - 0.25) * 0.5, -0.3, 0.3);
+    float sS = clamp((u_Secondary.a - 0.25) * 0.5, -0.3, 0.3);
+    float sB = clamp((u_Bright.a - 0.25) * 0.5, -0.3, 0.3);
+    w0 = smoothstep(0.2 - sD, 0.9 - 1.5 * sD, w0);
+    w1 = smoothstep(0.2 - sP, 0.9 - 1.5 * sP, w1);
+    w2 = smoothstep(0.2 - sS, 0.9 - 1.5 * sS, w2);
+    w3 = smoothstep(0.2 - sB, 0.9 - 1.5 * sB, w3);
 
     float total = w0 + w1 + w2 + w3 + 0.001;
     w0 /= total; w1 /= total; w2 /= total; w3 /= total;
+    // Gentle purity lift: concentrate each region slightly toward its local
+    // winner so small-share colors read as hazy patches instead of pale wash.
+    w0 = pow(w0, 1.5); w1 = pow(w1, 1.5); w2 = pow(w2, 1.5); w3 = pow(w3, 1.5);
+    float ptotal = w0 + w1 + w2 + w3 + 0.001;
+    w0 /= ptotal; w1 /= ptotal; w2 /= ptotal; w3 /= ptotal;
 
     vec3 r0 = u_Dark.rgb;
     vec3 r1 = u_Primary.rgb;
@@ -136,12 +148,11 @@ void main() {
     float rw3 = mix(w3, w0, reverse);
 
     vec3 rgb = c0 * rw0 + c1 * rw1 + c2 * rw2 + c3 * rw3;
-    float alpha = u_Dark.a * rw0 + u_Primary.a * rw1 + u_Secondary.a * rw2 + u_Bright.a * rw3;
 
     vec2 halfSize = vec2(halfWidth, halfHeight);
     vec2 d = abs(f_Position) - halfSize + radius;
     float dis = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
     float mask = 1.0 - aastep(dis);
 
-    fragColor = vec4(rgb, alpha * mask);
+    fragColor = vec4(rgb, mask);
 }
