@@ -23,7 +23,7 @@ import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.ApiBinaryUpdateService;
 import indi.etern.musichud.server.api.ApiServerFetcher;
 import indi.etern.musichud.server.api.ApiServerManager;
-import net.minecraft.Util;
+import net.minecraft.util.Util;
 import net.minecraft.client.resources.language.I18n;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.util.tinyfd.TinyFileDialogs;
