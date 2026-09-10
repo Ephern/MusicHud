@@ -10,11 +10,13 @@ import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.INetworkRegister;
 import indi.etern.musichud.network.NetworkReceiver;
+import indi.etern.musichud.network.payloads.ProtocolVersion;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
 
 import java.util.List;
 
+@ProtocolVersion(1)
 public record UpdateAllIdlePlaySourcesMessage(List<IdlePlaySource> idlePlaySources) implements S2CPayload {
     public static final ByteBufCodec<UpdateAllIdlePlaySourcesMessage> CODEC = ByteBufCodec.composite(
             Codecs.ofList(() -> IdlePlaySource.CODEC),

@@ -1,5 +1,7 @@
 package indi.etern.musichud.client.audio.decoder;
 
+import indi.etern.musichud.beans.user.MultichannelMode;
+import indi.etern.musichud.client.audio.OpenAlSource;
 import lombok.SneakyThrows;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.EXTFloat32;
@@ -19,13 +21,20 @@ import java.nio.ByteOrder;
  */
 public class WavStreamDecoder implements AudioDecoder {
     private final InputStream inputStream;
-    private final IResampler resampler;
-    private final int sampleRate;
-    private final int format;          // OpenAL format constant
     private final long dataSize;       // total audio data bytes in file
-    private final int frameSize;
-    private final boolean float32Output;
-    private final int inputBytesPerSample;
+    private final int sampleRate;
+    private final int inputFrameBytes;
+    private final int bitsPerSample;
+    private final int sourceChannels;
+    private final boolean useFloat32;
+    private final MultichannelMode multichannelMode;
+    private volatile int format;          // OpenAL format constant
+    private volatile int frameSize;
+    private volatile int outputFrameBytes;
+    private volatile IResampler channelMixer;
+    private volatile IResampler bitDepthResampler;
+    private volatile boolean float32Output;
+    private volatile boolean discreteAttempt;
     private long bytesRead;      // raw bytes read from stream
 
     /**
@@ -35,9 +44,18 @@ public class WavStreamDecoder implements AudioDecoder {
      * @param useFloat32  whether float32 buffer formats ({@code AL_EXT_FLOAT32})
      *                    are available; enables lossless 24/32-bit stereo output
      */
-    @SneakyThrows
     public WavStreamDecoder(InputStream inputStream, boolean useFloat32) {
+        this(inputStream, useFloat32, MultichannelMode.PREFER_DISCRETE);
+    }
+
+    /**
+     * @param mode how to handle sources with more than 2 channels
+     */
+    @SneakyThrows
+    public WavStreamDecoder(InputStream inputStream, boolean useFloat32, MultichannelMode mode) {
         this.inputStream = inputStream;
+        this.useFloat32 = useFloat32;
+        this.multichannelMode = mode == null ? MultichannelMode.PREFER_DISCRETE : mode;
 
         try {
             // 1. read RIFF header
@@ -111,53 +129,131 @@ public class WavStreamDecoder implements AudioDecoder {
             sampleRate = sampleRateTmp;
             dataSize = dataSizeTmp;
             bytesRead = 0;
+            this.sourceChannels = channels;
+            this.bitsPerSample = bitsPerSample;
+            this.inputFrameBytes = channels * (bitsPerSample / 8);
 
-            int effectiveBitsPerSample = bitsPerSample;
-            boolean floatOutput = useFloat32 && channels == 2 && (bitsPerSample == 24 || bitsPerSample == 32);
-
-            // determine OpenAL format and resampler
-            if (channels == 1) {
-                switch (bitsPerSample) {
-                    case 8 -> this.format = AL10.AL_FORMAT_MONO8;
-                    case 16 -> this.format = AL10.AL_FORMAT_MONO16;
-                    case 24, 32 -> {
-                        this.format = AL10.AL_FORMAT_MONO16;
-                        effectiveBitsPerSample = 16;
-                    }
-                    default -> throw new IOException("Unsupported bits per sample: " + bitsPerSample);
-                }
-            } else if (channels == 2) {
-                switch (bitsPerSample) {
-                    case 8 -> this.format = AL10.AL_FORMAT_STEREO8;
-                    case 16 -> this.format = AL10.AL_FORMAT_STEREO16;
-                    case 24, 32 -> {
-                        if (floatOutput) {
-                            this.format = EXTFloat32.AL_FORMAT_STEREO_FLOAT32;
-                            effectiveBitsPerSample = 32;
-                        } else {
-                            this.format = AL10.AL_FORMAT_STEREO16;
-                            effectiveBitsPerSample = 16;
-                        }
-                    }
-                    default -> throw new IOException("Unsupported bits per sample: " + bitsPerSample);
-                }
+            if (channels <= 2) {
+                buildLegacyStereo(channels, bitsPerSample, useFloat32);
             } else {
-                throw new IOException("Unsupported channel count: " + channels);
+                buildMultichannel(channels, bitsPerSample);
             }
-
-            this.resampler = switch (bitsPerSample) {
-                case 24 -> floatOutput ? new Bit24ToFloat32Converter() : new Bit24To16Resampler();
-                case 32 -> floatOutput ? new Bit32ToFloat32Converter() : new Bit32To16Resampler();
-                default -> null;
-            };
-
-            this.float32Output = floatOutput;
-            this.inputBytesPerSample = bitsPerSample / 8;
-            frameSize = effectiveBitsPerSample * channels * sampleRate / 8;
         } catch (Exception e) {
             inputStream.close();
             throw e;
         }
+    }
+
+    private void buildLegacyStereo(int channels, int bitsPerSample, boolean useFloat32) throws IOException {
+        int effectiveBitsPerSample = bitsPerSample;
+        boolean floatOutput = useFloat32 && channels == 2 && (bitsPerSample == 24 || bitsPerSample == 32);
+
+        // determine OpenAL format and resampler
+        if (channels == 1) {
+            switch (bitsPerSample) {
+                case 8 -> this.format = AL10.AL_FORMAT_MONO8;
+                case 16 -> this.format = AL10.AL_FORMAT_MONO16;
+                case 24, 32 -> {
+                    this.format = AL10.AL_FORMAT_MONO16;
+                    effectiveBitsPerSample = 16;
+                }
+                default -> throw new IOException("Unsupported bits per sample: " + bitsPerSample);
+            }
+        } else {
+            switch (bitsPerSample) {
+                case 8 -> this.format = AL10.AL_FORMAT_STEREO8;
+                case 16 -> this.format = AL10.AL_FORMAT_STEREO16;
+                case 24, 32 -> {
+                    if (floatOutput) {
+                        this.format = EXTFloat32.AL_FORMAT_STEREO_FLOAT32;
+                        effectiveBitsPerSample = 32;
+                    } else {
+                        this.format = AL10.AL_FORMAT_STEREO16;
+                        effectiveBitsPerSample = 16;
+                    }
+                }
+                default -> throw new IOException("Unsupported bits per sample: " + bitsPerSample);
+            }
+        }
+
+        this.bitDepthResampler = switch (bitsPerSample) {
+            case 24 -> floatOutput ? new Bit24ToFloat32Converter() : new Bit24To16Resampler();
+            case 32 -> floatOutput ? new Bit32ToFloat32Converter() : new Bit32To16Resampler();
+            default -> null;
+        };
+
+        this.channelMixer = null;
+        this.float32Output = floatOutput;
+        this.discreteAttempt = false;
+        this.outputFrameBytes = channels * (floatOutput ? 4 : effectiveBitsPerSample / 8);
+        frameSize = effectiveBitsPerSample * channels * sampleRate / 8;
+    }
+
+    private void buildMultichannel(int channels, int bitsPerSample) throws IOException {
+        if (bitsPerSample != 8 && bitsPerSample != 16 && bitsPerSample != 24 && bitsPerSample != 32) {
+            throw new IOException("Unsupported bits per sample: " + bitsPerSample);
+        }
+        boolean wantDiscrete = multichannelMode != MultichannelMode.FORCE_DOWNMIX;
+        int discreteBits = (bitsPerSample == 8 || bitsPerSample == 16) ? bitsPerSample : 16;
+        int discreteFormat = wantDiscrete ? MultichannelFormats.discreteFormat(channels, discreteBits) : -1;
+        if (wantDiscrete && discreteFormat != -1 && OpenAlSource.isMultichannelSupported()) {
+            buildDiscrete(channels, bitsPerSample, discreteFormat);
+        } else if (multichannelMode == MultichannelMode.DISCRETE_ONLY) {
+            if (discreteFormat == -1) {
+                throw new IOException("No discrete multichannel format for " + channels + " channels");
+            }
+            throw new IOException("Discrete multichannel output not supported by the OpenAL device");
+        } else {
+            buildDownmix(channels, bitsPerSample);
+        }
+    }
+
+    private void buildDiscrete(int channels, int bitsPerSample, int discreteFormat) {
+        this.bitDepthResampler = switch (bitsPerSample) {
+            case 24 -> new Bit24To16Resampler();
+            case 32 -> new Bit32To16Resampler();
+            default -> null;
+        };
+        int effectiveBits = (bitsPerSample == 8) ? 8 : 16;
+        this.channelMixer = null;
+        this.format = discreteFormat;
+        this.float32Output = false;
+        this.discreteAttempt = true;
+        this.outputFrameBytes = channels * (effectiveBits / 8);
+        frameSize = effectiveBits * channels * sampleRate / 8;
+    }
+
+    private void buildDownmix(int channels, int bitsPerSample) {
+        boolean floatOutput = useFloat32 && (bitsPerSample == 24 || bitsPerSample == 32);
+        this.channelMixer = new MultichannelToStereoMixer(channels, bitsPerSample / 8, true);
+        this.bitDepthResampler = switch (bitsPerSample) {
+            case 24 -> floatOutput ? new Bit24ToFloat32Converter() : new Bit24To16Resampler();
+            case 32 -> floatOutput ? new Bit32ToFloat32Converter() : new Bit32To16Resampler();
+            default -> null;
+        };
+        int effectiveBits = bitsPerSample <= 16 ? bitsPerSample : (floatOutput ? 32 : 16);
+        if (bitsPerSample == 8) {
+            this.format = AL10.AL_FORMAT_STEREO8;
+        } else if (floatOutput) {
+            this.format = EXTFloat32.AL_FORMAT_STEREO_FLOAT32;
+        } else {
+            this.format = AL10.AL_FORMAT_STEREO16;
+        }
+        this.float32Output = floatOutput;
+        this.discreteAttempt = false;
+        this.outputFrameBytes = 2 * (effectiveBits / 8);
+        frameSize = effectiveBits * 2 * sampleRate / 8;
+    }
+
+    @Override
+    public synchronized boolean isDiscreteAttempt() {
+        return discreteAttempt;
+    }
+
+    @Override
+    public synchronized void fallbackToDownmix() {
+        if (!discreteAttempt) return;
+        buildDownmix(sourceChannels, bitsPerSample);
     }
 
     /**
@@ -167,17 +263,15 @@ public class WavStreamDecoder implements AudioDecoder {
      * @return audio data byte array, or null if end of data reached
      */
     @Override
-    public byte[] readChunk(long maxSize) {
+    public synchronized byte[] readChunk(long maxSize) {
         if (bytesRead >= dataSize) {
             return null;
         }
         long remaining = dataSize - bytesRead;
-        long inputTarget = maxSize;
-        if (float32Output) {
-            // float32 output is 4 bytes/sample: scale the raw read so the converted
-            // chunk stays near maxSize (e.g. 24-bit: read 3/4, 32-bit: 1:1).
-            inputTarget = (long) (maxSize * inputBytesPerSample / 4.0);
-        }
+        // Scale the raw read by the frame-size ratio so the converted chunk
+        // stays near maxSize (downmix shrinks Nch->stereo, 24/32-bit
+        // resampling shrinks, float32 output expands).
+        long inputTarget = Math.max(1, maxSize * inputFrameBytes / Math.max(1, outputFrameBytes));
         long toRead = Math.min(inputTarget, remaining);
         if (toRead > Integer.MAX_VALUE) {
             toRead = Integer.MAX_VALUE;
@@ -197,8 +291,11 @@ public class WavStreamDecoder implements AudioDecoder {
                 return null;
             }
             byte[] result = read < buffer.length ? trim(buffer, read) : buffer;
-            if (resampler != null) {
-                result = resampler.resample(result);
+            if (channelMixer != null) {
+                result = channelMixer.resample(result);
+            }
+            if (bitDepthResampler != null) {
+                result = bitDepthResampler.resample(result);
             }
             return result.length == 0 ? null : result;
         } catch (IOException e) {
