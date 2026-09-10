@@ -2,6 +2,7 @@ package indi.etern.musichud.client.audio;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.user.MultichannelMode;
 import indi.etern.musichud.client.audio.decoder.*;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.ToastUtil;
@@ -101,6 +102,12 @@ public class PlaybackTask {
     private volatile AudioDecoder currentDecoder;
     private int lastDecoderFormat = -1;
     private int lastDecoderSampleRate = -1;
+    /**
+     * Set by {@link #tryRecoverInvalidSource)}: the next {@code playOnce()} round
+     * rebuilds a dead source mid-track, so it resumes at full gain instead of
+     * restarting the fade-in (a fade dip after a context reload would be audible).
+     */
+    private volatile boolean skipFadeInOnce = false;
     private long lastStaleDropLogTime = 0;
     private long lastUnderrunLogTime = 0;
     private long lastDownloadRestartTimestamp = 0;
@@ -361,6 +368,12 @@ public class PlaybackTask {
                     return;
                 }
             } catch (Exception e) {
+                if (tryDiscreteFallback(e)) {
+                    continue;
+                }
+                if (tryRecoverInvalidSource(e)) {
+                    continue;
+                }
                 SoundEngineState current = SoundEngineState.getCurrent();
                 if (current == SoundEngineState.SHUTDOWN) {
                     break;
@@ -388,7 +401,12 @@ public class PlaybackTask {
      * playback with fade-in, run the main loop until natural end or restart.
      */
     private PlayResult playOnce() {
-        source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, AL.getCapabilities().AL_SOFT_direct_channels), ledger);
+        int initialFormat = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
+        // Discrete multichannel buffers must be rendered by OpenAL Soft itself,
+        // so AL_SOFT_direct_channels stays off for them.
+        boolean directChannels = AL.getCapabilities().AL_SOFT_direct_channels
+                && OpenAlSource.shouldUseDirectChannels(initialFormat);
+        source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
         waitInitialBuffer();
         if (cancelled) return PlayResult.RESTARTED;
 
@@ -441,11 +459,20 @@ public class PlaybackTask {
         // fade progress 与 startFuture 同刻起算：网络缓冲等待不会提前消耗淡入进度，
         // HUD 进度/歌词/淡入起点严格一致
         long fadeDuration = transitionFadeInMs >= 0 ? transitionFadeInMs : fadeIn.durationMs();
-        if (state != PlaybackState.FADING_OUT) {
+        if (skipFadeInOnce && state != PlaybackState.FADING_OUT) {
+            // source 重建恢复：不清淡入进度，直接以目标音量继续，避免可闻的音量 dip
+            skipFadeInOnce = false;
+            fadeStartNanos = -1;
+            fadeDurationMs = 0;
+            if (state != PlaybackState.PLAYING) {
+                setState(PlaybackState.PLAYING);
+            }
+        } else if (state != PlaybackState.FADING_OUT) {
             fadeDurationMs = fadeDuration;
             fadeStartNanos = System.nanoTime();
             setState(PlaybackState.FADING_IN);
         } else {
+            skipFadeInOnce = false;
             LOGGER.debug("Playback started while fade-out already requested, honoring fade-out");
         }
         ZonedDateTime wallStart = Objects.requireNonNullElseGet(serverStartTime, ZonedDateTime::now);
@@ -697,8 +724,65 @@ public class PlaybackTask {
         }
     }
 
-    private void rebuildForRetry() {
-        restartRequested = true;
+    /**
+     * One-shot fallback when the OpenAL device rejects a discrete multichannel
+     * buffer at upload time ({@code PREFER_DISCRETE} mode only): switch the live
+     * decoder to the stereo downmix pipeline, drop queued discrete chunks and
+     * let the next {@code playOnce()} round rebuild the source. The decoder
+     * keeps its stream position; {@code isDiscreteAttempt()} is false after the
+     * switch, so this runs at most once per decoder.
+     *
+     * @return true if the fallback was applied (caller should retry playback)
+     */
+    private boolean tryDiscreteFallback(Exception e) {
+        AudioDecoder decoder = currentDecoder;
+        if (decoder == null || !decoder.isDiscreteAttempt()) return false;
+        if (clientConfig.getMultichannelMode() != MultichannelMode.PREFER_DISCRETE) return false;
+        if (!OpenAlSource.isBufferDataError(e)) return false;
+        LOGGER.warn("Discrete multichannel buffer rejected by OpenAL device, falling back to stereo downmix", e);
+        synchronized (decoder) {
+            decoder.fallbackToDownmix();
+            audioBuffer.clear();
+            ledger.prefetchBytes.set(0);
+            lastDecoderFormat = -1;
+            lastDecoderSampleRate = -1;
+        }
+        if (source != null) {
+            try {
+                source.flush();
+            } catch (Exception ignored) {
+            }
+            source.release();
+            source = null;
+        }
+        return true;
+    }
+
+    /**
+     * Fast recovery when the OpenAL source name went invalid mid-playback
+     * (context reload / device loss): drop the dead source and let the next
+     * {@code playOnce()} round rebuild it. Unlike the full retry this keeps the
+     * decoder, the buffered chunks and the ledger position, so playback resumes
+     * almost seamlessly instead of restarting after a 1s sleep.
+     *
+     * @return true if the recovery was applied (caller should retry playback)
+     */
+    private boolean tryRecoverInvalidSource(Exception e) {
+        if (!OpenAlSource.isInvalidSourceError(e)) return false;
+        if (source == null) return false;
+        LOGGER.warn("OpenAL source went invalid mid-playback, rebuilding source immediately", e);
+        try {
+            source.release();
+        } catch (Exception ignored) {
+        }
+        source = null;
+        lastDecoderFormat = -1;
+        lastDecoderSampleRate = -1;
+        skipFadeInOnce = true;
+        return true;
+    }
+
+    private void rebuildForRetry() {        restartRequested = true;
         setState(PlaybackState.RETRYING);
         if (downloadThreadFuture != null) {
             downloadThreadFuture.cancel(true);
@@ -817,9 +901,9 @@ public class PlaybackTask {
             formatType1 = AudioFormatDetector.detectFormat(inputStream);
         }
         return switch (formatType1) {
-            case WAV -> new WavStreamDecoder(inputStream, useFloat32);
+            case WAV -> new WavStreamDecoder(inputStream, useFloat32, clientConfig.getMultichannelMode());
             case MP3 -> new MP3StreamDecoder(inputStream);
-            case FLAC -> new FLACStreamDecoder(inputStream, useFloat32);
+            case FLAC -> new FLACStreamDecoder(inputStream, useFloat32, clientConfig.getMultichannelMode());
             case AUTO -> throw new IllegalArgumentException();
         };
     }

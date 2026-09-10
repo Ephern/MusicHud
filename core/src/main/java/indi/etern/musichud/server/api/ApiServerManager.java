@@ -3,6 +3,7 @@ package indi.etern.musichud.server.api;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.interfaces.*;
 import indi.etern.musichud.platform.Environment;
+import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
 import org.apache.logging.log4j.LogManager;
@@ -98,6 +99,10 @@ public class ApiServerManager implements ServerRegister {
 
     public void restartApiServer() {
         triedCount = 0;
+        restartInternal();
+    }
+
+    private void restartInternal() {
         stopApiServer();
         if (processFuture != null) {
             processFuture.thenRun(this::launchApiServerInternal);
@@ -126,7 +131,6 @@ public class ApiServerManager implements ServerRegister {
             Thread.currentThread().setName("MHWorker-API-Launcher");
             boolean apiAvailable = ApiClient.checkAvailable();
             if (!apiAvailable) {
-                triedCount = 0;
                 startEmbeddedApiServer();
                 Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
                 if (side == Environment.Side.CLIENT) {
@@ -147,6 +151,9 @@ public class ApiServerManager implements ServerRegister {
         int maxTries = 5;
         if (triedCount >= maxTries) {
             apiLogger.error("Embedded API Server has been stopped due to maximum tries reached.");
+            if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
+                IClientDistUtil.getInstance().showToast(IClientDistUtil.getInstance().getI18n(MusicHud.MOD_ID + "."));
+            }
             return;
         }
         String binaryExecutableApiServerPathString = serverConfig.getServerApiBinaryExecutablePath();
@@ -219,7 +226,7 @@ public class ApiServerManager implements ServerRegister {
                                         }
                                     } else {
                                         apiLogger.info("Api server started, but unavailable, restarting");
-                                        restartApiServer();
+                                        restartInternal();
                                         return;
                                     }
                                 }

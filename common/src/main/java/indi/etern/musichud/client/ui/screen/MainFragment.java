@@ -810,9 +810,9 @@ public class MainFragment extends Fragment {
                     icon = "/assets/music_hud/textures/gui/icons/unlink.png";
                     String template;
                     if (clientConfig.getEnableIsolatedMode()) {
-                        template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer");
-                    } else {
                         template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer.isolated");
+                    } else {
+                        template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer");
                     }
                     buttonText = template.replace("{version}", connectionManager.getServerVersion().toString());
                     switchServerConnectButton.setEnabled(false);
