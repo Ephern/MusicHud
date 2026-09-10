@@ -7,6 +7,7 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import net.minecraft.client.resources.sounds.SoundInstance;
 import net.minecraft.client.sounds.SoundEngine;
 import net.minecraft.sounds.SoundSource;
+import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL11;
 import org.lwjgl.openal.ALC10;
 import org.lwjgl.openal.EXTEfx;
@@ -24,7 +25,18 @@ public class SoundEngineMixin {
 
     @Inject(method = "tick", at = @At("RETURN"))
     private void music_hud$clearExternalSfx(CallbackInfo ci) {
-        if (ALC10.alcGetCurrentContext() == 0) {
+        long context = ALC10.alcGetCurrentContext();
+        if (context == 0) {
+            return;
+        }
+        // EFX is optional and the auxiliary send count may be zero; without it
+        // these calls would raise AL_INVALID_ENUM / AL_INVALID_VALUE on the
+        // shared context.
+        if (!AL.getCapabilities().ALC_EXT_EFX) {
+            return;
+        }
+        long device = ALC10.alcGetContextsDevice(context);
+        if (device == 0 || ALC10.alcGetInteger(device, EXTEfx.ALC_MAX_AUXILIARY_SENDS) <= 0) {
             return;
         }
         for (int sourceId : OpenAlSource.ownedSourceIds()) {
@@ -38,6 +50,9 @@ public class SoundEngineMixin {
             AL11.alSourcef(sourceId, EXTEfx.AL_AUXILIARY_SEND_FILTER_GAINHF_AUTO, AL11.AL_FALSE);
             AL11.alSourcei(sourceId, EXTEfx.AL_DIRECT_FILTER, 0);
         }
+        // These EFX calls are best-effort and unchecked; never leave an error
+        // pending on the shared context for other threads to misattribute.
+        AL11.alGetError();
     }
 
     @Inject(method = "play(Lnet/minecraft/client/resources/sounds/SoundInstance;)Lnet/minecraft/client/sounds/SoundEngine$PlayResult;",

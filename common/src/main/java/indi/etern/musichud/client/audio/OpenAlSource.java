@@ -162,6 +162,7 @@ public final class OpenAlSource implements AutoCloseable {
                     throw new SourceInvalidException("Failed to create OpenAL buffer");
                 }
             }
+            clearStaleALError();
             AL10.alSourcei(source, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE);
             AL10.alSource3f(source, AL10.AL_POSITION, 0, 0, 0);
             AL10.alSourcef(source, AL10.AL_ROLLOFF_FACTOR, 0);
@@ -205,14 +206,16 @@ public final class OpenAlSource implements AutoCloseable {
         if (SoundEngineState.getCurrent() == SoundEngineState.LOADING) {
             return 0;
         }
+        clearStaleALError();
         if (queuedCount() == 0) {
             return fillEmpty(supplier, maxSlots, format, sampleRate);
         }
         int slots = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
-        checkALError("alGetSourcei-Processed");
+        checkQueryALError("alGetSourcei-Processed");
         int filled = 0;
         for (int i = 0; i < slots && filled < maxSlots; i++) {
             int[] buffer = new int[1];
+            clearStaleALError();
             AL10.alSourceUnqueueBuffers(source, buffer);
             checkALError("alSourceUnqueueBuffers");
             ledger.removeHead();
@@ -254,8 +257,10 @@ public final class OpenAlSource implements AutoCloseable {
         ByteBuffer direct = ByteBuffer.allocateDirect(data.length);
         direct.put(data);
         direct.flip();
+        clearStaleALError();
         AL10.alBufferData(bufferId, format, direct, sampleRate);
         checkALError("alBufferData format=" + format + " bytes=" + data.length + " buffer=" + bufferId + " rate=" + sampleRate);
+        clearStaleALError();
         AL10.alSourceQueueBuffers(source, bufferId);
         checkALError("alSourceQueueBuffers buffer=" + bufferId);
         ledger.fedBytes.addAndGet(data.length);
@@ -308,8 +313,9 @@ public final class OpenAlSource implements AutoCloseable {
         checkSourceValid();
         ledger.playbackBytes = Math.max(0, ledger.fedBytes.get() - ledger.queuedBytes.get());
         try {
+            clearStaleALError();
             long offset = AL10.alGetSourcei(source, AL11.AL_SAMPLE_OFFSET);
-            checkALError("alGetSourcei-SampleOffset");
+            checkQueryALError("alGetSourcei-SampleOffset");
             if (offset >= 0 && offset >= lastSampleOffset) {
                 PlaybackLedger.LedgerEntry head = ledger.peekFirst();
                 int bytesPerFrame = head != null && head.sampleCount() > 0 ? head.bytes() / head.sampleCount() : 4;
@@ -333,12 +339,15 @@ public final class OpenAlSource implements AutoCloseable {
 
     public void flush() {
         checkSourceValid();
+        clearStaleALError();
         AL10.alSourceStop(source);
         checkALError("alSourceStop-Flush");
+        clearStaleALError();
         int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-        checkALError("alGetSourcei-Queued-Flush");
+        checkQueryALError("alGetSourcei-Queued-Flush");
         for (int i = 0; i < queued; i++) {
             int[] buffer = new int[1];
+            clearStaleALError();
             AL10.alSourceUnqueueBuffers(source, buffer);
             checkALError("alSourceUnqueueBuffers-Flush");
         }
@@ -349,12 +358,14 @@ public final class OpenAlSource implements AutoCloseable {
 
     public void play() {
         checkSourceValid();
+        clearStaleALError();
         AL10.alSourcePlay(source);
         checkALError("alSourcePlay");
     }
 
     public void stop() {
         checkSourceValid();
+        clearStaleALError();
         AL10.alSourceStop(source);
         checkALError("alSourceStop");
     }
@@ -443,13 +454,41 @@ public final class OpenAlSource implements AutoCloseable {
         }
     }
 
+    /**
+     * Drains any pending OpenAL error. Minecraft's OpenAL context is shared by
+     * several threads (vanilla SoundEngine, the EFX-cleanup mixin, third-party
+     * audio mods) and the OpenAL Soft error state is per-context and sticky, so
+     * an error left by another thread would otherwise be misattributed to our
+     * next checked operation. Call this immediately before an operation whose
+     * error we intend to validate.
+     */
+    private static void clearStaleALError() {
+        AL10.alGetError();
+    }
+
     private void checkALError(String operation) {
         int error = AL10.alGetError();
         if (error != AL10.AL_NO_ERROR) {
             String errorMsg = getALErrorString(error);
             String context = diagnosticContext();
             LOGGER.warn("OpenAL Error during {}: {} ({}) {}", operation, errorMsg, error, context);
+            if (error == AL10.AL_INVALID_NAME) {
+                throw new SourceInvalidException("al error occurred while \"" + operation + "\": " + errorMsg + " " + context);
+            }
             throw new RuntimeException("al error occurred while \"" + operation + "\": " + errorMsg + " " + context);
+        }
+    }
+
+    /**
+     * Validates a read-only query. Such queries cannot fail for a valid source,
+     * so any error reported here was raised by another thread sharing this
+     * context; report it without aborting playback.
+     */
+    private void checkQueryALError(String operation) {
+        int error = AL10.alGetError();
+        if (error != AL10.AL_NO_ERROR) {
+            LOGGER.warn("Ignoring non-fatal OpenAL error during {}: {} ({}) {}",
+                    operation, getALErrorString(error), error, diagnosticContext());
         }
     }
 
