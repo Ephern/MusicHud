@@ -74,6 +74,9 @@ public class SoundEngineMixin {
 
     @Inject(method = "reload", at = @At("RETURN"))
     private void onReloadDone(CallbackInfo ci) {
+        // The OpenAL context was destroyed and rebuilt: invalidate every source
+        // created before this point before advertising the engine as running.
+        SoundEngineState.onReload();
         SoundEngineState.setCurrent(SoundEngineState.RUNNING);
     }
 

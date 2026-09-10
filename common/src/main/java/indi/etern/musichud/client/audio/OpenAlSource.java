@@ -124,6 +124,12 @@ public final class OpenAlSource implements AutoCloseable {
     private final PlaybackLedger ledger;
     private final Config config;
     private final int[] buffers;
+    /**
+     * SoundEngine reload generation captured when this source was created. A
+     * mismatch means the OpenAL context was destroyed and rebuilt since then,
+     * so our source/buffer names belong to the old context.
+     */
+    private final long contextGeneration;
     private int source = 0;
     private int roundRobinIndex = 0;
     private long lastSampleOffset = -1;
@@ -133,6 +139,7 @@ public final class OpenAlSource implements AutoCloseable {
         this.config = config;
         this.ledger = ledger;
         this.buffers = new int[config.bufferCount()];
+        this.contextGeneration = SoundEngineState.getReloadGeneration();
     }
 
     public static OpenAlSource create(Config config, PlaybackLedger ledger) {
@@ -189,7 +196,9 @@ public final class OpenAlSource implements AutoCloseable {
     }
 
     private void checkSourceValid() {
-        if (source == 0 || !AL10.alIsSource(source)) {
+        if (source == 0
+                || contextGeneration != SoundEngineState.getReloadGeneration()
+                || !AL10.alIsSource(source)) {
             throw new SourceInvalidException("OpenAL source is invalid");
         }
     }
@@ -200,12 +209,12 @@ public final class OpenAlSource implements AutoCloseable {
      * the processed slots. Returns the number of chunks queued.
      */
     public int fill(AudioChunkSupplier supplier, int maxSlots, int format, int sampleRate) {
-        checkSourceValid();
         // While vanilla SoundEngine is reloading the context may be half-dead;
         // skip uploads for these iterations instead of erroring on stale names.
         if (SoundEngineState.getCurrent() == SoundEngineState.LOADING) {
             return 0;
         }
+        checkSourceValid();
         clearStaleALError();
         if (queuedCount() == 0) {
             return fillEmpty(supplier, maxSlots, format, sampleRate);
@@ -424,8 +433,12 @@ public final class OpenAlSource implements AutoCloseable {
      * and the orchestrator re-anchors them for the new format.
      */
     public void release() {
+        // After a context reload the old names belong to a destroyed context and
+        // may have been reused by unrelated objects in the new one; issuing AL
+        // deletes against them would delete other mods' sources/buffers.
+        boolean contextChanged = contextGeneration != SoundEngineState.getReloadGeneration();
         if (source != 0) {
-            if (AL10.alIsSource(source)) {
+            if (!contextChanged && AL10.alIsSource(source)) {
                 AL10.alSourceStop(source);
                 AL10.alGetError();
                 int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
@@ -445,7 +458,7 @@ public final class OpenAlSource implements AutoCloseable {
         }
         for (int i = 0; i < buffers.length; i++) {
             if (buffers[i] != 0) {
-                if (AL10.alIsBuffer(buffers[i])) {
+                if (!contextChanged && AL10.alIsBuffer(buffers[i])) {
                     AL10.alDeleteBuffers(buffers[i]);
                     AL10.alGetError();
                 }
