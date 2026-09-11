@@ -9,6 +9,7 @@ import org.lwjgl.openal.AL11;
 import org.lwjgl.openal.EXTFloat32;
 import org.lwjgl.openal.EXTMCFormats;
 import org.lwjgl.openal.SOFTDirectChannels;
+import org.lwjgl.openal.SOFTDirectChannelsRemix;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
@@ -16,19 +17,28 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Facade over a single OpenAL source: owns the source and its buffer pool,
- * performs all mechanical AL operations with built-in error checks, drives the
- * {@link PlaybackLedger} and optionally delivers the currently playing PCM to a
- * {@link PcmSink}.
- * <p>
- * The buffer pool (queue/available round-robin) is fully internal, so the
- * orchestrator can never hit buffer-id reuse errors. The ledger queue is kept
- * in sync: {@code queueData} adds an entry, unqueue removes the head, and
- * {@link #flush()} resets it together with the sample-offset anchor (the
- * offset is only meaningful within a single format segment).
+ * Facade over a single OpenAL source and its internal buffer pool; drives the
+ * {@link PlaybackLedger} and optionally delivers the playing PCM to a {@link PcmSink}.
  */
 public final class OpenAlSource implements AutoCloseable {
-    public record Config(int bufferCount, boolean directChannels) {
+    /**
+     * How a multi-channel buffer is fed to the output; resolved against the live
+     * context capabilities when the source is created.
+     */
+    public enum DirectChannels {
+        /** Let OpenAL Soft virtualize/downmix the buffer. */
+        OFF,
+        /** Direct output, dropping channels the device has no slot for. */
+        DROP_UNMATCHED,
+        /**
+         * Direct output, remixing unmatched channels into the closest outputs
+         * ({@code AL_REMIX_UNMATCHED_SOFT}). Preferred for discrete surround:
+         * matching devices get the true layout, others still hear every channel.
+         */
+        REMIX_UNMATCHED
+    }
+
+    public record Config(int bufferCount, DirectChannels directChannels) {
         public Config {
             if (bufferCount <= 0) {
                 throw new IllegalArgumentException("bufferCount must be positive");
@@ -85,19 +95,35 @@ public final class OpenAlSource implements AutoCloseable {
     }
 
     /**
-     * Whether {@code AL_SOFT_direct_channels} should be enabled for the given
-     * buffer format. Discrete multichannel buffers must go through the
-     * OpenAL Soft renderer (panning/HRTF/downmix), so direct channels stays
-     * off for them.
+     * Discrete multichannel buffers (quad/5.1/6.1/7.1) use
+     * {@link DirectChannels#REMIX_UNMATCHED}; everything else uses plain direct output.
      */
-    public static boolean shouldUseDirectChannels(int format) {
+    public static DirectChannels directChannelsFor(int format) {
         return switch (format) {
             case EXTMCFormats.AL_FORMAT_QUAD8, EXTMCFormats.AL_FORMAT_QUAD16,
                  EXTMCFormats.AL_FORMAT_51CHN8, EXTMCFormats.AL_FORMAT_51CHN16,
                  EXTMCFormats.AL_FORMAT_61CHN8, EXTMCFormats.AL_FORMAT_61CHN16,
-                 EXTMCFormats.AL_FORMAT_71CHN8, EXTMCFormats.AL_FORMAT_71CHN16 -> false;
-            default -> true;
+                 EXTMCFormats.AL_FORMAT_71CHN8, EXTMCFormats.AL_FORMAT_71CHN16 -> DirectChannels.REMIX_UNMATCHED;
+            default -> DirectChannels.DROP_UNMATCHED;
         };
+    }
+
+    private static int directChannelsValue(DirectChannels mode) {
+        if (mode == DirectChannels.OFF) return 0;
+        boolean direct;
+        boolean remix;
+        try {
+            var caps = AL.getCapabilities();
+            direct = caps.AL_SOFT_direct_channels;
+            remix = caps.AL_SOFT_direct_channels_remix;
+        } catch (RuntimeException e) {
+            return 0;
+        }
+        if (!direct) return 0;
+        if (mode == DirectChannels.REMIX_UNMATCHED && remix) {
+            return SOFTDirectChannelsRemix.AL_REMIX_UNMATCHED_SOFT;
+        }
+        return AL10.AL_TRUE;
     }
 
     /**
@@ -106,15 +132,44 @@ public final class OpenAlSource implements AutoCloseable {
      * format it advertised). Used to trigger the downmix fallback.
      */
     public static boolean isBufferDataError(Throwable e) {
-        String message = e == null ? null : e.getMessage();
-        return message != null && message.contains("alBufferData");
+        // A reload/device loss is not a format rejection; the fast recovery handles it.
+        if (isInvalidSourceError(e)) return false;
+        if (e instanceof OpenAlException alError) {
+            return alError.operation().startsWith("alBufferData") && isFormatRejection(alError.errorCode());
+        }
+        return false;
+    }
+
+    private static boolean isFormatRejection(int errorCode) {
+        return errorCode == AL10.AL_INVALID_ENUM
+                || errorCode == AL10.AL_INVALID_VALUE
+                || errorCode == AL10.AL_OUT_OF_MEMORY;
     }
 
     /**
-     * Whether the throwable means the OpenAL source name went invalid
-     * mid-playback (context reload / device loss). Used to rebuild the source
-     * immediately instead of going through the timed full retry.
+     * A checked OpenAL error carrying the failing operation and raw AL error code,
+     * so callers can tell a real buffer-format rejection from a transient error.
      */
+    public static final class OpenAlException extends RuntimeException {
+        private final int errorCode;
+        private final String operation;
+
+        public OpenAlException(String operation, int errorCode, String message) {
+            super(message);
+            this.operation = operation;
+            this.errorCode = errorCode;
+        }
+
+        public int errorCode() {
+            return errorCode;
+        }
+
+        public String operation() {
+            return operation;
+        }
+    }
+
+    /** Whether the throwable means the source name went invalid (reload/device loss). */
     public static boolean isInvalidSourceError(Throwable e) {
         if (e instanceof SourceInvalidException) return true;
         String message = e == null ? null : e.getMessage();
@@ -124,6 +179,8 @@ public final class OpenAlSource implements AutoCloseable {
     private final PlaybackLedger ledger;
     private final Config config;
     private final int[] buffers;
+    /** Reload generation at creation; a mismatch means the context was rebuilt. */
+    private final long contextGeneration;
     private int source = 0;
     private int roundRobinIndex = 0;
     private long lastSampleOffset = -1;
@@ -133,6 +190,7 @@ public final class OpenAlSource implements AutoCloseable {
         this.config = config;
         this.ledger = ledger;
         this.buffers = new int[config.bufferCount()];
+        this.contextGeneration = SoundEngineState.getReloadGeneration();
     }
 
     public static OpenAlSource create(Config config, PlaybackLedger ledger) {
@@ -148,6 +206,11 @@ public final class OpenAlSource implements AutoCloseable {
 
     public int sourceId() {
         return source;
+    }
+
+    /** Whether this source still belongs to the live OpenAL context. */
+    public boolean isContextCurrent() {
+        return source != 0 && contextGeneration == SoundEngineState.getReloadGeneration();
     }
 
     private void initSource() {
@@ -166,12 +229,12 @@ public final class OpenAlSource implements AutoCloseable {
             AL10.alSourcei(source, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE);
             AL10.alSource3f(source, AL10.AL_POSITION, 0, 0, 0);
             AL10.alSourcef(source, AL10.AL_ROLLOFF_FACTOR, 0);
-            if (config.directChannels() && AL.getCapabilities().AL_SOFT_direct_channels) {
-                AL10.alSourcei(source, SOFTDirectChannels.AL_DIRECT_CHANNELS_SOFT, AL10.AL_TRUE);
+            int directValue = directChannelsValue(config.directChannels());
+            if (directValue != 0) {
+                AL10.alSourcei(source, SOFTDirectChannels.AL_DIRECT_CHANNELS_SOFT, directValue);
             }
             checkALError("source configuration");
         } catch (RuntimeException e) {
-            // 部分创建失败时清理已分配的资源，避免泄漏
             if (source != 0) {
                 AL10.alDeleteSources(source);
                 AL10.alGetError();
@@ -189,23 +252,20 @@ public final class OpenAlSource implements AutoCloseable {
     }
 
     private void checkSourceValid() {
-        if (source == 0 || !AL10.alIsSource(source)) {
+        if (source == 0
+                || contextGeneration != SoundEngineState.getReloadGeneration()
+                || !AL10.alIsSource(source)) {
             throw new SourceInvalidException("OpenAL source is invalid");
         }
     }
 
-    /**
-     * Feed the source: if the source queue is empty, actively fill it from the
-     * supplier (buffer pool round-robin) and start playback; otherwise refill
-     * the processed slots. Returns the number of chunks queued.
-     */
+    /** Fill the queue from the supplier (buffer pool round-robin); returns chunks queued. */
     public int fill(AudioChunkSupplier supplier, int maxSlots, int format, int sampleRate) {
-        checkSourceValid();
-        // While vanilla SoundEngine is reloading the context may be half-dead;
-        // skip uploads for these iterations instead of erroring on stale names.
+        // Skip uploads while the context is half-dead during a reload.
         if (SoundEngineState.getCurrent() == SoundEngineState.LOADING) {
             return 0;
         }
+        checkSourceValid();
         clearStaleALError();
         if (queuedCount() == 0) {
             return fillEmpty(supplier, maxSlots, format, sampleRate);
@@ -241,10 +301,6 @@ public final class OpenAlSource implements AutoCloseable {
         return filled;
     }
 
-    /**
-     * Explicitly queue one chunk (initial prefill), taking the next buffer from
-     * the pool. The source queue must be empty.
-     */
     public void queueChunk(byte[] data, int format, int sampleRate) {
         checkSourceValid();
         int bufferId = buffers[roundRobinIndex];
@@ -268,12 +324,7 @@ public final class OpenAlSource implements AutoCloseable {
                 data.length / Math.max(1, bytesPerSample(format))));
     }
 
-    /**
-     * Pre-upload integrity check for PCM chunks. A chunk whose size is not a
-     * multiple of the frame size would play back as channel-scrambled garbage,
-     * and NaN/Inf float samples decode as loud noise, so both are reported
-     * instead of failing silently.
-     */
+    /** Flags frame-misaligned chunks and NaN/Inf float samples instead of failing silently. */
     private void validateChunk(byte[] data, int format) {
         int frameBytes = bytesPerSample(format);
         if (data.length % frameBytes != 0) {
@@ -305,10 +356,7 @@ public final class OpenAlSource implements AutoCloseable {
         }
     }
 
-    /**
-     * Update the actual playback position from the OpenAL sample offset and
-     * deliver the currently playing PCM chunk to the PCM sink.
-     */
+    /** Update the playback position from {@code AL_SAMPLE_OFFSET} and feed the PCM sink. */
     public void updatePlaybackPosition() {
         checkSourceValid();
         ledger.playbackBytes = Math.max(0, ledger.fedBytes.get() - ledger.queuedBytes.get());
@@ -417,15 +465,12 @@ public final class OpenAlSource implements AutoCloseable {
         ledger.resetAll();
     }
 
-    /**
-     * Delete the OpenAL source and buffers without touching the
-     * {@link PlaybackLedger}. Used when the pipeline format changes mid-stream
-     * (e.g. discrete-multichannel downmix fallback): ledger counters stay valid
-     * and the orchestrator re-anchors them for the new format.
-     */
+    /** Delete the AL source/buffers without touching the ledger (format-change rebuild). */
     public void release() {
+        // Old names may be reused by other objects in the rebuilt context; don't delete them.
+        boolean contextChanged = contextGeneration != SoundEngineState.getReloadGeneration();
         if (source != 0) {
-            if (AL10.alIsSource(source)) {
+            if (!contextChanged && AL10.alIsSource(source)) {
                 AL10.alSourceStop(source);
                 AL10.alGetError();
                 int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
@@ -445,7 +490,7 @@ public final class OpenAlSource implements AutoCloseable {
         }
         for (int i = 0; i < buffers.length; i++) {
             if (buffers[i] != 0) {
-                if (AL10.alIsBuffer(buffers[i])) {
+                if (!contextChanged && AL10.alIsBuffer(buffers[i])) {
                     AL10.alDeleteBuffers(buffers[i]);
                     AL10.alGetError();
                 }
@@ -455,12 +500,8 @@ public final class OpenAlSource implements AutoCloseable {
     }
 
     /**
-     * Drains any pending OpenAL error. Minecraft's OpenAL context is shared by
-     * several threads (vanilla SoundEngine, the EFX-cleanup mixin, third-party
-     * audio mods) and the OpenAL Soft error state is per-context and sticky, so
-     * an error left by another thread would otherwise be misattributed to our
-     * next checked operation. Call this immediately before an operation whose
-     * error we intend to validate.
+     * Drains a pending AL error left by another thread sharing this context, so
+     * it can't be misattributed to our next checked operation.
      */
     private static void clearStaleALError() {
         AL10.alGetError();
@@ -472,18 +513,18 @@ public final class OpenAlSource implements AutoCloseable {
             String errorMsg = getALErrorString(error);
             String context = diagnosticContext();
             LOGGER.warn("OpenAL Error during {}: {} ({}) {}", operation, errorMsg, error, context);
-            if (error == AL10.AL_INVALID_NAME) {
+            // A reload or half-dead context turns any AL error into a stale name:
+            // route it to fast recovery, never the permanent downmix fallback.
+            if (error == AL10.AL_INVALID_NAME
+                    || contextGeneration != SoundEngineState.getReloadGeneration()
+                    || SoundEngineState.getCurrent() != SoundEngineState.RUNNING) {
                 throw new SourceInvalidException("al error occurred while \"" + operation + "\": " + errorMsg + " " + context);
             }
-            throw new RuntimeException("al error occurred while \"" + operation + "\": " + errorMsg + " " + context);
+            throw new OpenAlException(operation, error, "al error occurred while \"" + operation + "\": " + errorMsg + " " + context);
         }
     }
 
-    /**
-     * Validates a read-only query. Such queries cannot fail for a valid source,
-     * so any error reported here was raised by another thread sharing this
-     * context; report it without aborting playback.
-     */
+    /** A failed read-only query was raised by another thread; log it without aborting. */
     private void checkQueryALError(String operation) {
         int error = AL10.alGetError();
         if (error != AL10.AL_NO_ERROR) {
@@ -492,10 +533,7 @@ public final class OpenAlSource implements AutoCloseable {
         }
     }
 
-    /**
-     * Snapshot of the source/engine state at failure time, so the next
-     * occurrence of an occasional error is directly diagnosable from the log.
-     */
+    /** Source/engine snapshot for error logs. */
     private String diagnosticContext() {
         boolean valid = false;
         try {

@@ -665,7 +665,7 @@ public class MainFragment extends Fragment {
             });
 
             var params = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
-            params.setMargins(routerContainer.dp(80), 0, routerContainer.dp(24), 0);
+            params.setMargins(routerContainer.dp(64), 0, 0, 0);
             base.addView(routerContainer, params);
 
             LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(lyricsPanelWidth, MATCH_PARENT);

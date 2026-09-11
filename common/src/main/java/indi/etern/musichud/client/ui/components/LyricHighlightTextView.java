@@ -9,10 +9,10 @@ import icyllis.modernui.graphics.Shader;
 import icyllis.modernui.text.Layout;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.widget.TextView;
-import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.utils.ui.Easing;
+import indi.etern.musichud.client.ui.dto.LyricLine;
+import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import lombok.NonNull;
 import lombok.Setter;
 
@@ -24,9 +24,11 @@ import java.util.function.Function;
 public class LyricHighlightTextView extends TextView {
     private static final int fullLineHighlightDelay = 300;
     private static final int animationDurationMillis = 300;
+    private static final int RAISE_ANIMATION_DURATION = 1000;
+    private static final SpringInterpolator SPRING = new SpringInterpolator(RAISE_ANIMATION_DURATION * 0.001f, 1);
     private final LyricLine lyricLine;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    private final float phraseRaiseY = dp(1) * 1.5f;
+    private final float phraseRaiseY = dp(2);
     private final Duration fadeAt;
     private final List<LyricLine.Phrase> phrases;
     private HighlightStatus status = HighlightStatus.WAITING;
@@ -34,6 +36,7 @@ public class LyricHighlightTextView extends TextView {
     private boolean statusUpdateProcessing = false;
     @Setter
     private Runnable onFade;
+
 
     public LyricHighlightTextView(Context context, LyricLine line) {
         super(context);
@@ -130,10 +133,9 @@ public class LyricHighlightTextView extends TextView {
         }
 
         int phraseIndex = lyricLine.binarySearchPhraseIndex(playedDuration);
-        if (phraseIndex < 0) phraseIndex = 0;
         Duration phraseStart, phraseEnd;
         LyricLine.Phrase currentPhrase;
-        if (phraseIndex == 0) {
+        if (phraseIndex <= 0) {
             phraseStart = lyricLine.getStartTime();
             currentPhrase = phrases.getFirst();
         } else if (phraseIndex >= phrases.size()) {
@@ -142,12 +144,6 @@ public class LyricHighlightTextView extends TextView {
         } else {
             phraseStart = phrases.get(phraseIndex - 1).endTime();
             currentPhrase = phrases.get(phraseIndex);
-        }
-        for (int i = 0; i < phraseIndex; i++) {
-            List<LyricLine.HighlightSpan> spans = phrases.get(i).spans();
-            for (LyricLine.HighlightSpan span : spans) {
-                span.setYOffset(-phraseRaiseY);
-            }
         }
         if (playedDuration.compareTo(fadeAt) >= 0) {
             super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
@@ -163,8 +159,18 @@ public class LyricHighlightTextView extends TextView {
         }
 
         phraseEnd = currentPhrase == null ? null : currentPhrase.endTime();
-        if (currentPhrase != null) {
-            raisePhrase(currentPhrase, phraseStart, phraseEnd, playedDuration);
+        for (int i = 0; i < phrases.size() && i <= phraseIndex; i++) {
+            LyricLine.Phrase phrase = phrases.get(i);
+            Duration animStart = i == 0 ? lyricLine.getStartTime() : phrases.get(i - 1).endTime();
+            boolean isCurrent = i == phraseIndex;
+            if (isCurrent || playedDuration.minus(animStart).toMillis() < RAISE_ANIMATION_DURATION) {
+                raisePhrase(phrase, animStart, playedDuration);
+            } else {
+                phrase.spans().forEach(span -> {
+                    span.setYOffset(-phraseRaiseY);
+                    span.setScale(1f);
+                });
+            }
         }
 
         long phraseDurationMillis = currentPhrase == null ? -1 : phraseEnd.minus(phraseStart).toMillis();
@@ -234,13 +240,11 @@ public class LyricHighlightTextView extends TextView {
         }
     }
 
-    private void raisePhrase(LyricLine.Phrase phrase, Duration startAt, Duration endAt, Duration now) {
+    private void raisePhrase(LyricLine.Phrase phrase, Duration startAt, Duration now) {
         long startAtMillis = startAt.toMillis();
-        long endAtMillis = endAt.toMillis();
         long nowMillis = now.toMillis();
-        long totalDuration = endAtMillis - startAtMillis;
+        long totalDuration = RAISE_ANIMATION_DURATION;
         long progressMillis = nowMillis - startAtMillis;
-        if (totalDuration <= 0) return;
 
         List<LyricLine.HighlightSpan> spans = phrase.spans();
         if (spans.isEmpty()) return;
@@ -250,32 +254,33 @@ public class LyricHighlightTextView extends TextView {
         if (phrase.durationMillis() <= LyricLine.DURABLE_PHRASE_MILLIS || charCount <= 1) {
             LyricLine.HighlightSpan span = spans.getFirst();
             float t = Math.clamp((float) progressMillis / totalDuration, 0, 1);
-            span.setYOffset(-phraseRaiseY * Easing.EASE_IN_OUT_QUAD.getInterpolation(t));
+            span.setYOffset(-phraseRaiseY * SPRING.getInterpolation(t));
         } else {
-            float staggerRate = 0.2f; // stagger ratio: the last char starts totalDuration * staggerRate later
-            long staggerDuration = (long) (totalDuration * staggerRate); // total stagger time
-            long animDuration = totalDuration - staggerDuration; // per-char animation duration
-            if (animDuration <= 0) animDuration = 1;
+            float staggerRate = 0.2f; // stagger ratio
+            // Raise uses the fixed RAISE_ANIMATION_DURATION.
+            long staggerDuration = (long) (totalDuration * staggerRate);
+            long animDuration = totalDuration - staggerDuration;
+            // Scale keeps the original phrase-duration-based waveform.
+            long phraseDuration = phrase.durationMillis();
+            long scaleStaggerDuration = (long) (phraseDuration * staggerRate);
+            long scaleDuration = phraseDuration - scaleStaggerDuration;
+            float scaleAmplitude = 0.5f * Math.min(phraseDuration, LyricLine.FULL_DURABLE_PHRASE_MILLIS)
+                    / LyricLine.FULL_DURABLE_PHRASE_MILLIS;
 
             int globalIndex = 0;
             for (LyricLine.HighlightSpan span : spans) {
                 for (int j = 0; j < span.getCharCount(); j++, globalIndex++) {
-                    // stagger offset: globalIndex / (charCount - 1) * staggerDuration,
-                    // the last char gets the full staggerDuration
-                    long delay = (globalIndex == charCount - 1)
-                            ? staggerDuration
-                            : (long) ((double) globalIndex / (charCount - 1) * staggerDuration);
-                    long animStart = startAtMillis + delay;
-                    if (nowMillis <= animStart) {
-                        span.setCharState(j, 0, 1);
-                    } else if (nowMillis >= animStart + animDuration) {
-                        span.setCharState(j, -phraseRaiseY, 1);
-                    } else {
-                        float t = (float) (nowMillis - animStart) / animDuration;
-                        span.setCharState(j,
-                                -phraseRaiseY * Easing.EASE_IN_OUT_QUAD.getInterpolation(t),
-                                1 + 0.5f * Math.min(phrase.durationMillis(), LyricLine.FULL_DURABLE_PHRASE_MILLIS) / LyricLine.FULL_DURABLE_PHRASE_MILLIS * quadratic(t));
-                    }
+                    // the last char gets the full stagger
+                    double staggerFraction = (globalIndex == charCount - 1)
+                            ? 1.0
+                            : (double) globalIndex / (charCount - 1);
+                    long raiseStart = startAtMillis + (long) (staggerFraction * staggerDuration);
+                    long scaleStart = startAtMillis + (long) (staggerFraction * scaleStaggerDuration);
+                    float tRaise = Math.clamp((float) (nowMillis - raiseStart) / animDuration, 0, 1);
+                    float tScale = Math.clamp((float) (nowMillis - scaleStart) / scaleDuration, 0, 1);
+                    span.setCharState(j,
+                            -phraseRaiseY * SPRING.getInterpolation(tRaise),
+                            1 + scaleAmplitude * quadratic(tScale));
                 }
             }
         }
@@ -289,8 +294,8 @@ public class LyricHighlightTextView extends TextView {
         long startAtMillis = startAt.toMillis();
         long endAtMillis = endAt.toMillis();
         long nowMillis = now.toMillis();
-        float t = Math.clamp((float) (nowMillis - startAtMillis) / (endAtMillis - startAtMillis), 0, 1);
-        float yOffset = -phraseRaiseY * Easing.EASE_OUT_QUAD.getInterpolation(t);
+        float t = Math.clamp((float) (nowMillis - startAtMillis) / RAISE_ANIMATION_DURATION, 0, 1);
+        float yOffset = -phraseRaiseY * SPRING.getInterpolation(t);
 
         phrase.spans().forEach(span -> span.setYOffset(yOffset));
     }
@@ -299,6 +304,5 @@ public class LyricHighlightTextView extends TextView {
         return duration1.minus(duration2).toMillis();
     }
 
-    // 动画过渡相关
     public enum HighlightStatus {WAITING, PERFORMING, DONE}
 }
