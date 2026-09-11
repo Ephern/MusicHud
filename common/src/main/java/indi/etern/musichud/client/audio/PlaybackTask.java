@@ -22,7 +22,6 @@ import net.minecraft.client.resources.language.I18n;
 import net.minecraft.sounds.SoundSource;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.openal.AL;
 import org.lwjgl.openal.AL10;
 
 import java.io.BufferedInputStream;
@@ -37,32 +36,30 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
 
 /**
- * Playback task for a single song: owns the decoder, the OpenAL source/buffers,
- * the audio buffer queue, the download & play worker threads and all byte-level
- * wall-clock alignment state.
- * <p>
- * Lifecycle: {@code PENDING} (waiting for the start gate) → downloader fills the
- * buffer queue → gate opens → source initialized → {@code FADING_IN} (gain ramps
- * up, {@link #startFuture()} completes) → {@code PLAYING} → natural end or
- * {@link #beginFadeOut(long)} → {@code FADING_OUT} → {@code FINISHED}.
- * <p>
- * A task can be cancelled or fully restarted (reopen stream, rebuild source) at
- * any point; both paths release resources and complete {@link #finishFuture()}.
+ * Playback task for a single song: owns the decoder, OpenAL source, prefetch
+ * queue, worker threads and the wall-clock alignment state.
  */
 public class PlaybackTask {
     private static final int BUFFER_COUNT = 8;
     private static final int BUFFER_SIZE = 65536;
     private static final int AUDIO_BUFFER_CAPACITY = 60;
-    private static final long STALE_DROP_MARGIN_MS = 500;// 内容落后墙钟超过该值才丢弃
-    private static final long PLAYBACK_STALL_LOG_MS = 500;// 播放线程迭代间隔超过该值记录停滞
-    private static final long PLAY_LOOP_SLEEP_MS = 40;// 主循环轮询间隔
-    private static final long INITIAL_BUFFER_WAIT_SLEEP_MS = 50;// 初始缓冲等待轮询间隔
-    private static final long FULLY_RETRY_SLEEP_MS = 1000;// 全量重试前的等待
+    /**
+     * Consecutive {@code alBufferData} failures required before permanently
+     * switching a discrete stream to stereo downmix (one failure can be transient).
+     */
+    private static final int DISCRETE_REJECTION_CONFIRMATIONS = 2;
+    private static final long STALE_DROP_MARGIN_MS = 500;
+    private static final long PLAYBACK_STALL_LOG_MS = 500;
+    private static final long PLAY_LOOP_SLEEP_MS = 40;
+    private static final long INITIAL_BUFFER_WAIT_SLEEP_MS = 50;
+    private static final long FULLY_RETRY_SLEEP_MS = 1000;
     private static final long DOWNLOAD_RETRY_DELAY_ADDITIONAL_MS = 1000;
-    private static final long UNDERFLOW_BUFFERING_DELAY_MS = 300;// 预取队列连续欠载超过该值才上报 BUFFERING
+    private static final long UNDERFLOW_BUFFERING_DELAY_MS = 300;
     private static final int SCROBBLE_MIN_PLAY_DURATION_SEC = 30;
     private static final Logger LOGGER = MusicHud.getLogger(PlaybackTask.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
@@ -81,17 +78,19 @@ public class PlaybackTask {
     private final Set<Consumer<PlaybackState>> stateListeners = new CopyOnWriteArraySet<>();
     private final PlaybackLedger ledger = new PlaybackLedger();
     private final AtomicBoolean cleanupGuard = new AtomicBoolean();
-    /**
-     * 同步基准时刻：初始为服务器广播的开始时间（可为 null），首次起播时惰性重赋为
-     * wallStart（服务器时间 ?? 本地起播时刻），此后保持不变
-     */
+    /** Sync reference: server broadcast start time, lazily set to the local wall start. */
     private volatile ZonedDateTime serverStartTime;
-    /**
-     * 调度器在交叉淡化时指定的淡入时长（transitionMs = max(outgoing.fadeOut, incoming.fadeIn)）。
-     * -1 表示未指定，起播时使用任务自己的 fadeIn
-     */
+    /** Cross-fade duration set by the scheduler; -1 uses the task's own fade-in. */
     private volatile long transitionFadeInMs = -1;
-    private volatile BlockingDeque<byte[]> audioBuffer = new LinkedBlockingDeque<>(AUDIO_BUFFER_CAPACITY + BUFFER_COUNT);
+    private volatile BlockingDeque<byte[]> audioBuffer = new LinkedBlockingDeque<>(AUDIO_BUFFER_CAPACITY);
+    /** Chunks recovered from a dead source; drained before {@link #audioBuffer}. */
+    private final ConcurrentLinkedDeque<byte[]> recoveredHead = new ConcurrentLinkedDeque<>();
+    /**
+     * "Enough audio buffered" signal for {@link #waitInitialBuffer()}; a Condition
+     * (not a monitor) so waiting doesn't pin virtual-thread carriers.
+     */
+    private final ReentrantLock bufferLock = new ReentrantLock();
+    private final Condition bufferReady = bufferLock.newCondition();
     private volatile PlaybackState state = PlaybackState.PENDING;
     private volatile boolean cancelled = false;
     private volatile boolean restartRequested = false;
@@ -104,18 +103,11 @@ public class PlaybackTask {
     private volatile AudioDecoder currentDecoder;
     private int lastDecoderFormat = -1;
     private int lastDecoderSampleRate = -1;
-    /**
-     * Set by {@link #tryRecoverInvalidSource)}: the next {@code playOnce()} round
-     * rebuilds a dead source mid-track, so it resumes at full gain instead of
-     * restarting the fade-in (a fade dip after a context reload would be audible).
-     */
+    /** Consecutive upload failures; reset on a successful prefill. */
+    private int discreteRejectionCount = 0;
+    /** Rebuilds a dead source at full gain instead of restarting the fade-in. */
     private volatile boolean skipFadeInOnce = false;
-    /**
-     * Set by {@link #tryRecoverInvalidSource(Exception)}: the next
-     * {@code playOnce()} round resumes from the recovered queue and must drop
-     * the content that would have played during the context reload, so playback
-     * re-aligns to the wall clock instead of replaying the stale tail.
-     */
+    /** Next round drops content that would have played during a reload gap. */
     private volatile boolean resyncOnResume = false;
     private long lastStaleDropLogTime = 0;
     private long lastUnderrunLogTime = 0;
@@ -136,9 +128,6 @@ public class PlaybackTask {
         this.fadeOut = fadeOut;
     }
 
-    /**
-     * Create a task using the default fade durations.
-     */
     public static PlaybackTask of(Traceable<MusicDetail> musicTrace, ZonedDateTime serverStartTime) {
         return new PlaybackTask(musicTrace, serverStartTime,
                 Fade.of(StreamAudioPlayer.DEFAULT_FADE_IN_MS), Fade.of(StreamAudioPlayer.DEFAULT_FADE_OUT_MS));
@@ -152,18 +141,11 @@ public class PlaybackTask {
         return fadeOut;
     }
 
-    /**
-     * Completes with the effective wall-clock start time the moment this task
-     * becomes audible (fade-in begins). Completes exceptionally if the task is
-     * cancelled before it started playing.
-     */
+    /** Completes with the wall-clock start time when the task becomes audible. */
     public CompletableFuture<ZonedDateTime> startFuture() {
         return startFuture;
     }
 
-    /**
-     * Completes when playback fully ends (fade-out finished, resources released).
-     */
     public CompletableFuture<Void> finishFuture() {
         return finishFuture;
     }
@@ -216,20 +198,26 @@ public class PlaybackTask {
         setState(PlaybackState.FADING_OUT);
     }
 
-    /**
-     * Cancel the task immediately: interrupt workers, release resources,
-     * complete start future exceptionally and finish future normally.
-     */
+    /** Cancel immediately: interrupt workers, release resources, complete both futures. */
     public void cancel() {
         if (cancelled) return;
         cancelled = true;
-        restartRequested = true;
-        if (downloadThreadFuture != null) downloadThreadFuture.cancel(true);
+        stopDownloadWorker();
         if (playThreadFuture != null) playThreadFuture.cancel(true);
         gate.countDown();
         startFuture.completeExceptionally(new CancellationException("Playback task cancelled"));
         cleanup();
         finishFuture.complete(null);
+    }
+
+    /** Stop the download worker and interrupt it before cleanup closes its decoder. */
+    private void stopDownloadWorker() {
+        restartRequested = true;
+        Future<?> future = downloadThreadFuture;
+        if (future != null) {
+            future.cancel(true);
+            downloadThreadFuture = null;
+        }
     }
 
     private void setState(PlaybackState state) {
@@ -263,11 +251,19 @@ public class PlaybackTask {
                         }
                         continue;
                     }
+                    if (cancelled || restartRequested) return;
                 }
 
                 LOGGER.debug("Starting audio download (attempt {})", trial);
 
                 AudioDecoder decoder = loadAudioDecoder(musicResourceInfo.getUrl(), musicResourceInfo.getType());
+                if (cancelled || restartRequested) {
+                    try {
+                        decoder.close();
+                    } catch (Exception ignored) {
+                    }
+                    return;
+                }
                 currentDecoder = decoder;
                 // A freshly opened decoder starts at byte 0; make sure a stale
                 // count from a previous decoder (e.g. this loop restarted after
@@ -308,6 +304,7 @@ public class PlaybackTask {
 
                 // 下载完成
                 downloadDone = true;
+                signalBufferReady();
                 LOGGER.debug("Audio download completed");
                 return;
             } catch (InterruptedException e) {
@@ -332,7 +329,7 @@ public class PlaybackTask {
                     );
                 }
 
-                audioBuffer.clear();
+                clearAudio();
                 ledger.prefetchBytes.set(0);
                 ledger.decodedBytes.set(0);
                 forceSync = true;
@@ -352,19 +349,65 @@ public class PlaybackTask {
     }
 
     /**
-     * Enqueue a decoded chunk into the prefetch buffer. The downloader is held
-     * at {@link #AUDIO_BUFFER_CAPACITY} (the physical buffer is larger by
-     * {@link #BUFFER_COUNT} slots) so a context-reload recovery always has room
-     * to re-insert the recovered OpenAL queue without dropping audio.
+     * Enqueue a chunk, polling while the prefetch buffer is full. Does not signal
+     * {@link #bufferReady}: the byte counters are updated by the caller after this
+     * returns, so signalling here would wake {@link #waitInitialBuffer()} on a
+     * stale {@code prefetchBytes} value.
      */
     private void enqueueAudio(byte[] data) throws InterruptedException {
         while (audioBuffer.size() >= AUDIO_BUFFER_CAPACITY) {
             if (cancelled || restartRequested) {
                 throw new InterruptedException("download stopped");
             }
+            //noinspection BusyWait
             Thread.sleep(PLAY_LOOP_SLEEP_MS);
         }
+        if (cancelled || restartRequested) {
+            throw new InterruptedException("download stopped");
+        }
         audioBuffer.put(data);
+    }
+
+    private void signalBufferReady() {
+        bufferLock.lock();
+        try {
+            bufferReady.signalAll();
+        } finally {
+            bufferLock.unlock();
+        }
+    }
+
+    /** Poll the next chunk (recovered head first) and decrement the prefetch count. */
+    private byte @Nullable [] pollAudio() {
+        byte[] data = recoveredHead.pollFirst();
+        if (data == null) {
+            data = audioBuffer.poll();
+        }
+        if (data != null) {
+            ledger.prefetchBytes.addAndGet(-data.length);
+        }
+        return data;
+    }
+
+    private byte @Nullable [] peekAudio() {
+        byte[] data = recoveredHead.peekFirst();
+        return data != null ? data : audioBuffer.peekFirst();
+    }
+
+    private boolean hasAudio() {
+        return !recoveredHead.isEmpty() || !audioBuffer.isEmpty();
+    }
+
+    private int bufferedChunks() {
+        return recoveredHead.size() + audioBuffer.size();
+    }
+
+    private void clearAudio() {
+        recoveredHead.clear();
+        audioBuffer.clear();
+        // Reset the byte count before signalling so waiters don't see a stale value.
+        ledger.prefetchBytes.set(0);
+        signalBufferReady();
     }
 
     private void syncPlaying() {
@@ -426,33 +469,21 @@ public class PlaybackTask {
         }
     }
 
-    /**
-     * One playback session: initialize source, wait for initial buffer, start
-     * playback with fade-in, run the main loop until natural end or restart.
-     */
+    /** One playback session from source creation to the main loop. */
     private PlayResult playOnce() {
-        // A SoundEngine reload may still be in progress when the fast recovery
-        // path is entered; wait for the rebuilt context before creating sources.
-        while (!cancelled && SoundEngineState.getCurrent() == SoundEngineState.LOADING) {
-            try {
-                Thread.sleep(INITIAL_BUFFER_WAIT_SLEEP_MS);
-            } catch (InterruptedException e) {
-                return PlayResult.RESTARTED;
-            }
+        // Block until any in-progress SoundEngine reload has rebuilt the context.
+        try {
+            SoundEngineState.awaitNotLoading();
+        } catch (InterruptedException e) {
+            return PlayResult.RESTARTED;
         }
         if (cancelled) return PlayResult.RESTARTED;
 
-        int initialFormat = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
-        // Discrete multichannel buffers must be rendered by OpenAL Soft itself,
-        // so AL_SOFT_direct_channels stays off for them.
-        boolean directChannels = AL.getCapabilities().AL_SOFT_direct_channels
-                && OpenAlSource.shouldUseDirectChannels(initialFormat);
-        source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
+        boolean recovered = false;
         if (resyncOnResume) {
-            // The context reload gap was recovered from the ledger; drop the
-            // stale leading content before waiting for fresh buffers so the
-            // source starts at the synchronized wall-clock position.
+            // Drop the content that would have played during the reload gap.
             resyncOnResume = false;
+            recovered = true;
             dropStaleToWallClock();
         }
         waitInitialBuffer();
@@ -465,37 +496,47 @@ public class PlaybackTask {
             return PlayResult.RESTARTED;
         }
 
-        if (source == null) {
-            throw new IllegalStateException("Audio player not initialized");
-        }
-
         int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
         int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
 
+        if (recovered) {
+            // waitInitialBuffer() may block; re-trim so the anchor below matches the
+            // content actually at the head when playback starts.
+            dropStaleToWallClock();
+        }
+
+        // The decoder may not exist yet at the top of this method (the downloader
+        // does a network round-trip first), so configure the source only now that
+        // the real stream format is known.
+        OpenAlSource.DirectChannels directChannels = OpenAlSource.directChannelsFor(format);
+        source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
+
         boolean firstChunk = true;
         for (int i = 0; i < BUFFER_COUNT; i++) {
-            byte[] audioData = audioBuffer.poll();
+            byte[] audioData = pollAudio();
             if (audioData == null) break;
 
             if (firstChunk) {
                 firstChunk = false;
-                // 锚定内容绝对位置：服务器同步时下载线程已把解码器跳到
-                // 墙钟位置，ledger.fedBytes 从这里开始累计，之后与 expectedBytes
-                // （墙钟绝对位置）基准一致。不再减半缓冲补偿——内容与墙钟
-                // 完全对齐，出声即同步（见 syncPlaying 注释）。
+                // Anchor the absolute content position to the wall clock; the
+                // downloader already skipped the decoder to it via syncPlaying().
                 if (serverStartTime != null && currentDecoder != null) {
                     long bytesPerSecond = (long) currentDecoder.getSampleRate()
                             * OpenAlSource.bytesPerSample(currentDecoder.getFormat());
-                    ledger.anchor(Math.max(0, Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000));
+                    long anchoredBytes = Math.max(0, Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000);
+                    ledger.anchor(anchoredBytes);
                 }
             }
 
             source.queueChunk(audioData, format, sampleRate);
-            ledger.prefetchBytes.addAndGet(-audioData.length);
+        }
+        if (!firstChunk) {
+            // A clean upload resets the rejection streak.
+            discreteRejectionCount = 0;
         }
 
         if (clientConfig.getDisableVanillaMusic()) {
-            // SoundManager 仅允许在主线程访问，投递到客户端线程
+            // SoundManager must be accessed on the client thread.
             Minecraft.getInstance().execute(() ->
                     Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC));
         }
@@ -504,11 +545,10 @@ public class PlaybackTask {
         lastSetGain = 0;
         source.play();
 
-        // fade progress 与 startFuture 同刻起算：网络缓冲等待不会提前消耗淡入进度，
-        // HUD 进度/歌词/淡入起点严格一致
+        // Fade progress and startFuture start together, so buffer waits don't consume it.
         long fadeDuration = transitionFadeInMs >= 0 ? transitionFadeInMs : fadeIn.durationMs();
         if (skipFadeInOnce && state != PlaybackState.FADING_OUT) {
-            // source 重建恢复：不清淡入进度，直接以目标音量继续，避免可闻的音量 dip
+            // Source rebuild: resume at target gain to avoid an audible dip.
             skipFadeInOnce = false;
             fadeStartNanos = -1;
             fadeDurationMs = 0;
@@ -537,11 +577,10 @@ public class PlaybackTask {
         long lastIterationNanos = -1;
         while (!cancelled && !Thread.currentThread().isInterrupted()) {
             try {
-                // A SoundEngine reload destroys and rebuilds the OpenAL context;
-                // skip AL work until it is running again, otherwise we would
-                // error on stale names and could delete ids reused by other mods.
+                // Block until a reload has rebuilt the context; stale names would
+                // error and could alias other mods' reused ids.
                 if (SoundEngineState.getCurrent() == SoundEngineState.LOADING) {
-                    Thread.sleep(PLAY_LOOP_SLEEP_MS);
+                    SoundEngineState.awaitNotLoading();
                     continue;
                 }
                 long iterationNow = System.nanoTime();
@@ -555,7 +594,7 @@ public class PlaybackTask {
                                         " [content={} ms expected={} ms bufferedChunks={} sourceQueued={} playing={} state={}]",
                                 stallMs,
                                 ledger.fedBytes.get() * 1000L / bytesPerSecond, expected * 1000L / bytesPerSecond,
-                                audioBuffer.size(),
+                                bufferedChunks(),
                                 source != null ? source.queuedCount() : -1,
                                 source != null && source.isPlaying(),
                                 state);
@@ -616,16 +655,13 @@ public class PlaybackTask {
         }
     }
 
-    /**
-     * 取一块数据供 OpenAL 填充：poll 预取队列，应用陈旧丢弃与欠载策略。
-     * 欠载恢复时重置 ledger 基准到墙钟并跳过陈旧判定（数据已被 sync 对齐）
-     */
+    /** Take a chunk for OpenAL, applying stale-drop and underrun policy. */
     private byte @Nullable [] takeChunk(long expectedBytes, long staleDropMarginBytes, long bytesPerSecond) {
         if (underrunSinceNanos >= 0) {
             underrunSinceNanos = -1;
             ledger.fedBytes.set(expectedBytes);
             logUnderrunDiagnostics("underrun-recovered", expectedBytes, bytesPerSecond);
-            byte[] data = audioBuffer.poll();
+            byte[] data = pollAudio();
             if (data == null) {
                 if (!downloadDone) {
                     underrunSinceNanos = System.nanoTime();
@@ -633,22 +669,15 @@ public class PlaybackTask {
                 }
                 return null;
             }
-            ledger.prefetchBytes.addAndGet(-data.length);
             return data;
         }
-        byte[] data = audioBuffer.poll();
-        if (data != null) {
-            ledger.prefetchBytes.addAndGet(-data.length);
-        }
+        byte[] data = pollAudio();
         while (data != null && ledger.fedBytes.get() < expectedBytes - staleDropMarginBytes) {
-            // 陈旧内容：丢弃并累加 fedBytes 推进绝对位置，追上墙钟后接住新鲜内容；
-            // 若覆盖赋值会把位置压塌导致整个队列被误判陈旧。
+            // Drop stale chunks and advance fedBytes (overwriting would collapse the
+            // position and mark the whole queue stale).
             ledger.fedBytes.addAndGet(data.length);
             logStaleDrop(data.length, bytesPerSecond);
-            data = audioBuffer.poll();
-            if (data != null) {
-                ledger.prefetchBytes.addAndGet(-data.length);
-            }
+            data = pollAudio();
         }
         if (data == null && !downloadDone && underrunSinceNanos < 0) {
             underrunSinceNanos = System.nanoTime();
@@ -664,7 +693,7 @@ public class PlaybackTask {
     }
 
     private void updateUnderrunState(long expectedBytes, long bytesPerSecond) {
-        if (underrunSinceNanos < 0 && audioBuffer.isEmpty() && !downloadDone) {
+        if (underrunSinceNanos < 0 && !hasAudio() && !downloadDone) {
             underrunSinceNanos = System.nanoTime();
             logUnderrunDiagnostics("underrun-started", expectedBytes, bytesPerSecond);
             // 下载线程异常退出（非 EOF）时温和重启下载，避免永久卡 BUFFERING
@@ -677,7 +706,7 @@ public class PlaybackTask {
             }
         }
 
-        if (downloadDone && audioBuffer.isEmpty() && state != PlaybackState.FADING_OUT
+        if (downloadDone && !hasAudio() && state != PlaybackState.FADING_OUT
                 && state != PlaybackState.ERROR && state != PlaybackState.RETRYING) {
             if (source != null && source.queuedCount() == 0) {
                 beginFadeOut(fadeOut.durationMs());
@@ -708,7 +737,7 @@ public class PlaybackTask {
                         event,
                         ledger.fedBytes.get() * 1000L / bytesPerSecond, expectedBytes * 1000L / bytesPerSecond,
                         (ledger.fedBytes.get() - expectedBytes) * 1000L / bytesPerSecond,
-                        audioBuffer.size(), queued, state);
+                        bufferedChunks(), queued, state);
             }
         } catch (Exception e) {
             LOGGER.warn("PlaybackDiagnostics failed to log {}: {}", event, e.getMessage());
@@ -774,34 +803,51 @@ public class PlaybackTask {
             if (source != null) {
                 source.flush();
             }
-            audioBuffer.clear();
+            clearAudio();
             ledger.prefetchBytes.set(0);
         }
     }
 
     /**
-     * One-shot fallback when the OpenAL device rejects a discrete multichannel
-     * buffer at upload time ({@code PREFER_DISCRETE} mode only): switch the live
-     * decoder to the stereo downmix pipeline, drop queued discrete chunks and
-     * let the next {@code playOnce()} round rebuild the source. The decoder
-     * keeps its stream position; {@code isDiscreteAttempt()} is false after the
-     * switch, so this runs at most once per decoder.
-     *
-     * @return true if the fallback was applied (caller should retry playback)
+     * Retries a rejected discrete multichannel upload once, then permanently
+     * switches the live decoder to the stereo downmix. Returns true when the
+     * caller should rebuild the source.
      */
     private boolean tryDiscreteFallback(Exception e) {
         AudioDecoder decoder = currentDecoder;
         if (decoder == null || !decoder.isDiscreteAttempt()) return false;
         if (clientConfig.getMultichannelMode() != MultichannelMode.PREFER_DISCRETE) return false;
+        // A reload/device loss is not a format rejection; the fast recovery handles it.
+        if (OpenAlSource.isInvalidSourceError(e)) return false;
+        // Only a healthy, unchanged context can report a real format rejection.
+        if (source == null || !source.isContextCurrent()
+                || SoundEngineState.getCurrent() != SoundEngineState.RUNNING) return false;
         if (!OpenAlSource.isBufferDataError(e)) return false;
+
+        if (++discreteRejectionCount < DISCRETE_REJECTION_CONFIRMATIONS) {
+            // Transient failure: rebuild with the same format before giving up.
+            LOGGER.warn("Discrete multichannel buffer upload failed (attempt {}/{}), retrying with the same format",
+                    discreteRejectionCount, DISCRETE_REJECTION_CONFIRMATIONS, e);
+            releaseSourceForRebuild();
+            return true;
+        }
+
         LOGGER.warn("Discrete multichannel buffer rejected by OpenAL device, falling back to stereo downmix", e);
         synchronized (decoder) {
             decoder.fallbackToDownmix();
-            audioBuffer.clear();
-            ledger.prefetchBytes.set(0);
+            clearAudio();
             lastDecoderFormat = -1;
             lastDecoderSampleRate = -1;
         }
+        releaseSourceForRebuild();
+        return true;
+    }
+
+    /**
+     * Drop the current source so the next {@code playOnce()} round creates a
+     * fresh one. Used by the discrete-format fallback/retry paths.
+     */
+    private void releaseSourceForRebuild() {
         if (source != null) {
             try {
                 source.flush();
@@ -810,7 +856,6 @@ public class PlaybackTask {
             source.release();
             source = null;
         }
-        return true;
     }
 
     /**
@@ -823,9 +868,12 @@ public class PlaybackTask {
      * @return true if the recovery was applied (caller should retry playback)
      */
     private boolean tryRecoverInvalidSource(Exception e) {
-        if (!OpenAlSource.isInvalidSourceError(e)) return false;
+        boolean contextLost = source != null && !source.isContextCurrent();
+        if (!OpenAlSource.isInvalidSourceError(e) && !contextLost) return false;
         if (source == null) return false;
-        LOGGER.warn("OpenAL source went invalid mid-playback, rebuilding source immediately", e);
+        if (SoundEngineState.getCurrent() != SoundEngineState.SHUTDOWN) {
+            LOGGER.warn("OpenAL source went invalid mid-playback, rebuilding source immediately", e);
+        }
         // The old OpenAL queue died with the context. The ledger queue mirrors
         // it, so recover its PCM and push it back to the head of the prefetch
         // buffer instead of silently skipping it (which would jump the audio
@@ -857,20 +905,17 @@ public class PlaybackTask {
         if (unplayed.isEmpty()) return;
         int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
         int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
-        for (int i = unplayed.size() - 1; i >= 0; i--) {
-            PlaybackLedger.LedgerEntry entry = unplayed.get(i);
+        for (PlaybackLedger.LedgerEntry entry : unplayed) {
             if (entry.format() != format || entry.sampleRate() != sampleRate) {
                 continue;
             }
             ByteBuffer pcm = entry.pcm();
             byte[] data = new byte[pcm.remaining()];
             pcm.duplicate().get(data);
-            if (audioBuffer.offerFirst(data)) {
-                ledger.prefetchBytes.addAndGet(data.length);
-            } else {
-                LOGGER.warn("Failed to restore {} bytes of recovered audio (buffer full)", data.length);
-            }
+            recoveredHead.addLast(data);
+            ledger.prefetchBytes.addAndGet(data.length);
         }
+        signalBufferReady();
     }
 
     /**
@@ -885,25 +930,47 @@ public class PlaybackTask {
         if (serverStartTime == null || currentDecoder == null) return;
         long bytesPerSample = OpenAlSource.bytesPerSample(currentDecoder.getFormat());
         long bytesPerSecond = (long) currentDecoder.getSampleRate() * bytesPerSample;
+        // Frame-align the target so the resumed chunk is never channel-scrambled.
         long expectedBytes = Math.max(0,
-                Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000);
-        while (ledger.fedBytes.get() < expectedBytes) {
-            byte[] head = audioBuffer.peekFirst();
+                Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000)
+                / bytesPerSample * bytesPerSample;
+        long startBytes = ledger.fedBytes.get();
+        long droppedBytes = 0;
+        int droppedChunks = 0;
+        while (true) {
+            long remaining = expectedBytes - ledger.fedBytes.get();
+            if (remaining <= 0) break;
+            byte[] head = peekAudio();
             if (head == null) break;
-            if (ledger.fedBytes.get() + head.length > expectedBytes) break;
-            audioBuffer.poll();
-            ledger.fedBytes.addAndGet(head.length);
-            ledger.prefetchBytes.addAndGet(-head.length);
-            logStaleDrop(head.length, bytesPerSecond);
+            if (head.length <= remaining) {
+                pollAudio();
+                ledger.fedBytes.addAndGet(head.length);
+                droppedBytes += head.length;
+                droppedChunks++;
+                logStaleDrop(head.length, bytesPerSecond);
+            } else {
+                // The next chunk crosses the wall clock: trim it so the resume
+                // lands exactly on the target instead of stopping a whole chunk
+                // short (which left the audio behind the lyrics/ledger).
+                int drop = (int) (remaining / bytesPerSample * bytesPerSample);
+                if (drop <= 0) break;
+                byte[] trimmed = new byte[head.length - drop];
+                System.arraycopy(head, drop, trimmed, 0, trimmed.length);
+                pollAudio();
+                recoveredHead.addFirst(trimmed);
+                ledger.prefetchBytes.addAndGet(trimmed.length);
+                ledger.fedBytes.addAndGet(drop);
+                droppedBytes += drop;
+                droppedChunks++;
+                logStaleDrop(drop, bytesPerSecond);
+                break;
+            }
         }
     }
 
-    private void rebuildForRetry() {        restartRequested = true;
+    private void rebuildForRetry() {
         setState(PlaybackState.RETRYING);
-        if (downloadThreadFuture != null) {
-            downloadThreadFuture.cancel(true);
-            downloadThreadFuture = null;
-        }
+        stopDownloadWorker();
         cleanup();
         // cleanup() only resets the ledger through source.close() when a source
         // exists; a retry triggered while source == null (e.g. after a context
@@ -923,24 +990,30 @@ public class PlaybackTask {
 
     private void waitInitialBuffer() {
         long lastRestartTimestamp = 0;
-        while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT) {
-            Future<?> currentDownloadFuture = downloadThreadFuture;
-            if (currentDownloadFuture != null && currentDownloadFuture.isDone() && !downloadDone
-                    && System.currentTimeMillis() - lastRestartTimestamp > 1000) {
-                LOGGER.warn("Download thread died unexpectedly, restarting download");
-                downloadThreadFuture = MusicHud.EXECUTOR.submit(this::downloadLoop);
-                lastRestartTimestamp = System.currentTimeMillis();
+        bufferLock.lock();
+        try {
+            while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT) {
+                Future<?> currentDownloadFuture = downloadThreadFuture;
+                if (currentDownloadFuture != null && currentDownloadFuture.isDone() && !downloadDone
+                        && System.currentTimeMillis() - lastRestartTimestamp > 1000) {
+                    LOGGER.warn("Download thread died unexpectedly, restarting download");
+                    downloadThreadFuture = MusicHud.EXECUTOR.submit(this::downloadLoop);
+                    lastRestartTimestamp = System.currentTimeMillis();
+                }
+                try {
+                    //noinspection ResultOfMethodCallIgnored
+                    bufferReady.await(INITIAL_BUFFER_WAIT_SLEEP_MS, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    return;
+                }
             }
-            try {
-                //noinspection BusyWait
-                Thread.sleep(INITIAL_BUFFER_WAIT_SLEEP_MS);
-            } catch (InterruptedException e) {
-                return;
-            }
+        } finally {
+            bufferLock.unlock();
         }
     }
 
     private void finish() {
+        stopDownloadWorker();
         scrobbleOnQuitUnregister.unregister();
         scrobble();
         cleanup();
@@ -997,7 +1070,9 @@ public class PlaybackTask {
             lastSetGain = -1;
             downloadDone = false;
             underrunSinceNanos = -1;
-            audioBuffer = new LinkedBlockingDeque<>(AUDIO_BUFFER_CAPACITY + BUFFER_COUNT);
+            audioBuffer = new LinkedBlockingDeque<>(AUDIO_BUFFER_CAPACITY);
+            recoveredHead.clear();
+            signalBufferReady();
             lastDecoderFormat = -1;
             lastDecoderSampleRate = -1;
             if (currentDecoder != null) {
@@ -1077,13 +1152,7 @@ public class PlaybackTask {
     }
 
     private enum PlayResult {
-        /**
-         * 播放自然结束（淡出完成），可以完成整个任务
-         */
         FINISHED,
-        /**
-         * 需要重启（资源已重建、下载线程已重启），播放线程继续下一轮
-         */
         RESTARTED
     }
 }
