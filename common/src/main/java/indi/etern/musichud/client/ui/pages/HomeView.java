@@ -6,7 +6,6 @@ import icyllis.modernui.graphics.Image;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
@@ -14,9 +13,11 @@ import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.beans.music.Traceable;
+import indi.etern.musichud.beans.music.actions.ActionResult;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.FlexWrapLayout;
 import indi.etern.musichud.client.ui.components.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicTrackItem;
@@ -33,10 +34,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
 
-import java.util.List;
-import java.util.Map;
-import java.util.Queue;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -62,7 +60,9 @@ public class HomeView extends LinearLayout {
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
     private MusicTrackItem nextToPlayItem;
+    private LinearLayout nextToPlayHeader;
     private TextView nextToPlayTitle;
+    private ImageButton rotateNextToPlayButton;
     private TextView queueTitle;
     private LinearLayout playQueueListView;
     private LinearLayout clientIdlePlaySourceView;
@@ -178,13 +178,38 @@ public class HomeView extends LinearLayout {
             transition1.enableTransitionType(LayoutTransition.CHANGING);
             scrollViewContainer.setLayoutTransition(transition1);
 
+            nextToPlayHeader = new LinearLayout(context);
+            nextToPlayHeader.setOrientation(LinearLayout.HORIZONTAL);
+            nextToPlayHeader.setGravity(Gravity.CENTER_VERTICAL);
+            nextToPlayHeader.setVisibility(GONE);
+            LayoutParams nextToPlayHeaderParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            nextToPlayHeaderParams.setMargins(0, dp(32), 0, dp(16));
+            scrollViewContainer.addView(nextToPlayHeader, nextToPlayHeaderParams);
+
             nextToPlayTitle = new TextView(context);
-            nextToPlayTitle.setVisibility(GONE);
             nextToPlayTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             nextToPlayTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.nextToPlay"));
-            LayoutParams nextToPlayTitleParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            nextToPlayTitleParams.setMargins(0, dp(32), 0, dp(16));
-            scrollViewContainer.addView(nextToPlayTitle, nextToPlayTitleParams);
+            nextToPlayHeader.addView(nextToPlayTitle, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+            rotateNextToPlayButton = new ImageButton(context);
+            rotateNextToPlayButton.setVisibility(GONE);
+            rotateNextToPlayButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            rotateNextToPlayButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.rotateNextToPlay"));
+            Image rotateIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/refresh_ccw_dot.png");
+            rotateNextToPlayButton.setImageDrawable(new ScaledImageDrawable(context.getResources(), rotateIcon, dp(16), dp(16)));
+            InsetBackgroundFactory.builder()
+                    .inset(dp(2))
+                    .cornerRadius(dp(4))
+                    .build()
+                    .applyBackgroundTo(rotateNextToPlayButton);
+            rotateNextToPlayButton.setOnClickListener(v -> musicService.rotateNextToPlay().thenAccept(result -> {
+                if (result.actionResult() == ActionResult.FAIL) {
+                    ToastUtil.show(I18n.get(result.message()));
+                }
+            }));
+            LinearLayout.LayoutParams rotateButtonParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+            rotateButtonParams.setMargins(dp(8), 0, 0, 0);
+            nextToPlayHeader.addView(rotateNextToPlayButton, rotateButtonParams);
 
             nextToPlayItem = new MusicTrackItem(context);
             nextToPlayItem.setVisibility(GONE);
@@ -371,13 +396,25 @@ public class HomeView extends LinearLayout {
         boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty() || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();
         MusicDetail next = hasIdlePlaySources && nextIdle != null ? nextIdle.value() : null;
         if (musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE)) {
-            nextToPlayTitle.setVisibility(VISIBLE);
+            nextToPlayHeader.setVisibility(VISIBLE);
             nextToPlayItem.setVisibility(VISIBLE);
             nextToPlayItem.bindData(nextIdle);
+            rotateNextToPlayButton.setVisibility(isLocalPlayer(next.getPusherInfo().getPlayerUUID()) ? VISIBLE : GONE);
         } else {
-            nextToPlayTitle.setVisibility(GONE);
+            nextToPlayHeader.setVisibility(GONE);
             nextToPlayItem.setVisibility(GONE);
+            rotateNextToPlayButton.setVisibility(GONE);
         }
+    }
+
+    /** Re-renders only the idle "next to play" row (e.g. after a server-side reroll). */
+    public void updateNextToPlay(Traceable<MusicDetail> nextIdle) {
+        MuiModApi.postToUiThread(() -> checkNextToPlay(nextIdle));
+    }
+
+    private static boolean isLocalPlayer(UUID playerUUID) {
+        LocalPlayer player = Minecraft.getInstance().player;
+        return player != null && player.getUUID().equals(playerUUID);
     }
 
     private void addMusicQueueItem(QueueItem item, LinearLayout playQueueView) {
@@ -385,7 +422,7 @@ public class HomeView extends LinearLayout {
         MusicDetail musicDetail = musicTrace.value();
         var musicListItem = new MusicTrackItem(getContext());
         musicListItem.bindData(musicTrace);
-        LayoutParams layoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, WRAP_CONTENT);
+        LayoutParams layoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         layoutParams.setMargins(0, 0, 0, dp(16));
 
         assert Minecraft.getInstance().player != null;

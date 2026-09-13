@@ -10,7 +10,6 @@ import icyllis.modernui.text.Spanned;
 import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Album;
@@ -67,7 +66,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         LinearLayout topBar = new LinearLayout(context);
         topBar.setOrientation(HORIZONTAL);
 
-        LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBar.setLayoutParams(params);
 
         ImageButton backButton = new ImageButton(context);
@@ -88,7 +87,7 @@ public class MusicCollectionDetailView extends LinearLayout {
                 .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
                 .build()
                 .applyBackgroundTo(backButton);
-        LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
+        LayoutParams backButtonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
         backButtonParams.setMargins(0, 0, dp(4), 0);
         topBar.addView(backButton, backButtonParams);
 
@@ -101,7 +100,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         LinearLayout briefInfo = new LinearLayout(context);
         briefInfo.setGravity(Gravity.CENTER_VERTICAL);
         briefInfo.setOrientation(VERTICAL);
-        LayoutParams params1 = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+        LayoutParams params1 = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
         params1.setMargins(dp(16), 0, 0, 0);
         topBar.addView(briefInfo, params1);
 
@@ -109,7 +108,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         row1.setOrientation(HORIZONTAL);
         row1.setBaselineAligned(false);
         row1.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams row1Params = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams row1Params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         row1Params.setMargins(0, 0, 0, dp(2));
         briefInfo.addView(row1, row1Params);
 
@@ -117,7 +116,7 @@ public class MusicCollectionDetailView extends LinearLayout {
         typeText.setTextSize(Theme.TEXT_SIZE_LARGE);
         typeText.setTextColor(Theme.NORMAL_TEXT_COLOR);
         typeText.setText(I18n.get(collectionNameI18n));
-        LayoutParams typeParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams typeParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         typeParams.setMargins(0, 0, dp(16), 0);
         row1.addView(typeText, typeParams);
 

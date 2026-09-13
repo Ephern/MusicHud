@@ -5,6 +5,7 @@ import io.netty.buffer.ByteBuf;
 
 import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 public interface ByteBufCodec<V> {
     static <V> ByteBufCodec<V> unit(final V object) {
@@ -17,6 +18,22 @@ public interface ByteBufCodec<V> {
                 if (!v.equals(object)) {
                     throw new IllegalStateException("Can't encode '" + v + "', expected '" + object + "'");
                 }
+            }
+        };
+    }
+
+    /**
+     * Field-less payload codec that decodes to a fresh instance. Prefer this over
+     * {@link #unit(Object)} for request/response payloads whose mutable request id is
+     * carried per cycle, so concurrent requests never share one instance.
+     */
+    static <V> ByteBufCodec<V> unit(Supplier<V> supplier) {
+        return new ByteBufCodec<>() {
+            public V decode(ByteBuf byteBuf) {
+                return supplier.get();
+            }
+
+            public void encode(ByteBuf byteBuf, V v) {
             }
         };
     }
