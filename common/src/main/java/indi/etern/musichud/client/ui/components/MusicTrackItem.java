@@ -8,7 +8,6 @@ import icyllis.modernui.text.Spanned;
 import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
@@ -67,7 +66,7 @@ public class MusicTrackItem extends LinearLayout {
 
     private void initView(Context context) {
         setOrientation(HORIZONTAL);
-        LayoutParams musicLayoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams musicLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         setLayoutParams(musicLayoutParams);
         setGravity(Gravity.CENTER_VERTICAL);
 
@@ -79,7 +78,7 @@ public class MusicTrackItem extends LinearLayout {
         LinearLayout musicTexts = new LinearLayout(context);
         musicTexts.setOrientation(VERTICAL);
         musicTexts.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams textsParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
+        LayoutParams textsParams = new LayoutParams(0, WRAP_CONTENT, 1);
         textsParams.setMargins(dp(12), 0, 0, 0);
         addView(musicTexts, textsParams);
 

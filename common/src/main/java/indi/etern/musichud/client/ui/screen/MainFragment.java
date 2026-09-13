@@ -151,6 +151,15 @@ public class MainFragment extends Fragment {
         }
     }
 
+    public static void updateNextToPlay(Traceable<MusicDetail> nextToPlayTrace) {
+        if (instance != null && instance.visible) {
+            HomeView homeView = HomeView.getInstance();
+            if (homeView != null) {
+                homeView.updateNextToPlay(nextToPlayTrace);
+            }
+        }
+    }
+
     private static void displayMusicInfo(Traceable<MusicDetail> musicDetailTrace) {
         if (musicDetailTrace == null || musicDetailTrace.value() == null || musicDetailTrace.value().equals(MusicDetail.NONE)) {
             instance.albumImage.loadUrl(MusicHud.ICON_BASE64);

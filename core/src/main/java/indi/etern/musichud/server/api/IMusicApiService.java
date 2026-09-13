@@ -4,6 +4,7 @@ import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.music.actions.SubscribableType;
 import indi.etern.musichud.beans.music.actions.SubscribeAction;
+import indi.etern.musichud.beans.record.PlayRecord;
 import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
 import indi.etern.musichud.throwable.PlaylistTypeUnsupportedException;
 import org.jetbrains.annotations.Nullable;
@@ -64,4 +65,6 @@ public interface IMusicApiService {
 
     /** @throws PlaylistTypeUnsupportedException if the playlist type is not supported (HTTP 400) */
     List<MusicDetail> getIntelligentList(long musicId, long playlistId, @Nullable Long sid, @Nullable UUID playerUUID);
+
+    List<? extends PlayRecord<?>> getUserPlayRecords(PlayRecord.ResourceType type, UUID playerUUID);
 }

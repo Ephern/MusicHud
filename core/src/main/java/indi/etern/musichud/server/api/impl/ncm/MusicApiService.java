@@ -6,10 +6,13 @@ import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.SearchType;
+import indi.etern.musichud.beans.login.LoginCookieInfo;
+import indi.etern.musichud.beans.login.LoginType;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.music.actions.ModifyType;
 import indi.etern.musichud.beans.music.actions.SubscribableType;
 import indi.etern.musichud.beans.music.actions.SubscribeAction;
+import indi.etern.musichud.beans.record.PlayRecord;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.interfaces.PostProcessable;
@@ -753,6 +756,38 @@ public class MusicApiService implements IMusicApiService {
                 + (response.message() == null ? "" : ": " + response.message()));
     }
 
+    @Override
+    public List<? extends PlayRecord<?>> getUserPlayRecords(PlayRecord.ResourceType type, UUID playerUUID) {
+        LoginCookieInfo loginCookieInfo = loginApiService.getLoginInfoByPlayerUUID(playerUUID).getLoginCookieInfo();
+        if (loginCookieInfo.type() == LoginType.ANONYMOUS) {
+            throw new IllegalStateException("Anonymous user");
+        }
+        RecentRecordResponse<?> playRecords = switch (type) {
+            case SONG -> ApiClient.post(
+                    ApiServerEndpointsMeta.User.RECENT_TRACK,
+                    new RecentRecordRequest(300),
+                    loginCookieInfo.rawCookie(),
+                    true
+            );
+            case PLAYLIST -> ApiClient.post(
+                    ApiServerEndpointsMeta.User.RECENT_PLAYLIST,
+                    new RecentRecordRequest(300),
+                    loginCookieInfo.rawCookie(),
+                    true
+            );
+            case ALBUM -> ApiClient.post(
+                    ApiServerEndpointsMeta.User.RECENT_ALBUM,
+                    new RecentRecordRequest(300),
+                    loginCookieInfo.rawCookie(),
+                    true
+            );
+            case UNSET -> {
+                throw new IllegalStateException("Invalid type");
+            }
+        };
+        return playRecords.data.list;
+    }
+
     public
     record IdAndUUIDKey(long id, UUID uuid) {
     }
@@ -907,5 +942,12 @@ public class MusicApiService implements IMusicApiService {
     }
 
     public record IntelligentListResponse(int code, String message, List<IntelligentItem> data) {
+    }
+
+    public record RecentRecordRequest(int limit) {}
+
+    public record RecentRecordResponse<T>(Data<T> data) {
+        public record Data<T>(int total, List<PlayRecord<T>> list) {
+        }
     }
 }

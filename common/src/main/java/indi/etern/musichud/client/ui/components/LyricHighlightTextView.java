@@ -295,7 +295,7 @@ public class LyricHighlightTextView extends TextView {
         long endAtMillis = endAt.toMillis();
         long nowMillis = now.toMillis();
         float t = Math.clamp((float) (nowMillis - startAtMillis) / RAISE_ANIMATION_DURATION, 0, 1);
-        float yOffset = -phraseRaiseY * SPRING.getInterpolation(t);
+        float yOffset = -phraseRaiseY * (1 - SPRING.getInterpolation(t));
 
         phrase.spans().forEach(span -> span.setYOffset(yOffset));
     }
