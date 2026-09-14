@@ -110,6 +110,9 @@ public class Playlist implements MusicCollection {
 
     @Override
     public String getNameI18nKey() {
+        if (specialType == null) {
+            return MusicHud.MOD_ID + ".text.playlist";
+        }
         return switch (specialType) {
             case LIKE_LIST -> MusicHud.MOD_ID + ".text.likeList";
             case USER_SPECIFIC -> MusicHud.MOD_ID + ".text.recommendlist";

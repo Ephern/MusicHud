@@ -9,7 +9,6 @@ import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Artist;
@@ -53,7 +52,7 @@ public class ArtistDetailView extends LinearLayout {
         LinearLayout topBar = new LinearLayout(context);
         topBar.setOrientation(HORIZONTAL);
 
-        LayoutParams params = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT);
+        LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBar.setLayoutParams(params);
 
         ImageButton backButton = new ImageButton(context);
@@ -74,7 +73,7 @@ public class ArtistDetailView extends LinearLayout {
                 .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
                 .build();
         backgroundFactory.applyBackgroundTo(backButton);
-        LayoutParams backButtonParams = new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.MATCH_PARENT);
+        LayoutParams backButtonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
         backButtonParams.setMargins(0, 0, dp(4), 0);
         topBar.addView(backButton, backButtonParams);
 
@@ -87,7 +86,7 @@ public class ArtistDetailView extends LinearLayout {
         LinearLayout artistInfoView = new LinearLayout(context);
         artistInfoView.setGravity(Gravity.LEFT | Gravity.TOP);
         artistInfoView.setOrientation(VERTICAL);
-        LayoutParams params1 = new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT);
+        LayoutParams params1 = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
         params1.setMargins(dp(16), 0, 0, 0);
         topBar.addView(artistInfoView, params1);
 
@@ -107,7 +106,7 @@ public class ArtistDetailView extends LinearLayout {
         name.setTextSize(Theme.TEXT_SIZE_LARGER);
         name.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         name.setText(artist.getName());
-        LayoutParams nameParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams nameParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         nameParams.setMargins(0, 0, dp(16), 0);
         row1.addView(name, nameParams);
 
@@ -115,7 +114,7 @@ public class ArtistDetailView extends LinearLayout {
         productionCounts.setTextSize(Theme.TEXT_SIZE_LARGE);
         productionCounts.setTextColor(Theme.NORMAL_TEXT_COLOR);
         productionCounts.setVisibility(GONE);
-        LayoutParams productionCountsParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams productionCountsParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         productionCountsParams.setMargins(0, 0, dp(16), 0);
         row1.addView(productionCounts, productionCountsParams);
 
@@ -148,13 +147,13 @@ public class ArtistDetailView extends LinearLayout {
         }
 
         ScrollView descriptionScrollView = new ScrollView(context);
-        LayoutParams scrollParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams scrollParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         descriptionScrollView.setLayoutParams(scrollParams);
 
         description = new TextView(context);
         description.setTextSize(Theme.TEXT_SIZE_NORMAL);
         description.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        LayoutParams descriptionParams = new LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams descriptionParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         description.setLayoutParams(descriptionParams);
         descriptionScrollView.addView(description);
 

@@ -6,6 +6,7 @@ import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.music.actions.MessagedResult;
 import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.state.ISubscribeState;
@@ -13,6 +14,7 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.PlaybackTask;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
+import indi.etern.musichud.client.dto.UserCollections;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.states.*;
@@ -27,7 +29,6 @@ import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientPushMusicToQu
 import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientRemoveMusicFromQueueMessage;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.VoteSkipCurrentMusicMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
-import indi.etern.musichud.utils.CollectionUpdateNotifier;
 import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import lombok.*;
@@ -124,7 +125,7 @@ public class MusicService implements IClientMusicService {
         if (userCollections == null) {
             return;
         }
-        UserCategoryPlaylists categoryPlaylists = userCollections.userCategoryPlaylists;
+        UserCategoryPlaylists categoryPlaylists = userCollections.getUserCategoryPlaylists();
         if (categoryPlaylists == null) {
             return;
         }
@@ -145,10 +146,10 @@ public class MusicService implements IClientMusicService {
             return;
         }
         UserCollections userCollections = currentUserCollections;
-        if (userCollections == null || userCollections.subscribedAlbums == null) {
+        if (userCollections == null || userCollections.getSubscribedAlbums() == null) {
             return;
         }
-        userCollections.subscribedAlbums.stream()
+        userCollections.getSubscribedAlbums().stream()
                 .filter(album -> album.equalsLoose(full))
                 .forEach(album -> album.updateFrom(full, true));
     }
@@ -158,8 +159,8 @@ public class MusicService implements IClientMusicService {
         if (userCollections == null) {
             return;
         }
-        if (userCollections.userCategoryPlaylists != null) {
-            UserCategoryPlaylists categoryPlaylists = userCollections.userCategoryPlaylists;
+        if (userCollections.getUserCategoryPlaylists() != null) {
+            UserCategoryPlaylists categoryPlaylists = userCollections.getUserCategoryPlaylists();
             Playlist likeList = categoryPlaylists.getLikeList();
             if (likeList != null) {
                 Playlist cached = playlistsCache.getIfPresent(PlaylistCacheKey.of(likeList, Profile.getCurrent().getUserId()));
@@ -180,8 +181,8 @@ public class MusicService implements IClientMusicService {
                 }
             });
         }
-        if (userCollections.subscribedAlbums != null) {
-            userCollections.subscribedAlbums.forEach(album -> {
+        if (userCollections.getSubscribedAlbums() != null) {
+            userCollections.getSubscribedAlbums().forEach(album -> {
                 Album cached = albumsCache.getIfPresent(album.getId());
                 if (cached != null && !cached.getMusicDetails().isEmpty()) {
                     album.updateFrom(cached, true);
@@ -350,6 +351,30 @@ public class MusicService implements IClientMusicService {
     }
 
     @Override
+    public CompletableFuture<MessagedResult<Void>> rotateNextToPlay() {
+        return RequestResponseManager.send(
+                        new RotateNextToPlayRequest(),
+                        RotateNextToPlayResponse.class,
+                        Duration.ofSeconds(20))
+                .thenApply(RotateNextToPlayResponse::getResult)
+                .exceptionally(e -> MessagedResult.fail(MusicHud.MOD_ID + ".text.rotateNextFailed", null));
+    }
+
+    @Override
+    public void updateNextToPlay(Traceable<MusicDetail> nextIdleMusicDetail) {
+        if (!clientConfig.getEnable()) {
+            return;
+        }
+        Traceable<MusicDetail> next = Objects.requireNonNullElse(nextIdleMusicDetail, Traceable.of(MusicDetail.NONE));
+        MusicDetail nextDetail = next.value();
+        if (!nextDetail.equals(MusicDetail.NONE)) {
+            ImageUtils.downloadAsync(nextDetail.getAlbum().getImageThumbnailUrl(240));
+            HudRendererManager.getInstance().preloadAlbumImage(nextDetail.getAlbum());
+        }
+        NowPlayingInfo.getInstance().updateNextToPlayIdle(next);
+    }
+
+    @Override
     public CompletableFuture<Artist> loadArtist(long id, boolean ignoreCache) {
         CompletableFuture<Artist> inProgress = loadingArtists.get(id);
         if (inProgress != null) {
@@ -433,7 +458,7 @@ public class MusicService implements IClientMusicService {
                 .thenApply(GetUserPlaylistResponse::getPlaylists)
                 .thenApply(playlists -> {
                     UserCollections userCollections = currentUserCollections;
-                    if (userCollections != null && userCollections.loaded) {
+                    if (userCollections != null && userCollections.isLoaded()) {
                         userCollections.syncUserCategoryPlaylists(playlists);
                     }
                     return playlists;
@@ -453,7 +478,7 @@ public class MusicService implements IClientMusicService {
                 .thenApply(GetUserAlbumsResponse::getAlbums)
                 .thenApply(albums -> {
                     UserCollections userCollections = currentUserCollections;
-                    if (userCollections != null && userCollections.loaded) {
+                    if (userCollections != null && userCollections.isLoaded()) {
                         userCollections.syncSubscribedAlbums(albums);
                     }
                     return albums;
@@ -473,7 +498,7 @@ public class MusicService implements IClientMusicService {
                 .thenApply(GetUserArtistsResponse::getArtists)
                 .thenApply(artists -> {
                     UserCollections userCollections = currentUserCollections;
-                    if (userCollections != null && userCollections.loaded) {
+                    if (userCollections != null && userCollections.isLoaded()) {
                         userCollections.syncSubscribedArtists(artists);
                     }
                     return artists;
@@ -541,7 +566,7 @@ public class MusicService implements IClientMusicService {
             return inProgress;
         }
         UserCollections existing = currentUserCollections;
-        if (existing != null && existing.loaded) {
+        if (existing != null && existing.isLoaded()) {
             if (ignoreCache) {
                 return rememberCollectionsLoad(CompletableFuture.allOf(
                         loadUserPlaylists(true),
@@ -564,7 +589,7 @@ public class MusicService implements IClientMusicService {
                             .thenAccept(subscribedArtists ->
                                     currentUserCollections.setSubscribedArtists(new ObservableSequencedSet<>(subscribedArtists)))
             ).thenApply(v -> {
-                currentUserCollections.loaded = true;
+                currentUserCollections.setLoaded(true);
                 syncUserCollectionsDownFromCaches();
                 return currentUserCollections;
             }));
@@ -589,164 +614,6 @@ public class MusicService implements IClientMusicService {
             return (CompletableFuture<T>) loadPlaylistDetail(id, false);
         } else {
             throw new IllegalArgumentException("Unrecognizable type");
-        }
-    }
-
-    @EqualsAndHashCode
-    @NoArgsConstructor(access = AccessLevel.PACKAGE)
-    public static class UserCollections implements IUserCollections {
-        private UserCategoryPlaylists userCategoryPlaylists;
-        @Setter
-        private ObservableSequencedSet<Album> subscribedAlbums;
-        @Setter
-        private ObservableSequencedSet<Artist> subscribedArtists;
-        private boolean loaded = false;
-        private volatile long lastReupdateCachesTimestamp = 0;
-
-        private final List<Unregister> playlistUnregisters = new ArrayList<>();
-
-        public void setUserCategoryPlaylists(UserCategoryPlaylists userCategoryPlaylists) {
-            this.userCategoryPlaylists = userCategoryPlaylists;
-            playlistUnregisters.forEach(Unregister::unregister);
-            playlistUnregisters.clear();
-
-            Playlist playlist1 = userCategoryPlaylists.getLikeList();
-            registerPlaylistUpdater(playlist1);
-
-            userCategoryPlaylists.getCreatedPlaylist().forEach(this::registerPlaylistUpdater);
-            userCategoryPlaylists.getSubscribedPlaylist().forEach(this::registerPlaylistUpdater);
-        }
-
-        private void registerPlaylistUpdater(Playlist playlist1) {
-            long likeListId = playlist1.getId();
-            Unregister unregister1 = CollectionUpdateNotifier.registerPlaylist(likeListId, (self) -> {
-                MusicService.getInstance().loadPlaylistDetail(likeListId, false).thenAccept((playlist) -> {
-                    playlist1.updateFrom(playlist, false);
-                });
-            });
-            playlistUnregisters.add(unregister1);
-        }
-
-        public UserCategoryPlaylists getUserCategoryPlaylists() {
-            reupdateCachesAsync();
-            return userCategoryPlaylists;
-        }
-
-        public ObservableSequencedSet<Album> getSubscribedAlbums() {
-            reupdateCachesAsync();
-            return subscribedAlbums;
-        }
-
-        public ObservableSequencedSet<Artist> getSubscribedArtists() {
-            reupdateCachesAsync();
-            return subscribedArtists;
-        }
-
-        private void reupdateCachesAsync() {
-            long currentTimeMillis = System.currentTimeMillis();
-            if (currentTimeMillis - lastReupdateCachesTimestamp >= 60000) {
-                lastReupdateCachesTimestamp = currentTimeMillis;
-                MusicHud.EXECUTOR.submit(() -> {
-                    if (userCategoryPlaylists != null) {
-                        Playlist likeList = userCategoryPlaylists.getLikeList();
-                        if (playlistsCache.asMap().putIfAbsent(PlaylistCacheKey.of(likeList, Profile.getCurrent().getUserId()), likeList) == null) {
-                            CollectionUpdateNotifier.notifyPlaylistUpdated(likeList.getId(), true);
-                        }
-                        userCategoryPlaylists.getCreatedPlaylist()
-                                .forEach(playlist -> {
-                                    if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
-                                            && playlistsCache.asMap().putIfAbsent(PlaylistCacheKey.of(playlist, Profile.getCurrent().getUserId()), playlist) == null) {
-                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), true);
-                                    }
-                                });
-                        userCategoryPlaylists.getSubscribedPlaylist()
-                                .forEach(playlist -> {
-                                    if (playlist.getMusicDetails() != null && playlist.getMusicDetails().size() == playlist.getMusicTrackCount()
-                                            && playlistsCache.asMap().putIfAbsent(PlaylistCacheKey.of(playlist, Profile.getCurrent().getUserId()), playlist) == null) {
-                                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), true);
-                                    }
-                                });
-                    }
-                    if (subscribedAlbums != null) {
-                        subscribedAlbums.forEach(album -> {
-                            if (album.getMusicDetails() != null && album.getMusicDetails().size() == album.getMusicTrackCount()
-                                    && albumsCache.asMap().putIfAbsent(album.getId(), album) == null) {
-                                CollectionUpdateNotifier.notifyAlbumUpdated(album.getId(), true);
-                            }
-                        });
-                    }
-                    if (subscribedArtists != null) {
-                        subscribedArtists.forEach(artist -> {
-                            if (artist.getMusicDetails() != null && !artist.getMusicDetails().isEmpty() && !artist.getDescription().isEmpty()) {
-                                artistsCache.asMap().putIfAbsent(artist.getId(), artist);
-                            }
-                        });
-                    }
-                });
-            }
-        }
-
-        void syncUserCategoryPlaylists(UserCategoryPlaylists fresh) {
-            if (fresh == null) {
-                return;
-            }
-            UserCategoryPlaylists old = userCategoryPlaylists;
-            if (old == null) {
-                userCategoryPlaylists = fresh;
-                return;
-            }
-            Playlist oldLike = old.getLikeList();
-            Playlist freshLike = fresh.getLikeList();
-            if (oldLike != null && freshLike != null) {
-                if (oldLike.updateFromBrief(freshLike)) {
-                    CollectionUpdateNotifier.notifyPlaylistUpdated(oldLike.getId(), false);
-                }
-            }
-            syncPlaylistSet(old.getCreatedPlaylist(), fresh.getCreatedPlaylist());
-            syncPlaylistSet(old.getSubscribedPlaylist(), fresh.getSubscribedPlaylist());
-        }
-
-        private void syncPlaylistSet(ObservableSequencedSet<Playlist> oldSet, ObservableSequencedSet<Playlist> freshSet) {
-            if (freshSet == null) {
-                return;
-            }
-            for (Playlist fresh : freshSet) {
-                oldSet.stream().filter(playlist -> playlist.equalsLoose(fresh)).findFirst().ifPresent(playlist -> {
-                    if (playlist.updateFromBrief(fresh)) {
-                        CollectionUpdateNotifier.notifyPlaylistUpdated(playlist.getId(), false);
-                    }
-                });
-            }
-            oldSet.syncWith(new ObservableSequencedSet<>(freshSet), true);
-        }
-
-        void syncSubscribedAlbums(LinkedHashSet<Album> freshSet) {
-            if (freshSet == null) {
-                return;
-            }
-            if (subscribedAlbums == null) {
-                subscribedAlbums = new ObservableSequencedSet<>(freshSet);
-                return;
-            }
-            for (Album fresh : freshSet) {
-                subscribedAlbums.stream().filter(album -> album.equalsLoose(fresh)).findFirst().ifPresent(album -> {
-                    if (album.updateFromBrief(fresh)) {
-                        CollectionUpdateNotifier.notifyAlbumUpdated(album.getId(), false);
-                    }
-                });
-            }
-            subscribedAlbums.syncWith(new ObservableSequencedSet<>(freshSet), true);
-        }
-
-        void syncSubscribedArtists(LinkedHashSet<Artist> freshSet) {
-            if (freshSet == null) {
-                return;
-            }
-            if (subscribedArtists == null) {
-                subscribedArtists = new ObservableSequencedSet<>(freshSet);
-                return;
-            }
-            subscribedArtists.syncWith(new ObservableSequencedSet<>(freshSet), true);
         }
     }
 

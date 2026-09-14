@@ -6,6 +6,7 @@ import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.beans.user.ScrobbleOption;
+import indi.etern.musichud.beans.user.MultichannelMode;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -39,6 +40,7 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> muted;
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
     private final ModConfigSpec.ConfigValue<String> scrobbleOption;
+    private final ModConfigSpec.ConfigValue<String> multichannelMode;
     private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundMixAlpha;
 
@@ -98,6 +100,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Scrobbling scope")
                 .translation(MusicHud.MOD_ID + ".config.common.scrobbleOption")
                 .define("scrobbleOption", ScrobbleOption.ONLY_SELF.name());
+        multichannelMode = builder
+                .comment("How to handle audio with more than 2 channels (discrete multichannel via AL_EXT_MCFORMATS vs software downmix to stereo)")
+                .translation(MusicHud.MOD_ID + ".config.common.multichannelMode")
+                .define("multichannelMode", MultichannelMode.PREFER_DISCRETE.name());
         mainScreenAdditionalBackgroundDarken = builder
                 .comment("Main Screen Additional Background Darken Rate")
                 .translation(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken")
@@ -531,6 +537,21 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setScrobbleOption(ScrobbleOption scrobbleOption) {
         this.scrobbleOption.set(scrobbleOption.name());
+    }
+
+    @Override
+    public MultichannelMode getMultichannelMode() {
+        return MultichannelMode.valueOf(multichannelMode.get());
+    }
+
+    @Override
+    public MultichannelMode getDefaultMultichannelMode() {
+        return MultichannelMode.valueOf(multichannelMode.getDefault());
+    }
+
+    @Override
+    public void setMultichannelMode(MultichannelMode multichannelMode) {
+        this.multichannelMode.set(multichannelMode.name());
     }
 
     @Override

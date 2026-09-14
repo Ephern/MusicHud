@@ -292,6 +292,39 @@ public class ApiServerEndpointsMeta {
                 true,
                 Set.of(200),
                 String.class);
+        @SuppressWarnings("rawtypes")
+        public static final UrlMeta<MusicApiService.RecentRecordResponse> RECENT_TRACK = new UrlMeta<>(
+                "/record/recent/song",
+                Set.of("limit"/*official: 300*/),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                MusicApiService.RecentRecordResponse.class);
+        @SuppressWarnings("rawtypes")
+        public static final UrlMeta<MusicApiService.RecentRecordResponse> RECENT_PLAYLIST = new UrlMeta<>(
+                "/record/recent/playlist",
+                Set.of("limit"/*official: 300*/),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                MusicApiService.RecentRecordResponse.class);
+        @SuppressWarnings("rawtypes")
+        public static final UrlMeta<MusicApiService.RecentRecordResponse> RECENT_ALBUM = new UrlMeta<>(
+                "/record/recent/album",
+                Set.of("limit"/*official: 300*/),
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                MusicApiService.RecentRecordResponse.class);
         public static final UrlMeta<String> SCROBBLE = new UrlMeta<>(
                 "/scrobble/v1",
                 Set.of("id", "time"/*in seccond*/),

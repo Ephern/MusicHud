@@ -325,6 +325,15 @@ public class NowPlayingInfo {
         callLyricsUpdateListeners(null);
     }
 
+    /** Replaces only the idle "next to play" (e.g. after a reroll) without touching playback/lyrics. */
+    public void updateNextToPlayIdle(Traceable<MusicDetail> idleNextToPlayTrace) {
+        nextToPlayIdleMusic = idleNextToPlayTrace == null ? Traceable.of(MusicDetail.NONE) : idleNextToPlayTrace;
+        try {
+            MuiModApi.postToUiThread(() -> MainFragment.updateNextToPlay(nextToPlayIdleMusic));
+        } catch (IllegalStateException ignored) {
+        }
+    }
+
     public void startAt(ZonedDateTime zonedDateTime) {
         musicStartTime = Objects.requireNonNullElseGet(zonedDateTime, ZonedDateTime::now);
         if (lyricLines != null && !lyricLines.isEmpty()) {

@@ -5,13 +5,14 @@ import icyllis.modernui.graphics.Image;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
 import icyllis.modernui.view.Gravity;
-import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+
+import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class ArtistCard extends LinearLayout {
     public static final int imageSize = 100;
@@ -32,7 +33,7 @@ public class ArtistCard extends LinearLayout {
     private void initView(Context context) {
         setOrientation(VERTICAL);
         setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams layoutParams = new LayoutParams(dp(120), ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams layoutParams = new LayoutParams(dp(120), WRAP_CONTENT);
         setLayoutParams(layoutParams);
 
         albumImage = new UrlImageView(context);

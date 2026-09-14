@@ -13,11 +13,7 @@ import icyllis.modernui.resources.TypedValue;
 import icyllis.modernui.util.ColorStateList;
 import icyllis.modernui.util.DataSet;
 import icyllis.modernui.util.StateSet;
-import icyllis.modernui.view.Gravity;
-import icyllis.modernui.view.LayoutInflater;
-import icyllis.modernui.view.MeasureSpec;
-import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
+import icyllis.modernui.view.*;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ScrollView;
@@ -81,10 +77,6 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         root = new FrameLayout(context);
         margin = root.dp(MARGIN);
 
-        LayoutTransition transition = new LayoutTransition();
-        transition.enableTransitionType(LayoutTransition.CHANGING);
-        root.setLayoutTransition(transition);
-
         overlay = new HudEditOverlayView(context);
         overlay.setOnConfigChanged(this::onHudConfigChanged);
         root.addView(overlay, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -98,6 +90,12 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         root.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> onRootSizeChanged());
         panel.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> updatePanelPosition());
         root.post(this::updatePanelPosition);
+
+        root.post(() -> {
+            LayoutTransition transition = new LayoutTransition();
+            transition.enableTransitionType(LayoutTransition.CHANGING);
+            root.setLayoutTransition(transition);
+        });
         return root;
     }
 

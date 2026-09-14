@@ -17,6 +17,9 @@ import net.minecraft.client.resources.language.I18n;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
+import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+
 public class SearchMusicResultView extends LinearLayout {
     @Getter
     private static SearchMusicResultView instance;
@@ -71,6 +74,6 @@ public class SearchMusicResultView extends LinearLayout {
             MusicService.getInstance().sendPushMusicToQueue(Traceable.of(musicDetail.getId()));
             ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
-        addView(musicLayout, new LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.WRAP_CONTENT));
+        addView(musicLayout, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
     }
 }

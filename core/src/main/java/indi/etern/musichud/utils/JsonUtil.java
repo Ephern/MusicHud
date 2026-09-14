@@ -11,6 +11,7 @@ import lombok.SneakyThrows;
 
 import java.io.IOException;
 import java.lang.reflect.Type;
+import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.time.format.DateTimeFormatter;
 
@@ -21,6 +22,7 @@ public class JsonUtil {
                 .registerTypeAdapterFactory(new LenientEnumTypeAdapterFactory())
                 .registerTypeAdapter(Class.class, new ClassAdapter())
                 .registerTypeAdapter(ZonedDateTime.class, new ZonedDateTimeAdapter())
+                .registerTypeAdapter(Instant.class, new InstantAdapter())
                 .create();
     }
 
@@ -116,9 +118,19 @@ public class JsonUtil {
         }
     }
 
-    public static class ClassAdapter implements JsonSerializer<Class<?>>, JsonDeserializer<Class<?>> {
-        private static final DateTimeFormatter FORMATTER = DateTimeFormatter.ISO_ZONED_DATE_TIME;
+    public static class InstantAdapter implements JsonSerializer<Instant>, JsonDeserializer<Instant> {
+        @Override
+        public JsonElement serialize(Instant src, Type typeOfSrc, JsonSerializationContext context) {
+            return new JsonPrimitive(src.getEpochSecond());
+        }
 
+        @Override
+        public Instant deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) {
+            return Instant.ofEpochSecond(json.getAsLong());
+        }
+    }
+
+    public static class ClassAdapter implements JsonSerializer<Class<?>>, JsonDeserializer<Class<?>> {
         @Override
         public JsonElement serialize(Class<?> src, Type typeOfSrc, JsonSerializationContext context) {
             return new JsonPrimitive(src.getName());

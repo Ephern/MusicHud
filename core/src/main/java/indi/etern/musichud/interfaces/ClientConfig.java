@@ -6,6 +6,7 @@ import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.beans.user.ScrobbleOption;
+import indi.etern.musichud.beans.user.MultichannelMode;
 import indi.etern.musichud.platform.Environment;
 
 import java.util.List;
@@ -205,4 +206,10 @@ public interface ClientConfig {
     ScrobbleOption getDefaultScrobbleOption();
 
     void setScrobbleOption(ScrobbleOption scrobbleOption);
+
+    MultichannelMode getMultichannelMode();
+
+    MultichannelMode getDefaultMultichannelMode();
+
+    void setMultichannelMode(MultichannelMode multichannelMode);
 }

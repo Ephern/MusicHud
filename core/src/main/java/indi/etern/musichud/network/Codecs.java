@@ -5,6 +5,7 @@ import io.netty.handler.codec.DecoderException;
 import lombok.NonNull;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
@@ -147,6 +148,20 @@ public class Codecs {
             VanillaUtf8String.write(byteBuf, string, 32767);
         }
     };
+
+    public static final ByteBufCodec<Instant> INSTANT =
+            new ByteBufCodec<>() {
+                @Override
+                public void encode(ByteBuf byteBuf, Instant value) {
+                    byteBuf.writeLong(value.getEpochSecond());
+                    byteBuf.writeInt(value.getNano());
+                }
+
+                @Override
+                public Instant decode(ByteBuf byteBuf) {
+                    return Instant.ofEpochSecond(byteBuf.readLong(), byteBuf.readInt());
+                }
+            };
 
     public static final ByteBufCodec<ZonedDateTime> ZONED_DATE_TIME =
             new ByteBufCodec<>() {

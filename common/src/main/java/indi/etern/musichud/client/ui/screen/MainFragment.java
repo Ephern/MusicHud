@@ -151,6 +151,15 @@ public class MainFragment extends Fragment {
         }
     }
 
+    public static void updateNextToPlay(Traceable<MusicDetail> nextToPlayTrace) {
+        if (instance != null && instance.visible) {
+            HomeView homeView = HomeView.getInstance();
+            if (homeView != null) {
+                homeView.updateNextToPlay(nextToPlayTrace);
+            }
+        }
+    }
+
     private static void displayMusicInfo(Traceable<MusicDetail> musicDetailTrace) {
         if (musicDetailTrace == null || musicDetailTrace.value() == null || musicDetailTrace.value().equals(MusicDetail.NONE)) {
             instance.albumImage.loadUrl(MusicHud.ICON_BASE64);
@@ -665,7 +674,7 @@ public class MainFragment extends Fragment {
             });
 
             var params = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
-            params.setMargins(routerContainer.dp(80), 0, routerContainer.dp(24), 0);
+            params.setMargins(routerContainer.dp(64), 0, 0, 0);
             base.addView(routerContainer, params);
 
             LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(lyricsPanelWidth, MATCH_PARENT);
@@ -810,9 +819,9 @@ public class MainFragment extends Fragment {
                     icon = "/assets/music_hud/textures/gui/icons/unlink.png";
                     String template;
                     if (clientConfig.getEnableIsolatedMode()) {
-                        template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer");
-                    } else {
                         template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer.isolated");
+                    } else {
+                        template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer");
                     }
                     buttonText = template.replace("{version}", connectionManager.getServerVersion().toString());
                     switchServerConnectButton.setEnabled(false);
