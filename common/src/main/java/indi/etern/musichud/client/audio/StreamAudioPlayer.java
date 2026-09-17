@@ -1,6 +1,8 @@
 package indi.etern.musichud.client.audio;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.Traceable;
 import lombok.Getter;
 import org.apache.logging.log4j.Logger;
 
@@ -34,6 +36,8 @@ public class StreamAudioPlayer {
     private final Set<Consumer<Status>> statusChangeListener = new HashSet<>();
     private PlaybackTask currentTask;
     private PlaybackTask pendingTask;
+    /** Next track buffered ahead of time; not audible until it becomes current/pending. */
+    private PlaybackTask preloadedTask;
 
 
     public static StreamAudioPlayer getInstance() {
@@ -75,6 +79,11 @@ public class StreamAudioPlayer {
      * is superseded before it started).
      */
     public synchronized CompletableFuture<ZonedDateTime> play(PlaybackTask task) {
+        PlaybackTask stale = preloadedTask;
+        if (stale != null && stale != task) {
+            preloadedTask = null;
+            stale.cancel();
+        }
         task.addStateListener(state -> onTaskStateChanged(task, state));
         task.finishFuture().whenComplete((unused, throwable) -> onTaskFinished(task));
         task.submitThreads();
@@ -112,7 +121,51 @@ public class StreamAudioPlayer {
         return task.startFuture();
     }
 
+    /**
+     * Buffer the given track without making it audible: its workers are started
+     * but the start gate stays closed, so only the download side runs. The task is
+     * handed to the next {@link #obtainTaskFor} call for the same music, removing
+     * the initial buffering cost from the actual switch. Requests for a track that
+     * is already preloaded are ignored; a changed next track replaces the old one.
+     */
+    public synchronized void preload(Traceable<MusicDetail> trace) {
+        if (trace == null || trace.value() == null || trace.value().equals(MusicDetail.NONE)) {
+            return;
+        }
+        long musicId = trace.value().getId();
+        PlaybackTask existing = preloadedTask;
+        if (existing != null && existing.getMusicDetail().getId() == musicId) {
+            return;
+        }
+        if (existing != null) {
+            existing.cancel();
+        }
+        PlaybackTask task = PlaybackTask.of(trace, null);
+        preloadedTask = task;
+        task.submitThreads();
+        LOGGER.debug("Preloading next track: {} (ID: {})", trace.value().getName(), musicId);
+    }
+
+    /**
+     * Returns the preloaded task when it matches the track and no server start time
+     * must be honoured, otherwise builds a fresh task. A non-matching preload is
+     * left for {@link #play(PlaybackTask)} to discard.
+     */
+    public synchronized PlaybackTask obtainTaskFor(Traceable<MusicDetail> trace, ZonedDateTime serverStartTime) {
+        PlaybackTask preloaded = preloadedTask;
+        if (preloaded != null && serverStartTime == null
+                && preloaded.getMusicDetail().getId() == trace.value().getId()) {
+            preloadedTask = null;
+            return preloaded;
+        }
+        return PlaybackTask.of(trace, serverStartTime);
+    }
+
     public synchronized CompletableFuture<Void> stop() {
+        if (preloadedTask != null) {
+            preloadedTask.cancel();
+            preloadedTask = null;
+        }
         if (pendingTask != null) {
             pendingTask.cancel();
             pendingTask = null;

@@ -20,6 +20,8 @@ import indi.etern.musichud.beans.state.IIdlePlaySourceLayerState;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.components.buttons.CycleIconButton;
+import indi.etern.musichud.client.ui.components.buttons.ToggleIdlePlaySourceButton;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;

@@ -85,6 +85,21 @@ public class MusicDetail implements IdentifiedBeans {
         this.lyricInfo = lyricInfo;
     }
 
+    /**
+     * Builds a display-only detail from locally known metadata (used for pending cloud
+     * uploads before the server returns the real track). {@code id} may be a synthetic
+     * negative id while the real track id is not known yet.
+     */
+    public static MusicDetail of(long id, String name, int durationMillis, List<Artist> artists, Album album) {
+        MusicDetail detail = new MusicDetail();
+        detail.id = id;
+        detail.name = name == null ? "" : name;
+        detail.durationMillis = Math.max(0, durationMillis);
+        detail.artists = artists == null ? List.of() : artists;
+        detail.album = album == null ? Album.NONE : album;
+        return detail;
+    }
+
     public String getName() {
         return Objects.requireNonNullElse(name, "");
     }
