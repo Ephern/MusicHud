@@ -2,7 +2,7 @@ package indi.etern.musichud.interfaces;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
-import indi.etern.musichud.beans.music.actions.MessagedResult;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.ISubscribeState;

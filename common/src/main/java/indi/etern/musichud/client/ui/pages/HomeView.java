@@ -13,17 +13,17 @@ import indi.etern.musichud.beans.music.MusicCollection;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.beans.music.Traceable;
-import indi.etern.musichud.beans.music.actions.ActionResult;
+import indi.etern.musichud.beans.result.ActionResult;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.components.FlexWrapLayout;
-import indi.etern.musichud.client.ui.components.MusicCollectionCard;
+import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
-import indi.etern.musichud.client.ui.dto.LyricLine;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
@@ -372,7 +372,7 @@ public class HomeView extends LinearLayout {
         if (queue.isEmpty()) {
             queueTitle.setVisibility(View.GONE);
             playQueueListView.setVisibility(View.GONE);
-            checkNextToPlay(NowPlayingInfo.getInstance().getNextToPlayIdleMusic());
+            checkNextToPlay(NowPlayingInfo.getInstance().getNextToPlayMusic());
         } else {
             queueTitle.setVisibility(View.VISIBLE);
             playQueueListView.setVisibility(View.VISIBLE);

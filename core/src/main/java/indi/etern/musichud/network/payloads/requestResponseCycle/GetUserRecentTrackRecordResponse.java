@@ -1,7 +1,7 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.actions.MessagedResult;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.beans.record.PlayRecord;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;

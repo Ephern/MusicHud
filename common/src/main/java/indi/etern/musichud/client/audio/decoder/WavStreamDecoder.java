@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.audio.decoder;
 
-import indi.etern.musichud.beans.user.MultichannelMode;
+import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.OpenAlSource;
 import lombok.SneakyThrows;
 import org.lwjgl.openal.AL10;
@@ -33,7 +33,6 @@ public class WavStreamDecoder implements AudioDecoder {
     private volatile int outputFrameBytes;
     private volatile IResampler channelMixer;
     private volatile IResampler bitDepthResampler;
-    private volatile boolean float32Output;
     private volatile boolean discreteAttempt;
     private long bytesRead;      // raw bytes read from stream
 
@@ -183,7 +182,6 @@ public class WavStreamDecoder implements AudioDecoder {
         };
 
         this.channelMixer = null;
-        this.float32Output = floatOutput;
         this.discreteAttempt = false;
         this.outputFrameBytes = channels * (floatOutput ? 4 : effectiveBitsPerSample / 8);
         frameSize = effectiveBitsPerSample * channels * sampleRate / 8;
@@ -217,7 +215,6 @@ public class WavStreamDecoder implements AudioDecoder {
         int effectiveBits = (bitsPerSample == 8) ? 8 : 16;
         this.channelMixer = null;
         this.format = discreteFormat;
-        this.float32Output = false;
         this.discreteAttempt = true;
         this.outputFrameBytes = channels * (effectiveBits / 8);
         frameSize = effectiveBits * channels * sampleRate / 8;
@@ -239,7 +236,6 @@ public class WavStreamDecoder implements AudioDecoder {
         } else {
             this.format = AL10.AL_FORMAT_STEREO16;
         }
-        this.float32Output = floatOutput;
         this.discreteAttempt = false;
         this.outputFrameBytes = 2 * (effectiveBits / 8);
         frameSize = effectiveBits * 2 * sampleRate / 8;

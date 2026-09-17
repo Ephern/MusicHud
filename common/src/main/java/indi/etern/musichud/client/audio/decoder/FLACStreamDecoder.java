@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.audio.decoder;
 
-import indi.etern.musichud.beans.user.MultichannelMode;
+import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.OpenAlSource;
 import lombok.SneakyThrows;
 import org.jflac.FLACDecoder;
@@ -28,7 +28,6 @@ public class FLACStreamDecoder implements AudioDecoder {
     private volatile int outputFrameBytes;
     private volatile IResampler channelMixer;
     private volatile IResampler bitDepthResampler;
-    private volatile boolean float32Output;
     private volatile boolean discreteAttempt;
 
     public FLACStreamDecoder(BufferedInputStream inputStream, boolean useFloat32) throws IOException {
@@ -101,7 +100,6 @@ public class FLACStreamDecoder implements AudioDecoder {
         };
 
         this.channelMixer = null;
-        this.float32Output = floatOutput;
         this.discreteAttempt = false;
         this.outputFrameBytes = channels * (floatOutput ? 4 : effectiveBitsPerSample / 8);
         frameSize = effectiveBitsPerSample * channels * sampleRate / 8;
@@ -137,7 +135,6 @@ public class FLACStreamDecoder implements AudioDecoder {
         int effectiveBits = (bitsPerSample == 8) ? 8 : 16;
         this.channelMixer = null;
         this.format = discreteFormat;
-        this.float32Output = false;
         this.discreteAttempt = true;
         this.outputFrameBytes = channels * (effectiveBits / 8);
         frameSize = effectiveBits * channels * sampleRate / 8;
@@ -159,7 +156,6 @@ public class FLACStreamDecoder implements AudioDecoder {
         } else {
             this.format = AL10.AL_FORMAT_STEREO16;
         }
-        this.float32Output = floatOutput;
         this.discreteAttempt = false;
         this.outputFrameBytes = 2 * (effectiveBits / 8);
         frameSize = effectiveBits * 2 * sampleRate / 8;

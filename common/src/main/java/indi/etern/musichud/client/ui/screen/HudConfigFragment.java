@@ -20,9 +20,9 @@ import icyllis.modernui.widget.ScrollView;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.AdaptiveFloatOption;
-import indi.etern.musichud.client.ui.components.DynamicIntegerOption;
-import indi.etern.musichud.client.ui.components.SignedIntegerOption;
+import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
+import indi.etern.musichud.client.ui.components.options.DynamicIntegerOption;
+import indi.etern.musichud.client.ui.components.options.SignedIntegerOption;
 import indi.etern.musichud.client.ui.hud.HudEditOverlayView;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
@@ -97,6 +97,12 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
             root.setLayoutTransition(transition);
         });
         return root;
+    }
+
+    @Override
+    public void onDetach() {
+        clientConfig.save();
+        super.onDetach();
     }
 
     private void onRootSizeChanged() {
