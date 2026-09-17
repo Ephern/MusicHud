@@ -10,11 +10,12 @@ import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.dto.LyricLine;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.utils.ui.Easing;
+import indi.etern.musichud.client.utils.ui.RhythmAnimator;
 import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
 

@@ -2,10 +2,9 @@ package indi.etern.musichud.client.utils.lyrics;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.LyricInfo;
-import indi.etern.musichud.client.ui.dto.LyricLine;
 import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.client.ui.dto.MetaInfoLine;
-import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.client.dto.LyricLine;
+import indi.etern.musichud.client.dto.MetaInfoLine;
 import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
@@ -26,7 +25,6 @@ public class FullLineLyricParser {
             .toFormatter();
     private static final Duration emptyLineIgnoreDuration = Duration.ofSeconds(10);
     private static final Logger logger = MusicHud.getLogger(FullLineLyricParser.class);
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     public static ArrayDeque<LyricLine> parse(MusicDetail musicDetail) {
         LyricInfo lyricInfo = musicDetail.getLyricInfo();

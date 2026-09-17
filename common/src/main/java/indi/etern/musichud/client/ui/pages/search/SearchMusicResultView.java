@@ -72,7 +72,7 @@ public class SearchMusicResultView extends LinearLayout {
                 .map(Artist::getName).collect(Collectors.joining(" / "));
         musicLayout.setOnClickListener((view) -> {
             MusicService.getInstance().sendPushMusicToQueue(Traceable.of(musicDetail.getId()));
-            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlaylist") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
+            ToastUtil.show(Toast.makeText(context, I18n.get(MusicHud.MOD_ID + ".text.pushedMusicToPlayQueue") + "\n" + musicDetail.getName() + " - " + artistsName, Toast.LENGTH_SHORT));
         });
         addView(musicLayout, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
     }

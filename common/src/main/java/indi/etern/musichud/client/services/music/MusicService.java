@@ -6,11 +6,12 @@ import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
-import indi.etern.musichud.beans.music.actions.MessagedResult;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.IMusicTrackState;
 import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.beans.user.Profile;
+import indi.etern.musichud.beans.user.cloud.CloudTracksPage;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.PlaybackTask;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
@@ -22,7 +23,10 @@ import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.connection.ConnectionStateMachine;
-import indi.etern.musichud.interfaces.*;
+import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.ClientRegister;
+import indi.etern.musichud.interfaces.IClientMusicService;
+import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientPushMusicToQueueMessage;
@@ -31,7 +35,9 @@ import indi.etern.musichud.network.payloads.pushMessages.c2s.VoteSkipCurrentMusi
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
 import net.minecraft.client.resources.language.I18n;
 
 import java.time.Duration;
@@ -338,7 +344,8 @@ public class MusicService implements IClientMusicService {
                 ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
-                streamAudioPlayer.play(PlaybackTask.of(musicDetail, serverStartTime))
+                PlaybackTask task = streamAudioPlayer.obtainTaskFor(musicDetail, serverStartTime);
+                streamAudioPlayer.play(task)
                         .thenAccept(nowPlayingInfo::startAt)
                         .exceptionally(e -> null);
             } else {
@@ -615,6 +622,38 @@ public class MusicService implements IClientMusicService {
         } else {
             throw new IllegalArgumentException("Unrecognizable type");
         }
+    }
+
+    public CompletableFuture<MessagedResult<CloudTracksPage>> loadCloudTracks(int offset, int limit) {
+        return RequestResponseManager.send(
+                        new GetCloudTracksRequest(offset, limit),
+                        GetCloudTracksResponse.class,
+                        Duration.ofSeconds(15))
+                .thenApply(GetCloudTracksResponse::getResult)
+                .exceptionally(e -> MessagedResult.fail(CloudTracksPage.EMPTY));
+    }
+
+    /** On-demand track detail fetch; {@code cloudSource} marks the user's own cloud-drive tracks. */
+    public CompletableFuture<List<MusicDetail>> loadMusicDetails(List<Long> ids, boolean cloudSource) {
+        if (ids == null || ids.isEmpty()) {
+            return CompletableFuture.completedFuture(List.of());
+        }
+        return RequestResponseManager.send(
+                        new GetMusicDetailsRequest(ids, cloudSource),
+                        GetMusicDetailsResponse.class,
+                        Duration.ofSeconds(15))
+                .thenApply(response -> response.getResult().extraData())
+                .exceptionally(e -> List.of());
+    }
+
+    public CompletableFuture<MessagedResult<Void>> deleteCloudTrack(long id) {
+        return RequestResponseManager.send(
+                        new DeleteCloudTrackRequest(id),
+                        DeleteCloudTrackResponse.class,
+                        Duration.ofSeconds(15))
+                .thenApply(DeleteCloudTrackResponse::getResult)
+                .exceptionally(e -> MessagedResult.fail(
+                        e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), null));
     }
 
     @RegisterMark

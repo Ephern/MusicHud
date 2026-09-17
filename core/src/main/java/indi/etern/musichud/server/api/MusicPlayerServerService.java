@@ -5,7 +5,7 @@ import com.google.common.cache.CacheBuilder;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.*;
-import indi.etern.musichud.beans.music.actions.MessagedResult;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.interfaces.ServerConfig;
@@ -44,13 +44,13 @@ public class MusicPlayerServerService {
     /** Client-facing bound for a reroll; must outlast the in-flight intelligent load wait. */
     private static final long ROTATE_TIMEOUT_MILLIS = INTELLIGENT_LOAD_WAIT_MILLIS + 5_000;
     /** Consecutive resource loading failures for the current music before it is skipped. */
-    private static final int MUSIC_RESOURCE_LOAD_FAILURE_THRESHOLD = 3;
+    private static final int MUSIC_RESOURCE_LOAD_FAILURE_THRESHOLD = 5;
     private static volatile MusicPlayerServerService instance;
     final Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources = new ConcurrentHashMap<>();
     /** Per (player, collection) monitors; entries live for the server uptime. */
     private final ConcurrentHashMap<String, Object> idleSourceKeyLocks = new ConcurrentHashMap<>();
-    /** Reroll requests handed to the pusher thread, which owns all preload/next state. */
-    private final BlockingQueue<RerollRequest> pendingRerolls = new LinkedBlockingQueue<>();
+    /** Pusher events (rerolls, resource-load deadline resets) handed to the pusher thread, which owns all preload/next state. */
+    private final BlockingQueue<PusherEvent> pendingPusherEvents = new LinkedBlockingQueue<>();
     private final IMusicApiService musicApiService = IMusicApiService.getInstance(ApiProvider.NCM);
     private final CurrentVoteInfo currentVoteInfo = new CurrentVoteInfo();
     private final Logger logger = MusicHud.getLogger(MusicPlayerServerService.class);
@@ -64,6 +64,10 @@ public class MusicPlayerServerService {
     private long musicResourceLoadFailureMusicId = -1;
     /** Message attached to the next switch triggered by a resource-failure skip. */
     private volatile String pendingSwitchMessage;
+    /** Music id the pusher currently awaits; the one-shot resource-load reset only applies to it. */
+    private long awaitedMusicId = -1;
+    /** Music id whose one-shot await-deadline reset has already been claimed. */
+    private long awaitDeadlineResetClaimedMusicId = -1;
     private final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private final AtomicInteger debounceToken = new AtomicInteger(0);
     private final Runnable musicPusher = new Runnable() {
@@ -131,6 +135,7 @@ public class MusicPlayerServerService {
                     if (playingMusic.getLyricInfo() == null || playingMusic.getLyricInfo().equals(LyricInfo.NONE)) {
                         playingMusic.setLyricInfo(musicApiService.getLyricInfo(playingMusic));
                     }
+                    beginAwaitForMusic(playingMusic.getId());
                     serverNetworkService.sendToPlayerInfos(
                             loginedPlayerInfoMap.values(),
                             new SwitchMusicMessage(nextToPlay, nextIdleMusicDetail, message)
@@ -142,7 +147,7 @@ public class MusicPlayerServerService {
                     nowPlayingStartTime = ZonedDateTime.now();
                     logger.info("Switched to music: {} (ID: {})", playingMusic.getName(), playingMusic.getId());
                     int musicMixMillis = 1200;
-                    awaitCurrentTrack(Math.max(1000, playingMusic.getDurationMillis() - musicMixMillis));
+                    awaitCurrentTrack(playingMusic.getId(), Math.max(1000, playingMusic.getDurationMillis() - musicMixMillis));
                 } catch (InterruptedException ignored) {//When force switch
                     logger.info("Skip current, switch to nextIdle");
                     String switchMessage = pendingSwitchMessage;
@@ -328,7 +333,6 @@ public class MusicPlayerServerService {
             if (loading != null) {
                 loading.get(Math.max(1, waitDeadline - System.currentTimeMillis()), TimeUnit.MILLISECONDS);
             } else {
-                //noinspection BusyWait
                 Thread.sleep(200);
             }
         } catch (InterruptedException e) {
@@ -628,7 +632,7 @@ public class MusicPlayerServerService {
                         musicResourceInfo = getMusicResourceInfoWithoutCache(quality, musicDetail, playerUUID);
                         musicResourceInfoCache.put(new CacheKey(id, quality), musicResourceInfo);
                     }
-                    onMusicResourceLoadSuccess();
+                    onMusicResourceLoadSuccess(id);
                     return musicResourceInfo;
                 } catch (Exception e) {
                     logger.error("Failed to get resource info for music: {}", musicDetail.getName(), e);
@@ -648,12 +652,33 @@ public class MusicPlayerServerService {
     }
 
     /**
+     * Arms the one-shot resource-load deadline reset for the given music. Called by the pusher
+     * before the switch is pushed so that the client's resource request can never be missed.
+     * The duration-based wait stays the fallback when no client requests the resource.
+     */
+    private synchronized void beginAwaitForMusic(long musicId) {
+        awaitedMusicId = musicId;
+        awaitDeadlineResetClaimedMusicId = -1;
+    }
+
+    /**
      * Resets the consecutive failure streak: a successful load anywhere means the current music
      * is no longer considered broken.
+     *
+     * <p>Additionally, the first successful load for the music the pusher is currently awaiting
+     * restarts that await from the moment the resource became available, so a slow load no longer
+     * makes the switch happen before the track actually played through. Every further successful
+     * load of the same track is ignored, and the plain duration-based wait remains untouched.</p>
      */
-    private synchronized void onMusicResourceLoadSuccess() {
-        musicResourceLoadFailureCount = 0;
+    private synchronized void onMusicResourceLoadSuccess(long id) {
+        musicResourceLoadFailureCount = -1;
         musicResourceLoadFailureMusicId = -1;
+        if (awaitedMusicId != id || awaitDeadlineResetClaimedMusicId == id) {
+            return;
+        }
+        awaitDeadlineResetClaimedMusicId = id;
+        //noinspection ResultOfMethodCallIgnored
+        pendingPusherEvents.offer(new DeadlineResetRequest(id));
     }
 
     /**
@@ -671,6 +696,9 @@ public class MusicPlayerServerService {
         }
         if (musicResourceLoadFailureMusicId != id) {
             musicResourceLoadFailureMusicId = id;
+            if (musicResourceLoadFailureCount == -1) {
+                return;
+            }
             musicResourceLoadFailureCount = 0;
         }
         int failures = ++musicResourceLoadFailureCount;
@@ -720,11 +748,12 @@ public class MusicPlayerServerService {
             return MessagedResult.fail(MusicHud.MOD_ID + ".text.rotateNextFailed", null);
         }
         RerollRequest request = new RerollRequest(pusherInfo, new CompletableFuture<>());
-        pendingRerolls.add(request);
+        pendingPusherEvents.add(request);
         try {
             return request.result().get(ROTATE_TIMEOUT_MILLIS, TimeUnit.MILLISECONDS);
         } catch (TimeoutException e) {
-            pendingRerolls.remove(request);
+            //noinspection ResultOfMethodCallIgnored
+            pendingPusherEvents.remove(request);
             return MessagedResult.fail(MusicHud.MOD_ID + ".text.rotateNextFailed", null);
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
@@ -736,10 +765,15 @@ public class MusicPlayerServerService {
 
     /**
      * Waits out the current track, servicing reroll requests while idle. The track's end
-     * time bounds every reroll
+     * time bounds every reroll.
+     *
+     * <p>The initial deadline is the plain duration-based wait. When the first resource load
+     * for this track succeeds, a {@link DeadlineResetRequest} restarts that wait from the
+     * moment the resource became available, giving a slow-loading track its full airtime.
+     * Without any resource request the behaviour is exactly the duration-based fallback.</p>
      */
-    private void awaitCurrentTrack(long millis) throws InterruptedException {
-        final long deadline = System.currentTimeMillis() + millis;
+    private void awaitCurrentTrack(long musicId, long millis) throws InterruptedException {
+        long deadline = System.currentTimeMillis() + millis;
         while (true) {
             if (Thread.interrupted()) {
                 throw new InterruptedException();
@@ -748,11 +782,21 @@ public class MusicPlayerServerService {
             if (remaining <= 0) {
                 return;
             }
-            RerollRequest request = pendingRerolls.poll(remaining, TimeUnit.MILLISECONDS);
-            if (request == null) {
-                return;
+            PusherEvent event = pendingPusherEvents.poll(remaining, TimeUnit.MILLISECONDS);
+            switch (event) {
+                case null -> {
+                    return;
+                }
+                case DeadlineResetRequest(long id) -> {
+                    if (id == musicId) {
+                        logger.info("Resource loaded for current music (ID: {}), restarting track wait", musicId);
+                        deadline = System.currentTimeMillis() + millis;
+                    }
+                }
+                case RerollRequest reroll -> handleReroll(reroll, deadline);
+                default -> {
+                }
             }
-            handleReroll(request, deadline);
         }
     }
 
@@ -794,7 +838,15 @@ public class MusicPlayerServerService {
         }
     }
 
-    private record RerollRequest(PusherInfo pusher, CompletableFuture<MessagedResult<Void>> result) {
+    /** Event consumed by the pusher thread while it awaits the current track. */
+    private sealed interface PusherEvent permits RerollRequest, DeadlineResetRequest {
+    }
+
+    private record RerollRequest(PusherInfo pusher, CompletableFuture<MessagedResult<Void>> result) implements PusherEvent {
+    }
+
+    /** Requests a one-shot restart of the current await, tagged with the music it belongs to. */
+    private record DeadlineResetRequest(long musicId) implements PusherEvent {
     }
 
     private record CacheKey(long musicId, Quality quality) {

@@ -11,7 +11,7 @@ import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.dto.LyricLine;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import lombok.NonNull;
 import lombok.Setter;
@@ -292,7 +292,6 @@ public class LyricHighlightTextView extends TextView {
 
     private void lowerPhrase(LyricLine.Phrase phrase, Duration startAt, Duration endAt, Duration now) {
         long startAtMillis = startAt.toMillis();
-        long endAtMillis = endAt.toMillis();
         long nowMillis = now.toMillis();
         float t = Math.clamp((float) (nowMillis - startAtMillis) / RAISE_ANIMATION_DURATION, 0, 1);
         float yOffset = -phraseRaiseY * (1 - SPRING.getInterpolation(t));

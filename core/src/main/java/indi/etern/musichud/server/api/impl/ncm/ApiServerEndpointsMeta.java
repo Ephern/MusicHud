@@ -1,6 +1,8 @@
 package indi.etern.musichud.server.api.impl.ncm;
 
+import com.google.gson.reflect.TypeToken;
 import indi.etern.musichud.beans.music.LyricInfo;
+import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.PlaylistResponse;
 import indi.etern.musichud.server.api.UrlMeta;
 import indi.etern.musichud.utils.http.ApiClient;
@@ -172,6 +174,16 @@ public class ApiServerEndpointsMeta {
                 true,
                 Set.of(200),
                 LoginApiService.AccountDetail.class);
+        public static final UrlMeta<LoginApiService.VipDetail> VIP_DETAIL = new UrlMeta<>(
+                "/vip/growthpoint",
+                null,
+                null,
+                true,
+                false,
+                false,
+                true,
+                Set.of(200),
+                LoginApiService.VipDetail.class);
         public static final UrlMeta<String> SUBCOUNT = new UrlMeta<>(
                 "/user/subcount",
                 null,
@@ -272,16 +284,6 @@ public class ApiServerEndpointsMeta {
                 true,
                 Set.of(200),
                 String.class);
-        public static final UrlMeta<String> CLOUD_DRIVE = new UrlMeta<>(
-                "/user/cloud",
-                null,
-                Set.of("limit"/*default:30*/, "offset"),
-                true,
-                false,
-                false,
-                true,
-                Set.of(200),
-                String.class);
         public static final UrlMeta<String> RECORD = new UrlMeta<>(
                 "/user/record",
                 Set.of("uid"),
@@ -292,8 +294,7 @@ public class ApiServerEndpointsMeta {
                 true,
                 Set.of(200),
                 String.class);
-        @SuppressWarnings("rawtypes")
-        public static final UrlMeta<MusicApiService.RecentRecordResponse> RECENT_TRACK = new UrlMeta<>(
+        public static final UrlMeta<MusicApiService.RecentRecordResponse<MusicDetail>> RECENT_TRACK = new UrlMeta<>(
                 "/record/recent/song",
                 Set.of("limit"/*official: 300*/),
                 null,
@@ -302,9 +303,9 @@ public class ApiServerEndpointsMeta {
                 false,
                 true,
                 Set.of(200),
-                MusicApiService.RecentRecordResponse.class);
-        @SuppressWarnings("rawtypes")
-        public static final UrlMeta<MusicApiService.RecentRecordResponse> RECENT_PLAYLIST = new UrlMeta<>(
+                new TypeToken<MusicApiService.RecentRecordResponse<MusicDetail>>() {
+                }.getType());
+        public static final UrlMeta<MusicApiService.RecentRecordResponse<indi.etern.musichud.beans.music.Playlist>> RECENT_PLAYLIST = new UrlMeta<>(
                 "/record/recent/playlist",
                 Set.of("limit"/*official: 300*/),
                 null,
@@ -313,9 +314,9 @@ public class ApiServerEndpointsMeta {
                 false,
                 true,
                 Set.of(200),
-                MusicApiService.RecentRecordResponse.class);
-        @SuppressWarnings("rawtypes")
-        public static final UrlMeta<MusicApiService.RecentRecordResponse> RECENT_ALBUM = new UrlMeta<>(
+                new TypeToken<MusicApiService.RecentRecordResponse<indi.etern.musichud.beans.music.Playlist>>() {
+                }.getType());
+        public static final UrlMeta<MusicApiService.RecentRecordResponse<indi.etern.musichud.beans.music.Album>> RECENT_ALBUM = new UrlMeta<>(
                 "/record/recent/album",
                 Set.of("limit"/*official: 300*/),
                 null,
@@ -324,7 +325,8 @@ public class ApiServerEndpointsMeta {
                 false,
                 true,
                 Set.of(200),
-                MusicApiService.RecentRecordResponse.class);
+                new TypeToken<MusicApiService.RecentRecordResponse<indi.etern.musichud.beans.music.Album>>() {
+                }.getType());
         public static final UrlMeta<String> SCROBBLE = new UrlMeta<>(
                 "/scrobble/v1",
                 Set.of("id", "time"/*in seccond*/),
@@ -380,6 +382,88 @@ public class ApiServerEndpointsMeta {
                 Set.of(200),
                 String.class
         );
+        public static class Cloud {
+            public static final UrlMeta<MusicApiService.CloudListResponse> LIST = new UrlMeta<>(
+                    "/user/cloud",
+                    null,
+                    Set.of("limit"/*default:30*/, "offset"),
+                    true,
+                    false,
+                    false,
+                    true,
+                    Set.of(200),
+                    MusicApiService.CloudListResponse.class);
+            public static final UrlMeta<String> DETAIL = new UrlMeta<>(
+                    "/user/cloud/detail",
+                    Set.of("id"/*split with comma*/),
+                    null,
+                    true,
+                    false,
+                    false,
+                    true,
+                    Set.of(200),
+                    String.class);
+            public static final UrlMeta<MusicApiService.CodeAndMessageResponse> DELETE = new UrlMeta<>(
+                    "/user/cloud/del",
+                    Set.of("id"/*split with comma*/),
+                    null,
+                    true,
+                    false,
+                    false,
+                    true,
+                    Set.of(200),
+                    MusicApiService.CodeAndMessageResponse.class);
+            public static final UrlMeta<MusicApiService.UploadTokenResponse> NEW_UPLOAD_TASK = new UrlMeta<>(
+                    "/cloud/upload/token",
+                    Set.of("cookie", "md5", "fileSize", "filename"),
+                    null,
+                    true,
+                    false,
+                    false,
+                    true,
+                    Set.of(200),
+                    MusicApiService.UploadTokenResponse.class);
+            public static final UrlMeta<MusicApiService.CompleteUploadResponse> COMPLETE_UPLOADED_META = new UrlMeta<>(
+                    "/cloud/upload/complete",
+                    Set.of("cookie", "songId"/*string*/, "resourceId"/*string*/, "md5", "filename"),
+                    Set.of("song"/*name*/, "artist"/*name split with comma?*/, "album"/*name*/),
+                    true,
+                    false,
+                    false,
+                    false, // no auto-retry: publish is slow/fragile, retries only pile onto a stuck API server
+                    Set.of(200),
+                    MusicApiService.CompleteUploadResponse.class);
+            public static final UrlMeta<String> COMPLETE_EXISTED_META = new UrlMeta<>(
+                    "/cloud/import",
+                    Set.of("song"/*name*/, "fileType", "fileSize", "bitrate", "md5"),
+                    Set.of("id"/*name*/, "artist"/*name split in comma?*/, "album"/*name*/),
+                    true,
+                    false,
+                    false,
+                    true,
+                    Set.of(200),
+                    String.class);
+            public static final UrlMeta<String> CORRECT = new UrlMeta<>(
+                    "/cloud/match",
+                    Set.of("uid"/*user id*/, "sid"/*song id*/, "asid"/*target song id, 0 for clear current*/),
+                    null,
+                    true,
+                    false,
+                    false,
+                    true,
+                    Set.of(200),
+                    String.class);
+            public static final UrlMeta<String> ID3_LYRICS = new UrlMeta<>(
+                    "/cloud/match",
+                    Set.of("uid"/*user id*/, "sid"/*song id*/, "asid"/*target song id, 0 for clear current*/),
+                    null,
+                    true,
+                    false,
+                    false,
+                    true,
+                    Set.of(200),
+                    String.class);
+        }
     }
 
     public static class Artist {
