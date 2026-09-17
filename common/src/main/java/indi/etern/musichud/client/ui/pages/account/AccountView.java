@@ -4,18 +4,22 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.user.Profile;
+import indi.etern.musichud.beans.user.VipType;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.ArtistCard;
-import indi.etern.musichud.client.ui.components.FlexWrapLayout;
-import indi.etern.musichud.client.ui.components.MusicCollectionCard;
+import indi.etern.musichud.client.ui.components.RouterContainer;
+import indi.etern.musichud.client.ui.components.cards.ArtistCard;
+import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
@@ -115,6 +119,23 @@ public class AccountView extends LinearLayout {
         });
     }
 
+    private static void buildCard(Context context, InsetBackgroundFactory backgroundFactory1, LinearLayout line1, String name, String icon, View.OnClickListener onClickListener) {
+        Button child = new Button(context);
+        child.setTextSize(Theme.TEXT_SIZE_LARGE);
+        SpannableString string = new SpannableString("  " + name);
+        Image image1 = ImageUtils.getImageFromResource(icon);
+        if (image1 != null) {
+            string.setSpan(ImageUtils.getIconSpan(image1), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        child.setText(string);
+        backgroundFactory1.applyBackgroundTo(child);
+        if (onClickListener != null) {
+            child.setClickable(true);
+            child.setOnClickListener(onClickListener);
+        }
+        line1.addView(child, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+    }
+
     private void unregisterCollectionListeners() {
         if (playlistAddRegister != null) {
             playlistAddRegister.unregister();
@@ -151,54 +172,119 @@ public class AccountView extends LinearLayout {
 
         Profile currentProfile = Profile.getCurrent();
         setGravity(Gravity.TOP);
-        LinearLayout topPanel = new LinearLayout(context);
-        topPanel.setOrientation(LinearLayout.HORIZONTAL);
-        topPanel.setGravity(Gravity.LEFT);
+        LinearLayout topBar = new LinearLayout(context);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.LEFT);
+        LayoutParams topPanelLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        topPanelLayoutParams.setMargins(0, dp(32), 0, dp(32));
+        addView(topBar, topPanelLayoutParams);
 
         UrlImageView avatar = new UrlImageView(context);
         avatar.setCircular(true);
-        LayoutParams layoutParams = new LayoutParams(dp(68), dp(68));
+        LayoutParams layoutParams = new LayoutParams(dp(80), dp(80));
         avatar.setLayoutParams(layoutParams);
-        topPanel.addView(avatar);
+        topBar.addView(avatar);
         avatar.loadUrl(currentProfile.getAvatarUrl());
 
         LayoutParams infoLp1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        infoLp1.setMargins(dp(16), 0, 0, 0);
-        LinearLayout infoLayout = new LinearLayout(context);
-        infoLayout.setOrientation(VERTICAL);
-        infoLayout.setGravity(Gravity.CENTER_VERTICAL);
-        topPanel.addView(infoLayout, infoLp1);
+        infoLp1.setMargins(dp(8), 0, 0, 0);
+        LinearLayout topBarContent = new LinearLayout(context);
+        topBarContent.setOrientation(VERTICAL);
+        topBarContent.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.addView(topBarContent, infoLp1);
 
-        LayoutParams nameLayoutParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        TextView nickName = new TextView(context);
-        nickName.setSingleLine(true);
-        nickName.setTextSize(Theme.TEXT_SIZE_LARGER);
-        nickName.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-        nickName.setText(currentProfile.getNickname());
-        infoLayout.addView(nickName, nameLayoutParams);
+        int dp6 = dp(6);
+        int dp8 = dp(8);
 
-        LayoutParams idLayoutParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        TextView id = new TextView(context);
-        id.setSingleLine(true);
-        id.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        id.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        id.setText(Long.toString(currentProfile.getUserId()));
-        infoLayout.addView(id, idLayoutParams);
+        LinearLayout topBarLine1 = new LinearLayout(context);
+        topBarLine1.setGravity(Gravity.CENTER_VERTICAL);
+        topBarLine1.setOrientation(HORIZONTAL);
+        LayoutParams topBarLine1Params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        topBarLine1Params.setMargins(dp8, 0, 0, 0);
+        topBarContent.addView(topBarLine1, topBarLine1Params);
 
-        LinearLayout buttonsLayout = new LinearLayout(context);
-        buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
-        infoLayout.addView(buttonsLayout);
+        {
+            LinearLayout userInfo = new LinearLayout(context);
+            userInfo.setGravity(Gravity.LEFT);
+            userInfo.setOrientation(VERTICAL);
+            LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            params.setMargins(0, 0, dp(16), 0);
+            topBarLine1.addView(userInfo, params);
 
-        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
+            TextView nickName = new TextView(context);
+            nickName.setSingleLine(true);
+            nickName.setTextSize(Theme.TEXT_SIZE_LARGER);
+            nickName.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            nickName.setText(currentProfile.getNickname());
+            LayoutParams nameLayoutParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            nameLayoutParams.setMargins(0, 0, 0, dp(2));
+            userInfo.addView(nickName, nameLayoutParams);
+
+            LinearLayout line2 = new LinearLayout(context);
+            line2.setOrientation(HORIZONTAL);
+            userInfo.addView(line2, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+            VipType vipType1 = currentProfile.getVipType();
+            if (vipType1 != VipType.NONE) {
+                TextView vipType = new TextView(context);
+                vipType.setSingleLine(true);
+                vipType.setTextSize(Theme.TEXT_SIZE_NORMAL);
+                vipType.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+                vipType.setText(I18n.get(MusicHud.MOD_ID + ".text.vip." + vipType1.name()));
+                LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+                params1.setMargins(0, 0, dp(8), 0);
+                line2.addView(vipType, params1);
+            }
+
+            TextView id = new TextView(context);
+            id.setSingleLine(true);
+            id.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            id.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            id.setText(Long.toString(currentProfile.getUserId()));
+            line2.addView(id);
+        }
+//        {
+//            LinearLayout buttonsLayout1 = new LinearLayout(context);
+//            buttonsLayout1.setOrientation(LinearLayout.HORIZONTAL);
+//            buttonsLayout1.setGravity(Gravity.CENTER_VERTICAL);
+//            topBarLine1.addView(buttonsLayout1);
+//        }
+
+        LinearLayout buttons = new LinearLayout(context);
+        buttons.setOrientation(LinearLayout.HORIZONTAL);
+        buttons.setGravity(Gravity.CENTER_VERTICAL);
+        topBarContent.addView(buttons);
+
+        InsetBackgroundFactory backgroundFactory1 = InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .inset(0)
+                .inset(dp(1))
                 .cornerRadius(dp(4))
-                .padding(new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
+                .padding(new InsetBackgroundFactory.Padding(dp8, dp6, dp8, dp6))
                 .build();
-        int dp28 = dp(28);
+        buildCard(context, backgroundFactory1, buttons, I18n.get(MusicHud.MOD_ID + ".button.history"), "/assets/music_hud/textures/gui/icons/rotate_ccw_clock.png",
+                v -> {
+                    RouterContainer routerContainer = RouterContainer.getInstance();
+                    if (routerContainer != null) {
+                        routerContainer.pushNavigate(new PlayHistoryView(context));
+                    }
+                });
+        buildCard(context, backgroundFactory1, buttons, I18n.get(MusicHud.MOD_ID + ".button.cloud"), "/assets/music_hud/textures/gui/icons/cloud.png",
+                v -> {
+                    RouterContainer routerContainer = RouterContainer.getInstance();
+                    if (routerContainer != null) {
+                        routerContainer.pushNavigate(new CloudDriveView(context));
+                    }
+                });
+
+        InsetBackgroundFactory backgroundFactory2 = InsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .inset(dp(1))
+                .cornerRadius(dp(4))
+                .padding(new InsetBackgroundFactory.Padding(dp6, dp6, dp6, dp6))
+                .build();
         {
             ImageButton refreshButton = new ImageButton(context);
-            backgroundFactory.applyBackgroundTo(refreshButton);
+            backgroundFactory2.applyBackgroundTo(refreshButton);
             refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
             refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
@@ -207,11 +293,11 @@ public class AccountView extends LinearLayout {
             refreshButton.setOnClickListener((v) -> {
                 refresh(true);
             });
-            buttonsLayout.addView(refreshButton, new LayoutParams(dp28, dp28));
+            buttons.addView(refreshButton, new LayoutParams(WRAP_CONTENT, MATCH_PARENT));
         }
         {
             ImageButton logoutButton = new ImageButton(context);
-            backgroundFactory.applyBackgroundTo(logoutButton);
+            backgroundFactory2.applyBackgroundTo(logoutButton);
             logoutButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
             logoutButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
@@ -220,37 +306,8 @@ public class AccountView extends LinearLayout {
             logoutButton.setOnClickListener((v) -> {
                 IClientLoginService.logoutAndReloginAsAnonymous();
             });
-            buttonsLayout.addView(logoutButton, new LayoutParams(dp28, dp28));
+            buttons.addView(logoutButton, new LayoutParams(WRAP_CONTENT, MATCH_PARENT));
         }
-
-//        Button refreshButton = new Button(context);
-//        refreshButton.setTextColor(Theme.PRIMARY_COLOR);
-//        refreshButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-//        refreshButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
-//        var background1 = backgroundFactory.newBackgroundDrawable();
-//        refreshButton.setBackground(background1);
-//        LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-//        params.setMargins(0, 0, dp(8), 0);
-//        refreshButton.setLayoutParams(params);
-//        refreshButton.setOnClickListener(b -> {
-//            refresh(true);
-//        });
-//        buttonsLayout.addView(refreshButton);
-
-//        Button logoutButton = new Button(context);
-//        logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
-//        logoutButton.setTextColor(Theme.PRIMARY_COLOR);
-//        logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-//        var background2 = backgroundFactory.newBackgroundDrawable();
-//        logoutButton.setBackground(background2);
-//        logoutButton.setOnClickListener(b -> {
-//            IClientLoginService.logoutAndReloginAsAnonymous();
-//        });
-//        buttonsLayout.addView(logoutButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-
-        LayoutParams topPanelLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        topPanelLayoutParams.setMargins(0, dp(32), 0, dp(32));
-        addView(topPanel, topPanelLayoutParams);
 
         ProgressBar progressBar = new ProgressBar(context);
         progressBar.setIndeterminate(true);

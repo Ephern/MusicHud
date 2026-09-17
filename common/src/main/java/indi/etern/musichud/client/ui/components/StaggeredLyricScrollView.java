@@ -18,7 +18,7 @@ import icyllis.modernui.widget.LinearLayout;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
-import indi.etern.musichud.client.ui.dto.LyricLine;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
@@ -36,7 +36,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 @SuppressWarnings("UnstableApiUsage")
-public class StaggeredLyricScrollView extends ClampingScrollView {
+public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initial sync
     public static final int AUTO_RECENTER_DELAY_MILLIS = 1000;
     public static final float MAX_DELAY_MILLIS = 500;
     public static final float STAGGERED_BASE_DURATION_MILLIS = 600;
@@ -419,29 +419,35 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     private void updateLoop() {
-        Choreographer.getInstance().postFrameCallback((choreographer, frameTimeNanos) -> {
-            if (continueUpdate) {
-                if (scrollController.isScrolling()) {
-                    scrollController.update(MuiModApi.getElapsedTime());
-                    scrollFinished = false;
-                }
-                if (((!scrollController.isScrolling() && !scrollFinished) || scrollController.getCurrValue() == lastTargetScrollPosition)
-                        && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
-                    scrollFinished = true;
-                    if (!staggeredActive || animatingLyricViews.isEmpty()) {
-                        scrollStatus = ScrollStatus.IDLE;
-                    } else {
-                        staggeringEndListener = () -> {
-                            scrollStatus = ScrollStatus.IDLE;
-                        };
+        try {
+            Choreographer.getInstance().postFrameCallback((choreographer, frameTimeNanos) -> {
+                if (continueUpdate) {
+                    if (scrollController.isScrolling()) {
+                        scrollController.update(MuiModApi.getElapsedTime());
+                        scrollFinished = false;
                     }
-                }
-                updateTranslations(frameTimeNanos);
+                    if (((!scrollController.isScrolling() && !scrollFinished) || scrollController.getCurrValue() == lastTargetScrollPosition)
+                            && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
+                        scrollFinished = true;
+                        if (!staggeredActive || animatingLyricViews.isEmpty()) {
+                            scrollStatus = ScrollStatus.IDLE;
+                        } else {
+                            staggeringEndListener = () -> {
+                                scrollStatus = ScrollStatus.IDLE;
+                            };
+                        }
+                    }
+                    updateTranslations(frameTimeNanos);
 
-                invalidate();
-                updateLoop();
+                    invalidate();
+                    updateLoop();
+                }
+            });
+        } catch (IllegalStateException e) {
+            if (continueUpdate) {
+                throw e;
             }
-        });
+        }
     }
 
     private void stopUpdateLoop() {

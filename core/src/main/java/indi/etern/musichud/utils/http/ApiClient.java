@@ -33,6 +33,7 @@ import java.util.stream.Collectors;
 public class ApiClient {
     public static final HttpClient CLIENT;
     private static final int maxTrial = 5;
+    private static final Duration REQUEST_TIMEOUT = Duration.ofMinutes(5);
     @SuppressWarnings("SpellCheckingInspection")
     private static final Set<String> COOKIE_ATTRIBUTE_NAMES = Set.of(
             "max-age", "expires", "path", "domain", "secure", "httponly", "samesite"
@@ -84,6 +85,7 @@ public class ApiClient {
                 }
                 HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
                         .uri(urlMeta.toURI())
+                        .timeout(REQUEST_TIMEOUT)
                         .setHeader("Content-Type", "application/json");
                 if (requestBody != null) {
                     JsonElement payload = requestBody instanceof JsonElement element ? element : JsonUtil.gson.toJsonTree(requestBody);
@@ -127,12 +129,11 @@ public class ApiClient {
                     var codeOnlyResponse = JsonUtil.gson.fromJson(responseBody, CodeOnlyResponse.class);
                     Set<Integer> allowedHttpCodes = urlMeta.allowedHttpCodes();
                     if (allowedHttpCodes == null || allowedHttpCodes.contains(codeOnlyResponse.code) || trial == maxTrial || !urlMeta.autoRetry()) {
-                        if (urlMeta.responseType().equals(String.class)) {
+                        if (urlMeta.deserializationType().equals(String.class)) {
                             //noinspection unchecked
                             t = (T) responseBody;
                         } else {
-                            currentlyParsing = urlMeta.responseType();
-                            t = JsonUtil.gson.fromJson(responseBody, urlMeta.responseType());
+                            t = JsonUtil.gson.fromJson(responseBody, urlMeta.deserializationType());
                         }
                     }
                 } catch (JsonSyntaxException e) {
@@ -170,7 +171,8 @@ public class ApiClient {
                     Thread.sleep(500);
                 }
                 HttpRequest.Builder requestBuilder = HttpRequest.newBuilder()
-                        .uri(urlMeta.toURI());
+                        .uri(urlMeta.toURI())
+                        .timeout(REQUEST_TIMEOUT);
                 if (formattedUserCookie != null && !formattedUserCookie.isEmpty()) {
                     String cleanCookie = cleanCookie(formattedUserCookie);
                     if (!cleanCookie.isEmpty()) {
@@ -186,11 +188,11 @@ public class ApiClient {
                     String string = response.body().toString();
                     var codeOnlyResponse = JsonUtil.gson.fromJson(string, CodeOnlyResponse.class);
                     if (codeOnlyResponse.code == 200 || trial == maxTrial || !urlMeta.autoRetry()) {
-                        if (urlMeta.responseType().equals(String.class)) {
+                        if (urlMeta.deserializationType().equals(String.class)) {
                             //noinspection unchecked
                             t = (T) string;
                         } else {
-                            t = JsonUtil.gson.fromJson(string, urlMeta.responseType());
+                            t = JsonUtil.gson.fromJson(string, urlMeta.deserializationType());
                         }
                     }
                 } catch (ConnectException e) {
@@ -258,6 +260,6 @@ public class ApiClient {
     private record ApiVersionResponseData(String version) {
     }
 
-    private record CodeOnlyResponse(int code) {
+    public record CodeOnlyResponse(int code) {
     }
 }

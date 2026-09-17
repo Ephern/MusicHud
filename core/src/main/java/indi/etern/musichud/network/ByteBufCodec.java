@@ -416,6 +416,56 @@ public interface ByteBufCodec<V> {
             }
         };
     }
+    static <V, T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13> ByteBufCodec<V> composite(
+            final ByteBufCodec<T1> byteBufCodec1, final Function<V, T1> supplier1,
+            final ByteBufCodec<T2> byteBufCodec2, final Function<V, T2> supplier2,
+            final ByteBufCodec<T3> byteBufCodec3, final Function<V, T3> supplier3,
+            final ByteBufCodec<T4> byteBufCodec4, final Function<V, T4> supplier4,
+            final ByteBufCodec<T5> byteBufCodec5, final Function<V, T5> supplier5,
+            final ByteBufCodec<T6> byteBufCodec6, final Function<V, T6> supplier6,
+            final ByteBufCodec<T7> byteBufCodec7, final Function<V, T7> supplier7,
+            final ByteBufCodec<T8> byteBufCodec8, final Function<V, T8> supplier8,
+            final ByteBufCodec<T9> byteBufCodec9, final Function<V, T9> supplier9,
+            final ByteBufCodec<T10> byteBufCodec10, final Function<V, T10> supplier10,
+            final ByteBufCodec<T11> byteBufCodec11, final Function<V, T11> supplier11,
+            final ByteBufCodec<T12> byteBufCodec12, final Function<V, T12> supplier12,
+            final ByteBufCodec<T13> byteBufCodec13, final Function<V, T13> supplier13,
+            final Function13<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10, T11, T12, T13, V> factory) {
+        return new ByteBufCodec<>() {
+            public V decode(ByteBuf byteBuf) {
+                T1 t1 = byteBufCodec1.decode(byteBuf);
+                T2 t2 = byteBufCodec2.decode(byteBuf);
+                T3 t3 = byteBufCodec3.decode(byteBuf);
+                T4 t4 = byteBufCodec4.decode(byteBuf);
+                T5 t5 = byteBufCodec5.decode(byteBuf);
+                T6 t6 = byteBufCodec6.decode(byteBuf);
+                T7 t7 = byteBufCodec7.decode(byteBuf);
+                T8 t8 = byteBufCodec8.decode(byteBuf);
+                T9 t9 = byteBufCodec9.decode(byteBuf);
+                T10 t10 = byteBufCodec10.decode(byteBuf);
+                T11 t11 = byteBufCodec11.decode(byteBuf);
+                T12 t12 = byteBufCodec12.decode(byteBuf);
+                T13 t13 = byteBufCodec13.decode(byteBuf);
+                return factory.apply(t1, t2, t3, t4, t5, t6, t7, t8, t9, t10, t11, t12, t13);
+            }
+
+            public void encode(ByteBuf byteBuf, V v) {
+                byteBufCodec1.encode(byteBuf, supplier1.apply(v));
+                byteBufCodec2.encode(byteBuf, supplier2.apply(v));
+                byteBufCodec3.encode(byteBuf, supplier3.apply(v));
+                byteBufCodec4.encode(byteBuf, supplier4.apply(v));
+                byteBufCodec5.encode(byteBuf, supplier5.apply(v));
+                byteBufCodec6.encode(byteBuf, supplier6.apply(v));
+                byteBufCodec7.encode(byteBuf, supplier7.apply(v));
+                byteBufCodec8.encode(byteBuf, supplier8.apply(v));
+                byteBufCodec9.encode(byteBuf, supplier9.apply(v));
+                byteBufCodec10.encode(byteBuf, supplier10.apply(v));
+                byteBufCodec11.encode(byteBuf, supplier11.apply(v));
+                byteBufCodec12.encode(byteBuf, supplier12.apply(v));
+                byteBufCodec13.encode(byteBuf, supplier13.apply(v));
+            }
+        };
+    }
 
     void encode(ByteBuf byteBuf, V value);
 

@@ -2,8 +2,8 @@ package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.client.ui.components.ArtistCard;
-import indi.etern.musichud.client.ui.components.FlexWrapLayout;
+import indi.etern.musichud.client.ui.components.cards.ArtistCard;
+import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import lombok.Getter;
 
 import java.util.List;

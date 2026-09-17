@@ -26,8 +26,14 @@ import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.ui.components.buttons.ModifyPlaylistTrackModalButton;
+import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButton;
+import indi.etern.musichud.client.ui.components.buttons.VoteSkipButton;
+import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
+import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.utils.ui.Easing;
-import indi.etern.musichud.client.ui.dto.LyricLine;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
@@ -119,7 +125,7 @@ public class MainFragment extends Fragment {
             // wipe the GUI while the HUD keeps playing.
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             Traceable<MusicDetail> current = nowPlayingInfo.getCurrentlyPlayingMusic();
-            Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayIdleMusic();
+            Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayMusic();
             Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
             displayMusicInfo(current);
             if (homeView != null) {
@@ -413,6 +419,13 @@ public class MainFragment extends Fragment {
                 musicInfo.addView(titleText);
 
                 artists = new FlexWrapLayout(context);
+                LayoutTransition layoutTransition = new LayoutTransition();
+                layoutTransition.setDuration(300);
+                layoutTransition.disableTransitionType(LayoutTransition.APPEARING);
+                layoutTransition.disableTransitionType(LayoutTransition.DISAPPEARING);
+                layoutTransition.setAnimateParentHierarchy(false);
+                artists.setLayoutTransition(layoutTransition);
+                artists.setMinimumHeight(artists.dp(16));
                 musicInfo.addView(artists);
 
                 albumContainer = new LinearLayout(context);
@@ -611,7 +624,7 @@ public class MainFragment extends Fragment {
 
                 NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
                 Traceable<MusicDetail> currentlyPlaying = nowPlayingInfo.getCurrentlyPlayingMusic();
-                Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayIdleMusic();
+                Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayMusic();
 
                 switchMusic(currentlyPlaying, nextToPlay, playingInfo.getLyricLines());
             }

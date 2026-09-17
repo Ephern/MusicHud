@@ -75,6 +75,10 @@ dependencies {
     shadowBundle "org.jflac:jflac-codec:$rootProject.jflac_version"
     forgeRuntimeLibrary "org.jflac:jflac-codec:$rootProject.jflac_version"
 
+    implementation "net.jthink:jaudiotagger:$rootProject.jaudiotagger_version"
+    shadowBundle "net.jthink:jaudiotagger:$rootProject.jaudiotagger_version"
+    forgeRuntimeLibrary "net.jthink:jaudiotagger:$rootProject.jaudiotagger_version"
+
 //    implementation "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
 //    shadowBundle "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
 //    forgeRuntimeLibrary "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"

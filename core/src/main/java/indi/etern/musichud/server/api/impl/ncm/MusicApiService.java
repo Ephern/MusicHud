@@ -15,6 +15,9 @@ import indi.etern.musichud.beans.music.actions.SubscribeAction;
 import indi.etern.musichud.beans.record.PlayRecord;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.VipType;
+import indi.etern.musichud.beans.user.cloud.CloudTrackInfo;
+import indi.etern.musichud.beans.user.cloud.CloudTracksPage;
+import indi.etern.musichud.beans.user.cloud.UploadTaskMeta;
 import indi.etern.musichud.interfaces.PostProcessable;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.server.api.ILoginApiService;
@@ -40,6 +43,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import java.util.function.Supplier;
+import java.util.stream.Collectors;
 
 import static indi.etern.musichud.server.api.impl.ncm.CommonCaches.*;
 
@@ -114,7 +118,7 @@ public class MusicApiService implements IMusicApiService {
                             playlist.getCreator().getUserId() == userId
                                     && playlist.getSpecialType() == PlaylistSpecialType.LIKE_LIST)
                     .findFirst()
-                    .ifPresentOrElse((playlist) -> {
+                    .ifPresentOrElse((playlist) -> {//FIXME when load failed
                         userCategoryPlaylists.setLikeList(playlist);
                         playlists.remove(playlist);
                     }, () -> userCategoryPlaylists.setLikeList(Playlist.EMPTY));
@@ -419,7 +423,7 @@ public class MusicApiService implements IMusicApiService {
                 var loginInfo = loginApiService.getLoginInfoByPlayerUUID(playerUUID);
                 AtomicBoolean vipAccessible = new AtomicBoolean(true);
                 String cookie;
-                boolean isVip = loginInfo != null && loginInfo.getVipType() == VipType.VIP;
+                boolean isVip = loginInfo != null && (loginInfo.getVipType() == VipType.VIP || loginInfo.getVipType() == VipType.SVIP);
                 MusicDetail.ExtraInfo extraInfo = musicDetail.getExtraInfo();
                 if (isVip || extraInfo != null && extraInfo.cloudSource()) {
                     if (!isVip) {
@@ -788,6 +792,88 @@ public class MusicApiService implements IMusicApiService {
         return playRecords.data.list;
     }
 
+    @Override
+    public UploadTaskMeta requestUploadUrl(String fileName, String md5, long fileBytes, UUID playerUUID) {
+        String cookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
+        UploadTokenResponse response = ApiClient.post(ApiServerEndpointsMeta.User.Cloud.NEW_UPLOAD_TASK,
+                new UploadTokenRequest(cookie, md5, fileBytes, fileName), cookie, true);
+        if (response == null || response.code != 200) {
+            throw new ApiException("Cloud upload token request failed: " + describe(response));
+        }
+        UploadTokenData data = response.data;
+        if (data == null) {
+            throw new ApiException("Cloud upload token response missing data");
+        }
+        if (data.songId == null || data.uploadUrl == null || data.uploadUrl.isBlank()) {
+            throw new ApiException("Cloud upload token response incomplete");
+        }
+        return new UploadTaskMeta(true, data.uploadUrl,
+                data.uploadToken == null ? "" : data.uploadToken, data.needUpload,
+                data.songId, data.resourceId == null ? "" : data.resourceId, fileBytes, md5, fileName);
+    }
+
+    @Override
+    public CloudTracksPage getUserCloudTracks(int offset, int limit, UUID playerUUID) {
+        String cookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
+        CloudListResponse response = ApiClient.post(ApiServerEndpointsMeta.User.Cloud.LIST,
+                new CloudListRequest(limit, offset), cookie, true);
+        if (response == null || response.data() == null) {
+            return CloudTracksPage.EMPTY;
+        }
+        List<CloudTrackInfo> tracks = new ArrayList<>(response.data().size());
+        for (CloudItem item : response.data()) {
+            if (item == null || item.simpleSong() == null) continue;
+            MusicDetail detail = item.simpleSong();
+            if (detail.getId() == 0) continue;
+            // Mark the track as a cloud source so playback uses the user's own cookie,
+            // and seed the detail cache so later playback resolves the same instance.
+            detail.setExtraInfo(new MusicDetail.ExtraInfo(true, 0, false));
+            musicDetailCache.put(detail.getId(), detail);
+            CloudAudioFoleMeta privateCloud = item.privateCloud();
+            String md5 = privateCloud == null || privateCloud.md5() == null || privateCloud.md5().isBlank()
+                    ? null : privateCloud.md5().toLowerCase(Locale.ROOT);
+            long fileSize = privateCloud == null ? 0 : privateCloud.fileSize();
+            tracks.add(new CloudTrackInfo(detail, md5, fileSize));
+        }
+        return new CloudTracksPage(tracks, response.count() > 0 ? response.count() : tracks.size(), response.usedBytes, response.maxBytes);
+    }
+
+    @Override
+    public void deleteCloudTracks(List<Long> ids, UUID playerUUID) {
+        if (ids == null || ids.isEmpty()) return;
+        String cookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
+        String idParam = ids.stream().map(String::valueOf).collect(Collectors.joining(","));
+        CodeAndMessageResponse response = ApiClient.post(ApiServerEndpointsMeta.User.Cloud.DELETE,
+                new CloudDeleteRequest(idParam), cookie, true);
+        ensureSuccess(response, "delete cloud tracks");
+    }
+
+    @Override
+    public String completeCloudUpload(String songId, String resourceId, String md5, String fileName,
+                                      String song, String artist, String album, UUID playerUUID) {
+        String cookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
+        CompleteUploadResponse response = ApiClient.post(ApiServerEndpointsMeta.User.Cloud.COMPLETE_UPLOADED_META,
+                new CompleteUploadRequest(cookie, songId, resourceId, md5, fileName, song, artist, album), cookie, true);
+        if (response == null || response.code() != 200) {
+            throw new ApiException("Failed to complete cloud upload: " + describe(response));
+        }
+        CompleteUploadData data = response.data();
+        return data == null ? null : data.songId();
+    }
+
+    private static void ensureSuccess(CodeMessage response, String action) {
+        if (response == null || response.code() != 200) {
+            throw new ApiException("Failed to " + action + ": " + describe(response));
+        }
+    }
+
+    private static String describe(CodeMessage response) {
+        if (response == null) {
+            return "empty response";
+        }
+        return response.code() + (response.msg() == null || response.msg().isBlank() ? "" : " " + response.msg());
+    }
+
     public
     record IdAndUUIDKey(long id, UUID uuid) {
     }
@@ -949,5 +1035,59 @@ public class MusicApiService implements IMusicApiService {
     public record RecentRecordResponse<T>(Data<T> data) {
         public record Data<T>(int total, List<PlayRecord<T>> list) {
         }
+    }
+
+    record UploadTokenRequest(String cookie, String md5, long fileSize, String filename) {
+    }
+
+    record CloudListRequest(int limit, int offset) {
+    }
+
+    /** Common shape of the NCM API envelope; lets {@link #describe(CodeMessage)} handle them uniformly. */
+    public interface CodeMessage {
+        int code();
+
+        String msg();
+    }
+
+    public record CloudListResponse(int code, String msg, List<CloudItem> data, int count,
+                                    @SerializedName("size") long usedBytes,
+                                    @SerializedName("maxSize") long maxBytes) implements CodeMessage {
+    }
+
+    /**
+     * A single /user/cloud entry. Only the embedded song detail is needed here; the
+     * private cloud song id always equals {@code simpleSong.id}, so deletion can work
+     * off the returned track id without keeping a separate mapping.
+     */
+    public record CloudItem(String songName, MusicDetail simpleSong,
+                            @SerializedName("privateCloud") CloudAudioFoleMeta privateCloud) {
+    }
+
+    public record CloudAudioFoleMeta(String md5, long fileSize) {
+    }
+
+    record CloudDeleteRequest(String id) {
+    }
+
+    record CompleteUploadRequest(String cookie, String songId, String resourceId, String md5, String filename,
+                                 String song, String artist, String album) {
+    }
+
+    public record CodeAndMessageResponse(int code, String msg) implements CodeMessage {
+    }
+
+    public record UploadTokenResponse(int code, String msg, UploadTokenData data) implements CodeMessage {
+    }
+
+    public record UploadTokenData(boolean needUpload, String songId, String uploadToken, String uploadUrl,
+                                  String resourceId, @SerializedName("objectKey") String objectKey,
+                                  String md5, long fileSize, String filename) {
+    }
+
+    public record CompleteUploadResponse(int code, String msg, CompleteUploadData data) implements CodeMessage {
+    }
+
+    public record CompleteUploadData(String songId) {
     }
 }

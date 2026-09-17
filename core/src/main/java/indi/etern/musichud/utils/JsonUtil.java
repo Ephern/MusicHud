@@ -126,7 +126,7 @@ public class JsonUtil {
 
         @Override
         public Instant deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) {
-            return Instant.ofEpochSecond(json.getAsLong());
+            return Instant.ofEpochSecond(json.getAsLong() / 1000).plusNanos(json.getAsLong() % 1000);
         }
     }
 
