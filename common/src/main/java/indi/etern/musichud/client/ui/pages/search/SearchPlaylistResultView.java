@@ -3,8 +3,8 @@ package indi.etern.musichud.client.ui.pages.search;
 import icyllis.modernui.core.Context;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.PusherInfo;
-import indi.etern.musichud.client.ui.components.MusicCollectionCard;
-import indi.etern.musichud.client.ui.components.WaterfallLayout;
+import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
+import indi.etern.musichud.client.ui.layouts.WaterfallLayout;
 import lombok.Getter;
 
 import java.util.List;

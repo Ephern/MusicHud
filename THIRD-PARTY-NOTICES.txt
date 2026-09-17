@@ -1,0 +1,82 @@
+Music HUD - Third-Party Notices
+================================
+
+This distribution bundles the following third-party libraries. They are included
+unmodified (as published upstream) and are used under the terms listed below.
+Full license texts are packed at META-INF/licenses/ inside this jar.
+
+For the LGPL-licensed libraries, the corresponding source code is available from
+the upstream project (links below). Music HUD itself is licensed under LGPL-3.0
+(see the "license" file). The bundled LGPL libraries are linked unmodified; you
+may relink this mod against modified versions of those libraries by rebuilding
+it from source:
+    https://github.com/Ephern/MusicHud
+
+--------------------------------------------------------------------------------
+LGPL-licensed libraries (bundled)
+--------------------------------------------------------------------------------
+
+1. JLayer (umjammer fork)
+   Version:  1.0.3
+   Maven:    com.github.umjammer:jlayer:1.0.3
+   Source:   https://github.com/umjammer/jlayer
+   License:  GNU Lesser General Public License v2.1 (LGPL-2.1-only)
+   Text:     META-INF/licenses/LGPL-2.1.txt
+   Copyright: (c) JavaZOOM / Naohide Sano and contributors
+
+2. jFLAC Codec
+   Version:  1.5.2
+   Maven:    org.jflac:jflac-codec:1.5.2
+   Source:   https://github.com/nguillaumin/jflac
+   License:  GNU Lesser General Public License v2.1 (LGPL-2.1-only)
+   Text:     META-INF/licenses/LGPL-2.1.txt
+   Copyright: (c) David R Robison, Bruce A. MacNaughton, Florian Bomers,
+              Alan Raison and contributors
+
+3. Jaudiotagger
+   Version:  3.0.1
+   Maven:    net.jthink:jaudiotagger:3.0.1
+   Source:   https://github.com/ijabz/jaudiotagger
+   License:  GNU Lesser General Public License v2.1 or later (LGPL-2.1-or-later)
+   Text:     META-INF/licenses/LGPL-2.1.txt and META-INF/licenses/LGPL-3.0.txt
+   Copyright: (c) Paul Taylor and contributors
+
+--------------------------------------------------------------------------------
+MIT-licensed libraries (bundled)
+--------------------------------------------------------------------------------
+
+4. dbus-java (core and native-unixsocket transport)
+   Version:  5.2.0
+   Maven:    com.github.hypfvieh:dbus-java-core:5.2.0
+             com.github.hypfvieh:dbus-java-transport-native-unixsocket:5.2.0
+   Source:   https://github.com/hypfvieh/dbus-java
+   License:  MIT
+   Text:     META-INF/licenses/MIT.txt
+
+5. JavaMediaTransportControls (vendored source + native SMTCAdapter.dll)
+   Source:   https://github.com/selemba1000/JavaMediaTransportControls
+   License:  MIT
+   Text:     META-INF/licenses/MIT.txt
+   Copyright: (c) 2023 Selemba
+
+6. SLF4J API
+   Note:     Classes are excluded from the shaded jar; only its license metadata
+             is retained. Included here for completeness.
+   Source:   https://www.slf4j.org/
+   License:  MIT
+   Text:     META-INF/licenses/MIT.txt
+   Copyright: (c) 2004-2022 QOS.ch Sarl (Switzerland)
+
+--------------------------------------------------------------------------------
+Separately distributed mod dependencies (NOT bundled in this jar)
+--------------------------------------------------------------------------------
+
+The following are resolved as separate mods at runtime and are not contained in
+this distribution. Their licenses are governed by their respective authors:
+
+  - ModernUI (icyllis.modernui)            https://github.com/IzzelAliz/ModernUI
+  - Forge Config API Port (fuzs...)        https://github.com/Fuzss/forgeconfigapiport
+  - Cloth Config API (me.shedaniel.cloth)  https://github.com/shedaniel/cloth-config
+  - Fabric API / Fabric Loader             https://github.com/FabricMC
+  - Mod Menu (com.terraformersmc)          https://github.com/TerraformersMC/ModMenu
+  - Minecraft / NeoForge                   (c) Mojang Studios / NeoForged

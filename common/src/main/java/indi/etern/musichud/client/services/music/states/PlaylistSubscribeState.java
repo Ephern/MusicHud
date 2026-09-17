@@ -5,6 +5,7 @@ import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.UserCategoryPlaylists;
 import indi.etern.musichud.beans.music.actions.SubscribableType;
 import indi.etern.musichud.beans.music.actions.SubscribeAction;
+import indi.etern.musichud.client.dto.UserCollections;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -22,7 +23,7 @@ public class PlaylistSubscribeState extends SubscribeState<Playlist> {
         super(id, Playlist.class,
                 (id1) -> musicService.loadPlaylistDetail(id1, false),
                 () -> musicService.loadUserCollections(false)
-                        .thenApply((MusicService.UserCollections userCollections) ->
+                        .thenApply((UserCollections userCollections) ->
                                 userCollections.getUserCategoryPlaylists().getSubscribedPlaylist()
                         ),
                 ((playlist, subscribed) -> {

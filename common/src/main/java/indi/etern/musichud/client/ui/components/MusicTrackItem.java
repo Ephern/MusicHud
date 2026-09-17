@@ -8,7 +8,6 @@ import icyllis.modernui.text.Spanned;
 import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
@@ -16,6 +15,11 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.components.buttons.ModifyPlaylistTrackModalButton;
+import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButton;
+import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
+import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
@@ -27,9 +31,12 @@ import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.resources.language.I18n;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.List;
 import java.util.Objects;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
@@ -38,6 +45,8 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class MusicTrackItem extends LinearLayout {
     public static final int imageSize = 56;
     private static final MusicService musicService = MusicService.getInstance();
+    private static final DateTimeFormatter PLAY_RECORD_FORMATTER =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
     private final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("mm:ss");
     private UrlImageView albumImage;
@@ -59,6 +68,10 @@ public class MusicTrackItem extends LinearLayout {
     private LinearLayout buttonsLayout;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
     private Button sourceButton;
+    private TextView playRecordTimeText;
+    private LinearLayout pusherInfo;
+    @Getter
+    private LinearLayout infoRow;
 
     public MusicTrackItem(Context context) {
         super(context);
@@ -67,7 +80,7 @@ public class MusicTrackItem extends LinearLayout {
 
     private void initView(Context context) {
         setOrientation(HORIZONTAL);
-        LayoutParams musicLayoutParams = new LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        LayoutParams musicLayoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         setLayoutParams(musicLayoutParams);
         setGravity(Gravity.CENTER_VERTICAL);
 
@@ -79,7 +92,7 @@ public class MusicTrackItem extends LinearLayout {
         LinearLayout musicTexts = new LinearLayout(context);
         musicTexts.setOrientation(VERTICAL);
         musicTexts.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams textsParams = new LayoutParams(0, LayoutParams.WRAP_CONTENT, 1);
+        LayoutParams textsParams = new LayoutParams(0, WRAP_CONTENT, 1);
         textsParams.setMargins(dp(12), 0, 0, 0);
         addView(musicTexts, textsParams);
 
@@ -98,10 +111,10 @@ public class MusicTrackItem extends LinearLayout {
         row2.setAnimationsEnabled(false);
         musicTexts.addView(row2, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-        LinearLayout row3 = new LinearLayout(context);
-        row3.setOrientation(HORIZONTAL);
-        row3.setGravity(Gravity.CENTER_VERTICAL);
-        musicTexts.addView(row3);
+        infoRow = new LinearLayout(context);
+        infoRow.setOrientation(HORIZONTAL);
+        infoRow.setGravity(Gravity.CENTER_VERTICAL);
+        musicTexts.addView(infoRow);
 
         durationText = new TextView(context);
         durationText.setTextSize(Theme.TEXT_SIZE_NORMAL);
@@ -110,7 +123,7 @@ public class MusicTrackItem extends LinearLayout {
 
         LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         params.setMargins(0, 0, dp(12), 0);
-        row3.addView(durationText, params);
+        infoRow.addView(durationText, params);
 
         feeLabel = new TextView(context);
         feeLabel.setSingleLine(true);
@@ -119,11 +132,15 @@ public class MusicTrackItem extends LinearLayout {
         feeLabel.setVisibility(GONE);
         LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         params1.setMargins(0, 0, dp(12), 0);
-        row3.addView(feeLabel, params1);
+        infoRow.addView(feeLabel, params1);
 
-        LinearLayout pusherInfo = new LinearLayout(context);
+        pusherInfo = new LinearLayout(context);
         pusherInfo.setOrientation(LinearLayout.HORIZONTAL);
         pusherInfo.setGravity(Gravity.CENTER_VERTICAL);
+        pusherInfo.setVisibility(GONE);
+        LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        params2.setMargins(0, 0, dp(12), 0);
+        infoRow.addView(pusherInfo, params2);
 
         pusherText = new TextView(context);
         pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
@@ -142,10 +159,6 @@ public class MusicTrackItem extends LinearLayout {
         params5.setMargins(pusherText.dp(4), 0, 0, 0);
         pusherInfo.addView(pusherText, params5);
 
-        LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params2.setMargins(0, 0, dp(12), 0);
-        row3.addView(pusherInfo, params2);
-
         sourceButton = new Button(context);
         sourceButton.setVisibility(View.GONE);
         sourceButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
@@ -161,7 +174,7 @@ public class MusicTrackItem extends LinearLayout {
                     MusicService.getInstance().loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
                             .thenAccept((musicCollection) ->
                                     MuiModApi.postToUiThread(() -> RouterContainer.getInstance().pushNavigate(
-                                            new MusicCollectionDetailView(context, musicCollection)))
+                                            new MusicCollectionDetailView(getContext(), musicCollection)))
                             );
                 }
             }
@@ -170,7 +183,15 @@ public class MusicTrackItem extends LinearLayout {
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .padding(new InsetBackgroundFactory.Padding(0, sourceButton.dp(1), 0, sourceButton.dp(1)))
                 .cornerRadius(sourceButton.dp(4)).build().applyBackgroundTo(sourceButton);
-        row3.addView(sourceButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        infoRow.addView(sourceButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+        playRecordTimeText = new TextView(context);
+        playRecordTimeText.setSingleLine(true);
+        playRecordTimeText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        playRecordTimeText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        playRecordTimeText.setVisibility(GONE);
+        LayoutParams recordTimeParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        infoRow.addView(playRecordTimeText, recordTimeParams);
 
         buttonsLayout = new LinearLayout(context);
         buttonsLayout.setOrientation(HORIZONTAL);
@@ -206,11 +227,30 @@ public class MusicTrackItem extends LinearLayout {
         pusherText.setText("");
         pusherHeadView.setVisibility(View.GONE);
         pusherHeadView.setPlayerSkinSupplier(null);
+        playRecordTimeText.setText("");
+        playRecordTimeText.setVisibility(GONE);
         addToPlaylistButton.bindMusicDetail(null);
         likeButton.bindMusicList(null);
         setTag(null);
         musicDetail = null;
         musicTrace = null;
+    }
+
+    /**
+     * Shows the play-record time at the end of the last row; pass {@code null} or
+     * {@link Instant#MIN} to hide it.
+     */
+    public void setPlayRecordTime(Instant playTime) {
+        if (playRecordTimeText == null) {
+            return;
+        }
+        if (playTime == null || playTime.equals(Instant.MIN)) {
+            playRecordTimeText.setText("");
+            playRecordTimeText.setVisibility(GONE);
+        } else {
+            playRecordTimeText.setText(PLAY_RECORD_FORMATTER.format(playTime));
+            playRecordTimeText.setVisibility(VISIBLE);
+        }
     }
 
     public void bindData(MusicDetail musicDetail) {
@@ -245,7 +285,8 @@ public class MusicTrackItem extends LinearLayout {
                 .cornerRadius(dp(2))
                 .padding(new InsetBackgroundFactory.Padding(0, 0, 0, 0))
                 .build();
-        for (final Artist artist : musicDetail.getArtists()) {
+        List<Artist> artists = musicDetail.getArtists();
+        for (final Artist artist : artists) {
             if (index != 0) {
                 TextView split = new TextView(context);
                 split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
@@ -272,28 +313,34 @@ public class MusicTrackItem extends LinearLayout {
             });
             row2.addView(artistButton);
         }
-        TextView split = new TextView(context);
-        split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        split.setTextSize(Theme.TEXT_SIZE_SMALL);
-        split.setText(" - ");
-        split.setSingleLine();
-        row2.addView(split);
-        Button albumButton = new Button(context);
-        backgroundFactory.applyBackgroundTo(albumButton);
-        albumButton.setTextColor(Theme.PRIMARY_COLOR);
-        albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        albumButton.setText(musicDetail.getAlbum().getName());
-        albumButton.setSingleLine();
-        albumButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-        albumButton.setOnClickListener(button -> {
-            RouterContainer routerContainer = RouterContainer.getInstance();
-            if (routerContainer != null) {
-                routerContainer.pushNavigate(
-                        new MusicCollectionDetailView(context, musicDetail.getAlbum())
-                );
-            }
-        });
-        row2.addView(albumButton);
+        String albumName = album.getName();
+        albumName = albumName == null ? "" : albumName;
+        if (!artists.isEmpty() && !artists.getFirst().getName().isBlank() && !albumName.isBlank()) {
+            TextView split = new TextView(context);
+            split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            split.setTextSize(Theme.TEXT_SIZE_SMALL);
+            split.setText(" - ");
+            split.setSingleLine();
+            row2.addView(split);
+        }
+        if (!Album.NONE.equals(album)) {
+            Button albumButton = new Button(context);
+            backgroundFactory.applyBackgroundTo(albumButton);
+            albumButton.setTextColor(Theme.PRIMARY_COLOR);
+            albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            albumButton.setText(albumName);
+            albumButton.setSingleLine();
+            albumButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+            albumButton.setOnClickListener(button -> {
+                RouterContainer routerContainer = RouterContainer.getInstance();
+                if (routerContainer != null) {
+                    routerContainer.pushNavigate(
+                            new MusicCollectionDetailView(context, album)
+                    );
+                }
+            });
+            row2.addView(albumButton);
+        }
 
         Duration duration = Duration.of(musicDetail.getDurationMillis(), ChronoUnit.MILLIS);
         DateTimeFormatter formatter = duration.toHoursPart() >= 1 ?
@@ -353,14 +400,17 @@ public class MusicTrackItem extends LinearLayout {
 
 
                 sourceButton.setText(text);
-                sourceButton.setVisibility(View.VISIBLE);
+                this.pusherInfo.setVisibility(VISIBLE);
+                sourceButton.setVisibility(VISIBLE);
             } else {
-                sourceButton.setVisibility(View.GONE);
+                this.pusherInfo.setVisibility(GONE);
+                sourceButton.setVisibility(GONE);
             }
         } else {
-            pusherHeadView.setVisibility(View.GONE);
+            pusherHeadView.setVisibility(GONE);
             pusherHeadView.setPlayerSkinSupplier(null);
-            sourceButton.setVisibility(View.GONE);
+            this.pusherInfo.setVisibility(GONE);
+            sourceButton.setVisibility(GONE);
         }
 
         addToPlaylistButton.bindMusicDetail(musicDetail);
