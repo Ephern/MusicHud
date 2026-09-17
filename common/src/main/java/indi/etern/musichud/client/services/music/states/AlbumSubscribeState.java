@@ -4,6 +4,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.actions.SubscribableType;
 import indi.etern.musichud.beans.music.actions.SubscribeAction;
+import indi.etern.musichud.client.dto.UserCollections;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -21,7 +22,7 @@ public class AlbumSubscribeState extends SubscribeState<Album> {
         super(id, Album.class,
                 (id1) -> musicService.loadAlbumDetail(id1, false),
                 () -> musicService.loadUserCollections(false)
-                        .thenApply(MusicService.UserCollections::getSubscribedAlbums),
+                        .thenApply(UserCollections::getSubscribedAlbums),
                 ((album, subscribed) -> {
                     musicService.loadUserCollections(false)
                             .thenAccept(userCollections -> {

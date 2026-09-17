@@ -2,6 +2,7 @@ package indi.etern.musichud.client.audio;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
@@ -46,6 +47,19 @@ public final class PlaybackLedger {
 
     public LedgerEntry peekFirst() {
         return queued.peekFirst();
+    }
+
+    /**
+     * Detach and return every entry currently queued in the OpenAL source (in
+     * playback order), clearing the queue and its byte counter. Used when the
+     * context is lost: the OpenAL buffers are gone, but the PCM they held is
+     * still referenced here and can be replayed by the next source.
+     */
+    public List<LedgerEntry> drainQueue() {
+        List<LedgerEntry> drained = List.copyOf(queued);
+        queued.clear();
+        queuedBytes.set(0);
+        return drained;
     }
 
     public void resetQueue() {

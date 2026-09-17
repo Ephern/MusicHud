@@ -1,7 +1,7 @@
 package indi.etern.musichud.network.payloads.pushMessages.s2c;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.actions.MessagedResult;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;

@@ -47,9 +47,12 @@ public class BackgroundRenderer implements HudRenderer {
     }
 
     private static void drawColorDebugLine(HudRenderContext renderContext, int currentY, int color, String label) {
+        // Force opaque display; alpha holds the share weight, not opacity.
+        int opaque = 0xFF000000 | (color & 0x00FFFFFF);
+        int share = (color >>> 24) & 0xFF;
         renderContext.fill(START_X, currentY, START_X + SWATCH_SIZE, currentY + SWATCH_SIZE, 0xFF000000);
-        renderContext.fill(START_X + 1, currentY + 1, START_X + SWATCH_SIZE - 1, currentY + SWATCH_SIZE - 1, color);
-        String hex = String.format("#%06X", color & 0x00FFFFFF);
+        renderContext.fill(START_X + 1, currentY + 1, START_X + SWATCH_SIZE - 1, currentY + SWATCH_SIZE - 1, opaque);
+        String hex = String.format("#%06X A=%d", color & 0x00FFFFFF, share);
         renderContext.drawString(Minecraft.getInstance().font, label + ": " + hex,
                 START_X + SWATCH_SIZE + PADDING, currentY + (SWATCH_SIZE - 8) / 2, 0xFFFFFFFF, true);
     }

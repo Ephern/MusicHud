@@ -60,9 +60,6 @@ public class LoginApiService implements ILoginApiService {
     }
 
     private static void sendSuccessLoginResultTo(IPlayerClient player, LoginCookieInfo loginCookieInfo, Profile profile) {
-        // No immediate idle-source snapshot here: it is always stale for the recipient
-        // (their own sources are only re-pushed after the client's post-login re-sync)
-        // and the recipient's view of other players' sources comes from GetInitialState.
         serverNetworkService.sendToPlayer(player, new LoginResultMessage(true, "", loginCookieInfo, profile));
     }
 
@@ -98,12 +95,14 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public String randomVipCookieOrElse(Supplier<String> defaultCookieSupplier) {
-        //noinspection ComparatorMethodParameterNotUsed
-        Comparator<String> randomComparator = (a, b) -> MusicHud.RANDOM.nextInt(-1, 1);
+        Comparator<PlayerLoginInfo> vipLevelComparator = (a, b) -> {
+            int ordinalDelta = a.getProfile().getVipType().ordinal() - b.getProfile().getVipType().ordinal();
+            return ordinalDelta == 0 ? MusicHud.RANDOM.nextInt(-1, 1) : ordinalDelta * 2;
+        };
         return playerInfoMap.values().stream()
-                .filter(info -> info.getVipType() != null && info.getVipType() == VipType.VIP)
+                .filter(info -> info.getVipType() != null && info.getVipType() == VipType.VIP || info.getVipType() == VipType.SVIP)
+                .sorted(vipLevelComparator)
                 .map(info -> info.getLoginCookieInfo().rawCookie())
-                .sorted(randomComparator)
                 .findAny()
                 .orElse(defaultCookieSupplier == null ? null : defaultCookieSupplier.get());
     }
@@ -286,7 +285,13 @@ public class LoginApiService implements ILoginApiService {
                 throw new IllegalStateException("Profile is null but the account is not anonymous");
             }
         }
-        profile.setVipType(account.vipType);
+        try {
+            VipDetail vipDetail = ApiClient.get(ApiServerEndpointsMeta.User.VIP_DETAIL, loginCookieInfo.rawCookie(), true);
+            profile.setVipType(vipDetail.data.userLevel.vipType);
+        } catch (Throwable t) {
+            logger.warn("Failed to get vip detail of user: {}", profile.getUserId(), t);
+            profile.setVipType(VipType.NONE);
+        }
         PlayerLoginInfo playerLoginInfo = ILoginApiService.PlayerLoginInfo.of(player, loginCookieInfo);
         playerLoginInfo.appendProfile(profile);
         playerInfoMap.put(player.getUUID(), playerLoginInfo);
@@ -413,8 +418,7 @@ public class LoginApiService implements ILoginApiService {
             }
         } else if (loginCookieInfo.type() != LoginType.ANONYMOUS) {
             try {
-                Profile profile =
-                        loadUserProfile(player, loginCookieInfo);
+                Profile profile = loadUserProfile(player, loginCookieInfo);
                 serverNetworkService.sendToPlayer(player,
                         new LoginResultMessage(true,
                                 "",
@@ -493,9 +497,22 @@ public class LoginApiService implements ILoginApiService {
     @AllArgsConstructor(access = AccessLevel.PUBLIC)
     @NoArgsConstructor(access = AccessLevel.PUBLIC)
     public static class Account {
-        VipType vipType;
         @SuppressWarnings("SpellCheckingInspection")
         @SerializedName("anonimousUser")
         boolean anonymous;
+    }
+
+    public record VipDetail(Data data) {
+        public record Data(UserLevel userLevel) {
+            public record UserLevel(
+                    long userId,
+                    int level,
+                    int growthPoint,
+                    String levelName,
+                    VipType vipType
+            ) {
+
+            }
+        }
     }
 }

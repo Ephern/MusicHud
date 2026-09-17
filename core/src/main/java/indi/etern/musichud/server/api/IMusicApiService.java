@@ -4,6 +4,9 @@ import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.music.actions.SubscribableType;
 import indi.etern.musichud.beans.music.actions.SubscribeAction;
+import indi.etern.musichud.beans.record.PlayRecord;
+import indi.etern.musichud.beans.user.cloud.CloudTracksPage;
+import indi.etern.musichud.beans.user.cloud.UploadTaskMeta;
 import indi.etern.musichud.server.api.impl.ncm.MusicApiService;
 import indi.etern.musichud.throwable.PlaylistTypeUnsupportedException;
 import org.jetbrains.annotations.Nullable;
@@ -64,4 +67,17 @@ public interface IMusicApiService {
 
     /** @throws PlaylistTypeUnsupportedException if the playlist type is not supported (HTTP 400) */
     List<MusicDetail> getIntelligentList(long musicId, long playlistId, @Nullable Long sid, @Nullable UUID playerUUID);
+
+    List<? extends PlayRecord<?>> getUserPlayRecords(PlayRecord.ResourceType type, UUID playerUUID);
+
+    UploadTaskMeta requestUploadUrl(String fileName, String md5, long fileBytes, UUID playerUUID);
+
+    /** Lists the user's cloud-drive tracks; {@code md5} is never computed here. */
+    CloudTracksPage getUserCloudTracks(int offset, int limit, UUID playerUUID);
+
+    void deleteCloudTracks(List<Long> ids, UUID playerUUID);
+
+    /** @return the resolved Netease cloud track id, or {@code null} if the API did not return one */
+    String completeCloudUpload(String songId, String resourceId, String md5, String fileName,
+                               @Nullable String song, @Nullable String artist, @Nullable String album, UUID playerUUID);
 }

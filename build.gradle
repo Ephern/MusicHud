@@ -6,3 +6,17 @@ allprojects {
     group = rootProject.maven_group
     version = rootProject.mod_version
 }
+
+// Inject the repository-root third-party license notices into every distributable jar.
+// Kept at the root and matched by task name (instead of module path) so the same block
+// also works on branches with a different module layout, e.g. without a client `common`.
+subprojects {
+    tasks.matching { it.name == 'shadowJar' }.configureEach {
+        from(rootProject.file('THIRD-PARTY-NOTICES.txt')) {
+            into 'META-INF'
+        }
+        from(rootProject.file('licenses')) {
+            into 'META-INF/licenses'
+        }
+    }
+}
