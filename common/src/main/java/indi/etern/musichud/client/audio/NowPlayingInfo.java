@@ -8,7 +8,7 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
-import indi.etern.musichud.client.ui.dto.LyricLine;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
@@ -276,7 +276,6 @@ public class NowPlayingInfo {
         MusicDetail previous = getCurrentlyPlayingMusicDetail();
         currentlyPlaying = Objects.requireNonNullElse(musicTrace, Traceable.of(MusicDetail.NONE));
         MusicDetail musicDetail = musicTrace.value();
-        MusicDetail idleNextToPlay = idleNextToPlayTrace == null ? MusicDetail.NONE : idleNextToPlayTrace.value();
         nextToPlayIdleMusic = idleNextToPlayTrace == null ? Traceable.of(MusicDetail.NONE) : idleNextToPlayTrace;
         currentLyricLine = null;
         if (!musicDetail.equals(MusicDetail.NONE)) {
@@ -319,10 +318,17 @@ public class NowPlayingInfo {
             } catch (InterruptedException ignored) {}
             HudRendererManager.getInstance().switchMusic(musicDetail);
         });
-        List.copyOf(musicSwitchListener).forEach(consumer -> {
-            consumer.accept(previous, musicDetail);
-        });
+        List.copyOf(musicSwitchListener).forEach(consumer -> consumer.accept(previous, musicDetail));
         callLyricsUpdateListeners(null);
+    }
+
+    /** Replaces only the idle "next to play" (e.g. after a reroll) without touching playback/lyrics. */
+    public void updateNextToPlayIdle(Traceable<MusicDetail> idleNextToPlayTrace) {
+        nextToPlayIdleMusic = idleNextToPlayTrace == null ? Traceable.of(MusicDetail.NONE) : idleNextToPlayTrace;
+        try {
+            MuiModApi.postToUiThread(() -> MainFragment.updateNextToPlay(nextToPlayIdleMusic));
+        } catch (IllegalStateException ignored) {
+        }
     }
 
     public void startAt(ZonedDateTime zonedDateTime) {
@@ -372,14 +378,6 @@ public class NowPlayingInfo {
         }
     }
 
-    public boolean isCompleted() {
-        if (musicStartTime == null) {
-            return true;
-        }
-        Duration startedPlayingDuration = Duration.between(musicStartTime, ZonedDateTime.now());
-        return startedPlayingDuration.compareTo(musicDuration) > 0;
-    }
-
     public PlayerInfo getPusherPlayerInfo() {
         MusicDetail currentlyPlayingMusicDetail = getCurrentlyPlayingMusicDetail();
         if (currentlyPlayingMusicDetail != null) {
@@ -401,7 +399,7 @@ public class NowPlayingInfo {
     }
 
     /** Traceable view of the next idle track (queue peek preferred); never null. */
-    public Traceable<MusicDetail> getNextToPlayIdleMusic() {
+    public Traceable<MusicDetail> getNextToPlayMusic() {
         // Single synchronized peek: the client queue is a plain ArrayDeque mutated on
         // network threads, so an isEmpty+peek pair here would race its clear()
         QueueItem peek = MusicService.getInstance().peekQueueItem();
@@ -409,12 +407,6 @@ public class NowPlayingInfo {
             return peek.musicDetail();
         }
         return Objects.requireNonNullElse(nextToPlayIdleMusic, Traceable.of(MusicDetail.NONE));
-    }
-
-    /** Derived accessor for consumers that only need the track itself. */
-    public MusicDetail getNextToPlayIdleMusicDetail() {
-        Traceable<MusicDetail> traceable = getNextToPlayIdleMusic();
-        return traceable == null ? null : traceable.value();
     }
 
     public void stop() {

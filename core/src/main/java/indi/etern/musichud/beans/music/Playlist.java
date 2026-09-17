@@ -18,6 +18,7 @@ public class Playlist implements MusicCollection {
     public static final ByteBufCodec<Playlist> CODEC = ByteBufCodec.composite(
             Codecs.LONG, Playlist::getId,
             Codecs.STRING_UTF8, Playlist::getName,
+            Codecs.STRING_UTF8, Playlist::getDescription,
             Codecs.LONG, Playlist::getCoverImgId,
             Codecs.STRING_UTF8, Playlist::getCoverImgId_str,
             Codecs.STRING_UTF8, Playlist::getCoverImgUrl,
@@ -36,6 +37,7 @@ public class Playlist implements MusicCollection {
     @Getter
     long id = -1;
     String name = "";
+    String description = "";
     @Getter
     long coverImgId = -1;
     @SerializedName("trackCount")
@@ -64,6 +66,7 @@ public class Playlist implements MusicCollection {
     protected Playlist(
             long id,
             String name,
+            String description,
             long coverImgId,
             String coverImgId_str,
             String coverImgUrl,
@@ -77,6 +80,7 @@ public class Playlist implements MusicCollection {
     ) {
         this.id = id;
         this.name = name;
+        this.description = description;
         this.coverImgId = coverImgId;
         this.coverImgId_str = coverImgId_str;
         this.coverImgUrl = coverImgUrl;
@@ -108,8 +112,15 @@ public class Playlist implements MusicCollection {
         return Objects.requireNonNullElse(name, "");
     }
 
+    public String getDescription() {
+        return Objects.requireNonNullElse(description, "");
+    }
+
     @Override
     public String getNameI18nKey() {
+        if (specialType == null) {
+            return MusicHud.MOD_ID + ".text.playlist";
+        }
         return switch (specialType) {
             case LIKE_LIST -> MusicHud.MOD_ID + ".text.likeList";
             case USER_SPECIFIC -> MusicHud.MOD_ID + ".text.recommendlist";
@@ -168,8 +179,8 @@ public class Playlist implements MusicCollection {
     public boolean equals(Object obj) {
         return obj instanceof Playlist playlist
                 && playlist.id == id
-                && playlist.name.equals(name)
-                && playlist.coverImgUrl.equals(coverImgUrl);
+                && Objects.equals(playlist.name, name)
+                && Objects.equals(playlist.coverImgUrl, coverImgUrl);
     }
 
     @Override

@@ -5,11 +5,12 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
-import lombok.*;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
-import java.util.LinkedHashSet;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 @NoArgsConstructor(access = AccessLevel.PUBLIC)
 public class Album implements MusicCollection {
@@ -21,6 +22,7 @@ public class Album implements MusicCollection {
             Codecs.STRING_UTF8, Album::getCompany,
             Codecs.INT, Album::getMusicTrackCount,
             Codecs.ofCollection(ObservableSequencedSet::new, () -> MusicDetail.CODEC), Album::getMusicDetails,
+            Codecs.ofCollection(LinkedHashSet::new, () -> Codecs.STRING_UTF8), Album::getAlias,
             Codecs.ofCollection(LinkedHashSet::new, () -> Artist.CODEC), Album::getArtists,
             Album::new
     );
@@ -37,6 +39,7 @@ public class Album implements MusicCollection {
     @SerializedName("songs")
     @Setter
     ObservableSequencedSet<MusicDetail> musicDetails = new ObservableSequencedSet<>(0);
+    LinkedHashSet<String> alias = new LinkedHashSet<>();
     LinkedHashSet<Artist> artists = new LinkedHashSet<>();
 
     private boolean nullFiltered = false;
@@ -49,6 +52,7 @@ public class Album implements MusicCollection {
             String company,
             Integer musicTrackCount,
             ObservableSequencedSet<MusicDetail> musicDetails,
+            LinkedHashSet<String> alias,
             LinkedHashSet<Artist> artists
     ) {
         this.id = id;
@@ -58,6 +62,7 @@ public class Album implements MusicCollection {
         this.company = company;
         this.musicTrackCount = musicTrackCount;
         this.musicDetails = musicDetails;
+        this.alias = alias;
         this.artists = artists;
     }
 
@@ -105,6 +110,10 @@ public class Album implements MusicCollection {
         }
     }
 
+    public LinkedHashSet<String> getAlias() {
+        return Objects.requireNonNullElse(alias, new LinkedHashSet<>());
+    }
+
     public LinkedHashSet<Artist> getArtists() {
         return Objects.requireNonNullElse(artists, new LinkedHashSet<>());
     }
@@ -124,8 +133,8 @@ public class Album implements MusicCollection {
     public boolean equals(Object obj) {
         return obj instanceof Album album
                 && album.id == id
-                && album.name.equals(name)
-                && album.picUrl.equals(picUrl);
+                && Objects.equals(album.name, name)
+                && Objects.equals(album.picUrl, picUrl);
     }
 
     @Override
