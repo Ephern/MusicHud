@@ -134,6 +134,7 @@ public class NowPlayingInfo {
             MusicHud.EXECUTOR.execute(() -> {
                 clientConfig.setMuted(false);
                 clientConfig.save();
+                MainFragment.refreshCoverScale();
             });
             postJmtc(() -> {
                 jmtc.setPlayingState(JMTCPlayingState.PLAYING);
@@ -144,6 +145,7 @@ public class NowPlayingInfo {
             MusicHud.EXECUTOR.execute(() -> {
                 clientConfig.setMuted(true);
                 clientConfig.save();
+                MainFragment.refreshCoverScale();
             });
             postJmtc(() -> {
                 jmtc.setPlayingState(JMTCPlayingState.PAUSED);
