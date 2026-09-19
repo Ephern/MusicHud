@@ -34,20 +34,42 @@ public class UserCollections implements IClientMusicService.IUserCollections {
     private volatile long lastReupdateCachesTimestamp = 0;
 
     private final List<Unregister> playlistUnregisters = new ArrayList<>();
+    private Unregister likeListUnregister;
 
     public void setUserCategoryPlaylists(UserCategoryPlaylists userCategoryPlaylists) {
         this.userCategoryPlaylists = userCategoryPlaylists;
         playlistUnregisters.forEach(Unregister::unregister);
         playlistUnregisters.clear();
 
-        Playlist playlist1 = userCategoryPlaylists.getLikeList();
-        registerPlaylistUpdater(playlist1);
+        registerLikeListUpdater(userCategoryPlaylists.getLikeList());
 
         userCategoryPlaylists.getCreatedPlaylist().forEach(this::registerPlaylistUpdater);
         userCategoryPlaylists.getSubscribedPlaylist().forEach(this::registerPlaylistUpdater);
     }
 
+    private void registerLikeListUpdater(Playlist likeList) {
+        unregisterLikeListUpdater();
+        if (likeList == null || likeList.getId() == -1) {
+            return;
+        }
+        likeListUnregister = CollectionUpdateNotifier.registerPlaylist(likeList.getId(), (self) -> {
+            MusicService.getInstance().loadPlaylistDetail(likeList.getId(), false).thenAccept((playlist) -> {
+                likeList.updateFrom(playlist, false);
+            });
+        });
+    }
+
+    private void unregisterLikeListUpdater() {
+        if (likeListUnregister != null) {
+            likeListUnregister.unregister();
+            likeListUnregister = null;
+        }
+    }
+
     private void registerPlaylistUpdater(Playlist playlist1) {
+        if (playlist1 == null || playlist1.getId() == -1) {
+            return;
+        }
         long likeListId = playlist1.getId();
         Unregister unregister1 = CollectionUpdateNotifier.registerPlaylist(likeListId, (self) -> {
             MusicService.getInstance().loadPlaylistDetail(likeListId, false).thenAccept((playlist) -> {
@@ -120,17 +142,29 @@ public class UserCollections implements IClientMusicService.IUserCollections {
         if (fresh == null) {
             return;
         }
+        Playlist freshLike = fresh.getLikeList();
+        if (freshLike == null || freshLike.getId() == -1) {
+            // An empty like list means the server-side fetch failed; leave existing data
+            // untouched instead of wiping it with a partial/empty response.
+            return;
+        }
         UserCategoryPlaylists old = userCategoryPlaylists;
         if (old == null) {
             userCategoryPlaylists = fresh;
             return;
         }
         Playlist oldLike = old.getLikeList();
-        Playlist freshLike = fresh.getLikeList();
-        if (oldLike != null && freshLike != null) {
+        boolean oldLikeValid = oldLike != null && oldLike.getId() != -1 && oldLike != Playlist.EMPTY;
+        if (oldLikeValid && oldLike.equalsLoose(freshLike)) {
             if (oldLike.updateFromBrief(freshLike)) {
                 CollectionUpdateNotifier.notifyPlaylistUpdated(oldLike.getId(), false);
             }
+        } else {
+            // Replace a placeholder (Playlist.EMPTY) or a like list whose id changed
+            // (e.g. account switch). updateFromBrief never copies the id, so an in-place
+            // merge would leave the -1 placeholder stuck forever.
+            old.setLikeList(freshLike);
+            registerLikeListUpdater(freshLike);
         }
         syncPlaylistSet(old.getCreatedPlaylist(), fresh.getCreatedPlaylist());
         syncPlaylistSet(old.getSubscribedPlaylist(), fresh.getSubscribedPlaylist());

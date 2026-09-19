@@ -79,6 +79,12 @@ public class PlaybackTask {
     private static final int SCROBBLE_MIN_PLAY_DURATION_SEC = 30;
     /** Start buffering the next track once this many ms remain in the current one. */
     private static final long NEXT_TRACK_PRELOAD_REMAINING_MS = 5000;
+    /**
+     * How many times a stream that ends well before the declared duration (a
+     * truncated/expired download rather than a real end) is retried with a fresh
+     * resource URL before its decoded content is accepted as-is.
+     */
+    private static final int MAX_TRUNCATION_RETRIES = 3;
     private static final Logger LOGGER = MusicHud.getLogger(PlaybackTask.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
@@ -250,6 +256,9 @@ public class PlaybackTask {
     public void cancel() {
         if (cancelled) return;
         cancelled = true;
+        LOGGER.debug("Playback task cancelled: {} (ID: {}, state: {}, audible: {})",
+                musicDetail == null ? "?" : musicDetail.getName(),
+                musicDetail == null ? -1 : musicDetail.getId(), state, isAudible());
         // A cancelled task never played through (preloads, replaced pending tasks), so it must
         // not emit a scrobble when the play worker unwinds through finish().
         scrobbled = true;
@@ -287,12 +296,15 @@ public class PlaybackTask {
     private void downloadLoop() {
         Thread.currentThread().setName("MHWorker-Downloader");
         int localRetryCount = 0;
+        int truncationRetryCount = 0;
         boolean forceSync = serverStartTime != null;
+        boolean forceResourceRefresh = false;
         musicResourceInfo = MusicResourceInfo.NONE;
         while (!cancelled && !restartRequested) {
             int trial = localRetryCount + 1;
             try {
-                if (musicResourceInfo == null || musicResourceInfo.equals(MusicResourceInfo.NONE) || localRetryCount % 3 == 0) {
+                if (forceResourceRefresh || musicResourceInfo == null || musicResourceInfo.equals(MusicResourceInfo.NONE) || localRetryCount % 3 == 0) {
+                    forceResourceRefresh = false;
                     musicResourceInfo = getCurrentMusicResourceInfo(clientConfig.getPrimaryChosenQuality(), musicResourceInfo).get();
                     if (musicResourceInfo == null) {
                         try {
@@ -351,6 +363,42 @@ public class PlaybackTask {
                 }
 
                 if (cancelled || restartRequested) return;
+
+                // A stream that ran out well before its declared duration is a
+                // truncated/expired download (e.g. a signed URL that died while a
+                // too-early preload held the connection), not a real end. Retry with
+                // a freshly requested URL instead of silently fading out early.
+                // Bounded, so tracks whose metadata is simply longer than the audio
+                // still play what exists after a few attempts.
+                long decodedMs = decodedMillis(decoder);
+                if (streamLooksTruncated(decoder)) {
+                    if (truncationRetryCount < MAX_TRUNCATION_RETRIES) {
+                        truncationRetryCount++;
+                        localRetryCount++;
+                        LOGGER.warn("Audio stream ended early: decoded ~{} ms of {} ms, retrying with a fresh resource (truncation retry {}/{})",
+                                decodedMs, musicDetail.getDurationMillis(), truncationRetryCount, MAX_TRUNCATION_RETRIES);
+                        try {
+                            decoder.close();
+                        } catch (Exception ignored) {
+                        }
+                        clearAudio();
+                        ledger.prefetchBytes.set(0);
+                        resetSyncAccounting();
+                        ledger.decodedBytes.set(0);
+                        forceSync = true;
+                        forceResourceRefresh = true;
+                        setState(PlaybackState.RETRYING);
+                        try {
+                            Thread.sleep((long) truncationRetryCount * DOWNLOAD_RETRY_DELAY_ADDITIONAL_MS);
+                        } catch (InterruptedException ie) {
+                            LOGGER.debug("Download thread interrupted");
+                            return;
+                        }
+                        continue;
+                    }
+                    LOGGER.warn("Audio stream still short after {} truncation retries, accepting decoded content (~{} ms of {} ms)",
+                            truncationRetryCount, decodedMs, musicDetail.getDurationMillis());
+                }
 
                 // 下载完成
                 downloadDone = true;
@@ -477,6 +525,32 @@ public class PlaybackTask {
         syncSkipTarget.set(0);
     }
 
+    /** Decoded stream position in ms for the given decoder, or -1 when unknown. */
+    private long decodedMillis(AudioDecoder decoder) {
+        if (decoder == null) return -1;
+        int sampleRate = decoder.getSampleRate();
+        int bytesPerSample = OpenAlSource.bytesPerSample(decoder.getFormat());
+        if (sampleRate <= 0 || bytesPerSample <= 0) return -1;
+        long bytesPerSecond = (long) sampleRate * bytesPerSample;
+        return ledger.decodedBytes.get() * 1000L / bytesPerSecond;
+    }
+
+    /**
+     * Whether the decoder hit EOF well before the track's declared duration, i.e.
+     * the download was cut short (dropped/expired connection) instead of ending
+     * at the real end of the audio. A tolerance absorbs metadata rounding and
+     * codec padding so they are not mistaken for truncation.
+     */
+    private boolean streamLooksTruncated(AudioDecoder decoder) {
+        if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) return false;
+        long durationMs = musicDetail.getDurationMillis();
+        if (durationMs <= 0) return false;
+        long decodedMs = decodedMillis(decoder);
+        if (decodedMs < 0) return false;
+        long tolerance = Math.max(2000L, durationMs / 20);
+        return decodedMs < durationMs - tolerance;
+    }
+
     /**
      * Bytes buffered that amount to {@link #REBUFFER_TARGET_MS}, capped at half
      * the prefetch capacity so the target is always reachable even for very high
@@ -531,7 +605,7 @@ public class PlaybackTask {
             finish();
             return;
         }
-        while (!cancelled) {
+        while (!cancelled && !Thread.currentThread().isInterrupted()) {
             try {
                 if (playOnce() == PlayResult.FINISHED) {
                     finish();
@@ -673,8 +747,11 @@ public class PlaybackTask {
         startFuture.complete(wallStart);
         LOGGER.debug("Playback started, wallStart={}, fadeIn={} ms", wallStart, fadeDurationMs);
 
-        mainLoop(wallStart);
-        return downloadStalled ? PlayResult.RESTARTED : PlayResult.FINISHED;
+        LoopExitReason exitReason = mainLoop(wallStart);
+        // Only a completed fade-out (real end of stream or an explicit fade-out) may
+        // finish the task. A dead source or an interrupted loop must be recovered by
+        // playLoop instead of being reported as a natural end.
+        return exitReason == LoopExitReason.ENDED ? PlayResult.FINISHED : PlayResult.RESTARTED;
     }
 
     /**
@@ -692,6 +769,16 @@ public class PlaybackTask {
                 || musicDetail.getDurationMillis() <= 0) {
             return;
         }
+        // Only the task that is both the audible current task and the one the app
+        // considers currently playing may preload. During a cross-fade the outgoing
+        // task is still currentTask (and still nearing its own end) while the
+        // successor is already pending; without those guards it would preload the
+        // track AFTER the pending one, opening an audio connection a whole track
+        // early so it can expire/get dropped before playback reaches it.
+        if (!StreamAudioPlayer.getInstance().canPreloadFrom(this)
+                || !Objects.equals(musicDetail, nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
+            return;
+        }
         long remainingMs = musicDetail.getDurationMillis()
                 - Duration.between(wallStart, ZonedDateTime.now()).toMillis();
         if (remainingMs > NEXT_TRACK_PRELOAD_REMAINING_MS) {
@@ -707,7 +794,7 @@ public class PlaybackTask {
     }
 
     @SuppressWarnings("BusyWait")
-    private void mainLoop(ZonedDateTime wallStart) {
+    private LoopExitReason mainLoop(ZonedDateTime wallStart) {
         long lastIterationNanos = -1;
         while (!cancelled && !Thread.currentThread().isInterrupted()) {
             try {
@@ -720,7 +807,7 @@ public class PlaybackTask {
                 if (downloadStalled) {
                     // Watchdog flagged an unresponsive download worker: leave the loop
                     // so playLoop rebuilds the pipeline instead of hanging silently.
-                    break;
+                    return LoopExitReason.STALLED;
                 }
                 long iterationNow = System.nanoTime();
                 if (lastIterationNanos > 0) {
@@ -750,9 +837,9 @@ public class PlaybackTask {
                 maybePreloadNextTrack(wallStart);
 
                 updateGain();
-                if (source == null) break;
+                if (source == null) return LoopExitReason.SOURCE_INVALID;
 
-                if (state == PlaybackState.FADING_OUT && fadeProgress() >= 1.0) break;
+                if (state == PlaybackState.FADING_OUT && fadeProgress() >= 1.0) return LoopExitReason.ENDED;
 
                 checkDecoderChangeAndFlush();
 
@@ -809,9 +896,10 @@ public class PlaybackTask {
                 }
                 Thread.sleep(PLAY_LOOP_SLEEP_MS);
             } catch (InterruptedException e) {
-                break;
+                return LoopExitReason.INTERRUPTED;
             }
         }
+        return LoopExitReason.INTERRUPTED;
     }
 
     /** Take a chunk for OpenAL, applying stale-drop and underrun policy. */
@@ -1264,8 +1352,11 @@ public class PlaybackTask {
         scrobbleOnQuitUnregister.unregister();
         scrobble();
         cleanup();
-        setState(PlaybackState.FINISHED);
+        // Complete the finish future FIRST: its listener promotes any pending task
+        // and updates the global status. Broadcasting FINISHED before that would
+        // briefly set the global status to IDLE even though a successor is waiting.
         finishFuture.complete(null);
+        setState(PlaybackState.FINISHED);
     }
 
     private void scrobble() {
@@ -1405,5 +1496,17 @@ public class PlaybackTask {
     private enum PlayResult {
         FINISHED,
         RESTARTED
+    }
+
+    /** Why {@link #mainLoop} returned; only {@link #ENDED} is a natural finish. */
+    private enum LoopExitReason {
+        /** Fade-out ran to completion (end of stream, cross-fade or explicit stop). */
+        ENDED,
+        /** The OpenAL source vanished mid-loop; the pipeline must be rebuilt. */
+        SOURCE_INVALID,
+        /** The download watchdog flagged the worker as unresponsive. */
+        STALLED,
+        /** The play thread was interrupted (cancellation / shutdown). */
+        INTERRUPTED
     }
 }

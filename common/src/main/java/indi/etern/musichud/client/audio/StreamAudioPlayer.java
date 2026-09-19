@@ -7,9 +7,9 @@ import lombok.Getter;
 import org.apache.logging.log4j.Logger;
 
 import java.time.ZonedDateTime;
-import java.util.HashSet;
 import java.util.Set;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
@@ -33,7 +33,7 @@ public class StreamAudioPlayer {
     private static volatile StreamAudioPlayer instance = null;
     private final AtomicReference<Status> status = new AtomicReference<>(Status.IDLE);
     @Getter
-    private final Set<Consumer<Status>> statusChangeListener = new HashSet<>();
+    private final Set<Consumer<Status>> statusChangeListener = new CopyOnWriteArraySet<>();
     private PlaybackTask currentTask;
     private PlaybackTask pendingTask;
     /** Next track buffered ahead of time; not audible until it becomes current/pending. */
@@ -94,10 +94,14 @@ public class StreamAudioPlayer {
                 retirePending(pendingTask);
             }
             pendingTask = null;
+            // Adopt the new task before cancelling the old one: {@code cancel()}
+            // completes the old task's finish future synchronously, and its
+            // onTaskFinished must not see itself as currentTask (which would clear
+            // currentTask and reset the global status to IDLE after we switched).
+            currentTask = task;
             if (current != null) {
                 current.cancel();
             }
-            currentTask = task;
             task.openGate();
         } else {
             if (pendingTask != null && pendingTask != task) {
@@ -147,6 +151,19 @@ public class StreamAudioPlayer {
     }
 
     /**
+     * Whether {@code task} is allowed to preload its successor right now: only the
+     * audible current task may do so, and only while no transition is pending.
+     * <p>
+     * Without this an outgoing task (still {@code currentTask} until its successor
+     * becomes audible) could preload the track <em>after</em> the pending one, i.e.
+     * open an audio connection a full track too early, which then risks a dropped
+     * or expired stream when that track finally starts.
+     */
+    synchronized boolean canPreloadFrom(PlaybackTask task) {
+        return currentTask == task && pendingTask == null;
+    }
+
+    /**
      * Returns the preloaded task when it matches the track and no server start time
      * must be honoured, otherwise builds a fresh task. A non-matching preload is
      * left for {@link #play(PlaybackTask)} to discard.
@@ -187,6 +204,9 @@ public class StreamAudioPlayer {
 
     private synchronized void onTaskStateChanged(PlaybackTask task, PlaybackState state) {
         if (task != currentTask) return;
+        // A pending successor will take over in onTaskFinished; never flash IDLE
+        // in between (the old task's FINISHED must not mask the already-known next).
+        if (state == PlaybackState.FINISHED && pendingTask != null) return;
         Status newStatus = switch (state) {
             case PENDING, LOADING, BUFFERING -> Status.BUFFERING;
             case FADING_IN, PLAYING, FADING_OUT -> Status.PLAYING;

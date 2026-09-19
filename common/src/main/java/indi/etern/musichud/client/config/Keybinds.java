@@ -96,6 +96,7 @@ public class Keybinds implements ClientRegister {
             MusicHud.EXECUTOR.execute(() -> {
                 clientConfig.setMuted(!clientConfig.getMuted());
                 clientConfig.save();
+                MainFragment.refreshCoverScale();
                 ToastUtil.show(getVolumeToastString());
             });
         });

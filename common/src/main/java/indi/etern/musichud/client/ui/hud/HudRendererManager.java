@@ -84,7 +84,7 @@ public class HudRendererManager {
                 } catch (InterruptedException ignored) {
                 }
 
-                LYRICS_LINE_RENDERER.setLines(style1, style2, 300);
+                LYRICS_LINE_RENDERER.setLines(style1, style2);
             });
         });
         PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
