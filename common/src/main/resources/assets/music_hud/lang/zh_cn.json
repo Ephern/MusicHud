@@ -2,7 +2,7 @@
   "key.category.music_hud.music_hud": "Music HUD",
   "music_hud.text.cloudUploadCancelled": "已取消",
   "music_hud.text.cloudUploadMatchUncertain": "状态未知，可刷新查看",
-  "music_hud.text.cloudUploadMatching": "匹配中...",
+  "music_hud.text.cloudUploadMatching": "匹配中",
   "music_hud.text.cloudUploadTooLarge": "文件超出云盘大小限制（HTTP 413）",
   "music_hud.text.cloudUploadDone": "上传完成",
   "music_hud.text.cloudUploadQueued": "等待中",

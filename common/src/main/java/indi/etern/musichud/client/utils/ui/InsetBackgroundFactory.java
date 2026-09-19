@@ -22,7 +22,7 @@ public class InsetBackgroundFactory {
     @Builder.Default
     ColorStateList backgroundColor = Theme.GHOST_CHECK_BUTTON_STATES;
     @Builder.Default
-    long transitionDuration = 150;
+    long transitionDuration = 100;
     public record Padding(int left,int top,int right,int bottom) {}
 
 /*
