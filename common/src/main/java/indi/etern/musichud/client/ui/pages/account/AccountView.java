@@ -412,7 +412,7 @@ public class AccountView extends LinearLayout {
                 unregisterCollectionListeners();
                 UserCategoryPlaylists categoryPlaylists = userCollections.getUserCategoryPlaylists();
                 Playlist likeList = categoryPlaylists.getLikeList();
-                if (likeList != Playlist.EMPTY) {
+                if (likeList != null && likeList.getId() != -1) {
                     elementMap.computeIfAbsent(new ElementKey(Playlist.class, likeList.getId()), key -> {
                         MusicCollectionCard card = new MusicCollectionCard(context, likeList, PusherInfo.EMPTY);
                         card.setTag(likeList.getId());

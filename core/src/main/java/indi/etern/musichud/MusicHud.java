@@ -28,8 +28,20 @@ public final class MusicHud {
     private static Environment currentEnvironment;
     private static long initAtMillis;
     private static Level logLevel = Level.INFO;
+    private static boolean logLevelRead = false;
 
     public static Logger getLogger(Class<?> clazz) {
+        if (!logLevelRead) {
+            logLevelRead = true;
+            try {
+                String sysLogLevel = System.getProperty("musichud.log.level");
+                if (sysLogLevel != null && !sysLogLevel.isEmpty()) {
+                    logLevel = Level.valueOf(sysLogLevel.toUpperCase());
+                }
+            } catch (Exception e) {
+                LOGGER.warn("Failed to load log level from property", e);
+            }
+        }
         Logger logger = LogManager.getLogger(LOGGER_BASE_NAME + "/" + clazz.getSimpleName());
         Configurator.setLevel(logger, logLevel);
         return logger;
@@ -38,10 +50,6 @@ public final class MusicHud {
     public static void init() {
         if (currentEnvironment == null) {
             throw new IllegalStateException("Current environment is not set");
-        }
-        String sysLogLevel = System.getProperty("musichud.log.level");
-        if (sysLogLevel != null && !sysLogLevel.isEmpty()) {
-            logLevel = Level.valueOf(sysLogLevel.toUpperCase());
         }
         Configurator.setLevel(LOGGER, logLevel);
         LOGGER.debug("Initialized in environment: {}", currentEnvironment);

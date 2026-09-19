@@ -2,7 +2,7 @@
   "key.category.music_hud.music_hud": "Music HUD",
   "music_hud.text.cloudUploadCancelled": "Cancelled",
   "music_hud.text.cloudUploadMatchUncertain": "Status unknown, refresh to check",
-  "music_hud.text.cloudUploadMatching": "Matching...",
+  "music_hud.text.cloudUploadMatching": "Matching",
   "music_hud.text.cloudUploadTooLarge": "File exceeds the cloud drive size limit (HTTP 413)",
   "music_hud.text.cloudUploadDone": "Upload complete",
   "music_hud.text.cloudUploadQueued": "Queued",

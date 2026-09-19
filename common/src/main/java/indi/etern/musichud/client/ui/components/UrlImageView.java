@@ -317,7 +317,9 @@ public class UrlImageView extends FrameLayout {
                 getContext().getResources(),
                 image
         );
-        drawable.setFilter(false);
+        int imageViewWidth = getWidth();
+        boolean useFilter = image.getWidth() * image.getHeight() >= 0.25 * imageViewWidth * imageViewWidth;
+        drawable.setFilter(useFilter);
 
         if (circular) {
             drawable.setCircular(true);

@@ -44,6 +44,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -469,8 +470,7 @@ public class MusicService implements IClientMusicService {
                         userCollections.syncUserCategoryPlaylists(playlists);
                     }
                     return playlists;
-                })
-                .exceptionally(e -> UserCategoryPlaylists.EMPTY);
+                });
     }
 
     protected CompletableFuture<LinkedHashSet<Album>> loadUserAlbums(boolean ignoreCache) {
@@ -489,8 +489,7 @@ public class MusicService implements IClientMusicService {
                         userCollections.syncSubscribedAlbums(albums);
                     }
                     return albums;
-                })
-                .exceptionally(e -> new LinkedHashSet<>(0));
+                });
     }
 
     protected CompletableFuture<LinkedHashSet<Artist>> loadUserArtists(boolean ignoreCache) {
@@ -509,8 +508,7 @@ public class MusicService implements IClientMusicService {
                         userCollections.syncSubscribedArtists(artists);
                     }
                     return artists;
-                })
-                .exceptionally(e -> new LinkedHashSet<>(0));
+                });
     }
 
     @Override
@@ -572,6 +570,11 @@ public class MusicService implements IClientMusicService {
         if (inProgress != null) {
             return inProgress;
         }
+        if (!LoginService.getInstance().isLogined()) {
+            // Anonymous callers (e.g. subscribe-state buttons while browsing) must still get a
+            // well-formed empty collection instead of a failed future.
+            return CompletableFuture.completedFuture(emptyCollections());
+        }
         UserCollections existing = currentUserCollections;
         if (existing != null && existing.isLoaded()) {
             if (ignoreCache) {
@@ -586,21 +589,44 @@ public class MusicService implements IClientMusicService {
             }
             return CompletableFuture.completedFuture(existing);
         } else {
-            currentUserCollections = new UserCollections();
+            UserCollections loading = new UserCollections();
+            currentUserCollections = loading;
+            CompletableFuture<UserCategoryPlaylists> playlistsFuture = loadUserPlaylists(ignoreCache);
             return rememberCollectionsLoad(CompletableFuture.allOf(
-                    loadUserPlaylists(ignoreCache).thenAccept(currentUserCollections::setUserCategoryPlaylists),
+                    playlistsFuture.thenAccept(loading::setUserCategoryPlaylists),
                     loadUserAlbums(ignoreCache)
                             .thenAccept(subscribedAlbums ->
-                                    currentUserCollections.setSubscribedAlbums(new ObservableSequencedSet<>(subscribedAlbums))),
+                                    loading.setSubscribedAlbums(new ObservableSequencedSet<>(subscribedAlbums))),
                     loadUserArtists(ignoreCache)
                             .thenAccept(subscribedArtists ->
-                                    currentUserCollections.setSubscribedArtists(new ObservableSequencedSet<>(subscribedArtists)))
+                                    loading.setSubscribedArtists(new ObservableSequencedSet<>(subscribedArtists)))
             ).thenApply(v -> {
-                currentUserCollections.setLoaded(true);
+                Playlist likeList = playlistsFuture.join().getLikeList();
+                if (likeList == null || likeList.getId() == -1) {
+                    // The playlist request can "succeed" yet carry an empty like list when the
+                    // server-side fetch times out. Never cache such a placeholder as loaded,
+                    // otherwise every following refresh keeps seeing it and the like list can
+                    // never recover.
+                    throw new CompletionException(new IllegalStateException("User playlists are incomplete"));
+                }
+                loading.setLoaded(true);
                 syncUserCollectionsDownFromCaches();
-                return currentUserCollections;
+                return loading;
+            }).whenComplete((r, e) -> {
+                if (e != null && currentUserCollections == loading) {
+                    currentUserCollections = null;
+                }
             }));
         }
+    }
+
+    private static UserCollections emptyCollections() {
+        UserCollections collections = new UserCollections();
+        collections.setUserCategoryPlaylists(UserCategoryPlaylists.EMPTY);
+        collections.setSubscribedAlbums(new ObservableSequencedSet<>(0));
+        collections.setSubscribedArtists(new ObservableSequencedSet<>(0));
+        collections.setLoaded(true);
+        return collections;
     }
 
     private CompletableFuture<UserCollections> rememberCollectionsLoad(CompletableFuture<UserCollections> future) {
