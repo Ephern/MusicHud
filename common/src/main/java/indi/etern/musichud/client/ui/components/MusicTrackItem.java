@@ -85,7 +85,7 @@ public class MusicTrackItem extends LinearLayout {
         setGravity(Gravity.CENTER_VERTICAL);
 
         albumImage = new UrlImageView(context);
-        albumImage.setCornerRadius(dp(8));
+        albumImage.setCornerRadius(dp(4));
         albumImage.setAspectRatio(1);
         addView(albumImage, new LayoutParams(dp(imageSize), dp(imageSize)));
 
@@ -298,7 +298,9 @@ public class MusicTrackItem extends LinearLayout {
             index++;
             Button artistButton = new Button(context);
             backgroundFactory.applyBackgroundTo(artistButton);
-            artistButton.setTextColor(Theme.PRIMARY_COLOR);
+            boolean validArtist = artist.getId() > 0;
+            artistButton.setEnabled(validArtist);
+            artistButton.setTextColor(validArtist ? Theme.PRIMARY_COLOR : Theme.SECONDARY_TEXT_COLOR);
             artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             artistButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
             artistButton.setText(artist.getName());
@@ -326,7 +328,9 @@ public class MusicTrackItem extends LinearLayout {
         if (!Album.NONE.equals(album)) {
             Button albumButton = new Button(context);
             backgroundFactory.applyBackgroundTo(albumButton);
-            albumButton.setTextColor(Theme.PRIMARY_COLOR);
+            boolean validAlbum = album.getId() > 0;
+            albumButton.setEnabled(validAlbum);
+            albumButton.setTextColor(validAlbum ? Theme.PRIMARY_COLOR : Theme.SECONDARY_TEXT_COLOR);
             albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
             albumButton.setText(albumName);
             albumButton.setSingleLine();

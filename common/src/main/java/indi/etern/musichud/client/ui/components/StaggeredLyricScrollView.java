@@ -42,6 +42,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
     public static final float STAGGERED_BASE_DURATION_MILLIS = 600;
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
     private static final float SPACER_HEIGHT_RATIO = 0.7f;
+    private static final int SWITCH_DURATION = 350;
+    private static final SpringInterpolator SWITCH_INTERPOLATOR =
+            new SpringInterpolator((float) SWITCH_DURATION / 1000, 1);
     private View bottomSpacer;
     private static final SpringInterpolator STAGGER_INTERPOLATOR = new SpringInterpolator(STAGGERED_BASE_DURATION_MILLIS * 0.001f, 1);
     private static Logger logger;
@@ -151,8 +154,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
             stopUpdateLoop();
             if (container.getChildCount() > 0) {
                 ObjectAnimator slideOut = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0, -getWidth());
-                slideOut.setInterpolator(Easing.EASE_IN_OUT_QUINT);
-                slideOut.setDuration(300);
+                slideOut.setInterpolator(SWITCH_INTERPOLATOR);
+                slideOut.setDuration(SWITCH_DURATION);
                 slideOut.addListener(new AnimatorListener() {
                     @Override
                     public void onAnimationEnd(@NonNull Animator animation) {
@@ -163,8 +166,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
                         buildLyricRows(lyrics);
                         container.setTranslationX(getWidth());
                         ObjectAnimator slideIn = ObjectAnimator.ofFloat(container, View.TRANSLATION_X, 0);
-                        slideIn.setInterpolator(Easing.EASE_IN_OUT_QUINT);
-                        slideIn.setDuration(300);
+                        slideIn.setInterpolator(SWITCH_INTERPOLATOR);
+                        slideIn.setDuration(SWITCH_DURATION);
                         slideIn.start();
                         if (!continueUpdate) {
                             startUpdateLoop();
