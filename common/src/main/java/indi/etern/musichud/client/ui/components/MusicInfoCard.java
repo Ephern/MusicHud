@@ -275,7 +275,7 @@ public class MusicInfoCard extends LinearLayout {
             albumImage.loadUrl(album.getImageThumbnailUrl(sideWidth));
             titleText.setText(musicDetail.getName());
             PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
-            String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().getName() : null;
+            String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().name() : null;
             if (name == null || name.isEmpty()) {
                 pusherHeadView.setVisibility(View.GONE);
                 pusherText.setText("");
