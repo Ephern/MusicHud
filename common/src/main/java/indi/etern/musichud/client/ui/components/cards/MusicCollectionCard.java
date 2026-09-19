@@ -101,10 +101,7 @@ public class MusicCollectionCard extends LinearLayout {
         imageView.setCornerRadius(dp(8));
 
         FlexWrapLayout row1 = new FlexWrapLayout(context);
-        row1.applyLineStyle(line -> {
-            line.setBaselineAligned(false);
-            line.setGravity(Gravity.TOP);
-        });
+        row1.setLineGravity(Gravity.TOP);
         addView(row1, new LayoutParams(dp160, WRAP_CONTENT));
 
         LinearLayout row2 = new LinearLayout(context);
