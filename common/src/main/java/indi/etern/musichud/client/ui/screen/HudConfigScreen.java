@@ -172,13 +172,13 @@ public class HudConfigScreen extends Screen implements MuiScreen {
 
     @Override
     public boolean keyPressed(KeyEvent event) {
-        mHost.onKeyPress(event.key(), event.scancode(), event.modifiers());
+        mHost.onKeyPress(event.key(), event.keycode(), event.modifiers());
         return false;
     }
 
     @Override
     public boolean keyReleased(KeyEvent event) {
-        mHost.onKeyRelease(event.key(), event.scancode(), event.modifiers());
+        mHost.onKeyRelease(event.key(), event.keycode(), event.modifiers());
         return false;
     }
 

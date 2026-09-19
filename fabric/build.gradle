@@ -76,7 +76,7 @@ dependencies {
 
     implementation "maven.modrinth:modmenu:$rootProject.modmenu_version"
 
-    implementation("icyllis.modernui:ModernUI-Fabric:26.2-${rootProject.modernui_version}.+")
+    implementation("icyllis.modernui:ModernUI-Fabric:26.3-${rootProject.modernui_version}.+")
     implementation("dev.icyllis:modernui-core:$rootProject.modernui_version") {
         exclude group: "org.slf4j", module: "slf4j-api"
         exclude group: "org.apache.logging.log4j", module: "log4j-core"

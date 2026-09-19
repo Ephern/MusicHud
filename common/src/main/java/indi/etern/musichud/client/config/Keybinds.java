@@ -21,7 +21,6 @@ import net.minecraft.client.KeyMapping;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
 import net.minecraft.resources.Identifier;
-import org.lwjgl.glfw.GLFW;
 
 @RegisterMark
 public class Keybinds implements ClientRegister {
@@ -32,44 +31,44 @@ public class Keybinds implements ClientRegister {
         KeyMapping.Category category = KeyMapping.Category.register(Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, MusicHud.MOD_ID));
         var mainMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".open_main",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_M,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_M,
                 category
         );
         var voteMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".vote_skip",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_PERIOD,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_PERIOD,
                 category
         );
         var toggleHudMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".toggle_hud",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_COMMA,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_COMMA,
                 category
         );
         var toggleIsolatedMode = new KeyMapping(
                 MusicHud.MOD_ID + ".toggle_connection",
-                InputConstants.Type.KEYSYM,
-                GLFW.GLFW_KEY_RIGHT_SHIFT,
+                InputConstants.Type.KEYBOARD,
+                InputConstants.KEY_RSHIFT,
                 category
         );
         var muteMapping = new KeyMapping(
                 MusicHud.MOD_ID + ".mute",
-                InputConstants.Type.KEYSYM,
-                -1,//No defaults as "InputConstants.UNKNOWN"
+                InputConstants.Type.KEYBOARD,
+                InputConstants.UNKNOWN.getValue(),//No defaults as "InputConstants.UNKNOWN"
                 category
         );
         var increaseVolume = new KeyMapping(
                 MusicHud.MOD_ID + ".increase_volume",
-                InputConstants.Type.KEYSYM,
-                -1,//No defaults as "InputConstants.UNKNOWN"
+                InputConstants.Type.KEYBOARD,
+                InputConstants.UNKNOWN.getValue(),//No defaults as "InputConstants.UNKNOWN"
                 category
         );
         var decreaseVolume = new KeyMapping(
                 MusicHud.MOD_ID + ".decrease_volume",
-                InputConstants.Type.KEYSYM,
-                -1,//No defaults as "InputConstants.UNKNOWN"
+                InputConstants.Type.KEYBOARD,
+                InputConstants.UNKNOWN.getValue(),//No defaults as "InputConstants.UNKNOWN"
                 category
         );
         IKeyRegistryService service = IKeyRegistryService.getInstance();

@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.pages;
 
+import com.mojang.blaze3d.Blaze3D;
 import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
@@ -10,6 +11,7 @@ import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.PreferencesFragment;
 import icyllis.modernui.util.StateSet;
 import icyllis.modernui.view.Gravity;
+import icyllis.modernui.view.KeyEvent;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
@@ -33,12 +35,11 @@ import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.*;
 import indi.etern.musichud.utils.http.ApiClient;
 import lombok.Getter;
-import net.minecraft.util.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.util.Util;
 import org.apache.commons.lang3.Range;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.glfw.GLFW;
 
 import java.io.IOException;
 import java.nio.file.Files;
@@ -352,7 +353,7 @@ public class ConfigView extends LinearLayout {
                     input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
                     input.setText(serverConfig.getServerApiBaseUrl());
                     input.setOnKeyListener((v, c, e) -> {
-                        if (c == GLFW.GLFW_KEY_ENTER) {
+                        if (c == KeyEvent.KEY_ENTER) {
                             input.clearFocus();
                             return true;
                         }
@@ -377,7 +378,7 @@ public class ConfigView extends LinearLayout {
                     input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
                     input.setText(serverConfig.getServerApiBinaryExecutablePath());
                     input.setOnKeyListener((v, c, e) -> {
-                        if (c == GLFW.GLFW_KEY_ENTER) {
+                        if (c == KeyEvent.KEY_ENTER) {
                             input.clearFocus();
                             return true;
                         }
@@ -494,7 +495,7 @@ public class ConfigView extends LinearLayout {
                     Files.createDirectories(logDir);
                 } catch (IOException ignored) {
                 }
-                Util.getPlatform().openFile(logDir.toFile());
+                Blaze3D.openPath(logDir);
                 updateApiLogLabel(apiLogLabel);
             });
 
@@ -616,7 +617,7 @@ public class ConfigView extends LinearLayout {
                 input.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
                 input.setText(currentValue);
                 input.setOnKeyListener((v, c, e) -> {
-                    if (c == GLFW.GLFW_KEY_ENTER) {
+                    if (c == KeyEvent.KEY_ENTER) {
                         input.clearFocus();
                         return true;
                     }

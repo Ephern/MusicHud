@@ -16,7 +16,7 @@ import java.io.PrintWriter;
 import java.util.*;
 
 @SupportedAnnotationTypes("indi.etern.musichud.interfaces.RegisterMark")
-@SupportedSourceVersion(SourceVersion.RELEASE_21)
+@SupportedSourceVersion(SourceVersion.RELEASE_25)
 public class RegisterMarkProcessor extends AbstractProcessor {
 
     private static final String REGISTRIES_RESOURCE_PREFIX = "META-INF/musichud-registries";

@@ -30,13 +30,11 @@ import indi.etern.musichud.client.ui.layouts.CloudTrackItemAdapter;
 import indi.etern.musichud.client.ui.layouts.VirtualizedListLayout;
 import indi.etern.musichud.client.utils.ByteUnitFormatter;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.FileDialogs;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import net.minecraft.client.resources.language.I18n;
-import org.lwjgl.PointerBuffer;
-import org.lwjgl.system.MemoryStack;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.nio.file.Paths;
 import java.util.*;
@@ -465,27 +463,18 @@ public class CloudDriveView extends LinearLayout {
     }
 
     private void pickAndUpload() {
-        String selected;
-        Set<String> allowedTypes = Set.of("*.mp3", "*.wav", "*.flac");
-        try (MemoryStack stack = MemoryStack.stackPush()) {
-            PointerBuffer patterns = stack.mallocPointer(allowedTypes.size());
-            for (String type : allowedTypes) {
-                patterns.put(stack.UTF8(type));
-            }
-            patterns.flip();
-            selected = TinyFileDialogs.tinyfd_openFileDialog(
-                    I18n.get(MusicHud.MOD_ID + ".text.cloudUploadTitle"),
-                    null,
-                    patterns,
-                    I18n.get(MusicHud.MOD_ID + ".text.cloudUploadFilter").replace("{}", String.join(", ", allowedTypes)),
-                    true);
-        }
-        if (selected == null || selected.isBlank()) {
-            return;
-        }
-        for (String path : selected.split("\\|")) {
-            if (path.isBlank()) continue;
-            CloudUploadService.getInstance().enqueue(Paths.get(path));
-        }
+        List<String> extensions = List.of("mp3", "wav", "flac");
+        FileDialogs.openFiles(
+                I18n.get(MusicHud.MOD_ID + ".text.cloudUploadTitle"),
+                I18n.get(MusicHud.MOD_ID + ".text.cloudUploadFilter").replace("{}", String.join(", ", extensions)),
+                extensions,
+                null,
+                true,
+                paths -> {
+                    for (String path : paths) {
+                        if (path.isBlank()) continue;
+                        CloudUploadService.getInstance().enqueue(Paths.get(path));
+                    }
+                });
     }
 }

@@ -1,7 +1,7 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -66,11 +66,13 @@ public class HudGuiElementRenderState implements GuiElementRenderState {
     }
 
     @Override
+    @NonNull
     public RenderPipeline pipeline() {
         return pipeline;
     }
 
     @Override
+    @NonNull
     public TextureSetup textureSetup() {
         return textureSetup;
     }

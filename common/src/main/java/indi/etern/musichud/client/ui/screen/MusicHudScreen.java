@@ -110,6 +110,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
 
     @Override
     public void extractRenderState(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
+        mHost.render(gr, mouseX, mouseY, deltaTick);
         super.extractRenderState(gr, mouseX, mouseY, deltaTick);
     }
 
@@ -199,7 +200,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         if (getFocused() != null && getFocused().keyPressed(event)) {
             return true;
         }
-        mHost.onKeyPress(event.key(), event.scancode(), event.modifiers());
+        mHost.onKeyPress(event.key(), event.keycode(), event.modifiers());
         return false;
     }
 
@@ -208,7 +209,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         if (getFocused() != null && getFocused().keyReleased(event)) {
             return true;
         }
-        mHost.onKeyRelease(event.key(), event.scancode(), event.modifiers());
+        mHost.onKeyRelease(event.key(), event.keycode(), event.modifiers());
         return false;
     }
 

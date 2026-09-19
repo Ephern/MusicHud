@@ -1,8 +1,8 @@
 package indi.etern.musichud.mixin;
 
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderTarget;
-import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
 import indi.etern.musichud.client.ui.hud.renderer.HudRenderContext;
 import indi.etern.musichud.client.ui.hud.renderer.HudRenderContextImpl;
 import net.minecraft.client.gui.render.GuiRenderer;
@@ -54,7 +54,7 @@ public class GuiRendererHudMixin {
      */
     @Inject(method = "addElementToMesh",
             at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/renderer/StagedVertexBuffer;appendDraw(Lcom/mojang/blaze3d/vertex/VertexFormat;Lcom/mojang/blaze3d/PrimitiveTopology;)Lnet/minecraft/client/renderer/StagedVertexBuffer$Draw;"))
+                    target = "Lnet/minecraft/client/renderer/StagedVertexBuffer;appendDraw(Lcom/mojang/renderpearl/api/vertex/VertexFormat;Lcom/mojang/renderpearl/api/pipeline/PrimitiveTopology;)Lnet/minecraft/client/renderer/StagedVertexBuffer$Draw;"))
     private void music_hud$recordElementSetup(GuiElementRenderState elementState, CallbackInfo ci) {
         music_hud$elementSetups.addLast(elementState.textureSetup());
     }
@@ -72,7 +72,7 @@ public class GuiRendererHudMixin {
      */
     @Inject(method = "executeDrawRange",
             at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;bindDefaultUniforms" +
-                    "(Lcom/mojang/blaze3d/systems/RenderPass;)V", shift = At.Shift.AFTER, remap = false),
+                    "(Lcom/mojang/renderpearl/api/commands/RenderPass;)V", shift = At.Shift.AFTER, remap = false),
             locals = LocalCapture.CAPTURE_FAILSOFT)
     private void music_hud$bindAllUniforms(Supplier<String> label, RenderTarget mainRenderTarget,
                                            GpuBufferSlice dynamicTransforms, int startIndex, int endIndex,
@@ -90,7 +90,7 @@ public class GuiRendererHudMixin {
      */
     @Inject(method = "executeDrawRange",
             at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/render/GuiRenderer;executeDraw(Lnet/minecraft/client/gui/render/GuiRenderer$Draw;Lcom/mojang/blaze3d/systems/RenderPass;)V"))
+                    target = "Lnet/minecraft/client/gui/render/GuiRenderer;executeDraw(Lnet/minecraft/client/gui/render/GuiRenderer$Draw;Lcom/mojang/renderpearl/api/commands/RenderPass;)V"))
     private void music_hud$bindElementUniforms(Supplier<String> label, RenderTarget mainRenderTarget,
                                                GpuBufferSlice dynamicTransforms, int startIndex, int endIndex,
                                                CallbackInfo ci) {

@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 
 /**
  * Adapter: wraps a {@link GpuTextureView} behind the neutral {@link HudTextureRef}.

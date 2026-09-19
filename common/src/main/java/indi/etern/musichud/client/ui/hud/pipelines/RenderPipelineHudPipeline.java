@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
-import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
 
 /**
  * Adapter: wraps the platform {@link RenderPipeline} behind the neutral

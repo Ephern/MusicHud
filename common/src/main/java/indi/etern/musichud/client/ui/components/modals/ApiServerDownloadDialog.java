@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.components.modals;
 
+import com.mojang.blaze3d.Blaze3D;
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
@@ -18,17 +19,17 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
+import indi.etern.musichud.client.utils.ui.FileDialogs;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.ApiBinaryUpdateService;
 import indi.etern.musichud.server.api.ApiServerFetcher;
 import indi.etern.musichud.server.api.ApiServerManager;
-import net.minecraft.util.Util;
 import net.minecraft.client.resources.language.I18n;
 import org.jetbrains.annotations.NotNull;
-import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.io.IOException;
+import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -425,7 +426,7 @@ public class ApiServerDownloadDialog {
                 SpannableString.SPAN_EXCLUSIVE_EXCLUSIVE);
         descriptionUrl.setText(spannable);
         descriptionUrl.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        descriptionUrl.setOnClickListener(v -> Util.getPlatform().openUri(latestReleaseUrl));
+        descriptionUrl.setOnClickListener(v -> Blaze3D.openUri(URI.create(latestReleaseUrl)));
 
         LinearLayout directoryLayout = new LinearLayout(context);
         directoryLayout.setOrientation(LinearLayout.HORIZONTAL);
@@ -453,13 +454,17 @@ public class ApiServerDownloadDialog {
         selectDirectoryButton.setOnClickListener(v -> {
             String current = directoryTextInput.getText().toString().trim();
             Path fallback = current.isEmpty() ? initialDir : Paths.get(current);
-            String folder = TinyFileDialogs.tinyfd_selectFolderDialog(
+            FileDialogs.openFolder(
                     I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.dir.dialog.title"),
-                    fallback.toAbsolutePath().toString());
-            if (folder != null) {
-                directoryTextInput.setText(folder);
-                checkExistingVersion(Paths.get(folder));
-            }
+                    fallback.toAbsolutePath().toString(),
+                    folders -> {
+                        if (folders.isEmpty()) {
+                            return;
+                        }
+                        String folder = folders.getFirst();
+                        directoryTextInput.setText(folder);
+                        checkExistingVersion(Paths.get(folder));
+                    });
         });
 
         LinearLayout.LayoutParams labelParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
@@ -550,7 +555,7 @@ public class ApiServerDownloadDialog {
         TextView desc = new TextView(context);
         desc.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.downloading.description"));
         desc.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        desc.setOnClickListener(v -> Util.getPlatform().openUri(ApiServerFetcher.LATEST_RELEASE_URL));
+        desc.setOnClickListener(v -> Blaze3D.openUri(URI.create(ApiServerFetcher.LATEST_RELEASE_URL)));
 
         LinearLayout progressLayout = new LinearLayout(context);
         progressLayout.setOrientation(LinearLayout.HORIZONTAL);

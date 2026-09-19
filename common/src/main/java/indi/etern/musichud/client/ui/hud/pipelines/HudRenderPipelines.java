@@ -1,12 +1,7 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
-import com.mojang.blaze3d.PrimitiveTopology;
-import com.mojang.blaze3d.pipeline.BindGroupLayout;
-import com.mojang.blaze3d.pipeline.BlendFunction;
-import com.mojang.blaze3d.pipeline.ColorTargetState;
-import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.renderpearl.api.pipeline.*;
 import indi.etern.musichud.MusicHud;
 import net.minecraft.resources.Identifier;
 
@@ -41,8 +36,8 @@ public class HudRenderPipelines {
                 .withFragmentShader(Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "core/album_image"))
                 .withBindGroupLayout(BindGroupLayout.builder().withUniform("MHPosition", UniformType.UNIFORM_BUFFER).build())
                 .withBindGroupLayout(BindGroupLayout.builder().withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER).build())
-                .withBindGroupLayout(BindGroupLayout.builder().withSampler("Sampler0").build())
-                .withBindGroupLayout(BindGroupLayout.builder().withSampler("Sampler1").build())
+                .withBindGroupLayout(BindGroupLayout.builder().withUniform("Sampler0", UniformType.COMBINED_IMAGE_SAMPLER).build())
+                .withBindGroupLayout(BindGroupLayout.builder().withUniform("Sampler1", UniformType.COMBINED_IMAGE_SAMPLER).build())
                 .withVertexBinding(0, DefaultVertexFormat.POSITION_COLOR)
                 .withPrimitiveTopology(PrimitiveTopology.QUADS)
                 .build());

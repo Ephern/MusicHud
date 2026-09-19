@@ -1,19 +1,21 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import com.mojang.blaze3d.GpuFormat;
-import com.mojang.blaze3d.buffers.GpuBufferSlice;
-import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.systems.SamplerCache;
-import com.mojang.blaze3d.textures.FilterMode;
-import com.mojang.blaze3d.textures.GpuTexture;
-import com.mojang.blaze3d.textures.GpuTextureView;
+import com.mojang.renderpearl.api.GpuFormat;
+import com.mojang.renderpearl.api.buffers.GpuBuffer;
+import com.mojang.renderpearl.api.buffers.GpuBufferSlice;
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.renderpearl.api.device.GpuDevice;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
 import indi.etern.musichud.client.ui.hud.pipelines.*;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.render.TextureSetup;
-import net.minecraft.client.renderer.DynamicUniformStorage;
+import net.minecraft.client.renderer.DynamicGpuDataStorage;
+import net.minecraft.client.renderer.DynamicGpuDataStorageMapped;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
@@ -28,7 +30,7 @@ import java.util.*;
  * {@link TextureSetup} identity and gets its own set of UBO slices. Uniform storage is
  * keyed by UBO name alone, so shared uniforms (e.g. {@code MHDynamicStatus}) are uploaded
  * only once per frame and deduplicated across elements by
- * {@link DynamicUniformStorage#writeUniform}, while distinct content for the same name
+ * {@link DynamicGpuDataStorage#writeData}, while distinct content for the same name
  * lives in separate blocks of the same buffer. During the GUI pass each draw binds only the
  * slices of the element it belongs to (per-draw uniform upload, equivalent to
  * {@code RenderPass.drawMultipleIndexed}'s {@code uniformUploaderConsumer}).
@@ -42,7 +44,7 @@ public class HudRenderContextImpl implements HudRenderContext {
     @Getter
     private static HudRenderContext current;
 
-    private final Map<String, DynamicUniformStorage<UniformAdapter>> storageMap = new HashMap<>();
+    private final Map<String, DynamicGpuDataStorage<UniformAdapter>> storageMap = new HashMap<>();
     private final Map<CacheKey, LastWritten> lastWrittenUniforms = new HashMap<>();
 
     private final List<ElementRecord> elements = new ArrayList<>();
@@ -57,7 +59,7 @@ public class HudRenderContextImpl implements HudRenderContext {
 
     @Override
     public void beginFrame(HudGraphics graphics) {
-        for (DynamicUniformStorage<?> storage : storageMap.values()) {
+        for (DynamicGpuDataStorage<?> storage : storageMap.values()) {
             storage.endFrame();
         }
         elements.clear();
@@ -136,11 +138,11 @@ public class HudRenderContextImpl implements HudRenderContext {
                         && last.slice != null && !last.slice.buffer().isClosed()) {
                     slice = last.slice;
                 } else {
-                    DynamicUniformStorage<UniformAdapter> storage = storageMap.computeIfAbsent(
+                    DynamicGpuDataStorage<UniformAdapter> storage = storageMap.computeIfAbsent(
                             uniform.getUBOName(),
-                            k -> new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
+                            k -> new DynamicGpuDataStorageMapped<>(uniform.getUBOName(), uniform.getUBOSize(), GpuBuffer.USAGE_UNIFORM, 256)
                     );
-                    slice = storage.writeUniform(new UniformAdapter(uniform));
+                    slice = storage.writeData(new UniformAdapter(uniform));
                 }
                 lastWrittenUniforms.put(cacheKey, new LastWritten(uniform, slice));
                 if (slices != null) {
@@ -236,7 +238,7 @@ public class HudRenderContextImpl implements HudRenderContext {
     private record ElementRecord(String elementKey, HudPipeline pipeline, TextureSetup textureSetup, HudUniform[] uniforms) {
     }
 
-    private record UniformAdapter(HudUniform uniform) implements DynamicUniformStorage.DynamicUniform {
+    private record UniformAdapter(HudUniform uniform) implements DynamicGpuDataStorage.DynamicGpuData {
         @Override
         public void write(ByteBuffer byteBuffer) {
             uniform.write(byteBuffer);
