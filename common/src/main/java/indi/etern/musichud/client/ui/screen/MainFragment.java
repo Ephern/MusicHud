@@ -36,6 +36,7 @@ import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.sounds.SoundSource;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -274,7 +275,9 @@ public class MainFragment extends Fragment {
     /** The album cover is full size only when a track is actually playing and not muted. */
     private static boolean isCoverExpanded() {
         MusicDetail detail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-        if (detail == null || detail.equals(MusicDetail.NONE) || clientConfig.getMuted()) {
+        float targetGain = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
+                (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
+        if (detail == null || detail.equals(MusicDetail.NONE) || targetGain == 0) {
             return false;
         }
         StreamAudioPlayer.Status status = StreamAudioPlayer.getInstance().getStatus();
