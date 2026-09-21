@@ -10,12 +10,12 @@ import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.RhythmAnimator;
+import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
 
@@ -29,6 +29,9 @@ public class LyricLineView extends LinearLayout {
     private static final float LYRIC_EMPHASIZE_SCALE = 1.02f;
     private static final float RHYTHM_EMPHASIZE_ANIMATION_SCALE = 0.85f;
     private static Logger logger;
+    private static final int SCALE_ANIMATION_DELAY = 200;
+    private static final int SCALE_ANIMATION_DURATION = 600;
+    private static final SpringInterpolator INTERPOLATOR = new SpringInterpolator(SCALE_ANIMATION_DURATION * 0.001f, 1);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private LinearLayout mainLine;
@@ -141,7 +144,8 @@ public class LyricLineView extends LinearLayout {
         }
     }
 
-    public void emphasize() {
+    public synchronized void emphasize() {
+        if (emphasizeAnim != null) return;
         Duration delta = nowPlayingInfo.getPlayedDuration().minus(lyricLine.getStartTime());
         Duration duration = lyricLine.getDuration();
         Duration stayEmphasizeDuration =
@@ -163,17 +167,22 @@ public class LyricLineView extends LinearLayout {
                 row.setPivotX(0f);
                 int height = row.getHeight();
                 row.setPivotY(Math.max(height, dp(24)));
-                ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, 1f, LYRIC_EMPHASIZE_SCALE);
-                scaleX.setInterpolator(Easing.EASE_IN_OUT_QUAD);
-                ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, 1f, LYRIC_EMPHASIZE_SCALE);
-                scaleY.setInterpolator(Easing.EASE_IN_OUT_QUAD);
 
-                AnimatorSet emphasizeAnimSet = new AnimatorSet();
-                emphasizeAnim = emphasizeAnimSet;
-                emphasizeAnimSet.playTogether(scaleX, scaleY/*, alphaAnim*/);
-                emphasizeAnimSet.setDuration(600);
-                emphasizeAnimSet.setStartDelay(200);
-                emphasizeAnimSet.start();
+                int playTime = Math.clamp(delta.toMillis() - SCALE_ANIMATION_DELAY, 0, SCALE_ANIMATION_DURATION);
+                if (playTime != SCALE_ANIMATION_DURATION) {
+                    ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, 1f, LYRIC_EMPHASIZE_SCALE);
+                    scaleX.setInterpolator(INTERPOLATOR);
+                    ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, 1f, LYRIC_EMPHASIZE_SCALE);
+                    scaleY.setInterpolator(INTERPOLATOR);
+
+                    AnimatorSet emphasizeAnimSet = new AnimatorSet();
+                    emphasizeAnim = emphasizeAnimSet;
+                    emphasizeAnimSet.playTogether(scaleX, scaleY/*, alphaAnim*/);
+                    emphasizeAnimSet.setDuration(SCALE_ANIMATION_DURATION);
+                    emphasizeAnimSet.setStartDelay(SCALE_ANIMATION_DELAY);
+                    emphasizeAnimSet.setCurrentPlayTime(playTime);
+                    emphasizeAnimSet.start();
+                }
             }
             case RHYTHM -> {
                 long stayMillis = stayEmphasizeDuration.toMillis();
@@ -203,7 +212,7 @@ public class LyricLineView extends LinearLayout {
             }
         }
         if (stayEmphasizeDuration.isPositive()) {
-            postDelayed(this::fade, stayEmphasizeDuration.toMillis() + 200);
+            postDelayed(this::fade, stayEmphasizeDuration.toMillis() + SCALE_ANIMATION_DELAY);
         } else {
             post(this::fade);
         }
@@ -211,13 +220,13 @@ public class LyricLineView extends LinearLayout {
 
     private void fadeNormalLine() {
         ObjectAnimator scaleX = ObjectAnimator.ofFloat(row, View.SCALE_X, row.getScaleX(), 1f);
-        scaleX.setInterpolator(Easing.EASE_IN_OUT_QUAD);
+        scaleX.setInterpolator(INTERPOLATOR);
         ObjectAnimator scaleY = ObjectAnimator.ofFloat(row, View.SCALE_Y, row.getScaleY(), 1f);
-        scaleY.setInterpolator(Easing.EASE_IN_OUT_QUAD);
+        scaleY.setInterpolator(INTERPOLATOR);
 
         AnimatorSet set = new AnimatorSet();
         set.playTogether(scaleX, scaleY);
-        set.setDuration(400);
+        set.setDuration(SCALE_ANIMATION_DURATION);
         set.start();
     }
 

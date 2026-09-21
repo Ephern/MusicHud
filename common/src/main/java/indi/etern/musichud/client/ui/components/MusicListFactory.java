@@ -26,7 +26,7 @@ public class MusicListFactory {
         item.setShowPusherInfo(false);
         if (item.getBackground() == null) {
             InsetBackgroundFactory.builder()
-                    .cornerRadius(item.dp(12))
+                    .cornerRadius(item.dp(7))
                     .inset(item.dp(1))
                     .padding(new InsetBackgroundFactory.Padding(item.dp(4), item.dp(4), item.dp(4), item.dp(4)))
                     .build()

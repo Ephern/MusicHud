@@ -36,6 +36,7 @@ import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.sounds.SoundSource;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -274,7 +275,9 @@ public class MainFragment extends Fragment {
     /** The album cover is full size only when a track is actually playing and not muted. */
     private static boolean isCoverExpanded() {
         MusicDetail detail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-        if (detail == null || detail.equals(MusicDetail.NONE) || clientConfig.getMuted()) {
+        float targetGain = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
+                (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
+        if (detail == null || detail.equals(MusicDetail.NONE) || targetGain == 0) {
             return false;
         }
         StreamAudioPlayer.Status status = StreamAudioPlayer.getInstance().getStatus();
@@ -578,9 +581,22 @@ public class MainFragment extends Fragment {
                 @Override
                 public void onTransitionStart(@Nullable String fromKey, @NonNull String toKey,
                                               @NonNull RouterContainer.TransitionType type) {
-                    // 过渡刚开始就提前启动回家时右侧歌词栏的隐藏动画，
-                    // 让面板在 onBeforeSwap 置 GONE 时已基本离屏，避免页面 addView 同帧重排。
                     if ("Home".equals(toKey)) {
+                        HomeView homeView = HomeView.getInstance();
+                        if (homeView != null) {
+                            StaggeredLyricScrollView scrollView = homeView.getStaggeredLyricScrollView();
+                            if (scrollView != null) {
+                                // HomeView is created lazily, so lyrics switched while another page was
+                                // shown were dropped. Push the current state before reinitializing; the
+                                // instance-based check avoids replaying the slide-in for the same content.
+                                MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
+                                Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
+                                if (!scrollView.isShowing(currentMusic, currentLyrics)) {
+                                    scrollView.switchLyrics(currentMusic == null ? MusicDetail.NONE : currentMusic, currentLyrics);
+                                }
+                                scrollView.reinitialize();
+                            }
+                        }
                         hideLyricsPanel();
                     }
                 }
@@ -594,6 +610,13 @@ public class MainFragment extends Fragment {
                             lyricsSidebar.setVisibility(View.GONE);
                         }
                     } else {
+                        HomeView homeView = HomeView.getInstance();
+                        if (homeView != null) {
+                            StaggeredLyricScrollView scrollView = homeView.getStaggeredLyricScrollView();
+                            if (scrollView != null) {
+                                scrollView.suspendLyricFollowingAndHide();
+                            }
+                        }
                         showLyricsPanel();
                     }
                 }
@@ -676,7 +699,7 @@ public class MainFragment extends Fragment {
         lyricsAnimator.start();
 
         if (lyricsScrollView != null) {
-            lyricsScrollView.reinitializeAfterShow();
+            lyricsScrollView.reinitialize();
         }
     }
 
@@ -689,7 +712,7 @@ public class MainFragment extends Fragment {
             lyricsAnimator.cancel();
         }
         if (lyricsScrollView != null) {
-            lyricsScrollView.suspendLyricFollowing();
+            lyricsScrollView.suspendLyricFollowingAndHide();
         }
 
         ObjectAnimator slideOut = ObjectAnimator.ofFloat(lyricsSidebar, View.TRANSLATION_X, 0, lyricsPanelWidth);

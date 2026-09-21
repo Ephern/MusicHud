@@ -53,6 +53,7 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
     private DynamicIntegerOption widthOption;
     private DynamicIntegerOption heightOption;
     private DynamicIntegerOption radiusOption;
+    private int syncedHeight;
 
     @Override
     public boolean hasDefaultBackground() {
@@ -246,8 +247,7 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
                 .setDefaultValue(clientConfig.getDefaultHudHeight())
                 .setOnChanged(() -> {
                     onLayoutOptionChanged();
-                    radiusOption.updateRange(0, clientConfig.getHudHeight() / 2, 1);
-                    widthOption.updateRange(clientConfig.getHudHeight(), 800, 4);
+                    syncHeightDependentRanges();
                 });
         heightOption.create(category);
 
@@ -259,6 +259,21 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
                 .setDefaultValue(clientConfig.getDefaultHudCornerRadius())
                 .setOnChanged(this::onLayoutOptionChanged)
                 .create(category);
+
+        syncedHeight = clientConfig.getHudHeight();
+    }
+
+    private void syncHeightDependentRanges() {
+        if (radiusOption == null || widthOption == null) {
+            return;
+        }
+        int height = clientConfig.getHudHeight();
+        if (height == syncedHeight) {
+            return;
+        }
+        syncedHeight = height;
+        radiusOption.updateRange(0, height / 2, 1);
+        widthOption.updateRange(height, 800, 4);
     }
 
     private void onLayoutOptionChanged() {
@@ -278,6 +293,7 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         if (heightOption != null) heightOption.refresh();
         if (radiusOption != null) radiusOption.refresh();
         updatePanelPosition();
+        syncHeightDependentRanges();
     }
 
     private void updatePanelPosition() {
