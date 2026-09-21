@@ -42,7 +42,7 @@ public class ArtistDetailView extends LinearLayout {
     private final UrlImageView avatarImageView;
     private static final IClientMusicService musicService = MusicService.getInstance();
     private final InsetBackgroundFactory itemBackgroundFactory = InsetBackgroundFactory.builder()
-            .cornerRadius(dp(12))
+            .cornerRadius(dp(7))
             .inset(dp(1))
             .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build();
     private final int imageSize = dp(128);

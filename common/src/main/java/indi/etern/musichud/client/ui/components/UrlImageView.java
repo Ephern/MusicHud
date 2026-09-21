@@ -19,6 +19,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.resources.language.I18n;
@@ -52,6 +53,9 @@ public class UrlImageView extends FrameLayout {
         return true;
     };
     private float aspectRatio = 1.0f; // 默认长宽比
+    @Setter
+    @Getter
+    private int transitionDuration = 400;
 
     public UrlImageView(Context context) {
         super(context);
@@ -350,7 +354,6 @@ public class UrlImageView extends FrameLayout {
     }
 
     private void setImageWithAnimation(RoundedImageDrawable drawable) {
-        // 取消上一次未完成的过渡动画, 防止其继续改动透明度/交换图层引用导致残留
         if (currentAnimator != null) {
             AnimatorSet old = currentAnimator;
             currentAnimator = null;
@@ -362,8 +365,8 @@ public class UrlImageView extends FrameLayout {
         ObjectAnimator fadeOut = ObjectAnimator.ofFloat(imageView, View.ALPHA, 0f);
         ObjectAnimator fadeIn = ObjectAnimator.ofFloat(nextImageView, View.ALPHA, 1f);
 
-        fadeOut.setDuration(400);
-        fadeIn.setDuration(400);
+        fadeOut.setDuration(transitionDuration);
+        fadeIn.setDuration(transitionDuration);
 
         AnimatorSet animatorSet = new AnimatorSet();
         animatorSet.playTogether(fadeOut, fadeIn);

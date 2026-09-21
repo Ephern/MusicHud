@@ -50,6 +50,7 @@ public class HudRendererManager {
     private final DateTimeFormatter LONG_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter SHORT_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("mm:ss");
     private final HudRenderContext hudRenderContext = new HudRenderContextImpl();
+    private String IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
     private volatile HudRenderData hudBaseData;
     private volatile HudRenderData imageDisplayData;
     @Setter
@@ -369,7 +370,10 @@ public class HudRendererManager {
     }
 
     public void reset() {
-        TITLE_RENDERER.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
+        IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
+        if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
+            TITLE_RENDERER.setText(IDLE_MESSAGE);
+        }
         ARTISTS_AND_ALBUM_RENDERER.setText("");
         LYRICS_LINE_RENDERER.clear();
         PLAY_TIME_RENDERER.setText("");
@@ -390,7 +394,11 @@ public class HudRendererManager {
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
             MusicDetail musicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
             if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
-                TITLE_RENDERER.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));//To prevent i18n lazy loading result in wrong text
+                //To prevent i18n lazy loading result in wrong text
+                IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
+                if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
+                    TITLE_RENDERER.setText(IDLE_MESSAGE);
+                }
                 if (clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()) {
                     return;
                 }

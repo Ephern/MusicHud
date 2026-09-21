@@ -75,7 +75,7 @@ public class PlaybackTask {
      * dry, treat it as unresponsive (blocked socket, or stuck in the catch-up
      * loop) and rebuild the pipeline instead of hanging silently in PLAYING.
      */
-    private static final long DOWNLOAD_STALL_RESTART_MS = 5000;
+    private static final long DOWNLOAD_STALL_RESTART_MS = 10000;
     private static final int SCROBBLE_MIN_PLAY_DURATION_SEC = 30;
     /** Start buffering the next track once this many ms remain in the current one. */
     private static final long NEXT_TRACK_PRELOAD_REMAINING_MS = 5000;

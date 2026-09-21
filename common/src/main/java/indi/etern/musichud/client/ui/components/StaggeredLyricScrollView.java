@@ -95,6 +95,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
     private float[] staggerFromOffsets;
     private long lastFrameTimeNanos;
     private volatile MusicDetail musicDetail;
+    // Lyrics collection currently built into the container; only assigned on successful build.
+    private Collection<LyricLine> currentLyrics;
+    private boolean pendingResyncToCurrent;
+    // True while a finger is on the view; programmatic/layout scroll changes must not count as manual.
+    private boolean pointerDown;
     private final Consumer<LyricLine> lyricLineUpdateListener = this::highlightLine;
     private final Runnable autoRecenterRunnable = new Runnable() {
         @Override
@@ -189,9 +194,19 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         }
     }
 
+    /**
+     * Whether the currently built content exactly corresponds to the given instances.
+     * Uses reference comparison (not equals) so a re-created MusicDetail or a different
+     * lyrics collection still triggers a rebuild.
+     */
+    public boolean isShowing(MusicDetail detail, Collection<LyricLine> lyrics) {
+        return musicDetail == detail && currentLyrics == lyrics;
+    }
+
     private void buildLyricRows(Collection<LyricLine> lyrics) {
         lyricLines.clear();
         lyricLineViewList.clear();
+        currentLyrics = lyrics;
 
         if (lyrics == null) return;
         Context context = getContext();
@@ -212,11 +227,19 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
             for (LyricLineView line : lyricLineViewList) {
                 line.setTranslationY(line.getTargetOffset(nowPlayingInfo.getCurrentLyricLine()));
             }
-            post(this::initializeScrollToCurrentLyric);
+            post(this::resyncToCurrentLyric);
         });
     }
 
-    private void initializeScrollToCurrentLyric() {
+    public void resyncToCurrentLyric() {
+        if (!isContentLaidOut()) {
+            // Rows were rebuilt while the view was GONE / not yet measured; child tops are
+            // still 0, so defer until the next real layout pass instead of computing a wrong jump.
+            pendingResyncToCurrent = true;
+            requestLayout();
+            return;
+        }
+        pendingResyncToCurrent = false;
         LyricLine current = nowPlayingInfo.getCurrentLyricLine();
         if (current != null) {
             LyricLineView target = lyricLines.get(current);
@@ -231,11 +254,18 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         } else if (!lyricLines.isEmpty()) {
             jumpToTop();
         }
+        startUpdateLoop();
 
         ObjectAnimator alpha = ObjectAnimator.ofFloat(this, View.ALPHA, 0, 1f);
         alpha.setDuration(300);
         alpha.setInterpolator(Easing.EASE_OUT_QUAD);
         alpha.start();
+    }
+
+    private boolean isContentLaidOut() {
+        // The first lyric row has real height only after a layout pass; a stale scroll-view
+        // height or previously laid out container cannot be trusted after a rebuild.
+        return lyricLineViewList.isEmpty() || lyricLineViewList.getFirst().getHeight() > 0;
     }
 
     void highlightLine(@Nullable LyricLine lyricLine) {
@@ -269,14 +299,15 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
     private void recenter() {
         LyricLine targetLine = justHighlightedLyricLine;
         if (targetLine == null) return;
-        lastHighlightedLyricLine = justHighlightedLyricLine;
-        if (scrollStatus == ScrollStatus.RECENTER) return;
-        scrollStatus = ScrollStatus.RECENTER;
-
+        // Resolve the target before switching state: entering RECENTER without a valid
+        // target would leave the state machine stuck (no scroll is started to complete it).
         LyricLineView target = lyricLines.get(targetLine);
-        if (target != null) {
-            scrollToLyric(target);
-        }
+        if (target == null) return;
+        if (scrollStatus == ScrollStatus.RECENTER) return;
+        lastHighlightedLyricLine = justHighlightedLyricLine;
+        scrollStatus = ScrollStatus.RECENTER;
+        scrollFinished = false;
+        scrollToLyric(target);
     }
 
     private void jumpToTop() {
@@ -308,6 +339,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         scrollController.setStartValue(currentScrollPosition);
         scrollController.abortAnimation();
         currentScrollPosition = targetScrollY;
+        // Keep the loop's settle check consistent with the controller value we just forced.
+        lastTargetScrollPosition = targetScrollY;
     }
 
     private void scrollToLyric(LyricLineView target) {
@@ -357,7 +390,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
 
     private void checkManualScrolling() {
         if (scrollStatus == ScrollStatus.IDLE) {
-            markManual();
+            // Only an active finger drag counts; programmatic jumps, aborts and layout-driven
+            // scroll corrections must not switch to MANUAL and cancel the edge fade.
+            if (pointerDown) {
+                markManual();
+            }
         } else if (scrollStatus == ScrollStatus.MANUAL) {
             lastUserScrollTime = MuiModApi.getElapsedTime();
         }
@@ -378,7 +415,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
     @Override
     public boolean onTouchEvent(MotionEvent ev) {
         int action = ev.getActionMasked();
-        if (action == MotionEvent.ACTION_DOWN && scrollStatus == ScrollStatus.FOLLOW_LYRICS) {
+        if (action == MotionEvent.ACTION_DOWN) {
+            pointerDown = true;
+        } else if (action == MotionEvent.ACTION_UP || action == MotionEvent.ACTION_CANCEL) {
+            pointerDown = false;
+        }
+        if (action == MotionEvent.ACTION_DOWN
+                && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
             markManual();
         }
         return super.onTouchEvent(ev);
@@ -386,7 +429,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
 
     @Override
     public boolean onGenericMotionEvent(MotionEvent ev) {
-        if (ev.getAction() == MotionEvent.ACTION_SCROLL && scrollStatus == ScrollStatus.FOLLOW_LYRICS) {
+        if (ev.getAction() == MotionEvent.ACTION_SCROLL
+                && (scrollStatus == ScrollStatus.IDLE
+                    || scrollStatus == ScrollStatus.FOLLOW_LYRICS
+                    || scrollStatus == ScrollStatus.RECENTER)) {
             markManual();
         }
         return super.onGenericMotionEvent(ev);
@@ -672,6 +718,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
                 bottomSpacer.requestLayout();
             }
         }
+        if (pendingResyncToCurrent) {
+            pendingResyncToCurrent = false;
+            post(this::resyncToCurrentLyric);
+        }
     }
 
     public void refreshLinesStyle() {
@@ -679,12 +729,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         post(this::recenter);
     }
 
-    /**
-     * Re-initialize layout and scroll position after the host panel becomes visible.
-     * The bottom spacer is sized in onLayout, so recomputing the scroll position here
-     * (after a re-layout) is sufficient.
-     */
-    public void reinitializeAfterShow() {
+    public void reinitialize() {
         if (container == null || lyricLineViewList.isEmpty()) {
             return;
         }
@@ -693,20 +738,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         lastAutoScrollTime = MuiModApi.getElapsedTime();
         post(() -> {
             requestLayout();
-            if (!continueUpdate) {
-                startUpdateLoop();
-            }
-            post(this::initializeScrollToCurrentLyric);
+            post(this::resyncToCurrentLyric);
         });
     }
 
-    /**
-     * Suspend lyric following while the host panel is hidden. The panel is only resized
-     * (width 0) instead of being detached, so without this the update loop and the lyric
-     * listener would keep driving the scroll/stagger on an invisible view, accumulating
-     * stale animation state that surfaces as glitches when the panel is shown again.
-     */
-    public void suspendLyricFollowing() {
+    public void suspendLyricFollowingAndHide() {
         stopUpdateLoop();
         removeCallbacks(autoRecenterRunnable);
         resetStaggerState();
@@ -725,6 +761,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         staggeringEndListener = null;
         if (scrollController != null) {
             scrollController.abortAnimation();
+            // abortAnimation forces the actual scroll to the controller value; keep our mirror in
+            // sync so the scroll-change listener filters it instead of flagging a manual scroll.
+            currentScrollPosition = (int) scrollController.getCurrValue();
         }
     }
 
