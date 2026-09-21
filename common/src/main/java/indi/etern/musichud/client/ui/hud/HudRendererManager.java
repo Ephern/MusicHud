@@ -12,10 +12,10 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
-import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
@@ -97,6 +97,16 @@ public class HudRendererManager {
                 return null;
             }
         });
+        IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
+            MusicHud.EXECUTOR.execute(() -> {
+                MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+                if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
+                    reset();
+                }
+            });
+        });
+        StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
+        ConnectionStateMachine.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
         updateLayoutFromConfig();
         refreshStyle();
         reset();
@@ -107,10 +117,7 @@ public class HudRendererManager {
             synchronized (HudRendererManager.class) {
                 if (instance == null) {
                     instance = new HudRendererManager();
-
                     updateStatus(StreamAudioPlayer.Status.IDLE);
-                    StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
-                    ConnectionStateMachine.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
                     loaded = true;
                 }
             }
@@ -136,14 +143,6 @@ public class HudRendererManager {
                     VerticalAlign.valueOf(clientConfig.getHudVerticalPosition())
             );
             setBaseLayout(layout);
-            IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
-                MusicHud.EXECUTOR.execute(() -> {
-                    MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-                    if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
-                        reset();
-                    }
-                });
-            });
         } catch (Exception e) {
             if (logger == null) {
                 logger = MusicHud.getLogger(HudRendererManager.class);
