@@ -66,7 +66,8 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     public void clear() {
         setLines(
                 new Line(null, "", 0, 0, 0),
-                new Line(null, "", 0, 0, 0)
+                new Line(null, "", 0, 0, 0),
+                false
         );
     }
 
@@ -76,7 +77,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
      * @param line1             第一行的文本和颜色
      * @param line2             第二行的文本和颜色
      */
-    public void setLines(Line line1, Line line2) {
+    public void setLines(Line line1, Line line2, boolean animate) {
         // 如果已经处于切换中，先强制结束当前切换，把next变成current
         if (isTransitioning) {
             currentLine1.copyFrom(nextLine1);
@@ -101,9 +102,11 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         }
 
         // 开始切换动画
-        isTransitioning = true;
-        transitionProgress = 0.0f;
-        transitionStartTime = System.currentTimeMillis();
+        isTransitioning = animate;
+        if (animate) {
+            transitionProgress = 0.0f;
+            transitionStartTime = System.currentTimeMillis();
+        }
     }
 
     private void recalcScrollIfNeeded(LineState line, int containerWidth, float lineHeight) {
