@@ -74,7 +74,6 @@ public class HomeView extends LinearLayout {
     // Latest-wins target arriving while the item switch animation is in flight
     private Traceable<MusicDetail> pendingNextToPlay;
     private LinearLayout nextToPlayHeader;
-    private TextView nextToPlayTitle;
     private ImageButton rotateNextToPlayButton;
     private TextView queueTitle;
     private LinearLayout playQueueListView;
@@ -201,7 +200,7 @@ public class HomeView extends LinearLayout {
             nextToPlayHeaderParams.setMargins(0, dp(32), 0, dp(16));
             scrollViewContainer.addView(nextToPlayHeader, nextToPlayHeaderParams);
 
-            nextToPlayTitle = new TextView(context);
+            TextView nextToPlayTitle = new TextView(context);
             nextToPlayTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             nextToPlayTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.nextToPlay"));
             nextToPlayHeader.addView(nextToPlayTitle, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
@@ -227,7 +226,7 @@ public class HomeView extends LinearLayout {
             nextToPlayHeader.addView(rotateNextToPlayButton, rotateButtonParams);
 
             nextToPlayItem = new MusicTrackItem(context);
-            nextToPlayItem.getAlbumImageView().setTransitionDuration(0);
+//            nextToPlayItem.getAlbumImageView().setTransitionDuration(0);
             nextToPlayItem.setVisibility(GONE);
             scrollViewContainer.addView(nextToPlayItem, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
