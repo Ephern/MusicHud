@@ -26,7 +26,7 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 - ~~Architectury API~~ (Fabric / NeoForge, required by MusicHUD 1.2.0 and below)
 
 ## Features
-- With graceful GUI, providing an in-game operation interface and a easily configurable HUD.
+- With graceful GUI, providing an in-game operation interface and an easily configurable HUD.
 - Can read NetEase Cloud Music account playlists for convenient song requests.
 - The server does not retain user data; it is only temporarily stored during session.
 - Streamed playback with no redundant client-side caching.
@@ -98,7 +98,7 @@ You can find "Download API..." button in setting page, which will open a downloa
 1. Deploy [NetEase Cloud Music API Enhanced](https://github.com/neteasecloudmusicapienhanced/api-enhanced) with guide in repository.
 2. If not using the default port (3000) of NCM API Enhanced or deploying on another server, modify the `serverApiBaseUrl` property in the config file `/config/music_hud-server.toml`.
 
-> Experimentally, there is another [Rust version API server](https://github.com/SPlayer-Dev/ncm-api-rs), which remains most of api endpoints same with NodeJS version but is much faster. MusicHUD have adapted to it since 1.2.13. You can find binary executable files in its release page. But there are still some issues in this api server edition. So use it at your own risk.
+> Experimentally, there is another [Rust version API server](https://github.com/SPlayer-Dev/ncm-api-rs), which remains most of api endpoints same with Node.js version but is much faster. MusicHUD have adapted to it since 1.2.13. You can find binary executable files in its release page. But there are still some issues in this api server edition. So use it at your own risk.
 
 ---
 ## CN version description
