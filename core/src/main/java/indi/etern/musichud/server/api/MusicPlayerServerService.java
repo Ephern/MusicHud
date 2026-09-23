@@ -68,6 +68,20 @@ public class MusicPlayerServerService {
     private long awaitedMusicId = -1;
     /** Music id whose one-shot await-deadline reset has already been claimed. */
     private long awaitDeadlineResetClaimedMusicId = -1;
+    /**
+     * Players that received the current track's switch. Only they can justify a resource-load
+     * extension; a player who was absent at the switch and joins mid-track is wall-clock synced
+     * and finishes on the original schedule, so extending the wait would leave a silent gap.
+     */
+    private Set<UUID> awaitEligiblePlayers = Set.of();
+    /**
+     * Players currently synced to {@code nowPlayingStartTime} for a track (they received it as the
+     * current track via initial state). Such a player plays from the synced offset and finishes at
+     * {@code nowPlayingStartTime + duration}, so their resource request must never extend the await
+     * even though they may still be in {@link #awaitEligiblePlayers} (in isolated mode the player
+     * stays registered while leaving the world).
+     */
+    private final Map<UUID, Long> syncedStartTrackByPlayer = new ConcurrentHashMap<>();
     private final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private final AtomicInteger debounceToken = new AtomicInteger(0);
     private final Runnable musicPusher = new Runnable() {
@@ -424,6 +438,7 @@ public class MusicPlayerServerService {
         if (pusherThread != null) {
             pusherThread.interrupt();
         }
+        clearAwaitState();
         currentMusicDetail = Traceable.of(MusicDetail.NONE);
         if (haveSentMusic) {
             haveSentMusic = false;
@@ -464,6 +479,13 @@ public class MusicPlayerServerService {
     public GetInitialStateResponse buildInitialStateFor(IPlayerClient player) {
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayerUUID(player.getUUID());
         List<IdlePlaySource> idleSources = buildIdleSourcesData(loginInfo != null ? loginInfo.getProfile() : Profile.ANONYMOUS);
+        // The client plays this current track from nowPlayingStartTime, so mark it synced: its
+        // resource request must not restart the await from the request time (silent gap otherwise).
+        if (currentMusicDetail.value().equals(MusicDetail.NONE)) {
+            syncedStartTrackByPlayer.remove(player.getUUID());
+        } else {
+            syncedStartTrackByPlayer.put(player.getUUID(), currentMusicDetail.value().getId());
+        }
         return new GetInitialStateResponse(
                 currentMusicDetail,
                 nextIdleMusicDetail,
@@ -632,7 +654,7 @@ public class MusicPlayerServerService {
                         musicResourceInfo = getMusicResourceInfoWithoutCache(quality, musicDetail, playerUUID);
                         musicResourceInfoCache.put(new CacheKey(id, quality), musicResourceInfo);
                     }
-                    onMusicResourceLoadSuccess(id);
+                    onMusicResourceLoadSuccess(id, playerUUID);
                     return musicResourceInfo;
                 } catch (Exception e) {
                     logger.error("Failed to get resource info for music: {}", musicDetail.getName(), e);
@@ -659,6 +681,16 @@ public class MusicPlayerServerService {
     private synchronized void beginAwaitForMusic(long musicId) {
         awaitedMusicId = musicId;
         awaitDeadlineResetClaimedMusicId = -1;
+        awaitEligiblePlayers = Set.copyOf(loginApiService.getPlayerInfoMap().keySet());
+        syncedStartTrackByPlayer.clear();
+    }
+
+    /** Drops the current await's reset state; a late resource success can no longer match. */
+    private synchronized void clearAwaitState() {
+        awaitedMusicId = -1;
+        awaitDeadlineResetClaimedMusicId = -1;
+        awaitEligiblePlayers = Set.of();
+        syncedStartTrackByPlayer.clear();
     }
 
     /**
@@ -667,13 +699,17 @@ public class MusicPlayerServerService {
      *
      * <p>Additionally, the first successful load for the music the pusher is currently awaiting
      * restarts that await from the moment the resource became available, so a slow load no longer
-     * makes the switch happen before the track actually played through. Every further successful
-     * load of the same track is ignored, and the plain duration-based wait remains untouched.</p>
+     * makes the switch happen before the track actually played through. Only players that were
+     * present at the switch qualify: a client joining mid-track is wall-clock synced and must not
+     * extend the wait. Every further successful load of the same track is ignored, and the plain
+     * duration-based wait remains untouched.</p>
      */
-    private synchronized void onMusicResourceLoadSuccess(long id) {
+    private synchronized void onMusicResourceLoadSuccess(long id, UUID playerUUID) {
         musicResourceLoadFailureCount = -1;
         musicResourceLoadFailureMusicId = -1;
-        if (awaitedMusicId != id || awaitDeadlineResetClaimedMusicId == id) {
+        if (awaitedMusicId != id || awaitDeadlineResetClaimedMusicId == id
+                || !awaitEligiblePlayers.contains(playerUUID)
+                || syncedStartTrackByPlayer.getOrDefault(playerUUID, -1L) == id) {
             return;
         }
         awaitDeadlineResetClaimedMusicId = id;
