@@ -112,28 +112,37 @@ public class MusicApiService implements IMusicApiService {
         UserCategoryPlaylists userCategoryPlaylists = new UserCategoryPlaylists();
         CompletableFuture<Void> totalComplete = CompletableFuture.allOf(createdPlaylistFuture, subscribedPlaylistFuture);
         MusicHud.EXECUTOR.submit(() -> {
-            LinkedHashSet<Playlist> playlists = loadUserCreatedPlaylists(userId, loginInfo);
-            playlists.stream()
-                    .filter(playlist ->
-                            playlist.getCreator().getUserId() == userId
-                                    && playlist.getSpecialType() == PlaylistSpecialType.LIKE_LIST)
-                    .findFirst()
-                    .ifPresentOrElse((playlist) -> {//FIXME when load failed
-                        userCategoryPlaylists.setLikeList(playlist);
-                        playlists.remove(playlist);
-                    }, () -> userCategoryPlaylists.setLikeList(Playlist.EMPTY));
-            userCategoryPlaylists.setCreatedPlaylist(new ObservableSequencedSet<>(playlists));
-            createdPlaylistFuture.complete(null);
+            try {
+                LinkedHashSet<Playlist> playlists = loadUserCreatedPlaylists(userId, loginInfo);
+                playlists.stream()
+                        .filter(playlist ->
+                                playlist.getCreator().getUserId() == userId
+                                        && playlist.getSpecialType() == PlaylistSpecialType.LIKE_LIST)
+                        .findFirst()
+                        .ifPresentOrElse((playlist) -> {
+                            userCategoryPlaylists.setLikeList(playlist);
+                            playlists.remove(playlist);
+                        }, () -> userCategoryPlaylists.setLikeList(Playlist.EMPTY));
+                userCategoryPlaylists.setCreatedPlaylist(new ObservableSequencedSet<>(playlists));
+                createdPlaylistFuture.complete(null);
+            } catch (Exception e) {
+                createdPlaylistFuture.completeExceptionally(e);
+            }
         });
         MusicHud.EXECUTOR.submit(() -> {
-            userCategoryPlaylists.setSubscribedPlaylist(new ObservableSequencedSet<>(loadUserSubscribedPlaylists(userId, loginInfo)));
+            try {
+                userCategoryPlaylists.setSubscribedPlaylist(new ObservableSequencedSet<>(loadUserSubscribedPlaylists(userId, loginInfo)));
+            } catch (Exception e) {
+                subscribedPlaylistFuture.completeExceptionally(e);
+            }
             subscribedPlaylistFuture.complete(null);
         });
         totalComplete.get(5, TimeUnit.SECONDS);
         if (totalComplete.state() == Future.State.SUCCESS) {
+            userPlaylistCache.put(userId, userCategoryPlaylists);
             return userCategoryPlaylists;
         } else {
-            return UserCategoryPlaylists.EMPTY;
+            throw new RuntimeException("Failed to load user playlists");
         }
     }
 
@@ -175,6 +184,13 @@ public class MusicApiService implements IMusicApiService {
                 loginInfo.getLoginCookieInfo().rawCookie(),
                 true);
         return userSubscribedArtistResponse.data();
+    }
+
+    private static String describe(CodeMessage response) {
+        if (response == null) {
+            return "empty response";
+        }
+        return response.code() + (response.msg() == null || response.msg().isBlank() ? "" : " " + response.msg());
     }
 
     private List<MusicDetail> appendArtistMusic(int offset, Artist artist, UUID playerUUID) throws InterruptedException, TimeoutException {
@@ -529,17 +545,15 @@ public class MusicApiService implements IMusicApiService {
     @SneakyThrows
     public UserCategoryPlaylists getPlayersUserPlaylists(boolean ignoreCache, UUID playerUUID) {
         if (playerUUID == null) {
-            return UserCategoryPlaylists.EMPTY;
+            throw new IllegalArgumentException("player uuid is null");
         }
         LoginApiService.PlayerLoginInfo loginInfo = loginApiService.getLoginInfoByPlayerUUID(playerUUID);
         if (loginInfo == null || loginInfo.getProfile() == null) {
-            return UserCategoryPlaylists.EMPTY;
+            throw new IllegalStateException("player have not login yet");
         } else {
             long userId = loginInfo.getProfile().getUserId();
             if (ignoreCache) {
-                UserCategoryPlaylists userCategoryPlaylists = loadUserCategoryPlaylist(userId, loginInfo);
-                userPlaylistCache.put(userId, userCategoryPlaylists);
-                return userCategoryPlaylists;
+                return loadUserCategoryPlaylist(userId, loginInfo);
             } else {
                 return userPlaylistCache.get(userId, () -> loadUserCategoryPlaylist(userId, loginInfo));
             }
@@ -559,6 +573,9 @@ public class MusicApiService implements IMusicApiService {
             long userId = loginInfo.getProfile().getUserId();
             if (ignoreCache) {
                 LinkedHashSet<Album> albums = loadUserSubscribedAlbums(userId, loginInfo);
+                if (albums == null) {
+                    throw new RuntimeException("Failed to load user subscribed albums");
+                }
                 userSubscribedAlbumsCache.put(userId, albums);
                 return albums;
             } else {
@@ -580,6 +597,9 @@ public class MusicApiService implements IMusicApiService {
             long userId = loginInfo.getProfile().getUserId();
             if (ignoreCache) {
                 LinkedHashSet<Artist> artists = loadUserSubscribedArtists(userId, loginInfo);
+                if (artists == null) {
+                    throw new RuntimeException("Failed to load user subscribed artists");
+                }
                 userSubscribedArtistsCache.put(userId, artists);
                 return artists;
             }
@@ -785,9 +805,7 @@ public class MusicApiService implements IMusicApiService {
                     loginCookieInfo.rawCookie(),
                     true
             );
-            case UNSET -> {
-                throw new IllegalStateException("Invalid type");
-            }
+            case UNSET -> throw new IllegalStateException("Invalid type");
         };
         return playRecords.data.list;
     }
@@ -845,7 +863,9 @@ public class MusicApiService implements IMusicApiService {
         String idParam = ids.stream().map(String::valueOf).collect(Collectors.joining(","));
         CodeAndMessageResponse response = ApiClient.post(ApiServerEndpointsMeta.User.Cloud.DELETE,
                 new CloudDeleteRequest(idParam), cookie, true);
-        ensureSuccess(response, "delete cloud tracks");
+        if (response == null || response.code() != 200) {
+            throw new ApiException("Failed to delete cloud tracks: " + describe(response));
+        }
     }
 
     @Override
@@ -861,17 +881,13 @@ public class MusicApiService implements IMusicApiService {
         return data == null ? null : data.songId();
     }
 
-    private static void ensureSuccess(CodeMessage response, String action) {
-        if (response == null || response.code() != 200) {
-            throw new ApiException("Failed to " + action + ": " + describe(response));
-        }
-    }
+    /**
+     * Common shape of the NCM API envelope; lets {@link #describe(CodeMessage)} handle them uniformly.
+     */
+    public interface CodeMessage {
+        int code();
 
-    private static String describe(CodeMessage response) {
-        if (response == null) {
-            return "empty response";
-        }
-        return response.code() + (response.msg() == null || response.msg().isBlank() ? "" : " " + response.msg());
+        String msg();
     }
 
     public
@@ -1030,7 +1046,8 @@ public class MusicApiService implements IMusicApiService {
     public record IntelligentListResponse(int code, String message, List<IntelligentItem> data) {
     }
 
-    public record RecentRecordRequest(int limit) {}
+    public record RecentRecordRequest(int limit) {
+    }
 
     public record RecentRecordResponse<T>(Data<T> data) {
         public record Data<T>(int total, List<PlayRecord<T>> list) {
@@ -1041,13 +1058,6 @@ public class MusicApiService implements IMusicApiService {
     }
 
     record CloudListRequest(int limit, int offset) {
-    }
-
-    /** Common shape of the NCM API envelope; lets {@link #describe(CodeMessage)} handle them uniformly. */
-    public interface CodeMessage {
-        int code();
-
-        String msg();
     }
 
     public record CloudListResponse(int code, String msg, List<CloudItem> data, int count,
