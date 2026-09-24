@@ -482,7 +482,6 @@ public class AccountView extends LinearLayout {
                 progressBar.setVisibility(View.GONE);
             });
         }).exceptionally((e) -> {
-            e.printStackTrace();
             MuiModApi.postToUiThread(() -> {
                 if (isAttachedToWindow()) {
                     progressBar.setVisibility(View.GONE);

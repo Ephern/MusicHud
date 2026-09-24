@@ -43,7 +43,7 @@ public class MusicTrackState implements IMusicTrackState {
 
     @Override
     public IPlaylistSubState currentUsersLikeList() {
-        return new PlaylistSubState(-1, () ->
+        return new PlaylistSubState(() ->
                 musicService.loadUserCollections(false)
                         .thenCompose(userCollections ->
                                 musicService.loadPlaylistDetail(userCollections.getUserCategoryPlaylists().getLikeList().getId(), false)

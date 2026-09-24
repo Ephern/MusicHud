@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.beans.music.Artist;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.*;
@@ -29,9 +30,13 @@ public class GetUserArtistsRequest extends ApiRequestPayload {
     public static class RegisterImpl implements CommonRegister {
         public void register() {
             RequestHandlerRegistry.autoRegisterPayload(GetUserArtistsRequest.class, CODEC, (request, player) -> {
-                LinkedHashSet<Artist> playersUserArtists = IMusicApiService.getInstance(ApiProvider.NCM)
-                        .getPlayersUserSubscribedArtists(request.isIgnoreCache(), player.getUUID());
-                return ResponseResult.of(new GetUserArtistsResponse(playersUserArtists));
+                try {
+                    LinkedHashSet<Artist> playersUserArtists = IMusicApiService.getInstance(ApiProvider.NCM)
+                            .getPlayersUserSubscribedArtists(request.isIgnoreCache(), player.getUUID());
+                    return ResponseResult.of(new GetUserArtistsResponse(MessagedResult.success(playersUserArtists)));
+                } catch (Exception e) {
+                    return ResponseResult.of(new GetUserArtistsResponse(MessagedResult.fail(e.getClass().getName() + ": " + e.getMessage(), new LinkedHashSet<>(0))));
+                }
             });
         }
     }
