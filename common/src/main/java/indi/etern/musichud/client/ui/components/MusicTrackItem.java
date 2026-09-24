@@ -370,6 +370,7 @@ public class MusicTrackItem extends LinearLayout {
                     return null;
                 });
             }
+            this.pusherInfo.setVisibility(VISIBLE);
 
             SourceMeta source = musicTrace.source();
             if (source != null) {
@@ -405,10 +406,8 @@ public class MusicTrackItem extends LinearLayout {
 
 
                 sourceButton.setText(text);
-                this.pusherInfo.setVisibility(VISIBLE);
                 sourceButton.setVisibility(VISIBLE);
             } else {
-                this.pusherInfo.setVisibility(GONE);
                 sourceButton.setVisibility(GONE);
             }
         } else {
