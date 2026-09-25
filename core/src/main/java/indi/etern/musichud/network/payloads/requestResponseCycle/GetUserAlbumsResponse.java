@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.beans.music.Album;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.*;
@@ -15,13 +16,13 @@ import java.util.LinkedHashSet;
 public class GetUserAlbumsResponse extends ApiResponsePayload {
     public static final ByteBufCodec<GetUserAlbumsResponse> CODEC = RequestResponseCodecs.withCycleId(
             ByteBufCodec.composite(
-                    Codecs.ofCollection(LinkedHashSet::new, () -> Album.CODEC),
-                    GetUserAlbumsResponse::getAlbums,
+                    MessagedResult.codec(Codecs.ofCollection(LinkedHashSet::new, () -> Album.CODEC)),
+                    GetUserAlbumsResponse::getResult,
                     GetUserAlbumsResponse::new
             )
     );
 
-    private final LinkedHashSet<Album> albums;
+    private final MessagedResult<LinkedHashSet<Album>> result;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {

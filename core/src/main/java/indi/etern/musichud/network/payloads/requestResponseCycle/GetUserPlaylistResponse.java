@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.beans.music.UserCategoryPlaylists;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -16,13 +17,13 @@ import lombok.Getter;
 public class GetUserPlaylistResponse extends ApiResponsePayload {
     public static final ByteBufCodec<GetUserPlaylistResponse> CODEC = RequestResponseCodecs.withCycleId(
             ByteBufCodec.composite(
-                    UserCategoryPlaylists.CODEC,
-                    GetUserPlaylistResponse::getPlaylists,
+                    MessagedResult.codec(UserCategoryPlaylists.CODEC),
+                    GetUserPlaylistResponse::getResult,
                     GetUserPlaylistResponse::new
             )
     );
 
-    private final UserCategoryPlaylists playlists;
+    private final MessagedResult<UserCategoryPlaylists> result;
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {

@@ -39,11 +39,19 @@ import lombok.Getter;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
 
+import java.time.Duration;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 @Getter
 public class MusicInfoCard extends LinearLayout {
+    private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+    private static final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter timeFormatterWithoutHour = DateTimeFormatter.ofPattern("mm:ss");
     private final UrlImageView albumImage;
     private final LinearLayout musicInfo;
     private final TextView titleText;
@@ -103,7 +111,7 @@ public class MusicInfoCard extends LinearLayout {
         pusherHeadView.setVisibility(View.GONE);
         pusherHeadView.setPlayerSkinSupplier(() -> {
             try {
-                PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
+                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
                 return PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo);
             } catch (Exception ignored) {
             }
@@ -274,7 +282,7 @@ public class MusicInfoCard extends LinearLayout {
             Album album = musicDetail.getAlbum();
             albumImage.loadUrl(album.getImageThumbnailUrl(sideWidth));
             titleText.setText(musicDetail.getName());
-            PlayerInfo pusherPlayerInfo = NowPlayingInfo.getInstance().getPusherPlayerInfo();
+            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
             String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().getName() : null;
             if (name == null || name.isEmpty()) {
                 pusherHeadView.setVisibility(View.GONE);
@@ -377,6 +385,17 @@ public class MusicInfoCard extends LinearLayout {
                 }
             });
             albumContainer.addView(albumButton);
+
+            Duration musicDuration = Duration.of(musicDetail.getDurationMillis(), ChronoUnit.MILLIS);
+            DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
+                    timeFormatterWithHour :
+                    timeFormatterWithoutHour;
+            String totalTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
+
+            Duration playedDuration = nowPlayingInfo.getPlayedDuration();
+            String playedTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()));
+            playedTimeText.setText(playedTimeString);
+            totalTimeText.setText(totalTimeString);
 
             skipCurrentButton.reset();
             progressBar.setVisibility(View.VISIBLE);
