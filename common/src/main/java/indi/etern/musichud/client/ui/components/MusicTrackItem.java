@@ -49,7 +49,8 @@ public class MusicTrackItem extends LinearLayout {
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
     private final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("mm:ss");
-    private UrlImageView albumImage;
+    @Getter
+    private UrlImageView albumImageView;
     private TextView musicName;
     private TextView feeLabel;
     private FlexWrapLayout row2;
@@ -84,10 +85,10 @@ public class MusicTrackItem extends LinearLayout {
         setLayoutParams(musicLayoutParams);
         setGravity(Gravity.CENTER_VERTICAL);
 
-        albumImage = new UrlImageView(context);
-        albumImage.setCornerRadius(dp(4));
-        albumImage.setAspectRatio(1);
-        addView(albumImage, new LayoutParams(dp(imageSize), dp(imageSize)));
+        albumImageView = new UrlImageView(context);
+        albumImageView.setCornerRadius(dp(4));
+        albumImageView.setAspectRatio(1);
+        addView(albumImageView, new LayoutParams(dp(imageSize), dp(imageSize)));
 
         LinearLayout musicTexts = new LinearLayout(context);
         musicTexts.setOrientation(VERTICAL);
@@ -218,7 +219,7 @@ public class MusicTrackItem extends LinearLayout {
     }
 
     public void clearData() {
-        albumImage.clear();
+        albumImageView.clear();
         musicName.setText("");
         feeLabel.setText("");
         feeLabel.setVisibility(GONE);
@@ -266,7 +267,7 @@ public class MusicTrackItem extends LinearLayout {
         this.musicDetail = musicDetail;
         this.musicTrace = musicTrace;
         Album album = musicDetail.getAlbum();
-        albumImage.loadUrl(album.getImageThumbnailUrl(dp(imageSize)));
+        albumImageView.loadUrl(album.getImageThumbnailUrl(dp(imageSize)));
 
         musicName.setText(musicDetail.getName());
         Fee fee1 = musicDetail.getFee();
@@ -369,6 +370,7 @@ public class MusicTrackItem extends LinearLayout {
                     return null;
                 });
             }
+            this.pusherInfo.setVisibility(VISIBLE);
 
             SourceMeta source = musicTrace.source();
             if (source != null) {
@@ -404,10 +406,8 @@ public class MusicTrackItem extends LinearLayout {
 
 
                 sourceButton.setText(text);
-                this.pusherInfo.setVisibility(VISIBLE);
                 sourceButton.setVisibility(VISIBLE);
             } else {
-                this.pusherInfo.setVisibility(GONE);
                 sourceButton.setVisibility(GONE);
             }
         } else {

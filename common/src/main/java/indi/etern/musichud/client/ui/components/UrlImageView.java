@@ -8,17 +8,21 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.RoundedImageDrawable;
+import icyllis.modernui.graphics.drawable.StateListDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.util.ColorStateList;
+import icyllis.modernui.util.StateSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewTreeObserver;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.resources.language.I18n;
@@ -30,9 +34,9 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class UrlImageView extends FrameLayout {
     private final ProgressBar progressRing;
-    private final TextView errorText;
     private final LinearLayout errorLayout;
     private final int detectBorder;
+    private final ImageButton retryButton;
     private boolean circular = false;
     private ImageView imageView;
     private ImageView nextImageView;
@@ -52,6 +56,9 @@ public class UrlImageView extends FrameLayout {
         return true;
     };
     private float aspectRatio = 1.0f; // 默认长宽比
+    @Setter
+    @Getter
+    private int transitionDuration = 400;
 
     public UrlImageView(Context context) {
         super(context);
@@ -85,30 +92,31 @@ public class UrlImageView extends FrameLayout {
         errorLayout.setGravity(Gravity.CENTER);
         errorLayout.setVisibility(GONE);
 
-        errorText = new TextView(context);
-        errorText.setText(I18n.get(MusicHud.MOD_ID + ".button.loadingError"));
-        errorText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        errorText.setTextAlignment(TEXT_ALIGNMENT_CENTER);
-        errorText.setTextColor(Theme.ERROR_TEXT_COLOR);
-        errorText.setGravity(Gravity.CENTER);
-        errorLayout.addView(errorText, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        retryButton = new ImageButton(context);
+        retryButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
 
-        Button retryButton = new Button(context);
-        retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
-        retryButton.setTextSize(Theme.TEXT_SIZE_SMALL);
-        retryButton.setTextColor(Theme.PRIMARY_COLOR);
+        StateListDrawable icon = new StateListDrawable();
+        var resources = getContext().getResources();
+        Image rotate = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_ccw.png");
+        if (rotate != null) {
+            icon.addState(StateSet.get(StateSet.VIEW_STATE_HOVERED), new ScaledImageDrawable(resources, rotate, dp(12), dp(20)));
+        }
+        Image off = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/image_off.png");
+        if (off != null) {
+            icon.addState(StateSet.WILD_CARD, new ScaledImageDrawable(resources, off, dp(12), dp(20)));
+        }
+
+        retryButton.setImageDrawable(icon);
         InsetBackgroundFactory.builder()
-                .padding(new InsetBackgroundFactory.Padding(retryButton.dp(2), retryButton.dp(1), retryButton.dp(2), retryButton.dp(1)))
-                .cornerRadius(retryButton.dp(4)).inset(dp(1)).build()
+                .padding(new InsetBackgroundFactory.Padding(dp(8), dp(8), dp(8), dp(8)))
+                .cornerRadius(dp(4)).inset(dp(1)).build()
                 .applyBackgroundTo(retryButton);
         retryButton.setOnClickListener(v -> {
             if (currentURLString != null) {
                 loadUrl(currentURLString);
             }
         });
-        var retryParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        retryParams.setMargins(0, dp(4), 0, 0);
-        errorLayout.addView(retryButton, retryParams);
+        errorLayout.addView(retryButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         addView(errorLayout, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
     }
@@ -350,7 +358,6 @@ public class UrlImageView extends FrameLayout {
     }
 
     private void setImageWithAnimation(RoundedImageDrawable drawable) {
-        // 取消上一次未完成的过渡动画, 防止其继续改动透明度/交换图层引用导致残留
         if (currentAnimator != null) {
             AnimatorSet old = currentAnimator;
             currentAnimator = null;
@@ -362,8 +369,8 @@ public class UrlImageView extends FrameLayout {
         ObjectAnimator fadeOut = ObjectAnimator.ofFloat(imageView, View.ALPHA, 0f);
         ObjectAnimator fadeIn = ObjectAnimator.ofFloat(nextImageView, View.ALPHA, 1f);
 
-        fadeOut.setDuration(400);
-        fadeIn.setDuration(400);
+        fadeOut.setDuration(transitionDuration);
+        fadeIn.setDuration(transitionDuration);
 
         AnimatorSet animatorSet = new AnimatorSet();
         animatorSet.playTogether(fadeOut, fadeIn);
@@ -385,7 +392,7 @@ public class UrlImageView extends FrameLayout {
 
     private void showError(String message) {
         progressRing.setVisibility(GONE);
-        errorText.setText(message);
+        retryButton.setTooltipText(message);
         errorLayout.setVisibility(VISIBLE);
     }
 

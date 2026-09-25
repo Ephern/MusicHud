@@ -1,6 +1,7 @@
 package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.beans.music.UserCategoryPlaylists;
+import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
@@ -31,9 +32,14 @@ public class GetUserPlaylistRequest extends ApiRequestPayload {
     public static class RegisterImpl implements CommonRegister {
         public void register() {
             RequestHandlerRegistry.autoRegisterPayload(GetUserPlaylistRequest.class, CODEC, (request, player) -> {
-                UserCategoryPlaylists playersUserPlaylists = IMusicApiService.getInstance(ApiProvider.NCM)
-                        .getPlayersUserPlaylists(request.isIgnoreCache(), player.getUUID());
-                return ResponseResult.of(new GetUserPlaylistResponse(playersUserPlaylists));
+                try {
+                    UserCategoryPlaylists playersUserPlaylists = IMusicApiService.getInstance(ApiProvider.NCM)
+                            .getPlayersUserPlaylists(request.isIgnoreCache(), player.getUUID());
+                    return ResponseResult.of(new GetUserPlaylistResponse(MessagedResult.success(playersUserPlaylists)));
+                } catch (Exception e) {
+                    return ResponseResult.of(new GetUserPlaylistResponse(MessagedResult.fail(e.getClass().getName() + ": " + e.getMessage(), UserCategoryPlaylists.EMPTY)));
+
+                }
             });
         }
     }
