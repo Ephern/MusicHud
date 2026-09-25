@@ -20,13 +20,13 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 [Third-party legacy Bukkit plugin (1.0.5 stable -)](https://github.com/Shiroiame-Kusu/MusicHud-Bukkit)
 
 ## Prerequisites
-- ModernUI (only client, using mVUS fork on 1.21.9-11, [this fork](https://github.com/Chino081/ModernUI-MC/releases/tag/26.2) on 26.2)
+- ModernUI (only client, using mVUS fork on 1.21.9-11, [this fork](https://github.com/MOPELotus/ModernUI-MC/releases) on [26.2](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9) and [26.3](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9))
 - Forge Config API Port (only Fabric)
 - Fabric API (only Fabric)
 - ~~Architectury API~~ (Fabric / NeoForge, required by MusicHUD 1.2.0 and below)
 
 ## Features
-- With graceful GUI, providing an in-game operation interface and a easily configurable HUD.
+- With graceful GUI, providing an in-game operation interface and an easily configurable HUD.
 - Can read NetEase Cloud Music account playlists for convenient song requests.
 - The server does not retain user data; it is only temporarily stored during session.
 - Streamed playback with no redundant client-side caching.
@@ -41,7 +41,7 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 
 ## Functions
 - Search for musics, playlists, albums and artists.
-- Favorite/Unfavorite musics, subscribe/unsubscribe playlists, albums and artists. (1.3.0 alpha +)
+- Favorite/Unfavorite musics, subscribe/unsubscribe playlists, albums and artists.
 - Vote for skipping current music
 - Log in to NetEase Cloud Music account via QR code or SMS code to explore subscribed playlists, albums and artists.
 - Scrobble your play record to NetEase Cloud Music account
@@ -51,8 +51,8 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801f
 
 ## Compatibility
 - Mute Reactive Music when MusicHUD is playing
-- Connected mode compatible with ViaVersion (1.3.0 alpha +)
-- Adapted to Sound Physics Perfected, disabled its reverb applied to MusicHUD audio pipeline to improve audio quality (1.3.0 alpha 2+)
+- Connected mode compatible with ViaVersion
+- Adapted to Sound Physics Perfected, disabled its reverb applied to MusicHUD audio pipeline to improve audio quality
 
 ## TO-DO List
 - Customizable HUD layout [target 1.4.0]
@@ -98,7 +98,7 @@ You can find "Download API..." button in setting page, which will open a downloa
 1. Deploy [NetEase Cloud Music API Enhanced](https://github.com/neteasecloudmusicapienhanced/api-enhanced) with guide in repository.
 2. If not using the default port (3000) of NCM API Enhanced or deploying on another server, modify the `serverApiBaseUrl` property in the config file `/config/music_hud-server.toml`.
 
-> Experimentally, there is another [Rust version API server](https://github.com/SPlayer-Dev/ncm-api-rs), which remains most of api endpoints same with NodeJS version but is much faster. MusicHUD have adapted to it since 1.2.13. You can find binary executable files in its release page. But there are still some issues in this api server edition. So use it at your own risk.
+> Experimentally, there is another [Rust version API server](https://github.com/SPlayer-Dev/ncm-api-rs), which remains most of api endpoints same with Node.js version but is much faster. MusicHUD have adapted to it since 1.2.13. You can find binary executable files in its release page. But there are still some issues in this api server edition. So use it at your own risk.
 
 ---
 ## CN version description
@@ -120,7 +120,7 @@ You can find "Download API..." button in setting page, which will open a downloa
 [第三方旧 Bukkit 插件实现 (1.0.5 stable -)](https://github.com/Shiroiame-Kusu/MusicHud-Bukkit)
 
 ## 前置依赖
-- ModernUI （仅客户端，在 1.21.9 上使用 mVUS 分支，在 26.2 上使用[该分支](https://github.com/Chino081/ModernUI-MC/releases/tag/26.2)）
+- ModernUI （仅客户端，在 1.21.9 - 1.21.11 上使用 mVUS 分支，在 26.2、26.3 上使用[该分支](https://github.com/MOPELotus/ModernUI-MC/releases) [(26.2 release)](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9) [(26.3 release)](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9)）
 - Forge Config API Port （仅 Fabric）
 - Fabric API （仅 Fabric）
 - ~~Architectury API~~ （Fabric / NeoForge，MusicHUD 1.2.0 以及更低版本需要）
@@ -141,7 +141,7 @@ You can find "Download API..." button in setting page, which will open a downloa
 
 ## 功能
 - 搜索音乐、歌单、专辑和歌手
-- 收藏/取消收藏音乐、歌单、专辑和歌手（1.3.0 alpha +）
+- 收藏/取消收藏音乐、歌单、专辑和歌手
 - 投票跳过歌曲
 - 通过二维码或短信验证码登录网易云账户，查看收藏的歌单、专辑和歌手
 - 将你的播放记录同步到网易云账户
@@ -151,8 +151,8 @@ You can find "Download API..." button in setting page, which will open a downloa
 
 ## 兼容
 - 在 MusicHUD 播放时静音 Reactive Music
-- 连接模式与 ViaVersion 兼容（1.3.0 alpha +）
-- 适配 Sound Physics Perfected, 禁用 MusicHUD 音频管线的混响以保证音质 (1.3.0 alpha 2 +)
+- 连接模式与 ViaVersion 兼容
+- 适配 Sound Physics Perfected, 禁用 MusicHUD 音频管线的混响以保证音质
 
 ## ~~大饼~~ 待办清单
 - 可自定义的 HUD 布局 [目标 1.4.0]
