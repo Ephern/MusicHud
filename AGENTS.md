@@ -1,6 +1,6 @@
 # Music HUD - Agent Guide
 
-Multi-loader Minecraft mod (Fabric + NeoForge + Paper) for 1.21.8 (Java 21). A GUI-based full-server song request system powered by Netease Cloud Music API.
+Multi-loader Minecraft mod (Fabric + NeoForge + Paper), specific Minecraft version should be determined by gradle.properties and git branch name. A GUI-based full-server song request system powered by Netease Cloud Music API.
 
 ## Build & Run
 
@@ -72,6 +72,8 @@ The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradl
 - Path variables below: `{projectRoot}` = this repository root (where this AGENTS.md lives); `{gradleHome}` = `H:\Dev\.gradle` on this machine (default `~/.gradle` elsewhere). Substitute them before calling `read_file` — it needs an absolute path.
 
 Fabric module uses the Loom-remapped jars (`-c1c451a1` / `-b5e3e3a6` suffixes) under the project `.gradle\loom-cache`; NeoForge module uses the plain jars under `{gradleHome}\caches`.
+
+1.21.8 example
 
 | Library | Sources JAR path template (use with `read_file --file_path "…!/path/to/Class.java"`) |
 |---|---|

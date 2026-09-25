@@ -76,7 +76,7 @@ public class JsonUtil {
                                     return result;
                                 }
                             }
-                            throw new JsonSyntaxException("Invalid enum value: " + input);
+                            return null;
                         case NUMBER:
                             int code = in.nextInt();
                             // 优先匹配 IntegerCodeEnum 的 code

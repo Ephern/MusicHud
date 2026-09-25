@@ -6,6 +6,7 @@ import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.widget.Toast;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.result.ActionResult;
 import indi.etern.musichud.beans.result.MessagedResult;
 import indi.etern.musichud.beans.state.IIdlePlaySourceState;
 import indi.etern.musichud.beans.state.IMusicTrackState;
@@ -39,6 +40,7 @@ import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import net.minecraft.client.resources.language.I18n;
+import org.apache.logging.log4j.Logger;
 
 import java.time.Duration;
 import java.time.ZonedDateTime;
@@ -55,6 +57,7 @@ import static indi.etern.musichud.server.api.impl.ncm.CommonCaches.*;
 public class MusicService implements IClientMusicService {
     private static final IClientNetworkService clientNetworkService = IClientNetworkService.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final Logger logger = MusicHud.getLogger(MusicService.class);
     private static volatile MusicService instance;
 
     @Getter(lazy = true)
@@ -463,8 +466,12 @@ public class MusicService implements IClientMusicService {
                         new GetUserPlaylistRequest(ignoreCache),
                         GetUserPlaylistResponse.class,
                         Duration.ofSeconds(10))
-                .thenApply(GetUserPlaylistResponse::getPlaylists)
-                .thenApply(playlists -> {
+                .thenApply(response -> {
+                    var result = response.getResult();
+                    if (result.actionResult().equals(ActionResult.FAIL)) {
+                        throw new RuntimeException("Failed to load user playlists, " + result.message());
+                    }
+                    UserCategoryPlaylists playlists = result.extraData();
                     UserCollections userCollections = currentUserCollections;
                     if (userCollections != null && userCollections.isLoaded()) {
                         userCollections.syncUserCategoryPlaylists(playlists);
@@ -482,8 +489,12 @@ public class MusicService implements IClientMusicService {
                         new GetUserAlbumsRequest(ignoreCache),
                         GetUserAlbumsResponse.class,
                         Duration.ofSeconds(10))
-                .thenApply(GetUserAlbumsResponse::getAlbums)
-                .thenApply(albums -> {
+                .thenApply(response -> {
+                    var result = response.getResult();
+                    if (result.actionResult().equals(ActionResult.FAIL)) {
+                        throw new RuntimeException("Failed to load user playlists, " + result.message());
+                    }
+                    LinkedHashSet<Album> albums = result.extraData();
                     UserCollections userCollections = currentUserCollections;
                     if (userCollections != null && userCollections.isLoaded()) {
                         userCollections.syncSubscribedAlbums(albums);
@@ -501,8 +512,12 @@ public class MusicService implements IClientMusicService {
                         new GetUserArtistsRequest(ignoreCache),
                         GetUserArtistsResponse.class,
                         Duration.ofSeconds(10))
-                .thenApply(GetUserArtistsResponse::getArtists)
-                .thenApply(artists -> {
+                .thenApply(response -> {
+                    var result = response.getResult();
+                    if (result.actionResult().equals(ActionResult.FAIL)) {
+                        throw new RuntimeException("Failed to load user playlists, " + result.message());
+                    }
+                    LinkedHashSet<Artist> artists = result.extraData();
                     UserCollections userCollections = currentUserCollections;
                     if (userCollections != null && userCollections.isLoaded()) {
                         userCollections.syncSubscribedArtists(artists);
@@ -585,6 +600,10 @@ public class MusicService implements IClientMusicService {
                 ).thenApply(v -> {
                     syncUserCollectionsDownFromCaches();
                     return existing;
+                }).whenComplete((u, throwable) -> {
+                    if (throwable != null) {
+                        logger.error("Failed to load user collections", throwable);
+                    }
                 }));
             }
             return CompletableFuture.completedFuture(existing);
@@ -612,9 +631,12 @@ public class MusicService implements IClientMusicService {
                 loading.setLoaded(true);
                 syncUserCollectionsDownFromCaches();
                 return loading;
-            }).whenComplete((r, e) -> {
-                if (e != null && currentUserCollections == loading) {
-                    currentUserCollections = null;
+            }).whenComplete((r, throwable) -> {
+                if (throwable != null) {
+                    logger.error("Failed to load user collections", throwable);
+                    if (currentUserCollections == loading) {
+                        currentUserCollections = null;
+                    }
                 }
             }));
         }
