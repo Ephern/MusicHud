@@ -13,6 +13,7 @@ import indi.etern.musichud.network.IServerNetworkService;
 import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
+import indi.etern.musichud.network.payloads.ProtocolVersion;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
@@ -168,8 +169,13 @@ public final class VelocityNetworkManager implements INetworkRegister, IServerNe
     }
 
     private static String channelIdOf(Class<?> clazz) {
+        String versionSuffix = "";
+        ProtocolVersion annotation = clazz.getAnnotation(ProtocolVersion.class);
+        if (annotation != null) {
+            versionSuffix = "_v" + annotation.value();
+        }
         String[] words = clazz.getSimpleName().split("(?<!(^|[A-Z]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
-        String name = String.join("_", words).toLowerCase();
+        String name = String.join("_", words).toLowerCase() + versionSuffix;
         return "music_hud:" + name;
     }
 

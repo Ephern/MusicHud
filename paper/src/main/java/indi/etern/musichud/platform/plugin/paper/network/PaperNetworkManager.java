@@ -4,9 +4,11 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.network.*;
 import indi.etern.musichud.network.payloads.C2SPayload;
 import indi.etern.musichud.network.payloads.IPayload;
+import indi.etern.musichud.network.payloads.ProtocolVersion;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import org.apache.commons.lang3.StringUtils;
 import org.apache.logging.log4j.Logger;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -138,8 +140,13 @@ public final class PaperNetworkManager implements INetworkRegister, IServerNetwo
     }
 
     private static String getChannelId(Class<?> clazz) {
+        String versionSuffix = "";
+        ProtocolVersion annotation = clazz.getAnnotation(ProtocolVersion.class);
+        if (annotation != null) {
+            versionSuffix = "_v" + annotation.value();
+        }
         String[] words = clazz.getSimpleName().split("(?<!(^|[A-Z]))(?=[A-Z])|(?<!^)(?=[A-Z][a-z])");
-        String name = String.join("_", words).toLowerCase();
+        String name = String.join("_", words).toLowerCase() + versionSuffix;
         return "music_hud:" + name;
     }
 
