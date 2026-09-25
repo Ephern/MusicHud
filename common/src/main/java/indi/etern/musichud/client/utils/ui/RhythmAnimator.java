@@ -80,7 +80,8 @@ public class RhythmAnimator extends ValueAnimator {
         if (playTime >= FADE_IN_DELAY_MS) {
             float alphaFrac = Math.clamp(
                     (playTime - FADE_IN_DELAY_MS) / (float) FADE_IN_DURATION_MS, 0f, 1f);
-            mainText.setAlpha(Easing.EASE_OUT_QUAD.getInterpolation(alphaFrac));
+            float currentAlpha = mainText.getAlpha();
+            mainText.setAlpha(currentAlpha + (1 - currentAlpha) * Easing.EASE_OUT_QUAD.getInterpolation(alphaFrac));
         }
         float scale = computeBreathingScale(playTime);
         row.setScaleX(scale);

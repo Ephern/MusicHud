@@ -85,17 +85,10 @@ public class DynamicIntegerOption extends AdaptiveIntegerOption {
     public void refresh() {
         MuiModApi.postToUiThread(() -> {
             int currentValue = getter.get();
-            int previousValue = Math.clamp(Integer.parseInt(input.getText().toString()), minValue, maxValue);
             input.setText(Integer.toString(currentValue));
             if (slider != null) {
                 int progress = MathUtil.clamp((currentValue - minValue) / stepSize, 0, slider.getMax());
                 slider.setProgress(progress);
-            }
-            if (previousValue != currentValue) {
-                setter.accept(previousValue);
-                if (onChanged != null) {
-                    onChanged.run();
-                }
             }
         });
     }

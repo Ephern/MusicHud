@@ -1,9 +1,11 @@
 package indi.etern.musichud.client.services.music.states;
 
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.IdentifiedBeans;
 import indi.etern.musichud.beans.state.ISubscribeState;
 import indi.etern.musichud.interfaces.Unregister;
 import lombok.Getter;
+import org.apache.logging.log4j.Logger;
 
 import java.util.SequencedSet;
 import java.util.concurrent.CompletableFuture;
@@ -17,6 +19,7 @@ import java.util.function.Supplier;
 public class SubscribeState<T extends IdentifiedBeans> implements ISubscribeState<T> {
     private static final ConcurrentHashMap<ClassIdPair, CopyOnWriteArrayList<Consumer<Boolean>>>
             modifyListeners = new ConcurrentHashMap<>();
+    private static final Logger logger = MusicHud.getLogger(SubscribeState.class);
     @Getter
     private final long beanId;
     private final Function<Long, CompletableFuture<T>> fullLoader;
@@ -61,10 +64,15 @@ public class SubscribeState<T extends IdentifiedBeans> implements ISubscribeStat
         });
     }
 
+    private void handleThrowable(String action, Throwable throwable) {
+        logger.error("Failed to {}: ", action, throwable);
+    }
+
     @Override
     public CompletableFuture<Boolean> isSubscribed() {
         return subscribedSetSupplier.get()
-                .thenApply(ts -> ts.stream().anyMatch(i -> i.getId() == beanId));
+                .thenApply(ts -> ts.stream().anyMatch(i -> i.getId() == beanId))
+                .whenComplete((unused, throwable) -> handleThrowable("list", throwable));
     }
 
     @Override
@@ -75,7 +83,8 @@ public class SubscribeState<T extends IdentifiedBeans> implements ISubscribeStat
                             subscribeAction.accept(t, true);
                             notifySubscribe(new ClassIdPair(beanId, tClass), true);
                             ts.addFirst(t);
-                        }));
+                        }).whenComplete(((unused, throwable) -> handleThrowable("subscribe", throwable)))
+                .whenComplete((unused, throwable) -> handleThrowable("loadT", throwable)));
     }
 
     @Override
@@ -86,7 +95,8 @@ public class SubscribeState<T extends IdentifiedBeans> implements ISubscribeStat
                             subscribeAction.accept(t, false);
                             notifySubscribe(new ClassIdPair(beanId, tClass), false);
                             ts.remove(t);
-                        }));
+                        }).whenComplete((unused, throwable) -> handleThrowable("unsubscribe", throwable)))
+                .whenComplete((unused1, throwable1) -> handleThrowable("loadT", throwable1));
     }
 
     @Override

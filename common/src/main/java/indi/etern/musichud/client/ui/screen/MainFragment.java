@@ -13,33 +13,35 @@ import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.LayoutInflater;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
-import icyllis.modernui.widget.*;
+import icyllis.modernui.widget.Button;
+import icyllis.modernui.widget.FrameLayout;
+import icyllis.modernui.widget.LinearLayout;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.*;
+import indi.etern.musichud.beans.music.MusicDetail;
+import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
-import indi.etern.musichud.client.utils.ui.Easing;
-import indi.etern.musichud.client.utils.ui.SpringInterpolator;
-import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.sounds.SoundSource;
 
 import java.time.Duration;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Queue;
@@ -274,7 +276,9 @@ public class MainFragment extends Fragment {
     /** The album cover is full size only when a track is actually playing and not muted. */
     private static boolean isCoverExpanded() {
         MusicDetail detail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-        if (detail == null || detail.equals(MusicDetail.NONE) || clientConfig.getMuted()) {
+        float targetGain = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
+                (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
+        if (detail == null || detail.equals(MusicDetail.NONE) || targetGain == 0) {
             return false;
         }
         StreamAudioPlayer.Status status = StreamAudioPlayer.getInstance().getStatus();
@@ -342,10 +346,6 @@ public class MainFragment extends Fragment {
         int token = progressUpdaterToken.incrementAndGet();
         NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
         Duration musicDuration = nowPlayingInfo.getMusicDuration();
-        DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
-                DateTimeFormatter.ofPattern("HH:mm:ss") :
-                DateTimeFormatter.ofPattern("mm:ss");
-        String totalTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
         // 兜底退出：startAt 可能因任务被取代/失败永不触发，超时后结束进度循环防泄漏
         long deadline = System.currentTimeMillis() + musicDuration.toMillis() + 120_000;
         MusicHud.EXECUTOR.execute(() -> {
@@ -355,14 +355,10 @@ public class MainFragment extends Fragment {
                         || progressUpdaterToken.get() != token) {
                     return;
                 }
-                Duration playedDuration = nowPlayingInfo.getPlayedDuration();
-                String playedTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()));
                 MuiModApi.postToUiThread(() -> {
                     MusicInfoCard current = instance == null ? null : instance.activeCard;
                     if (instance != null && instance.visible && current != null) {
                         current.getProgressBar().setProgress((int) (nowPlayingInfo.getProgressRate() * instance.sideWidth));
-                        current.getPlayedTimeText().setText(playedTimeString);
-                        current.getTotalTimeText().setText(totalTimeString);
                     }
                 });
                 try {
@@ -578,9 +574,22 @@ public class MainFragment extends Fragment {
                 @Override
                 public void onTransitionStart(@Nullable String fromKey, @NonNull String toKey,
                                               @NonNull RouterContainer.TransitionType type) {
-                    // 过渡刚开始就提前启动回家时右侧歌词栏的隐藏动画，
-                    // 让面板在 onBeforeSwap 置 GONE 时已基本离屏，避免页面 addView 同帧重排。
                     if ("Home".equals(toKey)) {
+                        HomeView homeView = HomeView.getInstance();
+                        if (homeView != null) {
+                            StaggeredLyricScrollView scrollView = homeView.getStaggeredLyricScrollView();
+                            if (scrollView != null) {
+                                // HomeView is created lazily, so lyrics switched while another page was
+                                // shown were dropped. Push the current state before reinitializing; the
+                                // instance-based check avoids replaying the slide-in for the same content.
+                                MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
+                                Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
+                                if (!scrollView.isShowing(currentMusic, currentLyrics)) {
+                                    scrollView.switchLyrics(currentMusic == null ? MusicDetail.NONE : currentMusic, currentLyrics);
+                                }
+                                scrollView.reinitialize();
+                            }
+                        }
                         hideLyricsPanel();
                     }
                 }
@@ -594,6 +603,13 @@ public class MainFragment extends Fragment {
                             lyricsSidebar.setVisibility(View.GONE);
                         }
                     } else {
+                        HomeView homeView = HomeView.getInstance();
+                        if (homeView != null) {
+                            StaggeredLyricScrollView scrollView = homeView.getStaggeredLyricScrollView();
+                            if (scrollView != null) {
+                                scrollView.suspendLyricFollowingAndHide();
+                            }
+                        }
                         showLyricsPanel();
                     }
                 }
@@ -676,7 +692,7 @@ public class MainFragment extends Fragment {
         lyricsAnimator.start();
 
         if (lyricsScrollView != null) {
-            lyricsScrollView.reinitializeAfterShow();
+            lyricsScrollView.reinitialize();
         }
     }
 
@@ -689,7 +705,7 @@ public class MainFragment extends Fragment {
             lyricsAnimator.cancel();
         }
         if (lyricsScrollView != null) {
-            lyricsScrollView.suspendLyricFollowing();
+            lyricsScrollView.suspendLyricFollowingAndHide();
         }
 
         ObjectAnimator slideOut = ObjectAnimator.ofFloat(lyricsSidebar, View.TRANSLATION_X, 0, lyricsPanelWidth);

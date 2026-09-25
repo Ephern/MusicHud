@@ -1,6 +1,11 @@
 package indi.etern.musichud.client.ui.pages;
 
+import icyllis.modernui.animation.Animator;
+import icyllis.modernui.animation.AnimatorListener;
+import icyllis.modernui.animation.AnimatorSet;
 import icyllis.modernui.animation.LayoutTransition;
+import icyllis.modernui.animation.ObjectAnimator;
+import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.mc.MuiModApi;
@@ -26,6 +31,7 @@ import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
@@ -52,6 +58,10 @@ public class HomeView extends LinearLayout {
 
     private static final MusicService musicService = MusicService.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final SpringInterpolator NEXT_TO_PLAY_INTERPOLATOR = new SpringInterpolator(0.25f, 1);
+    private static final int NEXT_TO_PLAY_ANIM_DURATION_MS =
+            Math.round(NEXT_TO_PLAY_INTERPOLATOR.getDuration() * 1000);
+    private static final float NEXT_TO_PLAY_MIN_SCALE = 0.95f;
     @Getter
     private static HomeView instance;
     private final Set<IdlePlaySource> serverIdlePlaySources = musicService.getIdlePlaySourceState().external().getSources();
@@ -60,8 +70,10 @@ public class HomeView extends LinearLayout {
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
     private MusicTrackItem nextToPlayItem;
+    private AnimatorSet nextToPlayAnimator;
+    // Latest-wins target arriving while the item switch animation is in flight
+    private Traceable<MusicDetail> pendingNextToPlay;
     private LinearLayout nextToPlayHeader;
-    private TextView nextToPlayTitle;
     private ImageButton rotateNextToPlayButton;
     private TextView queueTitle;
     private LinearLayout playQueueListView;
@@ -131,6 +143,8 @@ public class HomeView extends LinearLayout {
 
     public void refresh() {
         instance = this;
+        pendingNextToPlay = null;
+        cancelNextToPlayAnimation();
         if (musicQueuePushListener != null) {
             musicService.getMusicQueuePushListeners().remove(musicQueuePushListener);
         }
@@ -186,7 +200,7 @@ public class HomeView extends LinearLayout {
             nextToPlayHeaderParams.setMargins(0, dp(32), 0, dp(16));
             scrollViewContainer.addView(nextToPlayHeader, nextToPlayHeaderParams);
 
-            nextToPlayTitle = new TextView(context);
+            TextView nextToPlayTitle = new TextView(context);
             nextToPlayTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             nextToPlayTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.nextToPlay"));
             nextToPlayHeader.addView(nextToPlayTitle, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
@@ -212,6 +226,7 @@ public class HomeView extends LinearLayout {
             nextToPlayHeader.addView(rotateNextToPlayButton, rotateButtonParams);
 
             nextToPlayItem = new MusicTrackItem(context);
+//            nextToPlayItem.getAlbumImageView().setTransitionDuration(0);
             nextToPlayItem.setVisibility(GONE);
             scrollViewContainer.addView(nextToPlayItem, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
@@ -395,16 +410,129 @@ public class HomeView extends LinearLayout {
         Queue<QueueItem> musicQueue = musicService.getMusicQueue();
         boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty() || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();
         MusicDetail next = hasIdlePlaySources && nextIdle != null ? nextIdle.value() : null;
-        if (musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE)) {
-            nextToPlayHeader.setVisibility(VISIBLE);
-            nextToPlayItem.setVisibility(VISIBLE);
-            nextToPlayItem.bindData(nextIdle);
-            rotateNextToPlayButton.setVisibility(isLocalPlayer(next.getPusherInfo().getPlayerUUID()) ? VISIBLE : GONE);
-        } else {
+        boolean show = musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE);
+        applyNextToPlay(show, show ? nextIdle : null);
+    }
+
+    /**
+     * Drives visibility and content of the "next to play" row. When the row is already showing a
+     * different track, the switch is animated: the old content shrinks to {@link #NEXT_TO_PLAY_MIN_SCALE}
+     * and fades out, then the new content is bound and enters in reverse.
+     */
+    private void applyNextToPlay(boolean show, Traceable<MusicDetail> nextIdle) {
+        if (!show) {
+            pendingNextToPlay = null;
+            cancelNextToPlayAnimation();
             nextToPlayHeader.setVisibility(GONE);
             nextToPlayItem.setVisibility(GONE);
             rotateNextToPlayButton.setVisibility(GONE);
+            resetNextToPlayItemVisual();
+            return;
         }
+        if (nextToPlayAnimator != null) {
+            // A switch is already in flight: keep only the newest target.
+            pendingNextToPlay = nextIdle;
+            return;
+        }
+        boolean itemShown = nextToPlayItem.getVisibility() == VISIBLE;
+        nextToPlayHeader.setVisibility(VISIBLE);
+        if (itemShown && Objects.equals(nextToPlayItem.getMusicTrace(), nextIdle)) {
+            // Same track re-synced: refresh in place without replaying the switch animation.
+            updateNextToPlayRotateButton(nextIdle);
+            return;
+        }
+        if (!itemShown) {
+            // First appearance: bind in place, no outgoing content to animate.
+            nextToPlayItem.setVisibility(VISIBLE);
+            nextToPlayItem.bindData(nextIdle);
+            resetNextToPlayItemVisual();
+            updateNextToPlayRotateButton(nextIdle);
+            return;
+        }
+        startNextToPlaySwitch(nextIdle);
+    }
+
+    private void startNextToPlaySwitch(Traceable<MusicDetail> target) {
+        pendingNextToPlay = null;
+        ObjectAnimator outAlpha = ObjectAnimator.ofFloat(nextToPlayItem, View.ALPHA, nextToPlayItem.getAlpha(), 0f);
+        ObjectAnimator outScaleX = ObjectAnimator.ofFloat(nextToPlayItem, View.SCALE_X, nextToPlayItem.getScaleX(), NEXT_TO_PLAY_MIN_SCALE);
+        ObjectAnimator outScaleY = ObjectAnimator.ofFloat(nextToPlayItem, View.SCALE_Y, nextToPlayItem.getScaleY(), NEXT_TO_PLAY_MIN_SCALE);
+        AnimatorSet outSet = new AnimatorSet();
+        outSet.playTogether(outAlpha, outScaleX, outScaleY);
+        outSet.setDuration(NEXT_TO_PLAY_ANIM_DURATION_MS);
+        outSet.setInterpolator(NEXT_TO_PLAY_INTERPOLATOR);
+        nextToPlayAnimator = outSet;
+        outSet.addListener(new AnimatorListener() {
+            @Override
+            public void onAnimationEnd(@NonNull Animator animation) {
+                // Stale callbacks (canceled / replaced) must not settle a newer transition.
+                if (nextToPlayAnimator != outSet) {
+                    return;
+                }
+                Traceable<MusicDetail> bindTarget = target;
+                // A newer target may have arrived during the fade-out; skip the stale one entirely.
+                if (pendingNextToPlay != null) {
+                    bindTarget = pendingNextToPlay;
+                    pendingNextToPlay = null;
+                }
+                nextToPlayItem.clearData();
+                nextToPlayItem.bindData(bindTarget);
+                updateNextToPlayRotateButton(bindTarget);
+                post(() -> startNextToPlayEnter());
+            }
+        });
+        outSet.start();
+    }
+
+    private void startNextToPlayEnter() {
+        nextToPlayItem.setAlpha(0f);
+        nextToPlayItem.setScaleX(NEXT_TO_PLAY_MIN_SCALE);
+        nextToPlayItem.setScaleY(NEXT_TO_PLAY_MIN_SCALE);
+        ObjectAnimator inAlpha = ObjectAnimator.ofFloat(nextToPlayItem, View.ALPHA, 0f, 1f);
+        ObjectAnimator inScaleX = ObjectAnimator.ofFloat(nextToPlayItem, View.SCALE_X, NEXT_TO_PLAY_MIN_SCALE, 1f);
+        ObjectAnimator inScaleY = ObjectAnimator.ofFloat(nextToPlayItem, View.SCALE_Y, NEXT_TO_PLAY_MIN_SCALE, 1f);
+        AnimatorSet inSet = new AnimatorSet();
+        inSet.playTogether(inAlpha, inScaleX, inScaleY);
+        inSet.setDuration(NEXT_TO_PLAY_ANIM_DURATION_MS);
+        inSet.setInterpolator(NEXT_TO_PLAY_INTERPOLATOR);
+        nextToPlayAnimator = inSet;
+        inSet.addListener(new AnimatorListener() {
+            @Override
+            public void onAnimationEnd(@NonNull Animator animation) {
+                if (nextToPlayAnimator != inSet) {
+                    return;
+                }
+                nextToPlayAnimator = null;
+                resetNextToPlayItemVisual();
+                if (pendingNextToPlay != null) {
+                    Traceable<MusicDetail> pending = pendingNextToPlay;
+                    pendingNextToPlay = null;
+                    applyNextToPlay(true, pending);
+                }
+            }
+        });
+        inSet.start();
+    }
+
+    private void cancelNextToPlayAnimation() {
+        AnimatorSet animator = nextToPlayAnimator;
+        // Clear the field first so the cancel callback is treated as stale and does not advance.
+        nextToPlayAnimator = null;
+        if (animator != null) {
+            animator.cancel();
+        }
+    }
+
+    private void resetNextToPlayItemVisual() {
+        nextToPlayItem.setAlpha(1f);
+        nextToPlayItem.setScaleX(1f);
+        nextToPlayItem.setScaleY(1f);
+    }
+
+    private void updateNextToPlayRotateButton(Traceable<MusicDetail> nextIdle) {
+        MusicDetail next = nextIdle == null ? null : nextIdle.value();
+        rotateNextToPlayButton.setVisibility(
+                next != null && isLocalPlayer(next.getPusherInfo().getPlayerUUID()) ? VISIBLE : GONE);
     }
 
     /** Re-renders only the idle "next to play" row (e.g. after a server-side reroll). */
@@ -457,6 +585,8 @@ public class HomeView extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        pendingNextToPlay = null;
+        cancelNextToPlayAnimation();
         // 组件内部已处理资源清理，只需将 instance 置空
         instance = null;
     }

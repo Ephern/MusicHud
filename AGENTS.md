@@ -1,6 +1,6 @@
 # Music HUD - Agent Guide
 
-Multi-loader Minecraft mod (Fabric + NeoForge + Paper) for 1.21.8 (Java 21). A GUI-based full-server song request system powered by Netease Cloud Music API.
+Multi-loader Minecraft mod (Fabric + NeoForge + Paper), specific Minecraft version should be determined by gradle.properties and git branch name. A GUI-based full-server song request system powered by Netease Cloud Music API.
 
 ## Build & Run
 
@@ -73,13 +73,15 @@ The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradl
 
 Fabric module uses the Loom-remapped jars (`-c1c451a1` / `-b5e3e3a6` suffixes) under the project `.gradle\loom-cache`; NeoForge module uses the plain jars under `{gradleHome}\caches`.
 
-| Library                                                              | Sources JAR path template (use with `read_file --file_path "…!/path/to/Class.java"`)                                                                                                                                                                                      |
-|----------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| modernui-core 3.13.0 (remapped, fabric)                              | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\dev\icyllis\modernui-core-b5e3e3a6\3.13.0\modernui-core-b5e3e3a6-3.13.0-sources.jar`                                                                                                                             |
-| modernui-core 3.13.0 (plain)                                         | `{gradleHome}\caches\modules-2\files-2.1\dev.icyllis\modernui-core\3.13.0\bced1daf870a3ede277593ea26a72e70e571c052\modernui-core-3.13.0-sources.jar`                                                                                                                      |
-| ModernUI-Fabric 1.21.8-3.13.0.3 (remapped, used by fabric)           | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Fabric-c1c451a1\1.21.8-3.13.0.3\ModernUI-Fabric-c1c451a1-1.21.8-3.13.0.3-sources.jar`                                                                                                  |
-| ModernUI-NeoForge 1.21.8-3.13.0.3 (used by neoforge)                 | `{gradleHome}\caches\modules-2\files-2.1\icyllis.modernui\ModernUI-NeoForge\1.21.8-3.13.0.3\7a6e28682e8e33552076d37e3177ed513b22d309\ModernUI-NeoForge-1.21.8-3.13.0.3-sources.jar`                                                                                       |
-| ModernUI-Markflow 3.13.0 (remapped)                                  | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Markflow-b5e3e3a6\3.13.0\ModernUI-Markflow-b5e3e3a6-3.13.0-sources.jar`                                                                                                                |
+1.21.8 example
+
+| Library | Sources JAR path template (use with `read_file --file_path "…!/path/to/Class.java"`) |
+|---|---|
+| modernui-core 3.13.0 (remapped, fabric) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\dev\icyllis\modernui-core-b5e3e3a6\3.13.0\modernui-core-b5e3e3a6-3.13.0-sources.jar` |
+| modernui-core 3.13.0 (plain) | `{gradleHome}\caches\modules-2\files-2.1\dev.icyllis\modernui-core\3.13.0\bced1daf870a3ede277593ea26a72e70e571c052\modernui-core-3.13.0-sources.jar` |
+| ModernUI-Fabric 1.21.8-3.13.0.3 (remapped, used by fabric) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Fabric-c1c451a1\1.21.8-3.13.0.3\ModernUI-Fabric-c1c451a1-1.21.8-3.13.0.3-sources.jar` |
+| ModernUI-NeoForge 1.21.8-3.13.0.3 (used by neoforge) | `{gradleHome}\caches\modules-2\files-2.1\icyllis.modernui\ModernUI-NeoForge\1.21.8-3.13.0.3\7a6e28682e8e33552076d37e3177ed513b22d309\ModernUI-NeoForge-1.21.8-3.13.0.3-sources.jar` |
+| ModernUI-Markflow 3.13.0 (remapped) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Markflow-b5e3e3a6\3.13.0\ModernUI-Markflow-b5e3e3a6-3.13.0-sources.jar` |
 | arc3d-* 2026.2.0 (compiler/core/engine/granite/opengl/sketch/vulkan) | Pattern: `{gradleHome}\caches\modules-2\files-2.1\dev.icyllis\arc3d-<artifact>\2026.2.0\<hash>\arc3d-<artifact>-2026.2.0-sources.jar` — locate `<hash>` with `Get-ChildItem -Recurse "{gradleHome}\caches\modules-2\files-2.1\dev.icyllis" -Filter "arc3d-*-sources.jar"` |
 
 Fallback if a path is missing (e.g. after re-build, upgrade, or in another working tree): locate the JAR first, then pass the full path to `read_file`. Do NOT extract JARs with PowerShell — `read_file` reads JAR entries directly.
