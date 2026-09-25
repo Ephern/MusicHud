@@ -1,7 +1,7 @@
 ![Banner](
-https://cdn.modrinth.com/data/7Rnb6oJr/images/20ba5cbcaf71e2ab70436963776e5f801fea44a7.png)
-![Home View (in developing)](https://cdn-alt.modrinth.com/data/7Rnb6oJr/images/1df1c89491d051b3ac5bb90f95d4d4b054c0af57.png)
-(Shot on 1.3.0 alpha 2, see more in [gallery](https://modrinth.com/plugin/music-hud/gallery))
+https://cdn.modrinth.com/data/7Rnb6oJr/images/28c55d88f0786e40489e150aa8fcc44788e01cca.png)
+![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/0384594f476bc719b558f63070bc9da22f945063.png)
+(See more in [gallery](https://modrinth.com/plugin/music-hud/gallery))
 
 **A GUI-based, all situations (singleplayer/multiplayers) music mod/plugin designed with zero modifications to game mechanics**
 
