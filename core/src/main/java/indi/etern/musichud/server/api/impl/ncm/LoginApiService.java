@@ -28,6 +28,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -43,7 +44,7 @@ public class LoginApiService implements ILoginApiService {
             .softValues()
             .build();
     @Getter
-    Map<UUID, PlayerLoginInfo> playerInfoMap = new HashMap<>();
+    Map<UUID, PlayerLoginInfo> playerInfoMap = new ConcurrentHashMap<>();
     @Getter
     Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
     volatile String anonymousCookie;

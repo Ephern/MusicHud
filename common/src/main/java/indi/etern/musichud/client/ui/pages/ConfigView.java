@@ -119,6 +119,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getMixWithVanillaSoundVolume,
                     clientConfig::setMixWithVanillaSoundVolume)
                     .setDefaultValue(clientConfig.getDefaultMixWithVanillaSoundVolume())
+                    .setOnChanged(MainFragment::refreshCoverScale)
                     .create(commonCategory);
             new PreferencesFragment.IntegerOption(
                     context,
@@ -127,6 +128,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setSoundVolume)
                     .setRange(0, 100)
                     .setDefaultValue(clientConfig.getDefaultSoundVolume())
+                    .setOnChanged(MainFragment::refreshCoverScale)
                     .create(commonCategory);
             new PreferencesFragment.IntegerOption(
                     context,

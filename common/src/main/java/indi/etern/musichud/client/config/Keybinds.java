@@ -103,6 +103,7 @@ public class Keybinds implements ClientRegister {
             MusicHud.EXECUTOR.execute(() -> {
                 clientConfig.forceSetSoundVolume(Math.clamp(clientConfig.getSoundVolume() + clientConfig.getSoundVolumeInterval(), 0, 100));
                 clientConfig.save();
+                MainFragment.refreshCoverScale();
                 ToastUtil.show(getVolumeToastString());
             });
         });
@@ -110,6 +111,7 @@ public class Keybinds implements ClientRegister {
             MusicHud.EXECUTOR.execute(() -> {
                 clientConfig.forceSetSoundVolume(Math.clamp(clientConfig.getSoundVolume() - clientConfig.getSoundVolumeInterval(), 0, 100));
                 clientConfig.save();
+                MainFragment.refreshCoverScale();
                 ToastUtil.show(getVolumeToastString());
             });
         });

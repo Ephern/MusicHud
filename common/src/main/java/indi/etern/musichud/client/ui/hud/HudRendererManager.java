@@ -12,10 +12,10 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
-import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
@@ -50,6 +50,7 @@ public class HudRendererManager {
     private final DateTimeFormatter LONG_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter SHORT_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("mm:ss");
     private final HudRenderContext hudRenderContext = new HudRenderContextImpl();
+    private String IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
     private volatile HudRenderData hudBaseData;
     private volatile HudRenderData imageDisplayData;
     @Setter
@@ -84,7 +85,7 @@ public class HudRendererManager {
                 } catch (InterruptedException ignored) {
                 }
 
-                LYRICS_LINE_RENDERER.setLines(style1, style2);
+                LYRICS_LINE_RENDERER.setLines(style1, style2, true);
             });
         });
         PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
@@ -96,6 +97,16 @@ public class HudRendererManager {
                 return null;
             }
         });
+        IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
+            MusicHud.EXECUTOR.execute(() -> {
+                MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+                if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
+                    reset();
+                }
+            });
+        });
+        StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
+        ConnectionStateMachine.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
         updateLayoutFromConfig();
         refreshStyle();
         reset();
@@ -106,10 +117,7 @@ public class HudRendererManager {
             synchronized (HudRendererManager.class) {
                 if (instance == null) {
                     instance = new HudRendererManager();
-
                     updateStatus(StreamAudioPlayer.Status.IDLE);
-                    StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
-                    ConnectionStateMachine.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
                     loaded = true;
                 }
             }
@@ -135,14 +143,6 @@ public class HudRendererManager {
                     VerticalAlign.valueOf(clientConfig.getHudVerticalPosition())
             );
             setBaseLayout(layout);
-            IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
-                MusicHud.EXECUTOR.execute(() -> {
-                    MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-                    if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
-                        reset();
-                    }
-                });
-            });
         } catch (Exception e) {
             if (logger == null) {
                 logger = MusicHud.getLogger(HudRendererManager.class);
@@ -369,7 +369,10 @@ public class HudRendererManager {
     }
 
     public void reset() {
-        TITLE_RENDERER.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
+        IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
+        if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
+            TITLE_RENDERER.setText(IDLE_MESSAGE);
+        }
         ARTISTS_AND_ALBUM_RENDERER.setText("");
         LYRICS_LINE_RENDERER.clear();
         PLAY_TIME_RENDERER.setText("");
@@ -390,7 +393,11 @@ public class HudRendererManager {
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
             MusicDetail musicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
             if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
-                TITLE_RENDERER.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));//To prevent i18n lazy loading result in wrong text
+                //To prevent i18n lazy loading result in wrong text
+                IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
+                if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
+                    TITLE_RENDERER.setText(IDLE_MESSAGE);
+                }
                 if (clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()) {
                     return;
                 }

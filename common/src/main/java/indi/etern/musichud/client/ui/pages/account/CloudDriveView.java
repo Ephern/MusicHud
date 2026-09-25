@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.pages.account;
 
 import icyllis.modernui.R;
+import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
@@ -74,6 +75,7 @@ public class CloudDriveView extends LinearLayout {
         topBar.setOrientation(HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
         topBar.setMinimumHeight(dp(48));
+        topBar.setLayoutTransition(new LayoutTransition());
         LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBarParams.setMargins(0, dp(24), 0, dp(16));
         addView(topBar, topBarParams);
