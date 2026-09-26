@@ -31,6 +31,8 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 public class HudRendererManager {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
@@ -59,34 +61,29 @@ public class HudRendererManager {
     private String musicDurationString = "";
     private Logger logger;
     private int albumImageThumbnailSize = -1;
+    private final AtomicReference<ScrollingLyricLineRenderer.Line[]> pendingLyricLines = new AtomicReference<>();
+    private final AtomicBoolean lyricLinesScheduled = new AtomicBoolean();
 
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
-            MusicHud.EXECUTOR.execute(() -> {
-                String text = lyricLine == null ? "" : lyricLine.getText();
-                String translatedText = lyricLine == null ? "" : lyricLine.getTranslatedText();
+            String text = lyricLine == null ? "" : lyricLine.getText();
+            String translatedText = lyricLine == null ? "" : lyricLine.getTranslatedText();
 
-                long scrollMillis = -1;
-                if (lyricLine != null) {
-                    Duration duration = lyricLine.getDuration();
-                    if (duration != null) {
-                        scrollMillis = duration.toMillis();
-                    } else {
-                        scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
-                    }
-                    scrollMillis = (long) (scrollMillis * 0.8);
+            long scrollMillis = -1;
+            if (lyricLine != null) {
+                Duration duration = lyricLine.getDuration();
+                if (duration != null) {
+                    scrollMillis = duration.toMillis();
+                } else {
+                    scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
                 }
+                scrollMillis = (long) (scrollMillis * 0.8);
+            }
 
-                ScrollingLyricLineRenderer.Line style1 = new ScrollingLyricLineRenderer.Line(lyricLine, text, Theme.HUD_FADE_COLOR, Theme.HUD_EMPHASIZE_COLOR, scrollMillis);
-                ScrollingLyricLineRenderer.Line style2 = new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis);
-
-                try {
-                    Thread.sleep(300);
-                } catch (InterruptedException ignored) {
-                }
-
-                LYRICS_LINE_RENDERER.setLines(style1, style2, true);
-            });
+            scheduleLyricLines(
+                    new ScrollingLyricLineRenderer.Line(lyricLine, text, Theme.HUD_FADE_COLOR, Theme.HUD_EMPHASIZE_COLOR, scrollMillis),
+                    new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis)
+            );
         });
         PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
             try {
@@ -125,8 +122,28 @@ public class HudRendererManager {
         return instance;
     }
 
-    private static void updateStatus(@Nullable StreamAudioPlayer.Status status) {
-        if (instance != null) {
+    /**
+     * Conflates rapid lyric updates to the latest pair, keeping the ~300ms audio-sync delay
+     * but applying it once per burst instead of spawning one sleeper per lyric line.
+     */
+    private void scheduleLyricLines(ScrollingLyricLineRenderer.Line line1, ScrollingLyricLineRenderer.Line line2) {
+        pendingLyricLines.set(new ScrollingLyricLineRenderer.Line[]{line1, line2});
+        if (lyricLinesScheduled.compareAndSet(false, true)) {
+            MusicHud.EXECUTOR.execute(() -> {
+                try {
+                    Thread.sleep(300);
+                } catch (InterruptedException ignored) {
+                }
+                lyricLinesScheduled.set(false);
+                ScrollingLyricLineRenderer.Line[] lines = pendingLyricLines.getAndSet(null);
+                if (lines != null) {
+                    LYRICS_LINE_RENDERER.setLines(lines[0], lines[1], true);
+                }
+            });
+        }
+    }
+
+    private static void updateStatus(@Nullable StreamAudioPlayer.Status status) {        if (instance != null) {
             instance.PLAYING_STATUS_RENDERER.updateStatus(status);
         }
     }
