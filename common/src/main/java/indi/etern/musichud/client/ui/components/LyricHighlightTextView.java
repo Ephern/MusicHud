@@ -95,7 +95,7 @@ public class LyricHighlightTextView extends TextView {
                 textPaint.setShader(null);
             }
             if (phrases != null) {
-                phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));
+                phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, playedDuration));
             }
             super.onDraw(canvas);
             return;
@@ -150,7 +150,7 @@ public class LyricHighlightTextView extends TextView {
             textPaint.setShader(null);
             super.onDraw(canvas);
 
-            phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, fadeAt.plusMillis(animationDurationMillis), playedDuration));
+            phrases.forEach(phrase -> lowerPhrase(phrase, fadeAt, playedDuration));
             setStatus(HighlightStatus.DONE);
             if (onFade != null) {
                 onFade.run();
@@ -173,8 +173,7 @@ public class LyricHighlightTextView extends TextView {
             }
         }
 
-        long phraseDurationMillis = currentPhrase == null ? -1 : phraseEnd.minus(phraseStart).toMillis();
-        if (phraseDurationMillis <= 0) {
+        if (currentPhrase == null) {
             super.setTextColor(Theme.EMPHASIZE_LYRIC_COLOR);
             textPaint.setShader(null);
             super.onDraw(canvas);
@@ -207,7 +206,9 @@ public class LyricHighlightTextView extends TextView {
         int dp18 = dp(18);
         int dp36 = dp18 * 2;
         int additionalSpaceForLast = phraseIndex == phrases.size() - 1 ? dp36 : 0;
-        float gradientPointLogicalX = startLogicalX + (endLogicalX + additionalSpaceForLast - startLogicalX) * playedInPhrase / phraseDurationMillis - dp18;
+        long phraseDurationMillis = phraseEnd.minus(phraseStart).toMillis();
+        float phraseProgress = phraseDurationMillis <= 0 ? 1 : (float) playedInPhrase / phraseDurationMillis;
+        float gradientPointLogicalX = startLogicalX + (endLogicalX + additionalSpaceForLast - startLogicalX) * phraseProgress - dp18;
         float gradientLeftLogical = gradientPointLogicalX - dp18;
         float gradientRightLogical = gradientPointLogicalX + dp36;
 
@@ -290,7 +291,7 @@ public class LyricHighlightTextView extends TextView {
         return -f * (f - 1);
     }
 
-    private void lowerPhrase(LyricLine.Phrase phrase, Duration startAt, Duration endAt, Duration now) {
+    private void lowerPhrase(LyricLine.Phrase phrase, Duration startAt, Duration now) {
         long startAtMillis = startAt.toMillis();
         long nowMillis = now.toMillis();
         float t = Math.clamp((float) (nowMillis - startAtMillis) / RAISE_ANIMATION_DURATION, 0, 1);

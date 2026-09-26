@@ -134,16 +134,16 @@ public class WordByWordLyricParser {
 
     static void matchLine(String lyric, Consumer<LyricLineMetaData> matchedConsumer) {
         List<MetaInfoLine> metaInfoLines = RegexJsonExtractor.extractJsonObjectsSafely(lyric, MetaInfoLine.class);
-        metaInfoLines.forEach(metaInfoLine -> {
-            matchedConsumer.accept(new LyricLineMetaData(metaInfoLine.getTimestampDuration(), null, metaInfoLine.getText(), LyricLine.Type.META_DATA, null));
-        });
+        metaInfoLines.forEach(metaInfoLine -> matchedConsumer.accept(
+                new LyricLineMetaData(metaInfoLine.getTimestampDuration(), null, metaInfoLine.getText(), LyricLine.Type.META_DATA, null)
+        ));
         Matcher lineMatcher = mainPattern.matcher(lyric);
         Duration lastLineEnd = Duration.ZERO;
         while (lineMatcher.find()) {
             String timestampGroups = lineMatcher.group(1);
             String lineRawText = lineMatcher.group(2);
             Matcher timestampMatcher = timestampPattern.matcher(timestampGroups);
-            while (timestampMatcher.find()) {
+            if (timestampMatcher.find()) {
                 Map<Duration, Integer> phrases = new LinkedHashMap<>();
                 String lineStartTimestamp = timestampMatcher.group(1);
                 String lineDurationString = timestampMatcher.group(2);
@@ -158,19 +158,20 @@ public class WordByWordLyricParser {
                 Matcher phraseMatcher = phrasePattern.matcher(lineRawText);
                 StringBuilder lineText = new StringBuilder();
                 int charIndex = 0;
+                long rawDurationMillis = Long.parseLong(lineDurationString);
                 while (phraseMatcher.find()) {
 //                String phraseStartTimestamp = phraseMatcher.group(1);
-                    String phraseDurationMillis = phraseMatcher.group(2);
+                    long phraseDurationMillis = Long.parseLong(phraseMatcher.group(2));
 //                String unknown = phraseMatcher.group(3);
                     String phraseText = phraseMatcher.group(4);
                     String suffix = phraseText.endsWith(" ") ? " " : "";
                     phraseText = phraseText.replace('\u00A0', ' ').replace("\n", "").trim() + suffix;
                     lineText.append(phraseText);
                     charIndex += phraseText.length();
-                    nextPhraseStart = nextPhraseStart.plusMillis(Long.parseLong(phraseDurationMillis));
+                    nextPhraseStart = nextPhraseStart.plusMillis(phraseDurationMillis);
                     phrases.put(nextPhraseStart, charIndex);
                 }
-                Duration lineDuration = Duration.ofMillis(Long.parseLong(lineDurationString));
+                Duration lineDuration = Duration.ofMillis(rawDurationMillis);
                 Duration allPhraseDuration = nextPhraseStart.minus(lineStart);
                 if (allPhraseDuration.compareTo(lineDuration) < 0) {
                     lineDuration = allPhraseDuration;

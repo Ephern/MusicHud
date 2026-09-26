@@ -341,7 +341,7 @@ public class MusicInfoCard extends LinearLayout {
                 if (index != 0) {
                     TextView split = new TextView(context);
                     split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                    split.setTextSize(Theme.TEXT_SIZE_SMALL);
+                    split.setTextSize(Theme.TEXT_SIZE_NORMAL);
                     split.setText(" / ");
                     split.setSingleLine();
                     artists.addView(split);
