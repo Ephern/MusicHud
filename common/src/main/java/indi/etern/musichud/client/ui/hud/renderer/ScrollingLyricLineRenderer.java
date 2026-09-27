@@ -4,8 +4,8 @@ import icyllis.modernui.mc.FontResourceManager;
 import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.hud.metadata.Layout;
 import indi.etern.musichud.client.ui.lyric.LyricHighlightCalculator;
 import indi.etern.musichud.client.utils.ui.Easing;
@@ -17,18 +17,23 @@ import net.minecraft.client.gui.Font;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.List;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicReference;
 
 public class ScrollingLyricLineRenderer implements HudRenderer {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static final int LYRICS_ANIMATION_DURATION = 300;
-    private final SpringValue switchSpring = new SpringValue((float) LYRICS_ANIMATION_DURATION / 1000, 1f);
-    private final LineState currentLine1;
-    private final LineState currentLine2;
-    private final LineState nextLine1;
-    private final LineState nextLine2;
+    private static final float BASE_RESPONSE_SECONDS = (float) LYRICS_ANIMATION_DURATION / 1000f;
+    // Very short lines collapse the switch to a near-instant slide instead of dropping the line.
+    private static final float MIN_RESPONSE_SECONDS = 0.05f;
+    private static final float DURATION_RESPONSE_FACTOR = 0.75f;
+    private static final float SWITCH_DAMPING = 1f;
+    private final List<LinePair> pairs = new ArrayList<>();
+    private final ConcurrentLinkedQueue<PendingLines> pendingLines = new ConcurrentLinkedQueue<>();
     ModernStringSplitter modernStringSplitter;
     @Setter
     private float line1Height;
@@ -36,8 +41,6 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     private float line2Height;
     @Setter
     private Layout layout;
-    private boolean isTransitioning = false;
-    private final AtomicReference<PendingLines> pendingLines = new AtomicReference<>();
     private int cachedContainerWidth;
     @Setter
     private int lineSpacing = 0;
@@ -54,14 +57,10 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         } else {
             logger.debug("ModernTextEngine is disabled");
         }
-
-        currentLine1 = new LineState();
-        currentLine2 = new LineState();
-        nextLine1 = new LineState();
-        nextLine2 = new LineState();
     }
 
     public void clear() {
+        pendingLines.clear();
         setLines(
                 new Line(null, "", 0, 0, 0),
                 new Line(null, "", 0, 0, 0),
@@ -72,9 +71,9 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     /**
      * 设置双行文本及其样式
      * <p>
-     * May be called from a worker thread: the request is stashed and applied on the render
-     * thread (see {@link #applyPendingLines(long)}). Rapid calls naturally conflate to the
-     * latest request.
+     * May be called from a worker thread: the request is queued and applied on the render
+     * thread (see {@link #applyPendingLines(long)}). Every request is kept in order, so rapid
+     * switches never overwrite (and thus never drop) a line; the renderer decides how to animate.
      *
      * @param line1   第一行的文本和颜色
      * @param line2   第二行的文本和颜色
@@ -84,54 +83,77 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         int width = cachedContainerWidth;
         float maxScroll1 = computeMaxScrollOffset(line1.text(), line1Height, width);
         float maxScroll2 = computeMaxScrollOffset(line2.text(), line2Height, width);
-        pendingLines.set(new PendingLines(line1, line2, animate, maxScroll1, maxScroll2));
+        pendingLines.add(new PendingLines(line1, line2, animate, maxScroll1, maxScroll2));
     }
 
     private void applyPendingLines(long nowNanos) {
-        PendingLines pending = pendingLines.getAndSet(null);
+        // One per frame: if the producer ever enqueues faster than we render, each line still gets a
+        // frame instead of being overwritten.
+        PendingLines pending = pendingLines.poll();
         if (pending == null) {
             return;
         }
 
         Line line1 = pending.line1();
         Line line2 = pending.line2();
+        float height = layout.getHeight();
 
-        // Rapid switching: the outgoing line keeps sliding out; just replace the incoming
-        // line and retarget the same spring, which keeps its value and velocity.
-        if (isTransitioning) {
-            if (!line1.equals(nextLine1.line) || !line2.equals(nextLine2.line)) {
-                nextLine1.reset(line1);
-                nextLine2.reset(line2);
-                applyScrollMetrics(nextLine1, pending.maxScroll1());
-                applyScrollMetrics(nextLine2, pending.maxScroll2());
-                switchSpring.setTarget(1f, nowNanos);
-            }
+        // Non-animated update (e.g. clear): drop every running pair and snap to the new lines.
+        if (!pending.animate()) {
+            pairs.clear();
+            LinePair pair = new LinePair();
+            applyPair(pair, line1, line2, pending.maxScroll1(), pending.maxScroll2());
+            pair.offset.jumpTo(0f);
+            startScrollingIfPossible(pair);
             return;
         }
 
-        boolean textChanged = !line1.equals(currentLine1.line) || !line2.equals(currentLine2.line);
-        if (!textChanged) {
+        LinePair newest = pairs.isEmpty() ? null : pairs.getLast();
+        if (newest != null && line1.equals(newest.line1.line) && line2.equals(newest.line2.line)) {
+            return; // already showing the active pair
+        }
+
+        // Strict single line: keep only the pair currently on screen and discard any older outgoing
+        // pair, so at most one leaving + one entering pair exist. The kept pair keeps its current
+        // value and velocity (setTarget), so the hand-off has no jump.
+        if (pairs.size() > 1) {
+            pairs.subList(0, pairs.size() - 1).clear();
+        }
+        for (LinePair pair : pairs) {
+            pair.requestLeave(nowNanos, height);
+        }
+
+        LinePair pair = new LinePair();
+        applyPair(pair, line1, line2, pending.maxScroll1(), pending.maxScroll2());
+        pair.offset.set(height, 0f, 0f, nowNanos); // enter from below, target rest
+        pairs.add(pair);
+    }
+
+    private void applyPair(LinePair pair, Line line1, Line line2, float maxScroll1, float maxScroll2) {
+        pair.line1.reset(line1);
+        pair.line2.reset(line2);
+        applyScrollMetrics(pair.line1, maxScroll1);
+        applyScrollMetrics(pair.line2, maxScroll2);
+        // Per-line switch speed: short lines switch fast so the slide finishes before the next line.
+        pair.offset.setResponse(computeSwitchResponse(line1));
+    }
+
+    private float computeSwitchResponse(Line line) {
+        LyricLine lyricLine = line.lyricLine();
+        if (lyricLine == null || lyricLine.getDuration() == null) {
+            return BASE_RESPONSE_SECONDS;
+        }
+        float seconds = lyricLine.getDuration().toMillis() / 1000f;
+        return Math.clamp(seconds * DURATION_RESPONSE_FACTOR, MIN_RESPONSE_SECONDS, BASE_RESPONSE_SECONDS);
+    }
+
+    private void startScrollingIfPossible(LinePair pair) {
+        if (pair.scrollStarted || cachedContainerWidth <= 0) {
             return;
         }
-
-        nextLine1.reset(line1);
-        nextLine2.reset(line2);
-        applyScrollMetrics(nextLine1, pending.maxScroll1());
-        applyScrollMetrics(nextLine2, pending.maxScroll2());
-
-        isTransitioning = pending.animate();
-        if (isTransitioning) {
-            switchSpring.set(0f, 0f, 1f, nowNanos);
-        } else {
-            currentLine1.copyFrom(nextLine1);
-            currentLine2.copyFrom(nextLine2);
-            if (cachedContainerWidth > 0) {
-                startScrollingIfNeeded(currentLine1, cachedContainerWidth);
-                startScrollingIfNeeded(currentLine2, cachedContainerWidth);
-            }
-            nextLine1.reset(null);
-            nextLine2.reset(null);
-        }
+        pair.scrollStarted = true;
+        startScrollingIfNeeded(pair.line1, cachedContainerWidth);
+        startScrollingIfNeeded(pair.line2, cachedContainerWidth);
     }
 
     private void applyScrollMetrics(LineState line, float maxScrollOffset) {
@@ -212,27 +234,25 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         applyPendingLines(nowNanos);
 
-        // 更新切换动画
-        if (isTransitioning) {
-            switchSpring.update(nowNanos);
-            if (switchSpring.isSettled()) {
-                isTransitioning = false;
-                switchSpring.jumpTo(1f);
-                currentLine1.copyFrom(nextLine1);
-                currentLine2.copyFrom(nextLine2);
-                if (cachedContainerWidth > 0) {
-                    startScrollingIfNeeded(currentLine1, cachedContainerWidth);
-                    startScrollingIfNeeded(currentLine2, cachedContainerWidth);
-                }
-                nextLine1.reset(null);
-                nextLine2.reset(null);
-            }
-        }
+        // Every pair owns its own offset spring: retargeting preserves velocity, so the loop just
+        // advances each spring and retires the ones that have finished sliding off the top.
+        for (Iterator<LinePair> it = pairs.iterator(); it.hasNext(); ) {
+            LinePair pair = it.next();
+            pair.offset.update(nowNanos);
 
-        // 更新滚动动画
-        if (!isTransitioning) {
-            updateScrolling(currentLine1, now);
-            updateScrolling(currentLine2, now);
+            if (pair.leaving) {
+                if (pair.offset.isSettled()) {
+                    it.remove();
+                }
+                continue;
+            }
+
+            // Reached rest: start the horizontal scroll animation for the active line.
+            if (!pair.scrollStarted && pair.offset.isSettled()) {
+                startScrollingIfPossible(pair);
+            }
+            updateScrolling(pair.line1, now);
+            updateScrolling(pair.line2, now);
         }
     }
 
@@ -260,52 +280,29 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         float x = absolutePosition.x();
         float y = absolutePosition.y();
         context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
-        if (isTransitioning && nextLine1.line != null && nextLine2.line != null) {
-            float easedProgress = Math.clamp(switchSpring.getValue(), 0f, 1f);
-            float oldYOffset = -easedProgress * layout.getHeight();
-            if (currentLine1.line != null && currentLine1.line.lyricLine != null) {
-                if (currentLine1.line.lyricLine.isWordByWord()) {
-                    renderLine(context, currentLine1, currentLine1.line.fadeColor, cachedContainerX, startY, line1Height, oldYOffset);
-                    renderLineHighlight(context, currentLine1, cachedContainerX, startY, line1Height, y, x, calcHighlightWidth(currentLine1, line1Height), oldYOffset);
-                } else {
-                    renderLine(context, currentLine1, currentLine1.line.emphasizeColor, cachedContainerX, startY, line1Height, oldYOffset);
-                }
-                if (clientConfig.getShowTranslatedCnLyrics()) {
-                    if (currentLine2.line != null && currentLine2.line.lyricLine != null) {
-                        renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, oldYOffset);
-                    }
-                }
+        for (LinePair pair : pairs) {
+            float yOffset = pair.offset.getValue();
+            Line line1 = pair.line1.line;
+            if (line1 == null || line1.lyricLine == null) {
+                continue;
             }
-
-            if (nextLine1.line != null && nextLine1.line.lyricLine != null) {
-                float newYOffset = (1 - easedProgress) * layout.getHeight();
-                int color = nextLine1.line.lyricLine.isWordByWord() ? nextLine1.line.fadeColor : nextLine1.line.emphasizeColor;
-                renderLine(context, nextLine1, color, cachedContainerX, startY, line1Height, newYOffset);
-                if (clientConfig.getShowTranslatedCnLyrics()) {
-                    if (nextLine2.line != null && nextLine2.line.lyricLine != null) {
-                        renderLine(context, nextLine2, nextLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, newYOffset);
-                    }
-                }
+            if (line1.lyricLine.isWordByWord()) {
+                renderLine(context, pair.line1, line1.fadeColor, cachedContainerX, startY, line1Height, yOffset);
+                renderLineHighlight(context, pair.line1, cachedContainerX, startY, line1Height, y, x, calcHighlightWidth(pair.line1, line1Height), yOffset);
+            } else {
+                renderLine(context, pair.line1, line1.emphasizeColor, cachedContainerX, startY, line1Height, yOffset);
             }
-        } else {
-            if (currentLine1.line != null && currentLine1.line.lyricLine != null) {
-                if (currentLine1.line.lyricLine.isWordByWord()) {
-                    renderLine(context, currentLine1, currentLine1.line.fadeColor, cachedContainerX, startY, line1Height, 0);
-                    renderLineHighlight(context, currentLine1, cachedContainerX, startY, line1Height, y, x, calcHighlightWidth(currentLine1, line1Height), 0);
-                } else {
-                    renderLine(context, currentLine1, currentLine1.line.emphasizeColor, cachedContainerX, startY, line1Height, 0);
-                }
-                if (clientConfig.getShowTranslatedCnLyrics()) {
-                    if (currentLine2.line != null && currentLine2.line.lyricLine != null) {
-                        renderLine(context, currentLine2, currentLine2.line.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, 0);
-                    }
+            if (clientConfig.getShowTranslatedCnLyrics()) {
+                Line line2 = pair.line2.line;
+                if (line2 != null && line2.lyricLine != null) {
+                    renderLine(context, pair.line2, line2.fadeColor, cachedContainerX, (int) (startY + lineSpacing + line1Height), line2Height, yOffset);
                 }
             }
         }
         context.popScissor();
     }
 
-    private float calcHighlightWidth(LineState lineState,float lineHeight) {
+    private float calcHighlightWidth(LineState lineState, float lineHeight) {
         Line line = lineState.line;
         if (line == null) return 0;
         String text = line.text;
@@ -387,6 +384,30 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     private record PendingLines(Line line1, Line line2, boolean animate, float maxScroll1, float maxScroll2) {
     }
 
+    /**
+     * One on-screen lyric line-pair (original + translated) and its own vertical offset spring.
+     * Mirrors StaggeredLyricScrollView's RowWave: the offset is a pixel value in its own
+     * {@link SpringValue}, so it can be retargeted at any time while preserving value/velocity.
+     */
+    private static class LinePair {
+        final LineState line1 = new LineState();
+        final LineState line2 = new LineState();
+        final SpringValue offset = new SpringValue(BASE_RESPONSE_SECONDS, SWITCH_DAMPING);
+        boolean leaving;
+        boolean scrollStarted;
+
+        /**
+         * Retarget upward toward {@code -height}; keeps current value and velocity.
+         */
+        void requestLeave(long nowNanos, float height) {
+            if (leaving) {
+                return;
+            }
+            leaving = true;
+            offset.setTarget(-height, nowNanos);
+        }
+    }
+
     private static class LineState {
         Line line;
         boolean needScroll;
@@ -409,22 +430,8 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                     ? null
                     : new LyricHighlightCalculator(line.lyricLine());
         }
-
-        void copyFrom(LineState other) {
-            if (other.line != null) {
-                this.line = new Line(other.line.lyricLine, other.line.text, other.line.fadeColor, other.line.emphasizeColor, other.line.scrollMs);
-            } else {
-                this.line = null;
-            }
-            this.needScroll = other.needScroll;
-            this.maxScrollOffset = other.maxScrollOffset;
-            this.isScrolling = other.isScrolling;
-            this.scrollStartTime = other.scrollStartTime;
-            this.scrollTarget = other.scrollTarget;
-            this.scrollOffset = other.scrollOffset;
-            this.highlightCalculator = other.highlightCalculator;
-        }
     }
 
-    public record Line(LyricLine lyricLine, String text, int fadeColor, int emphasizeColor, long scrollMs) {}
+    public record Line(LyricLine lyricLine, String text, int fadeColor, int emphasizeColor, long scrollMs) {
+    }
 }

@@ -41,11 +41,6 @@ public class SpringValue {
         setDamping(dampingFraction);
     }
 
-    public SpringValue(float responseTime, float dampingFraction, float value) {
-        this(responseTime, dampingFraction);
-        jumpTo(value);
-    }
-
     public void setResponse(float responseTime) {
         omegaN = (float) (2 * Math.PI / Math.max(responseTime, 1e-4f));
     }
@@ -85,6 +80,17 @@ public class SpringValue {
         this.startValue = value;
         this.startVelocity = 0f;
         this.startTimeNanos = 0L;
+    }
+
+    /**
+     * Shift the whole spring - current value, rest target and the running segment - by {@code delta},
+     * preserving the velocity. Used to keep a moving frame of reference in sync without interrupting
+     * the interpolation.
+     */
+    public void translate(float delta) {
+        value += delta;
+        target += delta;
+        startValue += delta;
     }
 
     /**
