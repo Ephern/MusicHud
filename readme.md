@@ -164,6 +164,7 @@ Deploy separately (recommend for server)
 - 在 MusicHUD 播放时静音 Reactive Music
 - 连接模式与 ViaVersion 兼容
 - 适配 Sound Physics Perfected, 禁用 MusicHUD 音频管线的混响以保证音质
+- 在 1.21.1 上兼容 Raise Sound Limit Simplified，同时保持了 Blaze3D 音频管线上的修复
 
 ## ~~大饼~~ 待办清单
 - 可自定义的 HUD 布局 [目标 1.4.0]
