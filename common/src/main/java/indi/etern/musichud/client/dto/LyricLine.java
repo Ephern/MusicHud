@@ -1,7 +1,6 @@
 package indi.etern.musichud.client.dto;
 
 import icyllis.modernui.graphics.Canvas;
-import icyllis.modernui.graphics.Matrix;
 import icyllis.modernui.graphics.text.FontMetricsInt;
 import icyllis.modernui.graphics.text.ShapedText;
 import icyllis.modernui.text.*;
@@ -168,20 +167,6 @@ public class LyricLine implements Comparable<LyricLine> {
 
     @ToString
     public static class HighlightSpan extends ReplacementSpan {
-        // Near-identity projective matrix (persp0 = 1e-8): makes the position matrix
-        // report hasPerspective() so arc3d skips the direct-mask glyph path (which floors
-        // every glyph to whole device pixels) and uses the transformed-mask path, which
-        // keeps fractional positions and samples the atlas with bilinear filtering.
-        // The epsilon must live in m14 (persp0), NOT m44 (persp2): Device normalizes the
-        // CTM via Matrix.normalizePerspective(), which divides m44 back to exactly 1
-        // whenever m14/m24 are zero, silently undoing an m44-based flag. With m14 != 0
-        // the normalization is skipped entirely. The resulting w-distortion
-        // (~1e-8 * scale^2 * x) is far below one physical pixel.
-        private static final Matrix SUBPIXEL_MATRIX = new Matrix(
-                1f, 0f, 1e-8f,
-                0f, 1f, 0f,
-                0f, 0f, 1f
-        );
         // Index of the first char (code point) of this span within its phrase, used by the
         // view to compute per-char stagger delays for the karaoke raise animation.
         @Getter
@@ -282,15 +267,7 @@ public class LyricLine implements Comparable<LyricLine> {
                          int start, int end, float x, int top, int y, int bottom,
                          @NonNull TextPaint paint) {
             ensureShaped(paint, text, start, end);
-            // Per-char draw: the raise offset rides the float draw origin, while scaling
-            // pivots on the baseline. The near-identity perspective concat routes glyphs
-            // through arc3d's transformed-mask path: the direct-mask path floors every
-            // glyph position to whole device pixels (Y has no subpixel bins), which
-            // quantizes animation into visible steps; the transformed path keeps
-            // fractional positions and samples the glyph atlas with bilinear filtering,
-            // giving subpixel-smooth motion.
-            canvas.save();
-            canvas.concat(SUBPIXEL_MATRIX);
+
             float cx = x;
             int cu = cacheStart;
             for (int j = 0; j < charShapedTexts.length; j++) {
@@ -319,7 +296,6 @@ public class LyricLine implements Comparable<LyricLine> {
                     break;
                 }
             }
-            canvas.restore();
         }
     }
 }

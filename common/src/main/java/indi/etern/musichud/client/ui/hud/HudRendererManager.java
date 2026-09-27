@@ -31,6 +31,9 @@ import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 
 public class HudRendererManager {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
@@ -59,34 +62,31 @@ public class HudRendererManager {
     private String musicDurationString = "";
     private Logger logger;
     private int albumImageThumbnailSize = -1;
+    private static final long LYRIC_DELAY_NANOS = 300_000_000L;
+    private final ConcurrentLinkedQueue<QueuedLyric> lyricQueue = new ConcurrentLinkedQueue<>();
+    private final AtomicBoolean lyricWorkerRunning = new AtomicBoolean();
+    private final AtomicLong lyricGeneration = new AtomicLong();
 
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
-            MusicHud.EXECUTOR.execute(() -> {
-                String text = lyricLine == null ? "" : lyricLine.getText();
-                String translatedText = lyricLine == null ? "" : lyricLine.getTranslatedText();
+            String text = lyricLine == null ? "" : lyricLine.getText();
+            String translatedText = lyricLine == null ? "" : lyricLine.getTranslatedText();
 
-                long scrollMillis = -1;
-                if (lyricLine != null) {
-                    Duration duration = lyricLine.getDuration();
-                    if (duration != null) {
-                        scrollMillis = duration.toMillis();
-                    } else {
-                        scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
-                    }
-                    scrollMillis = (long) (scrollMillis * 0.8);
+            long scrollMillis = -1;
+            if (lyricLine != null) {
+                Duration duration = lyricLine.getDuration();
+                if (duration != null) {
+                    scrollMillis = duration.toMillis();
+                } else {
+                    scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
                 }
+                scrollMillis = (long) (scrollMillis * 0.8);
+            }
 
-                ScrollingLyricLineRenderer.Line style1 = new ScrollingLyricLineRenderer.Line(lyricLine, text, Theme.HUD_FADE_COLOR, Theme.HUD_EMPHASIZE_COLOR, scrollMillis);
-                ScrollingLyricLineRenderer.Line style2 = new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis);
-
-                try {
-                    Thread.sleep(300);
-                } catch (InterruptedException ignored) {
-                }
-
-                LYRICS_LINE_RENDERER.setLines(style1, style2, true);
-            });
+            scheduleLyricLines(
+                    new ScrollingLyricLineRenderer.Line(lyricLine, text, Theme.HUD_FADE_COLOR, Theme.HUD_EMPHASIZE_COLOR, scrollMillis),
+                    new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis)
+            );
         });
         PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
             try {
@@ -125,8 +125,56 @@ public class HudRendererManager {
         return instance;
     }
 
-    private static void updateStatus(@Nullable StreamAudioPlayer.Status status) {
-        if (instance != null) {
+    private void scheduleLyricLines(ScrollingLyricLineRenderer.Line line1, ScrollingLyricLineRenderer.Line line2) {
+        lyricQueue.add(new QueuedLyric(line1, line2, System.nanoTime(), lyricGeneration.get()));
+        if (lyricWorkerRunning.compareAndSet(false, true)) {
+            MusicHud.EXECUTOR.execute(this::drainLyricQueue);
+        }
+    }
+
+    /**
+     * Deliver every queued lyric line in order, each about {@link #LYRIC_DELAY_NANOS} after it was
+     * enqueued. The queue never overwrites an undelivered line, so rapid switches no longer drop
+     * lines; keeping the vertical switch single-line and shortening its own animation is instead
+     * left to the renderer.
+     */
+    private void drainLyricQueue() {
+        try {
+            QueuedLyric queued;
+            while ((queued = lyricQueue.poll()) != null) {
+                long remaining = queued.enqueueNanos() + LYRIC_DELAY_NANOS - System.nanoTime();
+                if (remaining > 0) {
+                    try {
+                        Thread.sleep(remaining / 1_000_000L, (int) (remaining % 1_000_000L));
+                    } catch (InterruptedException ignored) {
+                    }
+                }
+                if (queued.generation() != lyricGeneration.get()) {
+                    continue; // music switched or HUD reset while this line was queued
+                }
+                LYRICS_LINE_RENDERER.setLines(queued.line1(), queued.line2(), true);
+            }
+        } finally {
+            lyricWorkerRunning.set(false);
+            // A producer may have enqueued between our last poll() and this reset; restart if so.
+            if (!lyricQueue.isEmpty() && lyricWorkerRunning.compareAndSet(false, true)) {
+                MusicHud.EXECUTOR.execute(this::drainLyricQueue);
+            }
+        }
+    }
+
+    private void invalidatePendingLyrics() {
+        lyricGeneration.incrementAndGet();
+        lyricQueue.clear();
+    }
+
+    private record QueuedLyric(ScrollingLyricLineRenderer.Line line1,
+                               ScrollingLyricLineRenderer.Line line2,
+                               long enqueueNanos,
+                               long generation) {
+    }
+
+    private static void updateStatus(@Nullable StreamAudioPlayer.Status status) {        if (instance != null) {
             instance.PLAYING_STATUS_RENDERER.updateStatus(status);
         }
     }
@@ -312,6 +360,7 @@ public class HudRendererManager {
                         .reduce((a, b) -> a + " / " + b)
                         .orElse("");
                 ARTISTS_AND_ALBUM_RENDERER.setText(artists + " - " + musicDetail.getAlbum().getName());
+                invalidatePendingLyrics();
                 LYRICS_LINE_RENDERER.clear();
                 loadAndSwitchAlbumImageWithRetry(musicDetail);
             }
@@ -374,6 +423,7 @@ public class HudRendererManager {
             TITLE_RENDERER.setText(IDLE_MESSAGE);
         }
         ARTISTS_AND_ALBUM_RENDERER.setText("");
+        invalidatePendingLyrics();
         LYRICS_LINE_RENDERER.clear();
         PLAY_TIME_RENDERER.setText("");
         musicDurationString = "";
