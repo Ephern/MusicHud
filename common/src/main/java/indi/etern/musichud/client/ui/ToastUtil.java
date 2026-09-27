@@ -16,7 +16,7 @@ public class ToastUtil {
     public static void show(Toast toast) {
         MuiModApi.postToUiThread(() -> {
             long currentTimeMillis = System.currentTimeMillis();
-            if (currentTimeMillis - lastToastTime > lastToastDuration && lastToast != null) {
+            if (currentTimeMillis - lastToastTime < lastToastDuration && lastToast != null) {
                 lastToast.cancel();
             }
             lastToastTime = currentTimeMillis;
@@ -33,7 +33,7 @@ public class ToastUtil {
     public static void show(CharSequence message) {
         MuiModApi.postToUiThread(() -> {
             long currentTimeMillis = System.currentTimeMillis();
-            if (currentTimeMillis - lastToastTime > lastToastDuration && lastToast != null) {
+            if (currentTimeMillis - lastToastTime < lastToastDuration && lastToast != null) {
                 lastToast.cancel();
             }
             lastToastTime = currentTimeMillis;
