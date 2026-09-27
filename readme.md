@@ -20,7 +20,7 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/28c55d88f0786e40489e150aa8fcc44788
 [Third-party legacy Bukkit plugin (1.0.5 stable -)](https://github.com/Shiroiame-Kusu/MusicHud-Bukkit)
 
 ## Prerequisites
-- ModernUI (only client, using mVUS fork on 1.21.9-11, [this fork](https://github.com/MOPELotus/ModernUI-MC/releases) on [26.2](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9) and [26.3](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9))
+- ModernUI (only client, recommend to use [mVUS fork](https://modrinth.com/mod/modernui-mc-mvus) on 1.21.9-11, [this fork](https://github.com/MOPELotus/ModernUI-MC/releases) on [26.2](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9) and [26.3](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9))
 - Forge Config API Port (only Fabric)
 - Fabric API (only Fabric)
 - ~~Architectury API~~ (Fabric / NeoForge, required by MusicHUD 1.2.0 and below)
@@ -38,6 +38,7 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/28c55d88f0786e40489e150aa8fcc44788
 - Isolated mode: Do all works on client, enjoy music yourself.
 - Sharing same playback model between connected mode and isolated mode, easy to use
 - Low network bandwidth / performance required for server side, audio stream downloading and processing is done on client side
+- Fixes [MC-265514](https://bugs.mojang.com/browse/MC/issues/MC-265514) on 1.21.1 (exists from 23w31a to 1.21.4), which worsen the audio output quality
 
 ## Functions
 - Search for musics, playlists, albums and artists.
@@ -53,6 +54,7 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/28c55d88f0786e40489e150aa8fcc44788
 - Mute Reactive Music when MusicHUD is playing
 - Connected mode compatible with ViaVersion
 - Adapted to Sound Physics Perfected, disabled its reverb applied to MusicHUD audio pipeline to improve audio quality
+- Compatible with Raise Sound Limit Simplified while maintaining Blaze3D audio fix on 1.21.1
 
 ## TO-DO List
 - Customizable HUD layout [target 1.4.0]
@@ -61,7 +63,6 @@ https://cdn.modrinth.com/data/7Rnb6oJr/images/28c55d88f0786e40489e150aa8fcc44788
 ## Usage
 
 ### Client
-First of all, place the prerequisite mods and the MusicHud jar file into the mods folder.
 
 #### Single-player or LAN Multi-player Host
 All you need is to configure or deploy an API server.
@@ -77,8 +78,11 @@ All you need is to configure or deploy an API server.
 All you need is to configure or deploy an API server.
 
 ### How to Deploy an API Server
-There are 2 methods to deploy.
-#### Deploy bound with mod (recommend for client)
+<details>
+<summary>
+Deploy bound with mod (recommend for client)
+</summary>
+
 > This method allows MusicHUD to manage lifecycle of api server.
 >
 > Due to some limitations, API Server may not be auto-closed when game exit abnormal (e.g., due to a critical crash)
@@ -93,10 +97,16 @@ You can find "Download API..." button in setting page, which will open a downloa
    - Mod edition: `{corepath}/music-hud/` and rename it to `api` (`api.exe` on Windows)
    - Plugin edition: `{corepath}/plugins/MusicHud/` and rename it to `api` (`api.exe` on Windows)
    - Or place it anywhere and modify config in game or option `serverApiBinaryExecutablePath` (absolute or relative path) in config file `/config/music_hud-common.toml`.
+</details>
 
-#### Deploy separately (recommend for server)
+<details>
+<summary>
+Deploy separately (recommend for server)
+</summary>
+
 1. Deploy [NetEase Cloud Music API Enhanced](https://github.com/neteasecloudmusicapienhanced/api-enhanced) with guide in repository.
 2. If not using the default port (3000) of NCM API Enhanced or deploying on another server, modify the `serverApiBaseUrl` property in the config file `/config/music_hud-server.toml`.
+</details>
 
 > Experimentally, there is another [Rust version API server](https://github.com/SPlayer-Dev/ncm-api-rs), which remains most of api endpoints same with Node.js version but is much faster. MusicHUD have adapted to it since 1.2.13. You can find binary executable files in its release page. But there are still some issues in this api server edition. So use it at your own risk.
 
@@ -120,7 +130,7 @@ You can find "Download API..." button in setting page, which will open a downloa
 [第三方旧 Bukkit 插件实现 (1.0.5 stable -)](https://github.com/Shiroiame-Kusu/MusicHud-Bukkit)
 
 ## 前置依赖
-- ModernUI （仅客户端，在 1.21.9 - 1.21.11 上使用 mVUS 分支，在 26.2、26.3 上使用[该分支](https://github.com/MOPELotus/ModernUI-MC/releases) [(26.2 release)](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9) [(26.3 release)](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9)）
+- ModernUI （仅客户端，建议在 1.21.9 - 1.21.11 上使用 [mVUS 分支](https://modrinth.com/mod/modernui-mc-mvus)，在 26.2、26.3 上使用[该分支](https://github.com/MOPELotus/ModernUI-MC/releases) [(26.2 release)](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9) [(26.3 release)](https://github.com/MOPELotus/ModernUI-MC/releases#release-26.2-3.13.0.9)）
 - Forge Config API Port （仅 Fabric）
 - Fabric API （仅 Fabric）
 - ~~Architectury API~~ （Fabric / NeoForge，MusicHUD 1.2.0 以及更低版本需要）
@@ -138,6 +148,7 @@ You can find "Download API..." button in setting page, which will open a downloa
 - 隔离模式：在客户端上独自享受音乐
 - 连接模式/隔离模式共享同一播放模型，操作简便
 - 服务端带宽/性能占用低，音频流下载和处理由客户端完成
+- 在 1.21.1 上修复了一个导致了输出音频质量下降的 Bug [MC-265514](https://bugs.mojang.com/browse/MC/issues/MC-265514) (存在于 23w31a 至 1.21.4)
 
 ## 功能
 - 搜索音乐、歌单、专辑和歌手
@@ -161,7 +172,6 @@ You can find "Download API..." button in setting page, which will open a downloa
 ## 使用
 
 ### 客户端
-首先在 mods 文件夹中放入前置 mod 和 MusicHUD 的 jar 文件
 
 #### 单人模式 或 局域网联机主机
 只需要配置/部署 API 服务器
@@ -179,8 +189,11 @@ You can find "Download API..." button in setting page, which will open a downloa
 只需要部署 API 服务器
 
 ### 如何部署 API 服务器
-两种方法
-#### 绑定在 mod 中（推荐客户端使用）
+<details>
+<summary>
+绑定在 mod 中（推荐客户端）
+</summary>
+
 > 这个方法会让 MusicHUD 管理 API 服务器生命周期
 >
 > 由于一些限制，在游戏非正常退出时（如某些严重崩溃）可能无法自动结束进程
@@ -195,8 +208,15 @@ You can find "Download API..." button in setting page, which will open a downloa
    - 插件版: {核心目录}/plugins/MusicHud/api(.exe)
    - 或者放在任意处并在游戏内或配置文件`/config/music_hud-common.toml`中修改选项 `serverApiBinaryExecutablePath` 对应(绝对/相对)目录
 
-#### 独立部署（推荐服务端使用）
+</details>
+
+<details>
+<summary>
+独立部署（推荐服务端）
+</summary>
+
 1. 参考 [Netease Cloud Music API Enhanced 仓库](https://github.com/neteasecloudmusicapienhanced/api-enhanced) 内的说明部署
 2. 如果不使用 NCM API Enhanced 的默认端口 ( 3000 ) 或在其他服务器上部署，需要修改配置文件`/config/music_hud-server.toml`的 `serverApiBaseUrl` 属性
+</details>
 
 > 实验性地，有另一个[Rust 版本的 API 服务器](https://github.com/SPlayer-Dev/ncm-api-rs)，保持了大部分 API 端点不变，但比 NodeJS 版本快得多。MusicHUD 已在 1.2.13 实现对其兼容。可以在它的 Release 页中找到二进制可执行文件。但它仍然有一些问题。使用前请考虑风险
