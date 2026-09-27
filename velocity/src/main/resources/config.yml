@@ -1,0 +1,14 @@
+serverApiBaseUrl: "http://localhost:3000"
+startupBinaryApiServerWhenLaunch: true
+# Relative paths are resolved from plugins/music_hud/
+serverApiBinaryExecutablePath: "api"
+pusherVoteAdditionalRate: 0.5
+useRandomCnIp: true
+corsAllowOrigin: "*"
+enableProxy: false
+proxyUrl: "https://your-proxy-url.com/?proxy="
+enableGeneralUnblock: true
+enableFlac: true
+selectMaxBr: false
+followSourceOrder: true
+port: 3000
