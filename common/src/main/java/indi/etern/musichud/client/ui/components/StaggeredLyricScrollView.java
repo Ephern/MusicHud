@@ -650,7 +650,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 // spring it is currently running.
                 row.translate(decouple);
                 anyActive = true;
-            } else if (!staggerStarted[i]) {
+            } else if (i < staggerStarted.length && !staggerStarted[i]) {
                 // Its turn: drop the decoupling from the target so the spring now pulls the row back
                 // onto its target offset (interrupting the old interpolation, keeping the velocity).
                 row.retarget(view.getTargetOffset(justHighlightedLyricLine), currentTimeNanos);
