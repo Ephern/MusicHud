@@ -102,7 +102,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private float[] delayMillis;
     private boolean[] staggerStarted;
     private long[] staggerStartNanos;
-    private long lastFrameTimeNanos;
     // Per-frame scroll delta used to decouple every row from the container scroll during auto-scroll.
     private float prevScrollValue;
     private boolean prevScrollInitialized;
@@ -163,14 +162,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             }
         });
 
-        setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            post(() -> {
-                if (scrollY != oldScrollY && currentScrollPosition != scrollY) {
-                    currentScrollPosition = scrollY;
-                    checkManualScrolling();
-                }
-            });
-        });
+        setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> post(() -> {
+            if (scrollY != oldScrollY && currentScrollPosition != scrollY) {
+                currentScrollPosition = scrollY;
+                checkManualScrolling();
+            }
+        }));
 
         scrollSpring = new SpringValue((float) SCROLL_RESPONSE_MILLIS / 1000, SCROLL_DAMPING);
     }
@@ -311,6 +308,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
         float getValue() {
             return spring.getValue();
+        }
+
+        float getTarget() {
+            return spring.getTarget();
         }
 
         float getProgress() {
@@ -669,22 +670,22 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             return;
         }
         if (!staggeredActive) {
-            // Idle: ease each row onto its target offset (RHYTHM lines sit dp(30) below the active
-            // one) without the stagger wave.
-            float deltaSeconds = lastFrameTimeNanos == 0
-                    ? 0f : (currentTimeNanos - lastFrameTimeNanos) / 1_000_000_000f;
-            lastFrameTimeNanos = currentTimeNanos;
-            float smoothFactor = 1.0f - (float) Math.exp(-deltaSeconds * 10.0);
+            // Idle: drive each row's base spring onto its target offset (RHYTHM lines sit dp(30)
+            // below the active one) without the stagger wave. Driving the spring - and not the View
+            // directly - keeps the base in sync with what is rendered, so a later wave never resumes
+            // from a stale offset (e.g. after a manual scroll eased a row to dp(30)).
             LyricLine targetLine = justHighlightedLyricLine;
-            for (LyricLineView line : lyricLineViewList) {
-                float targetOffset = line.getTargetOffset(targetLine);
-                float currentOffset = line.getTranslationY();
-                float newOffset = currentOffset + (targetOffset - currentOffset) * smoothFactor;
-                if (Math.abs(newOffset - targetOffset) < 0.01f) {
-                    newOffset = targetOffset;
+            int count = Math.min(rows.size(), lyricLineViewList.size());
+            for (int i = 0; i < count; i++) {
+                RowWave row = rows.get(i);
+                float targetOffset = row.view.getTargetOffset(targetLine);
+                if (Math.abs(row.getTarget() - targetOffset) > 0.01f) {
+                    row.retarget(targetOffset, currentTimeNanos);
                 }
-                line.setTranslationY(newOffset);
+                row.update(currentTimeNanos);
+                row.view.setTranslationY(row.getValue());
             }
+            cumulativeBaseOffset = 0f;
             prevScrollInitialized = false;
             return;
         }
