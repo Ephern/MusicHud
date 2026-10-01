@@ -66,6 +66,7 @@ public class HudRendererManager {
     private final ConcurrentLinkedQueue<QueuedLyric> lyricQueue = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean lyricWorkerRunning = new AtomicBoolean();
     private final AtomicLong lyricGeneration = new AtomicLong();
+    private final Object lyricLock = new Object();
 
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
@@ -145,14 +146,17 @@ public class HudRendererManager {
                 long remaining = queued.enqueueNanos() + LYRIC_DELAY_NANOS - System.nanoTime();
                 if (remaining > 0) {
                     try {
+                        //noinspection BusyWait
                         Thread.sleep(remaining / 1_000_000L, (int) (remaining % 1_000_000L));
                     } catch (InterruptedException ignored) {
                     }
                 }
-                if (queued.generation() != lyricGeneration.get()) {
-                    continue; // music switched or HUD reset while this line was queued
+                synchronized (lyricLock) {
+                    if (queued.generation() != lyricGeneration.get()) {
+                        continue; // music switched or HUD reset while this line was queued
+                    }
+                    LYRICS_LINE_RENDERER.setLines(queued.line1(), queued.line2(), true);
                 }
-                LYRICS_LINE_RENDERER.setLines(queued.line1(), queued.line2(), true);
             }
         } finally {
             lyricWorkerRunning.set(false);
@@ -163,9 +167,17 @@ public class HudRendererManager {
         }
     }
 
-    private void invalidatePendingLyrics() {
-        lyricGeneration.incrementAndGet();
-        lyricQueue.clear();
+    /**
+     * Synchronously invalidates queued lyric updates and clears the on-screen lyric lines.
+     * Must run at music-switch time, before {@code startAt} can dispatch the first line: the
+     * newly scheduled first line then carries the fresh generation and is not discarded.
+     */
+    public void invalidateLyrics() {
+        synchronized (lyricLock) {
+            lyricGeneration.incrementAndGet();
+            lyricQueue.clear();
+            LYRICS_LINE_RENDERER.clear();
+        }
     }
 
     private record QueuedLyric(ScrollingLyricLineRenderer.Line line1,
@@ -360,8 +372,8 @@ public class HudRendererManager {
                         .reduce((a, b) -> a + " / " + b)
                         .orElse("");
                 ARTISTS_AND_ALBUM_RENDERER.setText(artists + " - " + musicDetail.getAlbum().getName());
-                invalidatePendingLyrics();
-                LYRICS_LINE_RENDERER.clear();
+                // Lyrics are reset synchronously at music-switch time (NowPlayingInfo.switchMusicInfo),
+                // not here: this HUD update is delayed ~500ms and would otherwise drop the first line.
                 loadAndSwitchAlbumImageWithRetry(musicDetail);
             }
         } catch (Exception e) {
@@ -402,12 +414,10 @@ public class HudRendererManager {
         Album album = musicDetail.getAlbum();
         Album album1 = musicDetail.getAlbum();
         return CompletableFuture.allOf(
-                        ImageUtils.downloadAsync(album1.getImageThumbnailUrl(albumImageThumbnailSize)).thenAccept(imageTextureData -> {
-                            imageTextures[0] = imageTextureData;
-                        }),
-                        ImageUtils.downloadAsync(album.getImageThumbnailUrl(240)).thenAccept(imageTextureData -> {
-                            imageTextures[1] = imageTextureData;
-                        })
+                        ImageUtils.downloadAsync(album1.getImageThumbnailUrl(albumImageThumbnailSize))
+                                .thenAccept(imageTextureData -> imageTextures[0] = imageTextureData),
+                        ImageUtils.downloadAsync(album.getImageThumbnailUrl(240))
+                                .thenAccept(imageTextureData -> imageTextures[1] = imageTextureData)
                 ).thenAccept(imageTextureData -> {
                     if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
                         BackgroundImages backgroundImages = new BackgroundImages(imageTextures[0], 1f);
@@ -423,8 +433,7 @@ public class HudRendererManager {
             TITLE_RENDERER.setText(IDLE_MESSAGE);
         }
         ARTISTS_AND_ALBUM_RENDERER.setText("");
-        invalidatePendingLyrics();
-        LYRICS_LINE_RENDERER.clear();
+        invalidateLyrics();
         PLAY_TIME_RENDERER.setText("");
         musicDurationString = "";
         var nextData = BackgroundData.NONE;
