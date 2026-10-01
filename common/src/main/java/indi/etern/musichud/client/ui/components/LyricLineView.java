@@ -28,14 +28,15 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class LyricLineView extends LinearLayout {
     private static final float LYRIC_EMPHASIZE_SCALE = 1.02f;
     private static final float RHYTHM_EMPHASIZE_ANIMATION_SCALE = 0.85f;
-    private static Logger logger;
     private static final int SCALE_ANIMATION_DELAY = 200;
     private static final int SCALE_ANIMATION_DURATION = 600;
     private static final SpringInterpolator INTERPOLATOR = new SpringInterpolator(SCALE_ANIMATION_DURATION * 0.001f, 1);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static Logger logger;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-    private LinearLayout mainLine;
+    private final int height = dp(30);
     TextView subText;
+    private LinearLayout mainLine;
     private LinearLayout row;
     private LyricLine lyricLine;
     private View mainText;
@@ -59,7 +60,7 @@ public class LyricLineView extends LinearLayout {
                     LinearLayout rhythmLine = new LinearLayout(getContext());
                     rhythmLine.setOrientation(LinearLayout.HORIZONTAL);
                     rhythmLine.setAlpha(0);
-                    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(WRAP_CONTENT, dp(30));
+                    LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(WRAP_CONTENT, height);
                     rhythmLine.setLayoutParams(params);
 
                     for (int i = 0; i < 3; i++) {
@@ -192,7 +193,7 @@ public class LyricLineView extends LinearLayout {
                     return;
                 }
 
-                row.setPivotX((float) mainText.getWidth() / 2);
+                row.setPivotX(Math.max((float) mainText.getWidth() / 2, dp(30)));
                 row.setPivotY(Math.max(row.getHeight() / 2, dp(12)));
                 rhythmAnim.start();
                 emphasizeAnim = rhythmAnim;
@@ -246,7 +247,7 @@ public class LyricLineView extends LinearLayout {
 
     public float getTargetOffset(LyricLine activeLyricLine) {
         if (activeLyricLine != null && activeLyricLine.getType() == LyricLine.Type.RHYTHM && lyricLine.isAfter(activeLyricLine)) {
-            return dp(30);
+            return height - dp(2);
         } else {
             return 0;
         }
