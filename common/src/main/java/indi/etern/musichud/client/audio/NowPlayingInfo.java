@@ -321,6 +321,9 @@ public class NowPlayingInfo {
             HudRendererManager.getInstance().switchMusic(musicDetail);
         });
         List.copyOf(musicSwitchListener).forEach(consumer -> consumer.accept(previous, musicDetail));
+        // Reset HUD lyrics synchronously, before startAt() (triggered by play()) can dispatch the
+        // first line. The delayed 500ms HUD update only refreshes title/artists/cover now.
+        HudRendererManager.getInstance().invalidateLyrics();
         callLyricsUpdateListeners(null);
     }
 

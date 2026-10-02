@@ -5,10 +5,8 @@ import icyllis.modernui.animation.AnimatorListener;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.core.Core;
 import icyllis.modernui.graphics.*;
 import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.mc.ScrollController;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
@@ -22,6 +20,7 @@ import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
+import indi.etern.musichud.client.utils.ui.SpringValue;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
@@ -29,77 +28,49 @@ import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.*;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 @SuppressWarnings("UnstableApiUsage")
-public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initial sync
+public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final int AUTO_RECENTER_DELAY_MILLIS = 1000;
-    public static final float MAX_DELAY_MILLIS = 500;
-    public static final float STAGGERED_BASE_DURATION_MILLIS = 600;
+    public static final float MAX_DELAY_MILLIS = 800;
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
     private static final float SPACER_HEIGHT_RATIO = 0.7f;
-    private static final int SWITCH_DURATION = 350;
+    private static final int SWITCH_DURATION = 400;
+    private static final int SCROLL_RESPONSE_MILLIS = 600;
+    private static final float SCROLL_DAMPING = 1f;
+    // The parent scroll delta is scaled by this before it is fed into each row's live decoupling.
+    // It must stay 0.5: icyllis.modernui.graphics.RenderProperties.computeTransform applies the
+    // view's x/y translation twice (preTranslate + postTranslate both carry it), so a rendered
+    // compensation that matches the scroll needs a set value of `delta / 2`.
+    private static final float SCROLL_DECOUPLE_FACTOR = 0.5f;
+    // Per-row stagger spring: one fixed curve shared by every row (slight overshoot), so a row's
+    // amplitude and duration never depend on its distance from the highlighted row. Only the
+    // per-row start delay differs, and that delay is scheduled by the scroll view, never the row.
+    private static final int ROW_RESPONSE_MILLIS = SCROLL_RESPONSE_MILLIS;
+    private static final float ROW_DAMPING = 1f;
+    // A very short highlighted line collapses the whole delay wave (see durationFactor) so a fast
+    // sequence of short lines never blocks; the per-row delay ratios are preserved.
+    private static final int DELAY_SHORTEN_TAU_MILLIS = 200;
     private static final SpringInterpolator SWITCH_INTERPOLATOR =
-            new SpringInterpolator((float) SWITCH_DURATION / 1000, 1);
-    private View bottomSpacer;
-    private static final SpringInterpolator STAGGER_INTERPOLATOR = new SpringInterpolator(STAGGERED_BASE_DURATION_MILLIS * 0.001f, 1);
+            new SpringInterpolator((float) SWITCH_DURATION / 1000, 0.9f);
     private static Logger logger;
-    private final Set<LyricLineView> animatingLyricViews = new HashSet<>();
     private final Map<LyricLine, LyricLineView> lyricLines = new LinkedHashMap<>();
     @Getter
     private final List<LyricLineView> lyricLineViewList = new ArrayList<>();
     private final LinearLayout container;
-    private final ScrollController scrollController;
+    private final SpringValue scrollSpring;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+    private final AtomicReference<LyricLine> pendingHighlightLine = new AtomicReference<>();
+    private final AtomicBoolean highlightScheduled = new AtomicBoolean();
     private final Paint fadeEdgePaint = new Paint();
-    Runnable staggeringEndListener = null;
-    boolean scrollFinished = false;
-    @Getter
-    private volatile ScrollStatus scrollStatus = ScrollStatus.FOLLOW_LYRICS;
-    @Getter
-    private long lastUserStartScrollTime = -AUTO_RECENTER_DELAY_MILLIS - MANUAL_SCROLL_FADE_DURATION;
-    @Getter
-    private long lastUserScrollTime = -AUTO_RECENTER_DELAY_MILLIS - MANUAL_SCROLL_FADE_DURATION;
-    private long lastAutoScrollTime = (long) -STAGGERED_BASE_DURATION_MILLIS;
-    @Getter
-    private int currentScrollPosition = 0;
-    private LyricLine justHighlightedLyricLine;
-    private LyricLine lastHighlightedLyricLine;
-    private boolean continueUpdate = false;
-    private long lyricAnimationStartAtMillis;
-    @Setter
-    @Getter
-    private boolean staggeredActive;
-    @Getter
-    @Setter
-    private boolean fadeEdgesEnabled = true;
-    @Getter
-    @Setter
-    private float fadeEdgeMaxStrength = 1.0f;
-    private LinearGradient topFadeGradient;
-    private LinearGradient bottomFadeGradient;
-    private int cachedTopFadeHeight = -1;
-    private int cachedBottomFadeHeight = -1;
-    private float cachedFadeStrength = -1f;
-    private float[] delayMillis;
-    @Getter
-    private float lastTargetScrollPosition;
-    private float cumulativeBaseOffset;
-    private float prevScrollValue;
-    private boolean prevScrollInitialized;
-    private float baseOffsetAtRedirect;
-    private float[] staggerFromOffsets;
-    private long lastFrameTimeNanos;
-    private volatile MusicDetail musicDetail;
-    // Lyrics collection currently built into the container; only assigned on successful build.
-    private Collection<LyricLine> currentLyrics;
-    private boolean pendingResyncToCurrent;
-    // True while a finger is on the view; programmatic/layout scroll changes must not count as manual.
-    private boolean pointerDown;
     private final Consumer<LyricLine> lyricLineUpdateListener = this::highlightLine;
     private final Runnable autoRecenterRunnable = new Runnable() {
         @Override
@@ -114,6 +85,56 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
             }
         }
     };
+    Runnable staggeringEndListener = null;
+    boolean scrollFinished = false;
+    private View bottomSpacer;
+    @Getter
+    private volatile ScrollStatus scrollStatus = ScrollStatus.FOLLOW_LYRICS;
+    @Getter
+    private long lastUserStartScrollTime = -AUTO_RECENTER_DELAY_MILLIS - MANUAL_SCROLL_FADE_DURATION;
+    @Getter
+    private long lastUserScrollTime = -AUTO_RECENTER_DELAY_MILLIS - MANUAL_SCROLL_FADE_DURATION;
+    @Getter
+    private int currentScrollPosition = 0;
+    private LyricLine justHighlightedLyricLine;
+    // Per-row stagger state. Each RowWave holds a spring and a progress spring; every delay - when
+    // to retarget the row - and every offset is computed and scheduled here, never inside the row.
+    private float[] delayMillis;
+    private boolean[] staggerStarted;
+    private long[] staggerStartNanos;
+    // Per-frame scroll delta used to decouple every row from the container scroll during auto-scroll.
+    private float prevScrollValue;
+    private boolean prevScrollInitialized;
+    // Parent-scroll compensation accumulated over the whole wave, relative to the wave start. A
+    // single shared scalar; each row releases its own share with its own progress, so this never
+    // pins or freezes a row that is still animating.
+    private float cumulativeBaseOffset;
+    private float baseOffsetAtRedirect;
+    private boolean continueUpdate = false;
+    @Setter
+    @Getter
+    private boolean staggeredActive;
+    @Getter
+    @Setter
+    private boolean fadeEdgesEnabled = true;
+    @Getter
+    @Setter
+    private float fadeEdgeMaxStrength = 1.0f;
+    private LinearGradient topFadeGradient;
+    private LinearGradient bottomFadeGradient;
+    private int cachedTopFadeHeight = -1;
+    private int cachedBottomFadeHeight = -1;
+    private float cachedFadeStrength = -1f;
+    // One spring-backed RowWave per lyric row (see buildLyricRows).
+    private final List<RowWave> rows = new ArrayList<>();
+    @Getter
+    private float lastTargetScrollPosition;
+    private volatile MusicDetail musicDetail;
+    // Lyrics collection currently built into the container; only assigned on successful build.
+    private Collection<LyricLine> currentLyrics;
+    private boolean pendingResyncToCurrent;
+    // True while a finger is on the view; programmatic/layout scroll changes must not count as manual.
+    private boolean pointerDown;
 
     public StaggeredLyricScrollView(Context context) {
         super(context);
@@ -124,7 +145,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
 
         container = new LinearLayout(context);
         container.setOrientation(LinearLayout.VERTICAL);
-        addView(container, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        params.setMargins(dp(1), 0, dp(1), 0);
+        addView(container, params);
 
         nowPlayingInfo.getLyricLineUpdateListener().add(lyricLineUpdateListener);
 
@@ -134,23 +157,19 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
             int lastWidth = oldRight - oldLeft;
             int lastHeight = oldBottom - oldTop;
             if ((width != lastWidth || height != lastHeight)
-                && (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.MANUAL)) {
+                    && (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.MANUAL)) {
                 recenter();
             }
         });
 
-        setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            post(() -> {
-                if (scrollY != oldScrollY && currentScrollPosition != scrollY) {
-                    currentScrollPosition = scrollY;
-                    checkManualScrolling();
-                }
-            });
-        });
+        setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> post(() -> {
+            if (scrollY != oldScrollY && currentScrollPosition != scrollY) {
+                currentScrollPosition = scrollY;
+                checkManualScrolling();
+            }
+        }));
 
-        scrollController = new ScrollController((controller, amount) -> {
-            scrollTo(0, (int) amount);
-        });
+        scrollSpring = new SpringValue((float) SCROLL_RESPONSE_MILLIS / 1000, SCROLL_DAMPING);
     }
 
     public void switchLyrics(MusicDetail musicDetail, Collection<LyricLine> lyrics) {
@@ -165,8 +184,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
                     @Override
                     public void onAnimationEnd(@NonNull Animator animation) {
                         justHighlightedLyricLine = null;
-                        lastHighlightedLyricLine = null;
-                        animatingLyricViews.clear();
                         container.removeAllViews();
                         buildLyricRows(lyrics);
                         container.setTranslationX(getWidth());
@@ -212,11 +229,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         Context context = getContext();
         container.addView(new FrameLayout(context), new LayoutParams(0, dp(64)));
 
+        rows.clear();
         for (LyricLine line : lyrics) {
             LyricLineView row = new LyricLineView(context, line);
             container.addView(row);
             lyricLines.put(line, row);
             lyricLineViewList.add(row);
+            rows.add(new RowWave(row));
         }
 
         bottomSpacer = new View(context);
@@ -224,11 +243,80 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
 
         post(() -> {
             requestLayout();
-            for (LyricLineView line : lyricLineViewList) {
-                line.setTranslationY(line.getTargetOffset(nowPlayingInfo.getCurrentLyricLine()));
+            for (int i = 0; i < lyricLineViewList.size(); i++) {
+                LyricLineView line = lyricLineViewList.get(i);
+                float offset = line.getTargetOffset(nowPlayingInfo.getCurrentLyricLine());
+                line.setTranslationY(offset);
+                rows.get(i).jumpTo(offset);
             }
             post(this::resyncToCurrentLyric);
         });
+    }
+
+    /**
+     * One lyric row's animation state: an absolute {@link SpringValue} driving the rendered
+     * translationY (minus the live decoupling), plus a normalized progress {@link SpringValue} that
+     * releases that decoupling. Both are retargeted with {@link SpringValue#setTarget}, so a rapid
+     * switch keeps the running value and velocity instead of resetting the animation. The row knows
+     * nothing about delays or scroll - the scroll view schedules every retarget.
+     */
+    private static final class RowWave {
+        final LyricLineView view;
+        final SpringValue spring;
+        final SpringValue progress;
+
+        RowWave(LyricLineView view) {
+            this.view = view;
+            this.spring = new SpringValue((float) ROW_RESPONSE_MILLIS / 1000, ROW_DAMPING);
+            this.progress = new SpringValue((float) ROW_RESPONSE_MILLIS / 1000, ROW_DAMPING);
+        }
+
+        void retarget(float target, long nowNanos) {
+            spring.setTarget(target, nowNanos);
+        }
+
+        void retargetProgress(float target, long nowNanos) {
+            progress.setTarget(target, nowNanos);
+        }
+
+        /**
+         * Snap the release factor. Safe at a wave start because the compensation has just been
+         * rebased to zero, so the factor does not affect the rendered value or its velocity.
+         */
+        void snapProgress(float value) {
+            progress.jumpTo(value);
+        }
+
+        /** Shift the running base spring by {@code delta} without interrupting it (keeps velocity). */
+        void translate(float delta) {
+            spring.translate(delta);
+        }
+
+        void update(long nowNanos) {
+            spring.update(nowNanos);
+            progress.update(nowNanos);
+        }
+
+        boolean isSettled() {
+            return spring.isSettled() && progress.isSettled();
+        }
+
+        void jumpTo(float value) {
+            spring.jumpTo(value);
+            progress.jumpTo(1f);
+        }
+
+        float getValue() {
+            return spring.getValue();
+        }
+
+        float getTarget() {
+            return spring.getTarget();
+        }
+
+        float getProgress() {
+            return progress.getValue();
+        }
     }
 
     public void resyncToCurrentLyric() {
@@ -244,10 +332,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         if (current != null) {
             LyricLineView target = lyricLines.get(current);
             if (target != null) {
+                justHighlightedLyricLine = current;
                 jumpToLyric(target);
                 target.emphasize();
-                lastHighlightedLyricLine = justHighlightedLyricLine;
-                justHighlightedLyricLine = current;
             } else {
                 jumpToTop();
             }
@@ -269,31 +356,35 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
     }
 
     void highlightLine(@Nullable LyricLine lyricLine) {
-        if (Objects.equals(musicDetail, nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
-            MuiModApi.postToUiThread(() -> {
-                if (lyricLine == null) {
-                    justHighlightedLyricLine = null;
-                    lastHighlightedLyricLine = null;
-                    return;
-                }
-                LyricLineView target = lyricLines.get(lyricLine);
-                if (target == null) return;
-                target.emphasize();
-                lastHighlightedLyricLine = justHighlightedLyricLine;
-                justHighlightedLyricLine = lyricLine;
-
-                if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.FOLLOW_LYRICS) {
-                    long now = MuiModApi.getElapsedTime();
-                    boolean disableStagger = lyricLine.getType() == LyricLine.Type.META_DATA || now - lastAutoScrollTime < STAGGERED_BASE_DURATION_MILLIS * 2 / 3;
-                    if (!disableStagger) {
-                        lastAutoScrollTime = MuiModApi.getElapsedTime();
-                        scrollToLyric(target);
-                    }
-                } else if (scrollStatus == ScrollStatus.MANUAL) {
-                    lyricAnimationStartAtMillis = Core.timeMillis();
-                }
-            });
+        if (!Objects.equals(musicDetail, nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
+            return;
         }
+        // Conflate rapid highlight updates to the latest one so the UI thread never backs up.
+        pendingHighlightLine.set(lyricLine);
+        if (highlightScheduled.compareAndSet(false, true)) {
+            MuiModApi.postToUiThread(this::drainHighlight);
+        }
+    }
+
+    private void drainHighlight() {
+        highlightScheduled.set(false);
+        applyHighlight(pendingHighlightLine.getAndSet(null));
+    }
+
+    private void applyHighlight(@Nullable LyricLine lyricLine) {
+        if (lyricLine == null) {
+            justHighlightedLyricLine = null;
+            return;
+        }
+        LyricLineView target = lyricLines.get(lyricLine);
+        if (target == null) return;
+        target.emphasize();
+        justHighlightedLyricLine = lyricLine;
+
+        if (scrollStatus == ScrollStatus.MANUAL) {
+            return;
+        }
+        scrollToLyric(target);
     }
 
     private void recenter() {
@@ -304,47 +395,43 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         LyricLineView target = lyricLines.get(targetLine);
         if (target == null) return;
         if (scrollStatus == ScrollStatus.RECENTER) return;
-        lastHighlightedLyricLine = justHighlightedLyricLine;
         scrollStatus = ScrollStatus.RECENTER;
         scrollFinished = false;
         scrollToLyric(target);
     }
 
     private void jumpToTop() {
-        if (scrollController == null) return;
+        if (scrollSpring == null) return;
         resetStaggerState();
-        int maxScroll = Math.max(0, container.getHeight() - getHeight());
-        scrollController.setMaxScroll(maxScroll);
-        scrollController.scrollTo(0, 0);
-        scrollController.setStartValue(currentScrollPosition);
-        scrollController.abortAnimation();
+        scrollSpring.jumpTo(0f);
+        scrollTo(0, 0);
         currentScrollPosition = 0;
+        lastTargetScrollPosition = 0f;
+        snapRows();
     }
 
     private void jumpToLyric(LyricLineView target) {
-        if (target == null || scrollController == null) return;
+        if (target == null || scrollSpring == null) return;
         int targetTop = target.getScrollPosition(this);
         int scrollViewHeight = getHeight();
         if (scrollViewHeight <= 0) {
             post(() -> jumpToLyric(target));
             return;
         }
-        int targetScrollY = targetTop - dp(80);
         int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
-        targetScrollY = Math.clamp(targetScrollY, 0, maxScroll);
+        int targetScrollY = Math.clamp(targetTop - dp(80), 0, maxScroll);
 
         resetStaggerState();
-        scrollController.setMaxScroll(maxScroll);
-        scrollController.scrollTo(targetScrollY, 0);
-        scrollController.setStartValue(currentScrollPosition);
-        scrollController.abortAnimation();
+        scrollSpring.jumpTo(targetScrollY);
+        scrollTo(0, targetScrollY);
         currentScrollPosition = targetScrollY;
-        // Keep the loop's settle check consistent with the controller value we just forced.
+        // Keep the loop's settle check consistent with the value we just forced.
         lastTargetScrollPosition = targetScrollY;
+        snapRows();
     }
 
     private void scrollToLyric(LyricLineView target) {
-        if (target == null || scrollController == null) return;
+        if (target == null || scrollSpring == null) return;
         int targetTop = target.getScrollPosition(this);
 
         int scrollViewHeight = getHeight();
@@ -353,39 +440,102 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
             return;
         }
         int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
-        lastTargetScrollPosition = Math.clamp(targetTop - dp(80), 0, maxScroll);
+        int targetScrollY = Math.clamp(targetTop - dp(80), 0, maxScroll);
+        lastTargetScrollPosition = targetScrollY;
 
-        int duration = (int) (STAGGERED_BASE_DURATION_MILLIS / 2);
-        if (scrollStatus == ScrollStatus.IDLE) {
+        if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.RECENTER) {
             scrollStatus = ScrollStatus.FOLLOW_LYRICS;
         }
 
+        long now = MuiModApi.getFrameTimeNanos();
         int targetIndex = lyricLineViewList.indexOf(target);
-        boolean staggerJustStarted = !staggeredActive;
-        if (staggerJustStarted) {
-            staggerFromOffsets = null;
-        } else {
-            baseOffsetAtRedirect = cumulativeBaseOffset;
-            staggerFromOffsets = new float[lyricLineViewList.size()];
-            for (int i = 0; i < lyricLineViewList.size(); i++) {
-                staggerFromOffsets[i] = lyricLineViewList.get(i).getTranslationY();
+        int n = rows.size();
+
+        calcLoggedDelay(targetIndex, justHighlightedLyricLine);
+        // Rebase the live compensation for this wave while keeping every running spring continuous:
+        // the old compensation is shifted into the base spring via translate() (value, velocity and
+        // the running segment are preserved), so a rapid highlight never freezes a row.
+        long[] previousStartNanos = staggerStartNanos;
+        float cumulativeBeforeRebase = cumulativeBaseOffset;
+        float previousBase = baseOffsetAtRedirect;
+
+        staggerStarted = new boolean[n];
+        staggerStartNanos = new long[n];
+        for (int i = 0; i < n; i++) {
+            float delay = delayMillis[Math.min(i, delayMillis.length - 1)];
+            if (scrollStatus == ScrollStatus.RECENTER) {
+                delay /= 2;
             }
-        }
-        calcLoggedDelay(targetIndex);
-        lyricAnimationStartAtMillis = Core.timeMillis();
-        if (targetIndex >= 0 && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
-            staggeredActive = true;
-        }
+            long newStart = now + (long) (delay * 1_000_000L);
+            // Only carry over the previous deadline while that row is still waiting (its deadline is
+            // still in the future): it may move earlier but never later, so it cannot be starved. A
+            // row whose previous deadline already passed has started, and gets a fresh delay so
+            // rapid highlights keep respecting the per-row stagger instead of moving in lockstep.
+            if (previousStartNanos != null && i < previousStartNanos.length
+                    && previousStartNanos[i] > now
+                    && previousStartNanos[i] < newStart) {
+                newStart = previousStartNanos[i];
+            }
+            staggerStartNanos[i] = newStart;
 
-        //Force reset due to manual scroll makes scrollController value different to actual value
-        if (Math.abs(scrollController.getCurrValue() - currentScrollPosition) > 1) {
-            scrollController.scrollTo(currentScrollPosition, 0);
-            scrollController.abortAnimation();
-            prevScrollInitialized = false;
+            RowWave row = rows.get(i);
+            float progress = Math.clamp(row.getProgress(), 0f, 1f);
+            row.translate((cumulativeBeforeRebase - previousBase) * (1f - progress));
+            // Re-decouple immediately from the very first frame instead of fading the factor in:
+            // the compensation was just rebased to zero, so this snap keeps position/velocity
+            // continuous and leaves the running base spring untouched.
+            row.snapProgress(0f);
         }
+        baseOffsetAtRedirect = cumulativeBaseOffset;
+        staggeredActive = true;
 
-        scrollController.setMaxScroll(maxScroll);
-        scrollController.scrollTo(lastTargetScrollPosition, duration);
+        scrollSpring.setTarget(targetScrollY, now);
+    }
+
+    private void calcLoggedDelay(int targetIndex, LyricLine highlighted) {
+        int totalLines = lyricLineViewList.size();
+        delayMillis = new float[totalLines];
+        double max = Math.max(5, Math.log(1 + totalLines));
+        float factor = durationFactor(highlighted);
+        for (int i = 0; i < totalLines; i++) {
+            int distance = Math.abs(i - targetIndex + 1);
+            float delayFactor = (float) Math.clamp(Math.log(1 + distance) / max, 0, 1);
+            delayMillis[i] = delayFactor * MAX_DELAY_MILLIS * (i < targetIndex ? 0.5f : 1) * factor;
+        }
+    }
+
+    /**
+     * Only a highlighted line that lasts tens-to-hundreds of milliseconds visibly shortens the
+     * wave; normal lines keep the full delay.
+     */
+    private static float durationFactor(@Nullable LyricLine highlighted) {
+        if (highlighted == null) return 1f;
+        Duration duration = highlighted.getDuration();
+        if (duration == null) return 1f;
+        float x = (float) duration.toMillis() / DELAY_SHORTEN_TAU_MILLIS;
+        return 1f - (float) Math.exp(-x * x);
+    }
+
+    /** Snap every row to rest at its target offset (used when the scroll position is forced). */
+    private void snapRows() {
+        clearStaggerState();
+        for (RowWave row : rows) {
+            float offset = row.view.getTargetOffset(justHighlightedLyricLine);
+            row.jumpTo(offset);
+            row.view.setTranslationY(offset);
+        }
+    }
+
+    /** Drop every in-flight stagger scheduling array; the rows keep their current value/velocity. */
+    private void clearStaggerState() {
+        staggeredActive = false;
+        delayMillis = null;
+        staggerStarted = null;
+        staggerStartNanos = null;
+        cumulativeBaseOffset = 0f;
+        baseOffsetAtRedirect = 0f;
+        prevScrollValue = 0f;
+        prevScrollInitialized = false;
     }
 
     private void checkManualScrolling() {
@@ -402,13 +552,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
 
     private void markManual() {
         scrollStatus = ScrollStatus.MANUAL;
-        staggeredActive = false;
+        clearStaggerState();
         lastUserStartScrollTime = MuiModApi.getElapsedTime();
         lastUserScrollTime = MuiModApi.getElapsedTime();
         removeCallbacks(autoRecenterRunnable);
         postDelayed(autoRecenterRunnable, AUTO_RECENTER_DELAY_MILLIS);
-        if (scrollController.isScrolling()) {
-            scrollController.abortAnimation();
+        if (scrollSpring != null) {
+            scrollSpring.jumpTo(getScrollY());
         }
     }
 
@@ -431,8 +581,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
     public boolean onGenericMotionEvent(MotionEvent ev) {
         if (ev.getAction() == MotionEvent.ACTION_SCROLL
                 && (scrollStatus == ScrollStatus.IDLE
-                    || scrollStatus == ScrollStatus.FOLLOW_LYRICS
-                    || scrollStatus == ScrollStatus.RECENTER)) {
+                || scrollStatus == ScrollStatus.FOLLOW_LYRICS
+                || scrollStatus == ScrollStatus.RECENTER)) {
             markManual();
         }
         return super.onGenericMotionEvent(ev);
@@ -454,9 +604,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         stopUpdateLoop();
         removeCallbacks(autoRecenterRunnable);
         nowPlayingInfo.getLyricLineUpdateListener().remove(lyricLineUpdateListener);
-        if (scrollController != null) {
-            scrollController.abortAnimation();
-        }
     }
 
     private void startUpdateLoop() {
@@ -471,20 +618,34 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         try {
             Choreographer.getInstance().postFrameCallback((choreographer, frameTimeNanos) -> {
                 if (continueUpdate) {
-                    if (scrollController.isScrolling()) {
-                        scrollController.update(MuiModApi.getElapsedTime());
-                        scrollFinished = false;
-                    }
-                    if (((!scrollController.isScrolling() && !scrollFinished) || scrollController.getCurrValue() == lastTargetScrollPosition)
-                            && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
-                        scrollFinished = true;
-                        if (!staggeredActive || animatingLyricViews.isEmpty()) {
-                            scrollStatus = ScrollStatus.IDLE;
-                        } else {
-                            staggeringEndListener = () -> {
-                                scrollStatus = ScrollStatus.IDLE;
-                            };
+                    if (scrollStatus != ScrollStatus.MANUAL) {
+                        float value = scrollSpring.update(frameTimeNanos);
+                        int maxScroll = Math.max(0, container.getHeight() - getHeight());
+                        scrollTo(0, Math.clamp((int) value, 0, maxScroll));
+                        if (!scrollSpring.isSettled()) {
+                            scrollFinished = false;
                         }
+                        // Settle when the spring has stopped or already sits on the target (the
+                        // latter matters when a new highlight maps to the same scroll position, so
+                        // the state machine still gets a chance to fall back to IDLE).
+                        boolean atTarget = Math.abs(scrollSpring.getValue() - lastTargetScrollPosition) < 1f;
+                        if (((!scrollSpring.isSettled() && !scrollFinished) || atTarget)
+                                && (scrollStatus == ScrollStatus.FOLLOW_LYRICS || scrollStatus == ScrollStatus.RECENTER)) {
+                            scrollFinished = true;
+                            if (!staggeredActive) {
+                                scrollStatus = ScrollStatus.IDLE;
+                            } else {
+                                staggeringEndListener = () -> {
+                                    if (scrollStatus != ScrollStatus.MANUAL) {
+                                        scrollStatus = ScrollStatus.IDLE;
+                                    }
+                                };
+                            }
+                        }
+                    } else {
+                        // A finger owns the scroll: keep the spring in sync so auto-follow resumes
+                        // from where the user left it instead of fighting the gesture.
+                        scrollSpring.jumpTo(getScrollY());
                     }
                     updateTranslations(frameTimeNanos);
 
@@ -504,106 +665,111 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         resetStaggerState();
     }
 
-    private void calcLoggedDelay(int targetIndex) {
-        int totalLines = lyricLineViewList.size();
-        delayMillis = new float[totalLines];
-
-        double max = Math.max(5, Math.log(1 + totalLines));
-        for (int i = 0; i < totalLines; i++) {
-            int distance = Math.abs(i - targetIndex + 1);
-            float delayFactor = (float) Math.clamp(Math.log(1 + distance) / max, 0, 1);
-            delayMillis[i] = delayFactor * MAX_DELAY_MILLIS * (i < targetIndex ? 0.5f : 1);
-        }
-    }
-
     private void updateTranslations(long currentTimeNanos) {
+        if (rows.isEmpty()) {
+            return;
+        }
         if (!staggeredActive) {
-            float deltaSeconds = lastFrameTimeNanos == 0 ? 0 : (currentTimeNanos - lastFrameTimeNanos) / 1_000_000_000f;
-            lastFrameTimeNanos = currentTimeNanos;
-            float smoothFactor = 1.0f - (float) Math.exp(-deltaSeconds * 10.0);
+            // Idle: drive each row's base spring onto its target offset (RHYTHM lines sit dp(30)
+            // below the active one) without the stagger wave. Driving the spring - and not the View
+            // directly - keeps the base in sync with what is rendered, so a later wave never resumes
+            // from a stale offset (e.g. after a manual scroll eased a row to dp(30)).
             LyricLine targetLine = justHighlightedLyricLine;
-            for (LyricLineView line : lyricLineViewList) {
-                float targetOffset = line.getTargetOffset(targetLine);
-                float currentOffset = line.getTranslationY();
-                float newOffset = currentOffset + (targetOffset - currentOffset) * smoothFactor;
-                if (Math.abs(newOffset - targetOffset) < 0.01f) {
-                    newOffset = targetOffset;
+            int count = Math.min(rows.size(), lyricLineViewList.size());
+            for (int i = 0; i < count; i++) {
+                RowWave row = rows.get(i);
+                float targetOffset = row.view.getTargetOffset(targetLine);
+                if (Math.abs(row.getTarget() - targetOffset) > 0.01f) {
+                    row.retarget(targetOffset, currentTimeNanos);
                 }
-                line.setTranslationY(newOffset);
+                row.update(currentTimeNanos);
+                row.view.setTranslationY(row.getValue());
             }
+            cumulativeBaseOffset = 0f;
             prevScrollInitialized = false;
-            cumulativeBaseOffset = 0;
-            delayMillis = null;
-            staggerFromOffsets = null;
             return;
         }
 
-        float elapsedMillis = ((float) currentTimeNanos / 1000000 - lyricAnimationStartAtMillis);
-        boolean anyActive = false;
-
-        float currentScrollValue = scrollController.getCurrValue();
-        if (prevScrollInitialized) {
-            cumulativeBaseOffset += (currentScrollValue - prevScrollValue) / 2.0f;
-        } else {
-            cumulativeBaseOffset = 0;
-            prevScrollInitialized = true;
-        }
+        float currentScrollValue = scrollSpring.getValue();
+        float decouple = prevScrollInitialized
+                ? (currentScrollValue - prevScrollValue) * SCROLL_DECOUPLE_FACTOR : 0f;
         prevScrollValue = currentScrollValue;
-        float baseOffset = cumulativeBaseOffset;
+        prevScrollInitialized = true;
 
-        float scrollCompensation = staggerFromOffsets != null
-                ? baseOffset - baseOffsetAtRedirect
-                : baseOffset;
+        // Accumulate the parent-scroll compensation for the whole wave (until the scroll settles).
+        // This is a single shared scalar; rows release their own share with their own progress, so it
+        // never freezes a row that is still animating.
+        boolean scrollSettled = scrollSpring.isSettled();
+        if (!scrollSettled) {
+            cumulativeBaseOffset += decouple;
+        }
+        float scrollCompensation = cumulativeBaseOffset - baseOffsetAtRedirect;
 
-        for (int i = 0; i < lyricLineViewList.size(); i++) {
-            LyricLineView line = lyricLineViewList.get(i);
-            float delay = delayMillis == null ? 0 : delayMillis[i >= delayMillis.length ? delayMillis.length - 1 : i];
-            if (scrollStatus == ScrollStatus.RECENTER) {
-                delay /= 2;
-            }
-            float lastTargetOffset = line.getTargetOffset(lastHighlightedLyricLine);
-            float targetOffset = line.getTargetOffset(justHighlightedLyricLine);
-
-            float fromOffset = staggerFromOffsets != null && i < staggerFromOffsets.length
-                    ? staggerFromOffsets[i]
-                    : lastTargetOffset;
-
-            if (elapsedMillis <= delay) {
-                line.setTranslationY(fromOffset + scrollCompensation);
+        boolean anyActive = false;
+        int n = rows.size();
+        for (int i = 0; i < n; i++) {
+            RowWave row = rows.get(i);
+            LyricLineView view = row.view;
+            long startNanos = staggerStartNanos != null && i < staggerStartNanos.length
+                    ? staggerStartNanos[i] : 0L;
+            if (currentTimeNanos < startNanos) {
+                // Not its turn yet: the row keeps following the parent scroll through the live
+                // compensation; its running spring is never interrupted.
                 anyActive = true;
-            } else {
-                float t = elapsedMillis - delay;
-                float rawProgress = t / STAGGERED_BASE_DURATION_MILLIS;
-                float progress = Math.min(rawProgress, 1.0f);
-                if (rawProgress <= 1.05) {
-                    animatingLyricViews.add(line);
-                    float eased = STAGGER_INTERPOLATOR.getInterpolation(progress);
-                    float offset = fromOffset * (1 - eased) + targetOffset * eased + scrollCompensation * (1 - eased);
-                    line.setTranslationY(offset);
-                    anyActive = true;
-                } else {
-                    line.setTranslationY(targetOffset);
-                    animatingLyricViews.remove(line);
-                    if (staggeredActive) {
-                        if (animatingLyricViews.isEmpty()) {
-                            if (staggeringEndListener != null) {
-                                staggeringEndListener.run();
-                            }
-                        }
-                    }
-                }
+            } else if (i < staggerStarted.length && !staggerStarted[i]) {
+                // Its turn: move toward the target offset and release this row's decoupling. Both
+                // retargets preserve the current value/velocity, so a rapid switch stays continuous.
+                row.retarget(view.getTargetOffset(justHighlightedLyricLine), currentTimeNanos);
+                row.retargetProgress(1f, currentTimeNanos);
+                staggerStarted[i] = true;
+            }
+            row.update(currentTimeNanos);
+            float progress = Math.clamp(row.getProgress(), 0f, 1f);
+            view.setTranslationY(row.getValue() + scrollCompensation * (1f - progress));
+            if (!row.isSettled()) {
+                anyActive = true;
             }
         }
-        if (!anyActive) {
-            if (staggeredActive) {
-                staggeredActive = false;
-                delayMillis = null;
-                staggerFromOffsets = null;
-                cumulativeBaseOffset = 0;
-            }
-            prevScrollInitialized = false;
+
+        // The wave is only finished once the parent scroll has settled as well, so the hand-off to
+        // the idle path never jumps (by then the released render already equals the target offset).
+        if (!scrollSettled) {
+            anyActive = true;
         }
-        lastFrameTimeNanos = currentTimeNanos;
+
+        boolean wasActive = staggeredActive;
+        staggeredActive = anyActive;
+        if (wasActive && !anyActive) {
+            clearStaggerState();
+            Runnable listener = staggeringEndListener;
+            staggeringEndListener = null;
+            if (listener != null) {
+                listener.run();
+            }
+        }
+    }
+
+    // Near-identity projective matrix (persp0 = 1e-8): makes the position matrix
+    // report hasPerspective() so arc3d skips the direct-mask glyph path (which floors
+    // every glyph to whole device pixels) and uses the transformed-mask path, which
+    // keeps fractional positions and samples the atlas with bilinear filtering.
+    // The epsilon must live in m14 (persp0), NOT m44 (persp2): Device normalizes the
+    // CTM via Matrix.normalizePerspective(), which divides m44 back to exactly 1
+    // whenever m14/m24 are zero, silently undoing an m44-based flag. With m14 != 0
+    // the normalization is skipped entirely. The resulting w-distortion
+    // (~1e-8 * scale^2 * x) is far below one physical pixel.
+    private static final Matrix SUBPIXEL_MATRIX = new Matrix(
+            1f, 0f, 1e-8f,
+            0f, 1f, 0f,
+            0f, 0f, 1f
+    );
+
+    @Override
+    protected void dispatchDraw(Canvas canvas) {
+        canvas.save();
+        canvas.concat(SUBPIXEL_MATRIX);
+        super.dispatchDraw(canvas);
+        canvas.restore();
     }
 
     @Override
@@ -735,7 +901,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
         }
         resetStaggerState();
         scrollStatus = ScrollStatus.IDLE;
-        lastAutoScrollTime = MuiModApi.getElapsedTime();
         post(() -> {
             requestLayout();
             post(this::resyncToCurrentLyric);
@@ -750,20 +915,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {//FIXME initia
     }
 
     private void resetStaggerState() {
-        staggeredActive = false;
-        animatingLyricViews.clear();
-        delayMillis = null;
-        staggerFromOffsets = null;
-        cumulativeBaseOffset = 0;
-        prevScrollInitialized = false;
-        baseOffsetAtRedirect = 0;
-        lyricAnimationStartAtMillis = 0;
         staggeringEndListener = null;
-        if (scrollController != null) {
-            scrollController.abortAnimation();
-            // abortAnimation forces the actual scroll to the controller value; keep our mirror in
-            // sync so the scroll-change listener filters it instead of flagging a manual scroll.
-            currentScrollPosition = (int) scrollController.getCurrValue();
+        clearStaggerState();
+        if (scrollSpring != null) {
+            // Sync the spring to the actual scroll position; keep our mirror consistent so the
+            // scroll-change listener filters the forced jump instead of flagging a manual scroll.
+            currentScrollPosition = getScrollY();
+            scrollSpring.jumpTo(currentScrollPosition);
         }
     }
 
