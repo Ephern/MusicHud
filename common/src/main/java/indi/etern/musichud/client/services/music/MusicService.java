@@ -62,7 +62,6 @@ public class MusicService implements IClientMusicService {
 
     @Getter(lazy = true)
     private final IIdlePlaySourceState idlePlaySourceState = new IdlePlaySourceState();
-    @Getter
     private final Queue<QueueItem> musicQueue = new ArrayDeque<>();
     @Getter
     private final Set<Consumer<Queue<QueueItem>>> musicQueueRefreshListeners = ConcurrentHashMap.newKeySet();
@@ -712,6 +711,10 @@ public class MusicService implements IClientMusicService {
                 MusicHud.EXECUTOR.execute(MusicService::resetCurrentMusicStatus);
             });
         }
+    }
+
+    public synchronized Queue<QueueItem> getMusicQueue() {
+        return new ArrayDeque<>(musicQueue);
     }
 
 }

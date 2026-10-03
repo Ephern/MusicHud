@@ -103,7 +103,9 @@ public class Album implements MusicCollection {
 
     @Override
     public String getImageThumbnailUrl(int size) {
-        if (picUrl.startsWith("data:image")) {
+        if (picUrl == null || picUrl.isBlank()) {
+            return "";
+        } else if (picUrl.startsWith("data:image")) {
             return picUrl;
         } else {
             return size >= 0 ? picUrl + "?param=" + size + "y" + size : picUrl;

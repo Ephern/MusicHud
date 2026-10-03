@@ -121,12 +121,13 @@ public class JsonUtil {
     public static class InstantAdapter implements JsonSerializer<Instant>, JsonDeserializer<Instant> {
         @Override
         public JsonElement serialize(Instant src, Type typeOfSrc, JsonSerializationContext context) {
-            return new JsonPrimitive(src.getEpochSecond());
+            return new JsonPrimitive(src.getEpochSecond() * 1000 + src.getNano() / 1_000_000);
         }
 
         @Override
         public Instant deserialize(JsonElement json, Type typeOfT, JsonDeserializationContext context) {
-            return Instant.ofEpochSecond(json.getAsLong() / 1000).plusNanos(json.getAsLong() % 1000);
+            long millis = json.getAsLong();
+            return Instant.ofEpochSecond(millis / 1000).plusMillis(millis % 1000);
         }
     }
 

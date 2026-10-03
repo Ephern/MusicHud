@@ -61,7 +61,7 @@ public class LyricLine implements Comparable<LyricLine> {
 
     @Override
     public int compareTo(@NotNull LyricLine o) {
-        return startTime.compareTo(o.startTime);
+        return startTime.compareTo(o.getStartTime());
     }
 
     public boolean isAfter(@NotNull LyricLine o) {
