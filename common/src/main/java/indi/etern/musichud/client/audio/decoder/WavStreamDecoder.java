@@ -78,7 +78,7 @@ public class WavStreamDecoder implements AudioDecoder {
             while (true) {
                 byte[] chunkId = new byte[4];
                 readFully(chunkId);
-                long chunkSize = readIntLE();
+                long chunkSize = readIntLE() & 0xFFFFFFFFL;
                 if (new String(chunkId).equals("fmt ")) {
                     audioFormat = readShortLE();   // format tag, 1 = PCM
                     channels = readShortLE();
@@ -90,18 +90,16 @@ public class WavStreamDecoder implements AudioDecoder {
                     // skip possible extra data in fmt chunk
                     long extra = chunkSize - 16;
                     if (extra > 0) {
-                        long skipped = inputStream.skip(extra);
-                        if (skipped != extra) {
-                            throw new IOException("Failed to skip fmt chunk extra data");
-                        }
+                        skipFully(extra);
+                    }
+                    // RIFF chunks are word-aligned: an odd-sized chunk has a pad byte
+                    if ((chunkSize & 1) != 0) {
+                        skipFully(1);
                     }
                     break;
                 } else {
-                    // skip other chunks
-                    long skipped = inputStream.skip(chunkSize);
-                    if (skipped != chunkSize) {
-                        throw new IOException("Failed to skip chunk");
-                    }
+                    // skip other chunks, including the RIFF word-alignment pad byte
+                    skipFully(chunkSize + (chunkSize & 1));
                 }
             }
             if (audioFormat != 1) {
@@ -113,15 +111,13 @@ public class WavStreamDecoder implements AudioDecoder {
             while (true) {
                 byte[] chunkId = new byte[4];
                 readFully(chunkId);
-                long chunkSize = readIntLE();
+                long chunkSize = readIntLE() & 0xFFFFFFFFL;
                 if (new String(chunkId).equals("data")) {
                     dataSizeTmp = chunkSize;
                     break;
                 } else {
-                    long skipped = inputStream.skip(chunkSize);
-                    if (skipped != chunkSize) {
-                        throw new IOException("Failed to skip chunk");
-                    }
+                    // skip other chunks, including the RIFF word-alignment pad byte
+                    skipFully(chunkSize + (chunkSize & 1));
                 }
             }
 
@@ -344,6 +340,20 @@ public class WavStreamDecoder implements AudioDecoder {
         byte[] b = new byte[2];
         readFully(b);
         return ByteBuffer.wrap(b).order(ByteOrder.LITTLE_ENDIAN).getShort();
+    }
+
+    private void skipFully(long byteCount) throws IOException {
+        long remaining = byteCount;
+        while (remaining > 0) {
+            long skipped = inputStream.skip(remaining);
+            if (skipped <= 0) {
+                if (inputStream.read() == -1) {
+                    throw new IOException("Unexpected end of stream while skipping chunk");
+                }
+                skipped = 1;
+            }
+            remaining -= skipped;
+        }
     }
 
     private static byte[] trim(byte[] src, int len) {

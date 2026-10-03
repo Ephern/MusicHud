@@ -33,11 +33,10 @@ import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
 import java.util.Base64;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
+import java.util.function.BiFunction;
 
 import static indi.etern.musichud.MusicHud.getLogger;
 
@@ -56,7 +55,19 @@ public class ImageUtils {
     private static ExecutorService downloadExecutor;
     private static Semaphore downloadSemaphore;
     private static int maxConcurrentDownloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS;
-    private static final Map<String, Image> cachedIconImageMap = new HashMap<>();
+    private static final Map<String, Image> cachedIconImageMap = new ConcurrentHashMap<>();
+    private static final BiFunction<String, InputStream, ImageTextureData> DEFAULT_PROCESSOR = (url, inputStream) -> {
+        var opts = new BitmapFactory.Options();
+        opts.inPreferredFormat = Bitmap.Format.RGBA_8888;
+
+        try (Bitmap source = BitmapFactory.decodeStream(inputStream, opts)) {
+            ImageTextureData imageTextureData = getImageTextureData(url, source);
+            cachedTexturesData.put(url, imageTextureData);
+            return imageTextureData;
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    };
 
     static {
         initializeVirtualThreadExecutor();
@@ -114,21 +125,10 @@ public class ImageUtils {
             LOGGER.debug("Cache hit for URL: {}", url);
             return CompletableFuture.completedFuture(cached);
         }
-        return downloadAsync(url, inputStream -> {
-            var opts = new BitmapFactory.Options();
-            opts.inPreferredFormat = Bitmap.Format.RGBA_8888;
-
-            try (Bitmap source = BitmapFactory.decodeStream(inputStream, opts)) {
-                ImageTextureData imageTextureData = getImageTextureData(url, source);
-                cachedTexturesData.put(url, imageTextureData);
-                return imageTextureData;
-            } catch (IOException e) {
-                throw new RuntimeException(e);
-            }
-        }, true);
+        return downloadAsync(url, DEFAULT_PROCESSOR, true);
     }
 
-    public static <R> CompletableFuture<R> downloadAsync(String url, Function<InputStream, R> streamProcessor, boolean computable) {
+    public static <R> CompletableFuture<R> downloadAsync(String url, BiFunction<String, InputStream, R> streamProcessor, boolean computable) {
         if (computable) {
             PendingKey key = new PendingKey(url, streamProcessor);
             //noinspection unchecked
@@ -143,7 +143,7 @@ public class ImageUtils {
         }
     }
 
-    private static <R> @NotNull CompletableFuture<R> downloadAsyncInternal(String url, Function<InputStream, R> streamProcessor) {
+    private static <R> @NotNull CompletableFuture<R> downloadAsyncInternal(String url, BiFunction<String, InputStream, R> streamProcessor) {
         return CompletableFuture.supplyAsync(() -> {
             try {
                 downloadSemaphore.acquire();
@@ -167,7 +167,7 @@ public class ImageUtils {
         }, downloadExecutor);
     }
 
-    private static <R> R downloadImage(String url, Function<InputStream, R> streamProcessor) throws IOException {
+    private static <R> R downloadImage(String url, BiFunction<String, InputStream, R> streamProcessor) throws IOException {
         HttpURLConnection connection = null;
         try {
             URL imageUrl = URI.create(url).toURL();
@@ -185,7 +185,7 @@ public class ImageUtils {
             LOGGER.debug("Downloading bitmap from {}, Content-Type: {}", url, contentType);
 
             try (InputStream stream = connection.getInputStream()) {
-                return streamProcessor.apply(stream);
+                return streamProcessor.apply(url, stream);
             }
         } finally {
             if (connection != null) {
@@ -232,6 +232,7 @@ public class ImageUtils {
     public static void cleanup() {
         cachedTexturesData.invalidateAll();
         pendingDownloads.clear();
+        cachedIconImageMap.clear();
 
         if (downloadExecutor != null && !downloadExecutor.isShutdown()) {
             downloadExecutor.shutdown();
@@ -320,6 +321,6 @@ public class ImageUtils {
         });
     }
 
-    record PendingKey(String url, Function<InputStream, ?> consumer) {
+    record PendingKey(String url, BiFunction<String, InputStream, ?> consumer) {
     }
 }

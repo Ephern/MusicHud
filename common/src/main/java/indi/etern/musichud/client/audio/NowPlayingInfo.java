@@ -32,6 +32,7 @@ import java.time.Duration;
 import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.atomic.AtomicLong;
@@ -43,9 +44,9 @@ public class NowPlayingInfo {
     private static volatile NowPlayingInfo instance = null;
     private final Logger logger = MusicHud.getLogger(NowPlayingInfo.class);
     @Getter
-    private final Set<Consumer<LyricLine>> lyricLineUpdateListener = new HashSet<>();
+    private final Set<Consumer<LyricLine>> lyricLineUpdateListener = new CopyOnWriteArraySet<>();
     @Getter
-    private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new HashSet<>();
+    private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new CopyOnWriteArraySet<>();
     private final AtomicReference<ArrayDeque<LyricLine>> atomicLyricLines = new AtomicReference<>();
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     private volatile JMTC jmtc;
@@ -65,9 +66,9 @@ public class NowPlayingInfo {
     @Getter
     private volatile ZonedDateTime musicStartTime = null;
     @Getter
-    private ArrayDeque<LyricLine> lyricLines;
+    private volatile ArrayDeque<LyricLine> lyricLines;
     @Getter
-    private LyricLine currentLyricLine;
+    private volatile LyricLine currentLyricLine;
     private volatile Thread lyricUpdaterVThread;
     private final AtomicLong lyricUpdaterGeneration = new AtomicLong(0);
 
@@ -232,7 +233,7 @@ public class NowPlayingInfo {
                     }
                     Path tempFile = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
                     tempFile.toFile().deleteOnExit();
-                    artUri = ImageUtils.downloadAsync(picUrl, inputStream -> {
+                    artUri = ImageUtils.downloadAsync(picUrl, (url, inputStream) -> {
                         try {
                             Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
                             return tempFile.toUri();
@@ -268,7 +269,7 @@ public class NowPlayingInfo {
     }
 
     public float getProgressRate() {
-        if (musicDuration == null || musicStartTime == null) {
+        if (musicDuration == null || musicStartTime == null || musicDuration.equals(Duration.ZERO)) {
             return 0.0f;
         }
         return (float) Duration.between(musicStartTime, ZonedDateTime.now()).toMillis() / musicDuration.toMillis();

@@ -12,6 +12,7 @@ import indi.etern.musichud.network.NetworkReceiver;
 import indi.etern.musichud.network.payloads.S2CPayload;
 import indi.etern.musichud.platform.Environment;
 
+import java.util.ArrayDeque;
 import java.util.Queue;
 
 public record RefreshMusicQueueMessage(Queue<QueueItem> queue) implements S2CPayload {
@@ -28,7 +29,7 @@ public record RefreshMusicQueueMessage(Queue<QueueItem> queue) implements S2CPay
             NetworkReceiver<RefreshMusicQueueMessage> receiver = NetworkReceiver.noop();
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
                 receiver = (message, context) -> MusicHud.EXECUTOR.execute(() ->
-                        IClientMusicService.getInstance().refreshQueue(message.queue)
+                        IClientMusicService.getInstance().refreshQueue(new ArrayDeque<>(message.queue))
                 );
             }
             INetworkRegister.getInstance().autoRegisterPayload(
