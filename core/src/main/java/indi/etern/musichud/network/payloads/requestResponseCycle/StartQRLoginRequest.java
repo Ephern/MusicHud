@@ -4,6 +4,7 @@ import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.RequestHandlerRegistry;
+import indi.etern.musichud.network.RequestResponseCodecs;
 import indi.etern.musichud.network.ResponseResult;
 import indi.etern.musichud.network.payloads.ApiRequestPayload;
 import indi.etern.musichud.server.api.ApiProvider;
@@ -13,7 +14,7 @@ import lombok.EqualsAndHashCode;
 @EqualsAndHashCode(callSuper = true)
 public class StartQRLoginRequest extends ApiRequestPayload {
     public static final StartQRLoginRequest REQUEST = new StartQRLoginRequest();
-    public static final ByteBufCodec<StartQRLoginRequest> CODEC = ByteBufCodec.unit(REQUEST);
+    public static final ByteBufCodec<StartQRLoginRequest> CODEC = RequestResponseCodecs.withCycleId(ByteBufCodec.unit(REQUEST));
 
     @RegisterMark
     public static class RegisterImpl implements CommonRegister {

@@ -51,7 +51,7 @@ public class LyricHighlightTextView extends TextView {
         highlightCalculator = new LyricHighlightCalculator(lyricLine);
 
         Duration fadeAt1 = line.getStartTime().plus(line.getDuration()).minus(500, ChronoUnit.MILLIS);
-        if (line.isWordByWord() && phrases1 != null) {
+        if (line.isWordByWord() && phrases1 != null && !phrases1.isEmpty()) {
             Duration lastPhraseEndAt = phrases1.getLast().endTime();
             if (lastPhraseEndAt.compareTo(fadeAt1) > 0) {
                 fadeAt1 = lastPhraseEndAt;

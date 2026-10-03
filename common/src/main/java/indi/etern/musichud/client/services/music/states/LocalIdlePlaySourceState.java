@@ -5,6 +5,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.MusicCollection;
+import indi.etern.musichud.beans.music.MusicCollections;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.beans.music.PusherInfo;
 import indi.etern.musichud.beans.result.ActionResult;
@@ -156,11 +157,11 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
         future.whenComplete((musicCollection, throwable) -> {
             if (throwable != null) {
                 scheduleRetry(idlePlaySource, attemptsLeft, remaining, generation, throwable);
-            } else if (musicCollection != null) {
+            } else if (MusicCollections.isUsable(musicCollection)) {
                 repushOrAdd(idlePlaySource);
                 markLoadSettled(remaining, generation);
             } else {
-                scheduleRetry(idlePlaySource, attemptsLeft, remaining, generation, "load returned empty collection");
+                scheduleRetry(idlePlaySource, attemptsLeft, remaining, generation, "load returned unusable collection");
             }
         });
     }

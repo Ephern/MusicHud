@@ -142,7 +142,7 @@ public class FLACStreamDecoder implements AudioDecoder {
 
     private void buildDownmix(int channels, int bitsPerSample) {
         boolean floatOutput = useFloat32 && (bitsPerSample == 24 || bitsPerSample == 32);
-        this.channelMixer = new MultichannelToStereoMixer(channels, bitsPerSample / 8, false);
+        this.channelMixer = new MultichannelToStereoMixer(channels, bitsPerSample / 8, true);
         this.bitDepthResampler = switch (bitsPerSample) {
             case 24 -> floatOutput ? new Bit24ToFloat32Converter() : new Bit24To16Resampler();
             case 32 -> floatOutput ? new Bit32ToFloat32Converter() : new Bit32To16Resampler();

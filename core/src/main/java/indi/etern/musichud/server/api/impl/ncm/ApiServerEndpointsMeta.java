@@ -454,8 +454,8 @@ public class ApiServerEndpointsMeta {
                     Set.of(200),
                     String.class);
             public static final UrlMeta<String> ID3_LYRICS = new UrlMeta<>(
-                    "/cloud/match",
-                    Set.of("uid"/*user id*/, "sid"/*song id*/, "asid"/*target song id, 0 for clear current*/),
+                    "/cloud/lyric/get",
+                    Set.of("uid"/*user id*/, "sid"/*song id*/),
                     null,
                     true,
                     false,

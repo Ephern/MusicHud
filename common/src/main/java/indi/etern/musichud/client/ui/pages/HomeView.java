@@ -15,6 +15,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.MusicCollection;
+import indi.etern.musichud.beans.music.MusicCollections;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.beans.music.Traceable;
@@ -39,6 +40,7 @@ import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
+import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,6 +60,9 @@ public class HomeView extends LinearLayout {
 
     private static final MusicService musicService = MusicService.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final Logger LOGGER = MusicHud.getLogger(HomeView.class);
+    /** Mirrors LocalIdlePlaySourceState.loadWithRetry: 3 attempts, 1s apart. */
+    private static final int IDLE_SOURCE_LOAD_ATTEMPTS = 3;
     private static final SpringInterpolator NEXT_TO_PLAY_INTERPOLATOR = new SpringInterpolator(0.25f, 1);
     private static final int NEXT_TO_PLAY_ANIM_DURATION_MS =
             Math.round(NEXT_TO_PLAY_INTERPOLATOR.getDuration() * 1000);
@@ -367,14 +372,39 @@ public class HomeView extends LinearLayout {
     private void addIdlePlaySourceTo(IdlePlaySource idlePlaySource, FlexWrapLayout targetView, boolean local) {
         CardKey key = CardKey.of(local, idlePlaySource);
         MusicCollection musicCollection = idlePlaySource.getMusicCollection();
-        if (musicCollection != null) {
+        if (MusicCollections.isUsable(musicCollection)) {
             addInternal(idlePlaySource, musicCollection, targetView, key);
         } else {
-            // View construction and addView must happen on the UI thread; the future may
-            // complete on a network virtual thread (observed: GetPlaylistDetailResponse)
-            musicService.loadMusicCollectionDetail(idlePlaySource.getId(), idlePlaySource.getType()).thenAccept(collection ->
-                    MuiModApi.postToUiThread(() -> addInternal(idlePlaySource, collection, targetView, key)));
+            loadIdlePlaySourceCard(idlePlaySource, targetView, key, IDLE_SOURCE_LOAD_ATTEMPTS);
         }
+    }
+
+    /**
+     * Loads a card's collection, retrying transient failures so the card is not built from a
+     * failure sentinel (which would break id-based recovery and the detail page).
+     */
+    private void loadIdlePlaySourceCard(IdlePlaySource idlePlaySource, FlexWrapLayout targetView, CardKey key, int attemptsLeft) {
+        // View construction and addView must happen on the UI thread; the future may
+        // complete on a network virtual thread (observed: GetPlaylistDetailResponse)
+        musicService.loadMusicCollectionDetail(idlePlaySource.getId(), idlePlaySource.getType())
+                .whenComplete((collection, throwable) -> {
+                    if (throwable == null && MusicCollections.isUsable(collection)) {
+                        MuiModApi.postToUiThread(() -> addInternal(idlePlaySource, collection, targetView, key));
+                    } else if (attemptsLeft > 0) {
+                        MusicHud.EXECUTOR.execute(() -> {
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                            loadIdlePlaySourceCard(idlePlaySource, targetView, key, attemptsLeft - 1);
+                        });
+                    } else {
+                        LOGGER.warn("Failed to load idle play source card {} ({})",
+                                idlePlaySource.getType().getSimpleName(), idlePlaySource.getId(), throwable);
+                    }
+                });
     }
 
     private void addInternal(IdlePlaySource idlePlaySource, MusicCollection musicCollection, FlexWrapLayout targetView, CardKey key) {
