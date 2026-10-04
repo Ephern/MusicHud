@@ -63,7 +63,7 @@ The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradl
 
 ## ModernUI Library JARs
 
-`idea_execute_tool read_file` can read files inside these sources JARs with `--file_path "<jar path>!/<entry>"`. `search_symbol` / `search_text` / `skill_search` do NOT index external libraries — never use them to locate classes inside these JARs; use the paths below directly.
+`read_file` (IDE MCP, shared by the AI Assistant / Air plugins) can read files inside these sources JARs with `--file_path "<jar path>!/<entry>"`. `search_symbol` / `search_text` do NOT index external libraries — never use them to locate classes inside these JARs; use the paths below directly.
 
 ### Path stability rules
 

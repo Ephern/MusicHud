@@ -18,9 +18,11 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.client.utils.ui.SpringValue;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
@@ -61,6 +63,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private static final int DELAY_SHORTEN_TAU_MILLIS = 200;
     private static final SpringInterpolator SWITCH_INTERPOLATOR =
             new SpringInterpolator((float) SWITCH_DURATION / 1000, 0.9f);
+    private static final float MAX_BLUR_DP = 8f;
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static Logger logger;
     private final Map<LyricLine, LyricLineView> lyricLines = new LinkedHashMap<>();
     @Getter
@@ -146,7 +150,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         container = new LinearLayout(context);
         container.setOrientation(LinearLayout.VERTICAL);
         LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        params.setMargins(dp(1), 0, dp(1), 0);
+        // Reserve room for the blurred lines' horizontal bleed, otherwise the tail is clipped by the
+        // scroll view's bounds and a hard edge appears at the left/right of every line.
+        int blurMargin = Math.max(dp(1), LineBlurRenderer.maxPaddingFor(dp(MAX_BLUR_DP)));
+        params.setMargins(blurMargin, 0, blurMargin, 0);
         addView(container, params);
 
         nowPlayingInfo.getLyricLineUpdateListener().add(lyricLineUpdateListener);
@@ -184,6 +191,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                     @Override
                     public void onAnimationEnd(@NonNull Animator animation) {
                         justHighlightedLyricLine = null;
+                        for (LyricLineView view : lyricLineViewList) {
+                            view.releaseBlurResources();
+                        }
                         container.removeAllViews();
                         buildLyricRows(lyrics);
                         container.setTranslationX(getWidth());
@@ -604,6 +614,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         stopUpdateLoop();
         removeCallbacks(autoRecenterRunnable);
         nowPlayingInfo.getLyricLineUpdateListener().remove(lyricLineUpdateListener);
+        for (LyricLineView view : lyricLineViewList) {
+            view.releaseBlurSurfaces();
+        }
     }
 
     private void startUpdateLoop() {
@@ -648,6 +661,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                         scrollSpring.jumpTo(getScrollY());
                     }
                     updateTranslations(frameTimeNanos);
+                    updateBlur(frameTimeNanos);
 
                     invalidate();
                     updateLoop();
@@ -747,6 +761,71 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 listener.run();
             }
         }
+    }
+
+    /**
+     * Drives the per-row defocus blur. The highlighted row stays sharp; the radius grows with the
+     * row distance and saturates five rows away. While the user is manually scrolling (or when no
+     * line is highlighted) every row is driven sharp.
+     */
+    private void updateBlur(long nowNanos) {
+        boolean blurEnabled = clientConfig.getEnableLyricBlur();
+        boolean manual = scrollStatus == ScrollStatus.MANUAL;
+        int referenceIndex = resolveBlurReferenceIndex();
+        float maxRadius = dp(MAX_BLUR_DP);
+        int scrollY = getScrollY();
+        int viewportBottom = scrollY + getHeight();
+        // Off-screen rows are snapped sharp instead of spring-animated, so the number of blurred
+        // (and therefore re-convolved) rows is bounded by the viewport rather than the whole song.
+        int margin = dp(160);
+        int count = lyricLineViewList.size();
+        for (int i = 0; i < count; i++) {
+            LyricLineView view = lyricLineViewList.get(i);
+            int top = getRelativeTop(view);
+            int bottom = top + view.getHeight();
+            boolean visible = view.getHeight() > 0
+                    && bottom >= scrollY - margin
+                    && top <= viewportBottom + margin;
+            if (visible && blurEnabled && !manual && referenceIndex >= 0 && view.isBlurEligible()) {
+                float target = LineBlurRenderer.radiusForDistance(Math.abs(i - referenceIndex), maxRadius);
+                view.setBlurTarget(target, nowNanos);
+                if (view.isBlurInitialized()) {
+                    view.updateBlur(nowNanos);
+                } else {
+                    // First time this row is blurred: appear already defocused instead of ramping up
+                    // from sharp, which otherwise looks like the blur is missing right after init.
+                    view.snapBlur();
+                    view.markBlurInitialized();
+                }
+            } else {
+                view.setBlurTarget(0f, nowNanos);
+                view.snapBlur();
+            }
+        }
+    }
+
+    /**
+     * The row the blur is focused on: the currently highlighted line, else the last highlighted
+     * line, else the first row - so the lyrics start defocused downward before the first line.
+     */
+    private int resolveBlurReferenceIndex() {
+        int index = indexOfLyricView(nowPlayingInfo.getCurrentLyricLine());
+        if (index >= 0) {
+            return index;
+        }
+        index = indexOfLyricView(justHighlightedLyricLine);
+        if (index >= 0) {
+            return index;
+        }
+        return lyricLineViewList.isEmpty() ? -1 : 0;
+    }
+
+    private int indexOfLyricView(@Nullable LyricLine line) {
+        if (line == null) {
+            return -1;
+        }
+        LyricLineView view = lyricLines.get(line);
+        return view == null ? -1 : lyricLineViewList.indexOf(view);
     }
 
     // Near-identity projective matrix (persp0 = 1e-8): makes the position matrix

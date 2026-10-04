@@ -4,6 +4,8 @@ import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorSet;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
@@ -14,10 +16,14 @@ import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
+import indi.etern.musichud.client.ui.lyric.LineBlurResources;
 import indi.etern.musichud.client.utils.ui.RhythmAnimator;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
+import indi.etern.musichud.client.utils.ui.SpringValue;
 import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.time.temporal.ChronoUnit;
@@ -41,6 +47,14 @@ public class LyricLineView extends LinearLayout {
     private LyricLine lyricLine;
     private View mainText;
     private Animator emphasizeAnim;
+
+    private static final float BLUR_SPRING_RESPONSE_SECONDS = 0.3f;
+    private final SpringValue blurSpring = new SpringValue(BLUR_SPRING_RESPONSE_SECONDS, 1f);
+    private final LineBlurResources blurResources = new LineBlurResources();
+    private float blurRadius = 0f;
+    private float blurTarget = 0f;
+    private boolean blurDisabled = false;
+    private boolean blurInitialized = false;
 
     public LyricLineView(Context context, LyricLine lyricLine) {
         super(context);
@@ -251,5 +265,116 @@ public class LyricLineView extends LinearLayout {
         } else {
             return 0;
         }
+    }
+
+    /** Only normal lyric rows (the ones with a blurred main + translation text) are blurred. */
+    public boolean isBlurEligible() {
+        return lyricLine != null && lyricLine.getType() == LyricLine.Type.NORMAL;
+    }
+
+    /** Retargets the blur radius spring; a no-op when the target does not change. */
+    public void setBlurTarget(float target, long nowNanos) {
+        target = Math.max(0f, target);
+        if (Math.abs(target - blurTarget) < 0.01f) {
+            return;
+        }
+        blurTarget = target;
+        blurSpring.setTarget(target, nowNanos);
+    }
+
+    /** Advances the blur radius animation. Must be called once per frame by the parent. */
+    public void updateBlur(long nowNanos) {
+        blurRadius = Math.max(0f, blurSpring.update(nowNanos));
+    }
+
+    /** Snaps the blur radius to its target without animating (used for off-screen rows). */
+    public void snapBlur() {
+        blurRadius = blurTarget;
+        blurSpring.jumpTo(blurTarget);
+    }
+
+    public boolean isBlurInitialized() {
+        return blurInitialized;
+    }
+
+    public void markBlurInitialized() {
+        blurInitialized = true;
+    }
+
+    /** Releases the offscreen GPU resources; the row falls back to a sharp draw afterward. */
+    public void releaseBlurResources() {
+        blurDisabled = true;
+        blurResources.close();
+    }
+
+    /** Releases the offscreen render targets but keeps the row blur-capable (e.g. temporary hide). */
+    public void releaseBlurSurfaces() {
+        blurResources.release();
+    }
+
+    @Override
+    protected void dispatchDraw(@NotNull Canvas canvas) {
+        //noinspection UnstableApiUsage
+        if (blurDisabled
+                || blurRadius < 0.5f
+                || !isBlurEligible()
+                || !(canvas instanceof ArcCanvas arcCanvas)
+                || getWidth() <= 0
+                || getHeight() <= 0) {
+            super.dispatchDraw(canvas);
+            return;
+        }
+        try {
+            if (!LineBlurRenderer.drawBlurred(arcCanvas, getWidth(), getHeight(),
+                    blurRadius, computeBlurContentStamp(), blurResources, this::drawBlurredContent)) {
+                super.dispatchDraw(canvas);
+            }
+        } catch (Throwable t) {
+            blurDisabled = true;
+            blurResources.release();
+            if (logger == null) {
+                logger = MusicHud.getLogger(HudRendererManager.class);
+            }
+            logger.error("Disabling lyric blur after an error", t);
+            super.dispatchDraw(canvas);
+        }
+    }
+
+    private void drawBlurredContent(Canvas canvas) {
+        super.dispatchDraw(canvas);
+    }
+
+    /**
+     * Cheap signature of everything that affects the rendered line, so the offscreen source is
+     * only re-rendered when it actually changes. It is forced to change every frame while the
+     * child is still animating (PERFORMING, or the DONE fade/lowering) and also tracks the row's
+     * scale, which can outlast the color fade during the highlight exit.
+     */
+    private long computeBlurContentStamp() {
+        long stamp = 17L;
+        if (mainText instanceof LyricHighlightTextView highlight) {
+            stamp = stamp * 31 + highlight.getStatus().ordinal();
+            stamp = stamp * 31 + highlight.getCurrentTextColor();
+            if (highlight.isVisuallyAnimating()) {
+                stamp = stamp * 31 + System.nanoTime();
+            }
+        } else if (mainText != null) {
+            stamp = stamp * 31 + System.identityHashCode(mainText);
+        }
+        if (row != null) {
+            stamp = stamp * 31 + Float.floatToIntBits(row.getScaleX());
+            stamp = stamp * 31 + Float.floatToIntBits(row.getScaleY());
+        }
+        if (subText != null) {
+            stamp = stamp * 31 + subText.getVisibility();
+            stamp = stamp * 31 + subText.getCurrentTextColor();
+        }
+        return stamp;
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        releaseBlurResources();
     }
 }
