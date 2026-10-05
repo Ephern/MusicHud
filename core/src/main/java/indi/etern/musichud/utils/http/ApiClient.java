@@ -125,6 +125,9 @@ public class ApiClient {
                 try {
                     HttpResponse<?> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
                     responseBody = response.body().toString();
+                    if (responseBody == null) {
+                        continue;
+                    }
                     currentlyParsing = CodeOnlyResponse.class;
                     var codeOnlyResponse = JsonUtil.gson.fromJson(responseBody, CodeOnlyResponse.class);
                     Set<Integer> allowedHttpCodes = urlMeta.allowedHttpCodes();
@@ -185,14 +188,17 @@ public class ApiClient {
                         .build();
                 try {
                     HttpResponse<?> response = CLIENT.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-                    String string = response.body().toString();
-                    var codeOnlyResponse = JsonUtil.gson.fromJson(string, CodeOnlyResponse.class);
+                    String responseBody = response.body().toString();
+                    if (responseBody == null) {
+                        continue;
+                    }
+                    var codeOnlyResponse = JsonUtil.gson.fromJson(responseBody, CodeOnlyResponse.class);
                     if (codeOnlyResponse.code == 200 || trial == maxTrial || !urlMeta.autoRetry()) {
                         if (urlMeta.deserializationType().equals(String.class)) {
                             //noinspection unchecked
-                            t = (T) string;
+                            t = (T) responseBody;
                         } else {
-                            t = JsonUtil.gson.fromJson(string, urlMeta.deserializationType());
+                            t = JsonUtil.gson.fromJson(responseBody, urlMeta.deserializationType());
                         }
                     }
                 } catch (ConnectException e) {

@@ -303,7 +303,7 @@ public class MusicCollectionDetailView extends LinearLayout {
             future = musicService.loadPlaylistDetail(collectionId, true);
         }
         future.whenComplete((latest, throwable) -> {
-            if (throwable != null || latest == null) return;
+            if (throwable != null || !MusicCollections.isUsable(latest)) return;
             MuiModApi.postToUiThread(() -> {
                 if (!isAttachedToWindow()) return;
                 String newCoverUrl = latest.getImageThumbnailUrl(imageSize);
@@ -370,28 +370,30 @@ public class MusicCollectionDetailView extends LinearLayout {
         progressBar.setVisibility(View.VISIBLE);
         progressBar.setIndeterminate(true);
         MusicService.getInstance().loadMoreMusicOfCollection(musicCollection, ignoreCache)
-                .thenAcceptAsync(result -> {
-                    MuiModApi.postToUiThread(() -> {
-                        Collection<MusicDetail> musicDetails = result.musicDetails();
-                        MusicCollection musicCollection1 = result.musicCollection();
-                        this.musicCollection = musicCollection1;
-                        currentCoverUrl = musicCollection1.getImageThumbnailUrl(imageSize);
-                        this.imageView.loadUrl(currentCoverUrl);
-                        if (musicTrackCountView != null) {
-                            if (musicCollection1 instanceof Album album) {
-                                updateAlbumTrackCountView(album);
-                            } else if (musicCollection1 instanceof Playlist playlist) {
-                                updatePlaylistTrackCountView(playlist);
-                            }
-                        }
+                .whenComplete((result, throwable) -> MuiModApi.postToUiThread(() -> {
+                    if (throwable != null || result == null || !MusicCollections.isUsable(result.musicCollection())) {
                         progressBar.setVisibility(View.GONE);
-                        virtualList.resetItems(musicDetails instanceof ObservableSequencedSet<MusicDetail> observable
-                                ? observable.snapshot()
-                                : new ArrayList<>(musicDetails));
-                        unregisterTracksSync();
-                        registerTracksSync(musicCollection1);
-                    });
-                }, MusicHud.EXECUTOR);
+                        return;
+                    }
+                    Collection<MusicDetail> musicDetails = result.musicDetails();
+                    MusicCollection musicCollection1 = result.musicCollection();
+                    this.musicCollection = musicCollection1;
+                    currentCoverUrl = musicCollection1.getImageThumbnailUrl(imageSize);
+                    this.imageView.loadUrl(currentCoverUrl);
+                    if (musicTrackCountView != null) {
+                        if (musicCollection1 instanceof Album album) {
+                            updateAlbumTrackCountView(album);
+                        } else if (musicCollection1 instanceof Playlist playlist) {
+                            updatePlaylistTrackCountView(playlist);
+                        }
+                    }
+                    progressBar.setVisibility(View.GONE);
+                    virtualList.resetItems(musicDetails instanceof ObservableSequencedSet<MusicDetail> observable
+                            ? observable.snapshot()
+                            : new ArrayList<>(musicDetails));
+                    unregisterTracksSync();
+                    registerTracksSync(musicCollection1);
+                }));
     }
 
     private void unregisterTracksSync() {

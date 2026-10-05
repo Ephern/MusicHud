@@ -15,6 +15,7 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
 import indi.etern.musichud.beans.music.MusicCollection;
+import indi.etern.musichud.beans.music.MusicCollections;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.beans.music.Traceable;
@@ -39,6 +40,7 @@ import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
+import org.apache.logging.log4j.Logger;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -58,6 +60,9 @@ public class HomeView extends LinearLayout {
 
     private static final MusicService musicService = MusicService.getInstance();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final Logger LOGGER = MusicHud.getLogger(HomeView.class);
+    /** Mirrors LocalIdlePlaySourceState.loadWithRetry: 3 attempts, 1s apart. */
+    private static final int IDLE_SOURCE_LOAD_ATTEMPTS = 3;
     private static final SpringInterpolator NEXT_TO_PLAY_INTERPOLATOR = new SpringInterpolator(0.25f, 1);
     private static final int NEXT_TO_PLAY_ANIM_DURATION_MS =
             Math.round(NEXT_TO_PLAY_INTERPOLATOR.getDuration() * 1000);
@@ -212,7 +217,7 @@ public class HomeView extends LinearLayout {
             Image rotateIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/refresh_ccw_dot.png");
             rotateNextToPlayButton.setImageDrawable(new ScaledImageDrawable(context.getResources(), rotateIcon, dp(16), dp(16)));
             InsetBackgroundFactory.builder()
-                    .inset(dp(2))
+                    .inset(0)
                     .cornerRadius(dp(4))
                     .build()
                     .applyBackgroundTo(rotateNextToPlayButton);
@@ -221,7 +226,7 @@ public class HomeView extends LinearLayout {
                     ToastUtil.show(I18n.get(result.message()));
                 }
             }));
-            LinearLayout.LayoutParams rotateButtonParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+            LinearLayout.LayoutParams rotateButtonParams = new LinearLayout.LayoutParams(dp(24), dp(24));
             rotateButtonParams.setMargins(dp(8), 0, 0, 0);
             nextToPlayHeader.addView(rotateNextToPlayButton, rotateButtonParams);
 
@@ -233,7 +238,8 @@ public class HomeView extends LinearLayout {
             queueTitle = new TextView(context);
             queueTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             queueTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.playQueue"));
-            LayoutParams queueTitleParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            queueTitle.setSingleLine();
+            LayoutParams queueTitleParams = new LayoutParams(WRAP_CONTENT, dp(24));
             queueTitleParams.setMargins(0, dp(32), 0, dp(16));
             scrollViewContainer.addView(queueTitle, queueTitleParams);
 
@@ -311,9 +317,8 @@ public class HomeView extends LinearLayout {
             });
             checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
             checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
-            checkQueue(musicService.getMusicQueue());
-
             Queue<QueueItem> queue = musicService.getMusicQueue();
+            checkQueue(queue);
 
             localAddRegister = musicService.getIdlePlaySourceState().local().onAdd(localAddListener);
             localRemoveRegister = musicService.getIdlePlaySourceState().local().onRemove(localRemoveListener);
@@ -331,7 +336,7 @@ public class HomeView extends LinearLayout {
             musicQueuePushListener = item -> {
                 MuiModApi.postToUiThread(() -> {
                     addMusicQueueItem(item, playQueueListView);
-                    checkQueue(queue);
+                    checkQueue(musicService.getMusicQueue());
                 });
             };
             musicQueueRemoveListener = (removeIndex, item) -> {
@@ -339,7 +344,7 @@ public class HomeView extends LinearLayout {
                     if (removeIndex >= 0 && removeIndex < playQueueListView.getChildCount()) {
                         playQueueListView.removeViewAt(removeIndex);
                     }
-                    checkQueue(queue);
+                    checkQueue(musicService.getMusicQueue());
                 });
             };
             musicService.getMusicQueuePushListeners().add(musicQueuePushListener);
@@ -367,14 +372,39 @@ public class HomeView extends LinearLayout {
     private void addIdlePlaySourceTo(IdlePlaySource idlePlaySource, FlexWrapLayout targetView, boolean local) {
         CardKey key = CardKey.of(local, idlePlaySource);
         MusicCollection musicCollection = idlePlaySource.getMusicCollection();
-        if (musicCollection != null) {
+        if (MusicCollections.isUsable(musicCollection)) {
             addInternal(idlePlaySource, musicCollection, targetView, key);
         } else {
-            // View construction and addView must happen on the UI thread; the future may
-            // complete on a network virtual thread (observed: GetPlaylistDetailResponse)
-            musicService.loadMusicCollectionDetail(idlePlaySource.getId(), idlePlaySource.getType()).thenAccept(collection ->
-                    MuiModApi.postToUiThread(() -> addInternal(idlePlaySource, collection, targetView, key)));
+            loadIdlePlaySourceCard(idlePlaySource, targetView, key, IDLE_SOURCE_LOAD_ATTEMPTS);
         }
+    }
+
+    /**
+     * Loads a card's collection, retrying transient failures so the card is not built from a
+     * failure sentinel (which would break id-based recovery and the detail page).
+     */
+    private void loadIdlePlaySourceCard(IdlePlaySource idlePlaySource, FlexWrapLayout targetView, CardKey key, int attemptsLeft) {
+        // View construction and addView must happen on the UI thread; the future may
+        // complete on a network virtual thread (observed: GetPlaylistDetailResponse)
+        musicService.loadMusicCollectionDetail(idlePlaySource.getId(), idlePlaySource.getType())
+                .whenComplete((collection, throwable) -> {
+                    if (throwable == null && MusicCollections.isUsable(collection)) {
+                        MuiModApi.postToUiThread(() -> addInternal(idlePlaySource, collection, targetView, key));
+                    } else if (attemptsLeft > 0) {
+                        MusicHud.EXECUTOR.execute(() -> {
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                            loadIdlePlaySourceCard(idlePlaySource, targetView, key, attemptsLeft - 1);
+                        });
+                    } else {
+                        LOGGER.warn("Failed to load idle play source card {} ({})",
+                                idlePlaySource.getType().getSimpleName(), idlePlaySource.getId(), throwable);
+                    }
+                });
     }
 
     private void addInternal(IdlePlaySource idlePlaySource, MusicCollection musicCollection, FlexWrapLayout targetView, CardKey key) {
@@ -402,11 +432,10 @@ public class HomeView extends LinearLayout {
         } else {
             targetView.setVisibility(View.VISIBLE);
         }
-        checkQueue(MusicService.getInstance().getMusicQueue());
+        checkQueue(musicService.getMusicQueue());
     }
 
     private void checkNextToPlay(Traceable<MusicDetail> nextIdle) {
-        MusicService musicService = MusicService.getInstance();
         Queue<QueueItem> musicQueue = musicService.getMusicQueue();
         boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty() || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();
         MusicDetail next = hasIdlePlaySources && nextIdle != null ? nextIdle.value() : null;
@@ -565,7 +594,7 @@ public class HomeView extends LinearLayout {
                     .build()
                     .applyBackgroundTo(removeButton);
             removeButton.setOnClickListener(v -> {
-                MusicService.getInstance().sendRemoveMusicFromQueue(item);
+                musicService.sendRemoveMusicFromQueue(item);
             });
             musicListItem.getButtonsLayout().addView(removeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
         }

@@ -5,12 +5,17 @@
   "name": "Music HUD",
   "description": "Enjoy music in all situations powered by Netease Cloud Music (NCM) | 基于网易云的全场景音乐模组",
   "authors": [
-    "Etern"
+    {
+      "name": "Etern",
+      "contact": {
+        "homepage": "https://github.com/Ephern"
+      }
+    }
   ],
   "contact": {
-    "sources": "https://github.com/Etern-34520/MusicHud",
+    "sources": "https://github.com/Ephern/MusicHud",
     "homepage": "https://modrinth.com/mod/music-hud",
-    "issues": "https://github.com/Etern-34520/MusicHud/issues"
+    "issues": "https://github.com/Ephern/MusicHud/issues"
   },
   "license": "LGPL-3.0",
   "icon": "assets/music_hud/icon.png",
@@ -35,7 +40,7 @@
   ],
   "depends": {
     "fabricloader": "*",
-    "minecraft": ["1.21.9", "1.21.10"],
+    "minecraft": ">=1.21.9 <=1.21.10",
     "java": ">=21",
     "fabric-api": "*",
     "forgeconfigapiport": "*"

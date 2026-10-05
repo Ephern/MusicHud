@@ -29,6 +29,7 @@ public class ClientConfigDefinition implements ClientConfig {
 
     private final ModConfigSpec.ConfigValue<Boolean> enable;
     private final ModConfigSpec.ConfigValue<Boolean> showTranslatedCnLyrics;
+    private final ModConfigSpec.ConfigValue<Boolean> enableLyricBlur;
     private final ModConfigSpec.ConfigValue<Boolean> disableVanillaMusic;
     private final ModConfigSpec.ConfigValue<Boolean> enableHud;
     private final ModConfigSpec.ConfigValue<Boolean> enableLyricsSidebar;
@@ -72,6 +73,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Show translated Chinese lyrics")
                 .translation(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics")
                 .define("showTranslatedCnLyrics", true);
+        enableLyricBlur = builder
+                .comment("Defocus (blur) non-highlighted lyric lines; the highlighted line stays sharp")
+                .translation(MusicHud.MOD_ID + ".config.common.enableLyricBlur")
+                .define("enableLyricBlur", true);
         disableVanillaMusic = builder
                 .comment("Disable vanilla game music")
                 .translation(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying")
@@ -302,6 +307,21 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setShowTranslatedCnLyrics(boolean showTranslatedCnLyrics) {
         this.showTranslatedCnLyrics.set(showTranslatedCnLyrics);
+    }
+
+    @Override
+    public boolean getEnableLyricBlur() {
+        return enableLyricBlur.get();
+    }
+
+    @Override
+    public boolean getDefaultEnableLyricBlur() {
+        return enableLyricBlur.getDefault();
+    }
+
+    @Override
+    public void setEnableLyricBlur(boolean enableLyricBlur) {
+        this.enableLyricBlur.set(enableLyricBlur);
     }
 
     @Override

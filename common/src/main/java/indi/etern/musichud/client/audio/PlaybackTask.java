@@ -1454,21 +1454,27 @@ public class PlaybackTask {
         InputStream inputStream = connection.getInputStream();
         BufferedInputStream bufferedStream = new BufferedInputStream(inputStream, 8192);
 
-        if (formatType != FormatType.AUTO) {
-            FormatType detectedFormatType = null;
-            try {
-                detectedFormatType = AudioFormatDetector.detectFormat(bufferedStream);
-            } catch (IOException e) {
-                LOGGER.warn("Error while trying to detect format", e);
-            }
-            if (detectedFormatType != null && detectedFormatType != formatType) {
-                LOGGER.warn("Detected format type is not equals to resource format type, using detected");
-                return getAudioDecoder(detectedFormatType, bufferedStream);
+        try {
+            if (formatType != FormatType.AUTO) {
+                FormatType detectedFormatType = null;
+                try {
+                    detectedFormatType = AudioFormatDetector.detectFormat(bufferedStream);
+                } catch (IOException e) {
+                    LOGGER.warn("Error while trying to detect format", e);
+                }
+                if (detectedFormatType != null && detectedFormatType != formatType) {
+                    LOGGER.warn("Detected format type is not equals to resource format type, using detected");
+                    return getAudioDecoder(detectedFormatType, bufferedStream);
+                } else {
+                    return getAudioDecoder(formatType, bufferedStream);
+                }
             } else {
                 return getAudioDecoder(formatType, bufferedStream);
             }
-        } else {
-            return getAudioDecoder(formatType, bufferedStream);
+        } catch (Throwable e) {
+            bufferedStream.close();
+            inputStream.close();
+            throw e;
         }
     }
 
