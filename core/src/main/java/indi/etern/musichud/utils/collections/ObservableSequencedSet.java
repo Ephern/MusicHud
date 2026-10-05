@@ -56,16 +56,20 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
 
     @Override
     public void addFirst(E e) {
-        delegate.addFirst(e);
-        addListeners.forEach(l -> l.accept(e));
-        changeListeners.forEach(Runnable::run);
+        if (!delegate.contains(e)) {
+            delegate.addFirst(e);
+            addListeners.forEach(l -> l.accept(e));
+            changeListeners.forEach(Runnable::run);
+        }
     }
 
     @Override
     public void addLast(E e) {
-        delegate.addLast(e);
-        addListeners.forEach(l -> l.accept(e));
-        changeListeners.forEach(Runnable::run);
+        if (!delegate.contains(e)) {
+            delegate.addLast(e);
+            addListeners.forEach(l -> l.accept(e));
+            changeListeners.forEach(Runnable::run);
+        }
     }
 
     @Override
@@ -100,9 +104,7 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
         List<? extends E> actuallyAdded = collection.stream().filter(object -> !contains(object)).toList();
         boolean changed = super.addAll(collection);
         if (changed) {
-            actuallyAdded.forEach(e -> {
-                addListeners.forEach(actuallyAdded::forEach);
-            });
+            addListeners.forEach(actuallyAdded::forEach);
             changeListeners.forEach(Runnable::run);
         }
         return changed;
@@ -110,11 +112,11 @@ public class ObservableSequencedSet<E> extends ForwardingSet<E> implements Seque
 
     @Override
     public boolean removeAll(@NotNull Collection<?> collection) {
-        List<?> actuallyRemoved = collection.stream().filter(this::contains).toList();
+        //noinspection unchecked
+        List<? extends E> actuallyRemoved = (List<? extends E>) collection.stream().filter(this::contains).toList();
         boolean changed = super.removeAll(collection);
         if (changed) {
-            //noinspection unchecked
-            removeListeners.forEach(l -> actuallyRemoved.forEach(i -> l.accept((E) i)));
+            removeListeners.forEach(actuallyRemoved::forEach);
             changeListeners.forEach(Runnable::run);
         }
         return changed;

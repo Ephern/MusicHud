@@ -106,6 +106,7 @@
   "music_hud.config.common.scrobbleOption.NONE": "停用",
   "music_hud.config.common.scrobbleOption.ONLY_SELF": "僅自有來源",
   "music_hud.config.common.showTranslatedCnLyrics": "顯示中文歌詞翻譯",
+  "music_hud.config.common.enableLyricBlur": "模糊非高亮歌詞",
   "music_hud.config.common.soundVolume": "Music HUD 音量",
   "music_hud.config.common.soundVolumeInterval": "增減音量增量",
   "music_hud.config.externalServer.autoConnect": "自動連接到伺服端 Music HUD",

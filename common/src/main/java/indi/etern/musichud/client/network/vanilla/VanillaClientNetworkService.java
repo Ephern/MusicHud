@@ -20,8 +20,7 @@ public interface VanillaClientNetworkService extends IClientNetworkService {
                 || payload instanceof ConnectRequest
                 || payload instanceof ConfirmConnectMessage)) {
             sendToNetworkServer(payload);
-        } else if ((minecraft.getCurrentServer() != null || minecraft.player != null)
-                && ClientConfig.getInstance().getEnableIsolatedMode()){// in single player game or isolated client
+        } else if (minecraft.player != null && ClientConfig.getInstance().getEnableIsolatedMode()){// in single player game or isolated client
             //noinspection unchecked
             NetworkReceiver<T> receiver = (NetworkReceiver<T>) IVanillaNetworkRegister.getMetaDataOrNew(payload.getClass(), null).receiver();
             if (receiver != null) {

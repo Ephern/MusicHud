@@ -136,7 +136,11 @@ public class MusicPlayerServerService {
                             }
                         }
                     } else {
-                        nextToPlay = musicQueue.remove().musicDetail();
+                        QueueItem queued = musicQueue.poll();
+                        if (queued == null) {
+                            continue;
+                        }
+                        nextToPlay = queued.musicDetail();
                         nextToPlayName = nextToPlay.value().getName();
                         nextToPlayId = nextToPlay.value().getId();
                         serverNetworkService.sendToPlayerInfos(loginedPlayerInfoMap.values(),
@@ -296,6 +300,7 @@ public class MusicPlayerServerService {
                 if (sampled.isPresent()) {
                     return sampled;
                 }
+                if (System.currentTimeMillis() >= deadline) return Optional.empty();
                 continue;
             }
 
@@ -391,7 +396,7 @@ public class MusicPlayerServerService {
     }
 
     @Getter
-    ArrayDeque<QueueItem> musicQueue = new ArrayDeque<>();
+    Queue<QueueItem> musicQueue = new ConcurrentLinkedDeque<>();
     boolean continuable;
     @Getter
     private volatile Traceable<MusicDetail> currentMusicDetail = Traceable.of(MusicDetail.NONE);
@@ -528,19 +533,27 @@ public class MusicPlayerServerService {
     }
 
     public void removeMusicDetailFromQueue(long id, UUID queueUniqueID, UUID playerUUID) {
+        QueueItem target = null;
         for (QueueItem queueItem : musicQueue) {
-            if (queueItem.musicDetail().value().getId() == id && queueItem.queueUniqueID().equals(queueUniqueID)) {
-                if (queueItem.musicDetail().value().getPusherInfo().getPlayerUUID().equals(playerUUID)) {
-                    musicQueue.remove(queueItem);
-                    serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
-                            new RefreshMusicQueueMessage(musicQueue));
-                } else {
-                    logger.warn("Player {} tried to remove music {} (id: {}) not pushed by them", playerUUID, queueItem.musicDetail().value().getName(), id);
-                }
-                return;
+            if (queueItem.musicDetail().value().getId() == id
+                    && queueItem.queueUniqueID().equals(queueUniqueID)) {
+                target = queueItem;
+                break;
             }
         }
-        logger.warn("Failed to remove music from queue: id {} with queue unique id {} not found", id, queueUniqueID);
+        if (target == null) {
+            logger.warn("Failed to remove music from queue: id {} with queue unique id {} not found", id, queueUniqueID);
+            return;
+        }
+        PusherInfo pusher = target.musicDetail().value().getPusherInfo();
+        if (pusher != null && playerUUID.equals(pusher.getPlayerUUID())) {
+            musicQueue.remove(target);
+            serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
+                    new RefreshMusicQueueMessage(musicQueue));
+        } else {
+            logger.warn("Player {} tried to remove music {} (id: {}) not pushed by them", playerUUID,
+                    target.musicDetail().value().getName(), id);
+        }
     }
 
     /**
@@ -903,27 +916,36 @@ public class MusicPlayerServerService {
     @Getter
     @Setter
     private class CurrentVoteInfo {
-        final Set<UUID> votedPlayers = new HashSet<>();
-        MusicDetail musicDetail;
+        final Set<UUID> votedPlayers = new CopyOnWriteArraySet<>();
+        MusicDetail musicDetail = MusicDetail.NONE;   // 不再为 null
         float voteRate;
 
-        public void vote(long id, UUID playerUUID) {
+        public synchronized void vote(long id, UUID playerUUID) {
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
                 IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
                 if (clientDistUtil.inSinglePlayer()) {
-                    pusherThread.interrupt();
+                    if (pusherThread != null) pusherThread.interrupt();
                     logger.info("Skip current music in singleplayer");
                     return;
                 }
             }
-            if (!votedPlayers.contains(playerUUID) && musicDetail.getId() == id) {
+            MusicDetail current = this.musicDetail;
+            if (current == null || current.equals(MusicDetail.NONE)) {
+                return;
+            }
+            int totalPlayers = loginApiService.getPlayerInfoMap().size();
+            if (totalPlayers == 0) {
+                return;
+            }
+            if (!votedPlayers.contains(playerUUID) && current.getId() == id) {
                 votedPlayers.add(playerUUID);
-                voteRate += 1.0f / loginApiService.getPlayerInfoMap().size();
-                if (musicDetail.getPusherInfo().getPlayerUUID().equals(playerUUID)) {
+                voteRate += 1.0f / totalPlayers;
+                PusherInfo pusherInfo = current.getPusherInfo();
+                if (pusherInfo != null && playerUUID.equals(pusherInfo.getPlayerUUID())) {
                     voteRate += (float) serverConfig.getPusherVoteAdditionalRate();
-                    logger.info("Pusher player \"{}\" voted for skip current music {}:{}", playerUUID, id, musicDetail.getName());
+                    logger.info("Pusher player \"{}\" voted for skip current music {}:{}", playerUUID, id, current.getName());
                 } else {
-                    logger.info("Player \"{}\" voted for skip current music {}:{}", playerUUID, id, musicDetail.getName());
+                    logger.info("Player \"{}\" voted for skip current music {}:{}", playerUUID, id, current.getName());
                 }
                 voteRate = Math.clamp(voteRate, 0.0f, 1.0f);
                 if (voteRate >= 0.5) {
@@ -936,7 +958,7 @@ public class MusicPlayerServerService {
             }
         }
 
-        public void resetTo(MusicDetail musicDetail) {
+        public synchronized void resetTo(MusicDetail musicDetail) {
             this.musicDetail = musicDetail;
             voteRate = 0;
             votedPlayers.clear();

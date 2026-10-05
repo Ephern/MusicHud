@@ -700,6 +700,21 @@ public class RouterContainer extends FrameLayout {
         return currentPageKey;
     }
 
+    /**
+     * The page key the router is settling on. While a transition is running this returns the
+     * navigation target, which becomes authoritative earlier than {@link #getCurrentPageKey()}
+     * (the committed key only flips in {@link #finishTransition} after the animation ends).
+     * Callers reacting to asynchronous events (e.g. a music switch) must use this instead of
+     * {@link #getCurrentPageKey()} to avoid acting on a stale page during a page change.
+     */
+    @Nullable
+    public String getEffectivePageKey() {
+        if (isTransitioning && transitionTargetKey != null) {
+            return transitionTargetKey;
+        }
+        return currentPageKey;
+    }
+
     @Nullable
     public View getCurrentPage() {
         if (currentPageKey == null) {
