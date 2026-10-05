@@ -106,6 +106,7 @@
   "music_hud.config.common.scrobbleOption.NONE": "Disabled",
   "music_hud.config.common.scrobbleOption.ONLY_SELF": "Own Sources Only",
   "music_hud.config.common.showTranslatedCnLyrics": "Show translated Chinese lyrics",
+  "music_hud.config.common.enableLyricBlur": "Blur non-highlighted lyric lines",
   "music_hud.config.common.soundVolume": "Sound volume for audio from Music HUD",
   "music_hud.config.common.soundVolumeInterval": "Sound volume interval for quick adjust",
   "music_hud.config.externalServer.autoConnect": "Auto connect MusicHUD to external server",

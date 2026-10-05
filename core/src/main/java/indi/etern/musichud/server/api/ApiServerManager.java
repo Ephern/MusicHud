@@ -15,10 +15,11 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 
 @RegisterMark
@@ -42,7 +43,7 @@ public class ApiServerManager implements ServerRegister {
 
     private final Logger apiLogger = LogManager.getLogger(MusicHud.LOGGER_BASE_NAME + "/API");
     @Getter
-    private final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new ArrayList<>();
+    private final List<Consumer<BinaryApiServerStatus>> apiStatusListeners = new CopyOnWriteArrayList<>();
     private volatile Process process;
     @Getter
     private BinaryApiServerStatus binaryApiServerStatus = BinaryApiServerStatus.STOPPED;
@@ -51,6 +52,7 @@ public class ApiServerManager implements ServerRegister {
     private Thread hook;
     private CompletableFuture<Integer> processFuture;
     private boolean continueRestart;
+    private final Runnable stopApiServerHook = this::stopApiServer;
 
     public void clearLogs() {
         try (var stream = Files.list(getLogDir())) {
@@ -88,13 +90,27 @@ public class ApiServerManager implements ServerRegister {
         }
     }
 
-    public void stopApiServer() {
-        if (process != null) {
-            continueRestart = false;
-            process.destroy();
-            process = null;
-            removeShutdownHook();
+    public synchronized void stopApiServer() {
+        Process p = this.process;
+        if (p == null) {
+            return;
         }
+        continueRestart = false;
+        p.destroy();
+        try {
+            // Usually the process exits immediately; give it a short grace period, then force.
+            if (!p.waitFor(500, TimeUnit.MILLISECONDS)) {
+                p.destroyForcibly();
+                p.waitFor(3, TimeUnit.SECONDS);
+            }
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            p.destroyForcibly();
+        }
+        if (this.process == p) {
+            this.process = null;
+        }
+        removeShutdownHook();
     }
 
     public void restartApiServer() {
@@ -102,7 +118,7 @@ public class ApiServerManager implements ServerRegister {
         restartInternal();
     }
 
-    private void restartInternal() {
+    private synchronized void restartInternal() {
         stopApiServer();
         if (processFuture != null) {
             processFuture.thenRun(this::launchApiServerInternal);
@@ -113,8 +129,8 @@ public class ApiServerManager implements ServerRegister {
 
     private void addShutdownHook() {
         if (hook == null) {
-            hook = new Thread(this::stopApiServer);
-            ICommonEventService.getInstance().registerCommonLifecycleStopping(this::stopApiServer);
+            hook = new Thread(stopApiServerHook);
+            ICommonEventService.getInstance().registerCommonLifecycleStopping(stopApiServerHook);
             Runtime.getRuntime().addShutdownHook(hook);
         }
     }
@@ -186,7 +202,8 @@ public class ApiServerManager implements ServerRegister {
                     env.put("SELECT_MAX_BR", String.valueOf(serverConfig.getSelectMaxBr()));
                     env.put("FOLLOW_SOURCE_ORDER", String.valueOf(serverConfig.getFollowSourceOrder()));
                     env.put("PORT", String.valueOf(serverConfig.getPort()));
-                    process = processBuilder.start();
+                    Process child = processBuilder.start();
+                    process = child;
 
                     Path logFile;
                     PrintWriter logWriter = null;
@@ -203,9 +220,10 @@ public class ApiServerManager implements ServerRegister {
                     CompletableFuture<Integer> future = new CompletableFuture<>();
                     processFuture = future;
 
+                    final Process proc = child;
                     MusicHud.EXECUTOR.execute(() -> {
                         Thread.currentThread().setName("MHWorker-API-Console");
-                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
+                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
                             String line;
                             while ((line = reader.readLine()) != null) {
                                 if (writer != null) writer.println(line);
@@ -239,7 +257,7 @@ public class ApiServerManager implements ServerRegister {
 
                     MusicHud.EXECUTOR.execute(() -> {
                         Thread.currentThread().setName("MHWorker-API-Console");
-                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getErrorStream()))) {
+                        try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getErrorStream()))) {
                             String line;
                             while ((line = reader.readLine()) != null) {
                                 if (writer != null) writer.println(line);
@@ -253,10 +271,18 @@ public class ApiServerManager implements ServerRegister {
                     MusicHud.EXECUTOR.execute(() -> {
                         Thread.currentThread().setName("MHWorker-API-Daemon");
                         try {
-                            int exitCode = process.waitFor();
+                            int exitCode = proc.waitFor();
                             if (writer != null) writer.close();
                             setApiStatus(BinaryApiServerStatus.STOPPED);
-                            if (continueRestart) {
+                            boolean current;
+                            synchronized (ApiServerManager.this) {
+                                current = process == proc;
+                                if (current) {
+                                    // Clear the active process so a restart can launch a new one.
+                                    process = null;
+                                }
+                            }
+                            if (continueRestart && current) {
                                 apiLogger.warn("Api server unexpectedly stopped with code:{}, restarting...", exitCode);
                                 future.complete(exitCode);
                                 startEmbeddedApiServer();

@@ -4,6 +4,7 @@ import indi.etern.musichud.MusicHud;
 import lombok.Getter;
 
 import java.util.*;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 
 /**
@@ -21,7 +22,7 @@ import java.util.function.Consumer;
 public final class ConnectionStateMachine {
     private static final Map<ConnectionState, EnumSet<ConnectionState>> ALLOWED = new EnumMap<>(ConnectionState.class);
     @Getter
-    public static final Set<Consumer<MusicHud.ConnectStatus>> connectStatusListeners = new HashSet<>();
+    public static final Set<Consumer<MusicHud.ConnectStatus>> connectStatusListeners = new CopyOnWriteArraySet<>();
 
     static {
         ALLOWED.put(ConnectionState.DISCONNECTED, EnumSet.of(
