@@ -173,7 +173,7 @@ public final class LineBlurRenderer {
             if (weight <= 0f) {
                 continue;
             }
-            paint.setAlpha(weight);
+            paint.setAlpha((int) (weight * 255));
             Rect2f dstRect = horizontal
                     ? new Rect2f(i, 0, i + surfaceWidth, surfaceHeight)
                     : new Rect2f(0, i, surfaceWidth, i + surfaceHeight);
