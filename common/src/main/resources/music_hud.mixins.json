@@ -10,7 +10,8 @@
     "ScreenMixin",
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
-    "SpanSetMixin"
+    "SpanSetMixin",
+    "VulkanSampledCopyMixin"
   ],
   "injectors": {
     "defaultRequire": 1

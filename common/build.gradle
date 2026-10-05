@@ -57,6 +57,7 @@ dependencies {
     implementation "net.neoforged:mergetool:2.0.0"
 
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    compileOnly "org.lwjgl:lwjgl-vulkan:$rootProject.lwjgl_version"
     compileOnly project(':processor')
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     annotationProcessor project(':processor')
