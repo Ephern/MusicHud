@@ -67,6 +67,33 @@ public class LyricHighlightTextView extends TextView {
         setStatus(HighlightStatus.PERFORMING);
     }
 
+    public HighlightStatus getStatus() {
+        return status;
+    }
+
+    /**
+     * Whether this line's appearance can still change on its own (used by the lyric blur to decide
+     * if the cached offscreen source must be re-rendered). WAITING is static. PERFORMING is always
+     * dynamic: its PERFORMING-to-DONE transition, color ramp and karaoke sweep are all advanced
+     * inside {@link #onDraw}, so skipping the draw would freeze them. DONE is dynamic while the
+     * fade-out / phrase lowering is still running.
+     */
+    public boolean isVisuallyAnimating() {
+        if (status == HighlightStatus.PERFORMING) {
+            return true;
+        }
+        if (status == HighlightStatus.DONE) {
+            if (statusUpdateProcessing) {
+                return true;
+            }
+            if (phrases != null && !phrases.isEmpty()) {
+                long elapsed = nowPlayingInfo.getPlayedDuration().minus(fadeAt).toMillis();
+                return elapsed < RAISE_ANIMATION_DURATION;
+            }
+        }
+        return false;
+    }
+
     private void setStatus(HighlightStatus status) {
         this.status = status;
         statusUpdateTime = nowPlayingInfo.getPlayedDuration();
