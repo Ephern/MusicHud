@@ -217,7 +217,7 @@ public class HomeView extends LinearLayout {
             Image rotateIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/refresh_ccw_dot.png");
             rotateNextToPlayButton.setImageDrawable(new ScaledImageDrawable(context.getResources(), rotateIcon, dp(16), dp(16)));
             InsetBackgroundFactory.builder()
-                    .inset(dp(2))
+                    .inset(0)
                     .cornerRadius(dp(4))
                     .build()
                     .applyBackgroundTo(rotateNextToPlayButton);
@@ -226,7 +226,7 @@ public class HomeView extends LinearLayout {
                     ToastUtil.show(I18n.get(result.message()));
                 }
             }));
-            LinearLayout.LayoutParams rotateButtonParams = new LinearLayout.LayoutParams(dp(28), dp(28));
+            LinearLayout.LayoutParams rotateButtonParams = new LinearLayout.LayoutParams(dp(24), dp(24));
             rotateButtonParams.setMargins(dp(8), 0, 0, 0);
             nextToPlayHeader.addView(rotateNextToPlayButton, rotateButtonParams);
 
@@ -238,7 +238,8 @@ public class HomeView extends LinearLayout {
             queueTitle = new TextView(context);
             queueTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             queueTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.playQueue"));
-            LayoutParams queueTitleParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            queueTitle.setSingleLine();
+            LayoutParams queueTitleParams = new LayoutParams(WRAP_CONTENT, dp(24));
             queueTitleParams.setMargins(0, dp(32), 0, dp(16));
             scrollViewContainer.addView(queueTitle, queueTitleParams);
 
@@ -316,9 +317,8 @@ public class HomeView extends LinearLayout {
             });
             checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
             checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
-            checkQueue(musicService.getMusicQueue());
-
             Queue<QueueItem> queue = musicService.getMusicQueue();
+            checkQueue(queue);
 
             localAddRegister = musicService.getIdlePlaySourceState().local().onAdd(localAddListener);
             localRemoveRegister = musicService.getIdlePlaySourceState().local().onRemove(localRemoveListener);
@@ -336,7 +336,7 @@ public class HomeView extends LinearLayout {
             musicQueuePushListener = item -> {
                 MuiModApi.postToUiThread(() -> {
                     addMusicQueueItem(item, playQueueListView);
-                    checkQueue(queue);
+                    checkQueue(musicService.getMusicQueue());
                 });
             };
             musicQueueRemoveListener = (removeIndex, item) -> {
@@ -344,7 +344,7 @@ public class HomeView extends LinearLayout {
                     if (removeIndex >= 0 && removeIndex < playQueueListView.getChildCount()) {
                         playQueueListView.removeViewAt(removeIndex);
                     }
-                    checkQueue(queue);
+                    checkQueue(musicService.getMusicQueue());
                 });
             };
             musicService.getMusicQueuePushListeners().add(musicQueuePushListener);
@@ -432,11 +432,10 @@ public class HomeView extends LinearLayout {
         } else {
             targetView.setVisibility(View.VISIBLE);
         }
-        checkQueue(MusicService.getInstance().getMusicQueue());
+        checkQueue(musicService.getMusicQueue());
     }
 
     private void checkNextToPlay(Traceable<MusicDetail> nextIdle) {
-        MusicService musicService = MusicService.getInstance();
         Queue<QueueItem> musicQueue = musicService.getMusicQueue();
         boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty() || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();
         MusicDetail next = hasIdlePlaySources && nextIdle != null ? nextIdle.value() : null;
@@ -595,7 +594,7 @@ public class HomeView extends LinearLayout {
                     .build()
                     .applyBackgroundTo(removeButton);
             removeButton.setOnClickListener(v -> {
-                MusicService.getInstance().sendRemoveMusicFromQueue(item);
+                musicService.sendRemoveMusicFromQueue(item);
             });
             musicListItem.getButtonsLayout().addView(removeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
         }
