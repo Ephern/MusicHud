@@ -34,6 +34,7 @@ import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientPushMusicToQu
 import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientRemoveMusicFromQueueMessage;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.VoteSkipCurrentMusicMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
+import indi.etern.musichud.throwable.MusicCollectionLoadException;
 import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import lombok.AccessLevel;
@@ -62,7 +63,6 @@ public class MusicService implements IClientMusicService {
 
     @Getter(lazy = true)
     private final IIdlePlaySourceState idlePlaySourceState = new IdlePlaySourceState();
-    @Getter
     private final Queue<QueueItem> musicQueue = new ArrayDeque<>();
     @Getter
     private final Set<Consumer<Queue<QueueItem>>> musicQueueRefreshListeners = ConcurrentHashMap.newKeySet();
@@ -222,6 +222,9 @@ public class MusicService implements IClientMusicService {
                         Duration.ofSeconds(10))
                 .thenApply(response -> {
                     Playlist loaded = response.getPlaylist();
+                    if (!MusicCollections.isUsable(loaded)) {
+                        throw new CompletionException(new MusicCollectionLoadException(id, Playlist.class));
+                    }
                     Playlist result;
                     if (finalCached != null) {
                         finalCached.updateFrom(loaded, true);
@@ -232,7 +235,7 @@ public class MusicService implements IClientMusicService {
                     }
                     pushDownToUserCollections(result);
                     return result;
-                }).exceptionally(e -> Playlist.EMPTY);
+                });
         loadingPlaylists.put(id, future);
         future.whenComplete((r, e) -> loadingPlaylists.remove(id, future));
         return future;
@@ -255,6 +258,9 @@ public class MusicService implements IClientMusicService {
                         Duration.ofSeconds(10))
                 .thenApply(response -> {
                     Album loaded = response.getAlbum();
+                    if (!MusicCollections.isUsable(loaded)) {
+                        throw new CompletionException(new MusicCollectionLoadException(id, Album.class));
+                    }
                     Album result;
                     if (cached != null) {
                         cached.updateFrom(loaded, true);
@@ -265,7 +271,7 @@ public class MusicService implements IClientMusicService {
                     }
                     pushDownToUserCollections(result);
                     return result;
-                }).exceptionally(e -> Album.NONE);
+                });
         loadingAlbums.put(id, future);
         future.whenComplete((r, e) -> loadingAlbums.remove(id, future));
         return future;
@@ -660,7 +666,6 @@ public class MusicService implements IClientMusicService {
         });
         return future;
     }
-
     @SuppressWarnings("unchecked")
     public <T extends MusicCollection> CompletableFuture<T> loadMusicCollectionDetail(long id, Class<T> type) {
         if (type == Album.class) {
@@ -712,6 +717,10 @@ public class MusicService implements IClientMusicService {
                 MusicHud.EXECUTOR.execute(MusicService::resetCurrentMusicStatus);
             });
         }
+    }
+
+    public synchronized Queue<QueueItem> getMusicQueue() {
+        return new ArrayDeque<>(musicQueue);
     }
 
 }

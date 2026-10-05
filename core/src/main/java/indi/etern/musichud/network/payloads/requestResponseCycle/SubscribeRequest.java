@@ -38,9 +38,9 @@ public class SubscribeRequest extends ApiRequestPayload {
                 IMusicApiService instance = IMusicApiService.getInstance(ApiProvider.NCM);
                 try {
                     instance.userSubscribe(request.getId(), request.getSubscribableType(), request.getAction(), playerClient.getUUID());
-                    return ResponseResult.of(new ModifyPlaylistResponse(true, ""));
+                    return ResponseResult.of(new SubscribeResponse(true, ""));
                 } catch (Throwable e) {
-                    return ResponseResult.of(new ModifyPlaylistResponse(false, e.getMessage()));
+                    return ResponseResult.of(new SubscribeResponse(false, e.getMessage()));
                 }
             });
         }

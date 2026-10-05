@@ -2,20 +2,19 @@ package indi.etern.musichud.network.payloads.requestResponseCycle;
 
 import indi.etern.musichud.interfaces.CommonRegister;
 import indi.etern.musichud.interfaces.RegisterMark;
-import indi.etern.musichud.network.ByteBufCodec;
-import indi.etern.musichud.network.Codecs;
-import indi.etern.musichud.network.INetworkRegister;
-import indi.etern.musichud.network.RequestResponseManager;
+import indi.etern.musichud.network.*;
 import indi.etern.musichud.network.payloads.ApiResponsePayload;
 import lombok.Getter;
 
 @Getter
 public final class StartQRLoginResponse extends ApiResponsePayload {
     public static final ByteBufCodec<StartQRLoginResponse> CODEC =
-            ByteBufCodec.composite(
-                    Codecs.STRING_UTF8,
-                    StartQRLoginResponse::getBase64QRImg,
-                    StartQRLoginResponse::new
+            RequestResponseCodecs.withCycleId(
+                    ByteBufCodec.composite(
+                            Codecs.STRING_UTF8,
+                            StartQRLoginResponse::getBase64QRImg,
+                            StartQRLoginResponse::new
+                    )
             );
     private final String base64QRImg;
 

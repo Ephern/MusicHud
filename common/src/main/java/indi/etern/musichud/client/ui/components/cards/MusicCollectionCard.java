@@ -340,7 +340,7 @@ public class MusicCollectionCard extends LinearLayout {
         }
         future.whenComplete((latest, throwable) -> {
             refreshPending.set(false);
-            if (throwable != null || latest == null) return;
+            if (throwable != null || !MusicCollections.isUsable(latest)) return;
             MuiModApi.postToUiThread(() -> {
                 if (latest != musicCollection) {
                     musicCollection = latest;

@@ -108,6 +108,13 @@ public class ConfigView extends LinearLayout {
                     .setOnChanged(MainFragment::refreshLyricViews)
                     .create(commonCategory);
             new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricBlur"),
+                    clientConfig::getEnableLyricBlur,
+                    clientConfig::setEnableLyricBlur)
+                    .setDefaultValue(clientConfig.getDefaultEnableLyricBlur())
+                    .setOnChanged(MainFragment::refreshLyricViews)
+                    .create(commonCategory);
+            new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying"),
                     clientConfig::getDisableVanillaMusic,
                     clientConfig::setDisableVanillaMusic)

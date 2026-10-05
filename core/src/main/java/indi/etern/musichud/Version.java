@@ -17,6 +17,9 @@ public record Version(long mayor, long minor, long patch, BuildType build) imple
     }
 
     private static Version ofLongArray(Long[] longs) {
+        if (longs.length <= 4) {
+            throw new IllegalStateException("Invalid version array");
+        }
         return new Version(longs[0], longs[1], longs[2], BuildType.ofOrdinal(longs[3].intValue()));
     }
 

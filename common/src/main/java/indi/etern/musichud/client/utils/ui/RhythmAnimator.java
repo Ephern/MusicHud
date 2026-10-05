@@ -17,7 +17,7 @@ public class RhythmAnimator extends ValueAnimator {
 
     public static final long BREATHE_CYCLE_MS = 4000;
     public static final long FADE_IN_DELAY_MS = 800;
-    public static final long FADE_IN_DURATION_MS = 400;
+    public static final long FADE_IN_DURATION_MS = 800;
     public static final long FADE_OUT_PEAK_MS = 1000;
     public static final long FADE_OUT_SHRINK_MS = 400;
 

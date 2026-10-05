@@ -671,7 +671,10 @@ public class MainFragment extends Fragment {
     private void updateLyricsPanelVisibility() {
         RouterContainer rc = RouterContainer.getInstance();
         if (rc == null) return;
-        String currentKey = rc.getCurrentPageKey();
+        // Use the effective (in-transition target) key: currentPageKey is stale until the
+        // transition finishes, so a music switch landing mid-transition to Home would otherwise
+        // wrongly re-show the sidebar after the page-change listener already hid it.
+        String currentKey = rc.getEffectivePageKey();
         if ("Home".equals(currentKey) || currentKey == null) return;
         if (shouldShowLyricsPanel()) {
             showLyricsPanel();

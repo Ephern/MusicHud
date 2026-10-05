@@ -29,6 +29,7 @@ import java.time.ZonedDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 
@@ -37,7 +38,7 @@ public class LoginApiService implements ILoginApiService {
     private static final Logger logger = MusicHud.getLogger(LoginApiService.class);
     private static final IServerNetworkService serverNetworkService = IServerNetworkService.getInstance();
     private static volatile LoginApiService loginApiService;
-    final Map<IPlayerClient, Runnable> pollingMap = new HashMap<>();
+    final Map<IPlayerClient, Runnable> pollingMap = new ConcurrentHashMap<>();
     final Cache<IPlayerClient, ZonedDateTime> lastSentTimes = CacheBuilder.newBuilder()
             .expireAfterWrite(Duration.ofSeconds(30))
             .maximumSize(Long.MAX_VALUE)
@@ -46,7 +47,7 @@ public class LoginApiService implements ILoginApiService {
     @Getter
     Map<UUID, PlayerLoginInfo> playerInfoMap = new ConcurrentHashMap<>();
     @Getter
-    Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new HashSet<>();
+    Set<Consumer<Collection<PlayerLoginInfo>>> loginStateChangeListeners = new CopyOnWriteArraySet<>();
     volatile String anonymousCookie;
 
     public static LoginApiService getInstance() {
@@ -96,16 +97,28 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public String randomVipCookieOrElse(Supplier<String> defaultCookieSupplier) {
-        Comparator<PlayerLoginInfo> vipLevelComparator = (a, b) -> {
-            int ordinalDelta = a.getProfile().getVipType().ordinal() - b.getProfile().getVipType().ordinal();
-            return ordinalDelta == 0 ? MusicHud.RANDOM.nextInt(-1, 1) : ordinalDelta * 2;
-        };
-        return playerInfoMap.values().stream()
-                .filter(info -> info.getVipType() != null && info.getVipType() == VipType.VIP || info.getVipType() == VipType.SVIP)
-                .sorted(vipLevelComparator)
+        // Prefer the highest membership tier available: SVIP first, then VIP.
+        // Within a tier, pick a random eligible player's cookie.
+        String cookie = pickVipCookie(VipType.SVIP);
+        if (cookie == null) {
+            cookie = pickVipCookie(VipType.VIP);
+        }
+        if (cookie != null) {
+            return cookie;
+        }
+        return defaultCookieSupplier == null ? null : defaultCookieSupplier.get();
+    }
+
+    private String pickVipCookie(VipType target) {
+        List<String> cookies = playerInfoMap.values().stream()
+                .filter(info -> info.getVipType() == target)
                 .map(info -> info.getLoginCookieInfo().rawCookie())
-                .findAny()
-                .orElse(defaultCookieSupplier == null ? null : defaultCookieSupplier.get());
+                .filter(cookie -> cookie != null && !cookie.isEmpty())
+                .toList();
+        if (cookies.isEmpty()) {
+            return null;
+        }
+        return cookies.get(MusicHud.RANDOM.nextInt(cookies.size()));
     }
 
     @Override
