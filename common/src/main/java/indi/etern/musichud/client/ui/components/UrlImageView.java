@@ -46,6 +46,8 @@ public class UrlImageView extends FrameLayout {
     // 延迟加载相关字段
     private String pendingUrl = null;
     private boolean hasLoadedImage = false;
+    private int loadTargetW = 0;
+    private int loadTargetH = 0;
     private boolean isAttachedToWindow = false;
     private CompletableFuture<Void> loadFuture;
     private AnimatorSet currentAnimator;
@@ -228,6 +230,16 @@ public class UrlImageView extends FrameLayout {
      * 公开的加载方法,设置待加载的 URL
      */
     public void loadUrl(String urlString) {
+        loadUrl(urlString, 0, 0);
+    }
+
+    /**
+     * 加载图片并降采样到不超过 targetW x targetH（保持长宽比）。
+     * 传入与原图相同的 URL 时可复用 ImageUtils 的字节缓存（含 JMTC 下载的全尺寸图）。
+     */
+    public void loadUrl(String urlString, int targetW, int targetH) {
+        loadTargetW = targetW;
+        loadTargetH = targetH;
         cancelLoad();
         currentURLString = urlString;
         pendingUrl = urlString;
@@ -257,6 +269,7 @@ public class UrlImageView extends FrameLayout {
         cancelLoad();
         loadFuture = CompletableFuture.runAsync(() -> {
             if (base64String.equals(currentURLString)) {
+                //noinspection resource
                 ImageTextureData imageTextureData = ImageUtils.loadBase64(base64String);
                 MuiModApi.postToUiThread(() -> {
                     if (base64String.equals(currentURLString)) {
@@ -283,7 +296,10 @@ public class UrlImageView extends FrameLayout {
         loadFuture = CompletableFuture.runAsync(() -> {
             if (urlString.equals(currentURLString)) {
                 try {
-                    ImageUtils.downloadAsync(urlString).thenAcceptAsync(imageTextureData -> {
+                    CompletableFuture<ImageTextureData> future = loadTargetW > 0 && loadTargetH > 0
+                            ? ImageUtils.downloadScaledAsync(urlString, loadTargetW, loadTargetH)
+                            : ImageUtils.downloadAsync(urlString);
+                    future.thenAcceptAsync(imageTextureData -> {
                         if (urlString.equals(currentURLString)) {
                             MuiModApi.postToUiThread(() -> {
                                 if (imageTextureData != null) {
@@ -326,7 +342,8 @@ public class UrlImageView extends FrameLayout {
                 image
         );
         int imageViewWidth = getWidth();
-        boolean useFilter = image.getWidth() * image.getHeight() >= 0.25 * imageViewWidth * imageViewWidth;
+        int imageViewHeight = getHeight();
+        boolean useFilter = image.getWidth() * image.getHeight() >= 0.25 * imageViewWidth * imageViewHeight;
         drawable.setFilter(useFilter);
 
         if (circular) {
@@ -415,6 +432,8 @@ public class UrlImageView extends FrameLayout {
         currentURLString = null;
         pendingUrl = null;
         hasLoadedImage = false;
+        loadTargetW = 0;
+        loadTargetH = 0;
     }
 
     public void setLoading(boolean loading) {

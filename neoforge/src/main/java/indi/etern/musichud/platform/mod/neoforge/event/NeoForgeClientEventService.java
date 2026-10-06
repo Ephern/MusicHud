@@ -10,16 +10,16 @@ import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
 import net.neoforged.neoforge.common.NeoForge;
 
-import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 public class NeoForgeClientEventService implements IClientEventService {
     private String serverIp;
     private static volatile NeoForgeClientEventService instance;
-    private final Set<Consumer<Player>> joinListeners = new HashSet<>();
-    private final Set<Consumer<Player>> quitListeners = new HashSet<>();
-    private final Set<Runnable> tickPostListeners = new HashSet<>();
+    private final Set<Consumer<Player>> joinListeners = ConcurrentHashMap.newKeySet();
+    private final Set<Consumer<Player>> quitListeners = ConcurrentHashMap.newKeySet();
+    private final Set<Runnable> tickPostListeners = ConcurrentHashMap.newKeySet();
 
     private NeoForgeClientEventService() {
         NeoForge.EVENT_BUS.register(this);

@@ -4,17 +4,26 @@ import com.mojang.blaze3d.platform.NativeImage;
 import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 
-import java.util.HashMap;
-import java.util.Map;
-
 import static indi.etern.musichud.client.utils.ui.UniformDataUtils.interpolateARGB;
 
 public class ColorExtractor {
+    public static final int MAX_SAMPLES = 1024 * 1024;
     // Duplicate threshold for theme colors (normalized redmean distance).
     // Priority on collision: primary -> secondary -> bright -> dark.
     private static final float DUPLICATE_DIST = 0.02f;
     // Floor for each color share so no channel vanishes in the shader.
     private static final float MIN_SHARE = 0.02f;
+    private static final int BITS = 5;
+    private static final int SHIFT = 8 - BITS;
+    private static final int HIST_SIZE = 1 << (BITS * 3);
+    private static final int CHANNEL_MASK = (1 << BITS) - 1;
+    private static final float PRIMARY_SAT_WEIGHT = 0.3f;
+    private static final float SECONDARY_SAT_WEIGHT = 0.25f;
+    private static final float LUM_WEIGHT = 0.3f;
+    private static final float FREQ_WEIGHT = 0.8f;
+    private static final float DIST_EPSILON = 0.001f;
+    private static final float BD_SAT_TARGET = 0.4f;
+    private static final float BD_SAT_SPREAD = 0.5f;
 
     /**
      * 从 DynamicTexture 提取四种颜色
@@ -35,62 +44,35 @@ public class ColorExtractor {
         if (width == 0 || height == 0) return getDefaultColors();
 
         // 采样步长
-        int step = Math.max(1, (int) Math.sqrt((width * height) / 6400.0));
-        Map<Integer, Float> colorWeight = new HashMap<>();  // 量化颜色 -> 累计权重
+        int step = Math.max(1, (int) Math.sqrt((double) (width * height) / MAX_SAMPLES));
+        int[] colorWeight = new int[HIST_SIZE];  // 量化颜色 -> 累计权重
 
-        // 在 extractColors 方法内，完成 colorWeight 统计后，计算总权重
-        float totalWeight = 0;
-
-        int bits = 5;  // 4~6
-        int shift = 8 - bits;
-
+        long totalWeight = 0;
         for (int y = 0; y < height; y += step) {
             for (int x = 0; x < width; x += step) {
                 int argb = image.getPixel(x, y);
                 if ((argb >>> 24) == 0) continue;
                 int rgb = argb & 0x00FFFFFF;
 
-                // 颜色量化
-                int r = (rgb >> 16) & 0xFF;
-                int g = (rgb >> 8) & 0xFF;
-                int b = rgb & 0xFF;
+                int qr = ((rgb >> 16) & 0xFF) >> SHIFT;
+                int qg = ((rgb >> 8) & 0xFF) >> SHIFT;
+                int qb = (rgb & 0xFF) >> SHIFT;
+                int quantized = (qr << (BITS * 2)) | (qg << BITS) | qb;
 
-                int qr = r >> shift;
-                int qg = g >> shift;
-                int qb = b >> shift;
-                int quantized = (qr << 10) | (qg << 5) | qb;   // 15位整数
-
-                colorWeight.merge(quantized, 1f, Float::sum);
+                colorWeight[quantized]++;
+                totalWeight++;
             }
         }
 
-        for (float w : colorWeight.values()) totalWeight += w;
-        float minWeightRatio = 0.002f; // 0.5%，可根据需要调整
-        float minWeight = totalWeight * minWeightRatio;
-
-        Map<Integer, Integer> quantToRgb = new HashMap<>();
-        for (int quant : colorWeight.keySet()) {
-            int r = ((quant >> 10) & 0x1F) << shift;
-            int g = ((quant >> 5) & 0x1F) << shift;
-            int b = (quant & 0x1F) << shift;
-            quantToRgb.put(quant, (r << 16) | (g << 8) | b);
-        }
-
-        if (colorWeight.isEmpty()) return getDefaultColors();
-
-        final float PRIMARY_SAT_WEIGHT = 0.3f;
-        final float SECONDARY_SAT_WEIGHT = 0.2f;
-        final float LUM_WEIGHT = 0.3f;
-        final float FREQ_WEIGHT = 0.5f;
-        final float DIST_EPSILON = 0.001f;
-        final float BD_SAT_TARGET = 0.15f;
-        final float BD_SAT_SPREAD = 0.7f;
+        if (totalWeight == 0) return getDefaultColors();
+        float minWeight = totalWeight * 0.001f;
 
         int bright = 0;
         float bestBrightScore = -1;
-        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
-            if (entry.getValue() < minWeight) continue;
-            int rgb = quantToRgb.get(entry.getKey());
+        for (int quant = 0; quant < HIST_SIZE; quant++) {
+            int weight = colorWeight[quant];
+            if (weight < minWeight) continue;
+            int rgb = rgbFromQuant(quant);
             float lum = getLuminance(rgb);
             float sat = getSaturation(rgb);
             float satPenalty = (sat - BD_SAT_TARGET) * (sat - BD_SAT_TARGET) / (BD_SAT_SPREAD * BD_SAT_SPREAD);
@@ -104,9 +86,10 @@ public class ColorExtractor {
 
         int dark = -1;
         float bestDarkScore = -1;
-        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
-            if (entry.getValue() < minWeight) continue;
-            int rgb = quantToRgb.get(entry.getKey());
+        for (int quant = 0; quant < HIST_SIZE; quant++) {
+            int weight = colorWeight[quant];
+            if (weight < minWeight) continue;
+            int rgb = rgbFromQuant(quant);
             float lum = getLuminance(rgb);
             float sat = getSaturation(rgb);
             float darkness = 1.0f - lum;
@@ -123,11 +106,10 @@ public class ColorExtractor {
         float bestPrimaryScore = -1;
         int primaryFallback = 0;
         float bestPrimaryFallbackScore = -1;
-        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
-            int quant = entry.getKey();
-            float weight = entry.getValue();
+        for (int quant = 0; quant < HIST_SIZE; quant++) {
+            int weight = colorWeight[quant];
             if (weight < minWeight) continue;  // 忽略低频杂色
-            int rgb = quantToRgb.get(quant);
+            int rgb = rgbFromQuant(quant);
             float sat = getSaturation(rgb);
             float lum = getLuminance(rgb);
             float dist1 = colorDistance(bright, rgb);
@@ -152,11 +134,10 @@ public class ColorExtractor {
         float bestSecondaryScore = -1;
         int secondaryFallback = primary;
         float bestSecondaryFallbackScore = -1;
-        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
-            int quant = entry.getKey();
-            float weight = entry.getValue();
+        for (int quant = 0; quant < HIST_SIZE; quant++) {
+            int weight = colorWeight[quant];
             if (weight < minWeight) continue;
-            int rgb = quantToRgb.get(quant);
+            int rgb = rgbFromQuant(quant);
             if (isDuplicate(rgb, primary)) continue;
             float sat = getSaturation(rgb);
             float lum = getLuminance(rgb);
@@ -181,17 +162,17 @@ public class ColorExtractor {
         // Deduplicate lower-priority colors against higher-priority ones.
         // Priority: primary -> secondary -> bright -> dark.
         if (isDuplicate(bright, primary, secondary)) {
-            int reselected = reselectBright(colorWeight, quantToRgb, minWeight, primary, secondary);
+            int reselected = reselectBright(colorWeight, minWeight, primary, secondary);
             if (reselected != Integer.MIN_VALUE) bright = reselected;
         }
         if (isDuplicate(dark, primary, secondary, bright)) {
-            int reselected = reselectDark(colorWeight, quantToRgb, minWeight, primary, secondary, bright);
+            int reselected = reselectDark(colorWeight, minWeight, primary, secondary, bright);
             if (reselected != Integer.MIN_VALUE) dark = reselected;
         }
 
         // Winner-takes-all cluster vote: each bucket counts toward its nearest
         // theme color, so shares reflect true area proportions in the image.
-        float[] cluster = clusterWeights(primary, secondary, bright, dark, colorWeight, quantToRgb, minWeight);
+        float[] cluster = clusterWeights(primary, secondary, bright, dark, colorWeight, minWeight);
         float sum = cluster[0] + cluster[1] + cluster[2] + cluster[3];
         if (sum <= 1e-6f) return getDefaultColors();
 
@@ -232,16 +213,13 @@ public class ColorExtractor {
     // color. Ties resolve by priority primary > secondary > bright > dark via
     // strict-less comparison. Order: {primary, secondary, bright, dark}.
     private static float[] clusterWeights(int primary, int secondary, int bright, int dark,
-                                          Map<Integer, Float> colorWeight, Map<Integer, Integer> quantToRgb,
-                                          float minWeight) {
+                                          int[] colorWeight, float minWeight) {
         float[] cluster = new float[4];
         int[] themes = new int[]{primary, secondary, bright, dark};
-        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
-            float weight = entry.getValue();
+        for (int quant = 0; quant < colorWeight.length; quant++) {
+            float weight = colorWeight[quant];
             if (weight < minWeight) continue;
-            Integer mapped = quantToRgb.get(entry.getKey());
-            if (mapped == null) continue;
-            int rgb = mapped;
+            int rgb = rgbFromQuant(quant);
             int best = 0;
             float bestDist = colorDistance(rgb, themes[0]);
             for (int i = 1; i < 4; i++) {
@@ -305,15 +283,14 @@ public class ColorExtractor {
     }
 
     // Re-select bright excluding taken colors; MIN_VALUE if no candidate.
-    private static int reselectBright(Map<Integer, Float> colorWeight, Map<Integer, Integer> quantToRgb,
-                                      float minWeight, int... taken) {
+    private static int reselectBright(int[] colorWeight, float minWeight, int... taken) {
         final float satTarget = 0.15f;
         final float satSpread = 0.7f;
         int best = Integer.MIN_VALUE;
         float bestScore = -1f;
-        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
-            if (entry.getValue() < minWeight) continue;
-            int rgb = quantToRgb.get(entry.getKey());
+        for (int quant = 0; quant < colorWeight.length; quant++) {
+            if (colorWeight[quant] < minWeight) continue;
+            int rgb = rgbFromQuant(quant);
             if (isDuplicate(rgb, taken)) continue;
             float lum = getLuminance(rgb);
             float sat = getSaturation(rgb);
@@ -328,15 +305,14 @@ public class ColorExtractor {
     }
 
     // Re-select dark excluding taken colors; MIN_VALUE if no candidate.
-    private static int reselectDark(Map<Integer, Float> colorWeight, Map<Integer, Integer> quantToRgb,
-                                    float minWeight, int... taken) {
+    private static int reselectDark(int[] colorWeight, float minWeight, int... taken) {
         final float satTarget = 0.15f;
         final float satSpread = 0.7f;
         int best = Integer.MIN_VALUE;
         float bestScore = -1f;
-        for (Map.Entry<Integer, Float> entry : colorWeight.entrySet()) {
-            if (entry.getValue() < minWeight) continue;
-            int rgb = quantToRgb.get(entry.getKey());
+        for (int quant = 0; quant < colorWeight.length; quant++) {
+            if (colorWeight[quant] < minWeight) continue;
+            int rgb = rgbFromQuant(quant);
             if (isDuplicate(rgb, taken)) continue;
             float darkness = 1.0f - getLuminance(rgb);
             float sat = getSaturation(rgb);
@@ -348,6 +324,15 @@ public class ColorExtractor {
             }
         }
         return best;
+    }
+
+    // Reconstruct an (approximate) opaque RGB from a 15-bit quantized index:
+    // each 5-bit channel is shifted back up to 8 bits.
+    private static int rgbFromQuant(int quant) {
+        int r = ((quant >> (BITS * 2)) & CHANNEL_MASK) << SHIFT;
+        int g = ((quant >> BITS) & CHANNEL_MASK) << SHIFT;
+        int b = (quant & CHANNEL_MASK) << SHIFT;
+        return (r << 16) | (g << 8) | b;
     }
 
     private static float getSaturation(int rgb) {
@@ -430,12 +415,10 @@ public class ColorExtractor {
         int g = (argb >> 8) & 0xFF;
         int b = argb & 0xFF;
 
-        // 线性化
         float rLin = (float) Math.pow(r / 255.0, 2.2);
         float gLin = (float) Math.pow(g / 255.0, 2.2);
         float bLin = (float) Math.pow(b / 255.0, 2.2);
 
-        // 自然饱和度
         if (vibrance != 1.0f) {
             float maxC = Math.max(rLin, Math.max(gLin, bLin));
             float minC = Math.min(rLin, Math.min(gLin, bLin));
@@ -452,12 +435,10 @@ public class ColorExtractor {
             } // 若 satOrig == 0，保持灰度不变（vibrance 对纯灰度无影响）
         }
 
-        // 亮度
         rLin *= brightness;
         gLin *= brightness;
         bLin *= brightness;
 
-        // 对比度（最后执行，并确保 clamp）
         if (contrast != 1.0f) {
             float midpoint = 0.5f;
             rLin = (rLin - midpoint) * contrast + midpoint;
