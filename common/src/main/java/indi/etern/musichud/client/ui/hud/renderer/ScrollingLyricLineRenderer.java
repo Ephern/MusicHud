@@ -64,7 +64,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         setLines(
                 new Line(null, "", 0, 0, 0),
                 new Line(null, "", 0, 0, 0),
-                false
+                true
         );
     }
 
@@ -354,9 +354,9 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         context.transform()
                 .translate(drawX, drawY)
                 .scale(scale)
-                .end(transforming -> {
-                    context.drawString(Minecraft.getInstance().font, text, 0, 0, color, false);
-                });
+                .end(transforming ->
+                        context.drawString(Minecraft.getInstance().font, text, 0, 0, color, false)
+                );
     }
 
     private void renderLineHighlight(HudRenderContext context, LineState line, int baseX, int baseY, float lineHeight, float positionY, float highlightFromX, float highlightToX, float yOffset) {
@@ -374,9 +374,9 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             context.transform()
                     .translate(drawX, drawY)
                     .scale(scale)
-                    .end(transforming -> {
-                        context.drawString(Minecraft.getInstance().font, text, 0, 0, line.line.emphasizeColor, false);
-                    });
+                    .end(transforming ->
+                            context.drawString(Minecraft.getInstance().font, text, 0, 0, line.line.emphasizeColor, false)
+                    );
             context.popScissor();
         }
     }

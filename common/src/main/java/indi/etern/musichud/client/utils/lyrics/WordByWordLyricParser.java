@@ -165,7 +165,7 @@ public class WordByWordLyricParser {
 //                String unknown = phraseMatcher.group(3);
                     String phraseText = phraseMatcher.group(4);
                     String suffix = phraseText.endsWith(" ") ? " " : "";
-                    phraseText = phraseText.replace('\u00A0', ' ').replace("\n", "").trim() + suffix;
+                    phraseText = phraseText.replace('\u00A0', ' ').replace('\n', ' ').trim() + suffix;
                     lineText.append(phraseText);
                     charIndex += phraseText.length();
                     nextPhraseStart = nextPhraseStart.plusMillis(phraseDurationMillis);
