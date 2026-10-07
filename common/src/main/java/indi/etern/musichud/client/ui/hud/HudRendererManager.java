@@ -13,7 +13,6 @@ import indi.etern.musichud.client.ui.hud.metadata.*;
 import indi.etern.musichud.client.ui.hud.renderer.*;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
-import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.connection.ConnectionStateMachine;
@@ -37,6 +36,8 @@ import java.util.concurrent.atomic.AtomicLong;
 
 public class HudRendererManager {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final long LYRIC_DELAY_NANOS = 300_000_000L;
+    private static final int DOWN_SCALE_TARGET_LENGTH = (int) Math.sqrt(ColorExtractor.MAX_SAMPLES);
     private static volatile HudRendererManager instance;
     @Getter
     private static volatile boolean loaded = false;
@@ -53,6 +54,10 @@ public class HudRendererManager {
     private final DateTimeFormatter LONG_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private final DateTimeFormatter SHORT_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("mm:ss");
     private final HudRenderContext hudRenderContext = new HudRenderContextImpl();
+    private final ConcurrentLinkedQueue<QueuedLyric> lyricQueue = new ConcurrentLinkedQueue<>();
+    private final AtomicBoolean lyricWorkerRunning = new AtomicBoolean();
+    private final AtomicLong lyricGeneration = new AtomicLong();
+    private final Object lyricLock = new Object();
     private String IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
     private volatile HudRenderData hudBaseData;
     private volatile HudRenderData imageDisplayData;
@@ -62,11 +67,7 @@ public class HudRendererManager {
     private String musicDurationString = "";
     private Logger logger;
     private int albumImageThumbnailSize = -1;
-    private static final long LYRIC_DELAY_NANOS = 300_000_000L;
-    private final ConcurrentLinkedQueue<QueuedLyric> lyricQueue = new ConcurrentLinkedQueue<>();
-    private final AtomicBoolean lyricWorkerRunning = new AtomicBoolean();
-    private final AtomicLong lyricGeneration = new AtomicLong();
-    private final Object lyricLock = new Object();
+    private Window window;
 
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
@@ -98,14 +99,12 @@ public class HudRendererManager {
                 return null;
             }
         });
-        IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
-            MusicHud.EXECUTOR.execute(() -> {
-                MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-                if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
-                    reset();
-                }
-            });
-        });
+        IClientEventService.getInstance().registerClientPlayerJoin((player) -> MusicHud.EXECUTOR.execute(() -> {
+            MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+            if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
+                reset();
+            }
+        }));
         StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
         ConnectionStateMachine.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
         updateLayoutFromConfig();
@@ -124,6 +123,12 @@ public class HudRendererManager {
             }
         }
         return instance;
+    }
+
+    private static void updateStatus(@Nullable StreamAudioPlayer.Status status) {
+        if (instance != null) {
+            instance.PLAYING_STATUS_RENDERER.updateStatus(status);
+        }
     }
 
     private void scheduleLyricLines(ScrollingLyricLineRenderer.Line line1, ScrollingLyricLineRenderer.Line line2) {
@@ -177,17 +182,6 @@ public class HudRendererManager {
             lyricGeneration.incrementAndGet();
             lyricQueue.clear();
             LYRICS_LINE_RENDERER.clear();
-        }
-    }
-
-    private record QueuedLyric(ScrollingLyricLineRenderer.Line line1,
-                               ScrollingLyricLineRenderer.Line line2,
-                               long enqueueNanos,
-                               long generation) {
-    }
-
-    private static void updateStatus(@Nullable StreamAudioPlayer.Status status) {        if (instance != null) {
-            instance.PLAYING_STATUS_RENDERER.updateStatus(status);
         }
     }
 
@@ -305,7 +299,9 @@ public class HudRendererManager {
     }
 
     private void refreshThumbnailSize() {
-        Window window = Minecraft.getInstance().getWindow();
+        if (window == null) {
+            window = Minecraft.getInstance().getWindow();
+        }
         //noinspection ConstantValue
         if (window != null) {
             int thumbnailSize = (int) (imageDisplayData.getLayout().getWidth() * window.getGuiScale());
@@ -410,21 +406,20 @@ public class HudRendererManager {
     }
 
     private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail) {
-        ImageTextureData[] imageTextures = new ImageTextureData[2];
+        if (albumImageThumbnailSize <= 0) {
+            return CompletableFuture.completedFuture(null);
+        }
         Album album = musicDetail.getAlbum();
-        Album album1 = musicDetail.getAlbum();
-        return CompletableFuture.allOf(
-                        ImageUtils.downloadAsync(album1.getImageThumbnailUrl(albumImageThumbnailSize))
-                                .thenAccept(imageTextureData -> imageTextures[0] = imageTextureData),
-                        ImageUtils.downloadAsync(album.getImageThumbnailUrl(240))
-                                .thenAccept(imageTextureData -> imageTextures[1] = imageTextureData)
-                ).thenAccept(imageTextureData -> {
-                    if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
-                        BackgroundImages backgroundImages = new BackgroundImages(imageTextures[0], 1f);
-                        var nextData = new BackgroundData(backgroundImages, ColorExtractor.extractColors(imageTextures[1].getTexture()));
-                        hudBaseData.getTransitionableBackground().startTransition(nextData);
-                    }
-                });
+        return ImageUtils.downloadScaledAsync(album.getPicUrl(), albumImageThumbnailSize, albumImageThumbnailSize)
+                .thenAcceptBoth(
+                        ImageUtils.downloadScaledAsync(album.getPicUrl(), DOWN_SCALE_TARGET_LENGTH, DOWN_SCALE_TARGET_LENGTH),
+                        (imageTextureData, downscaled) -> {
+                            if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
+                                BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
+                                var nextData = new BackgroundData(backgroundImages, ColorExtractor.extractColors(downscaled.getTexture()));
+                                hudBaseData.getTransitionableBackground().startTransition(nextData);
+                            }
+                        });
     }
 
     public void reset() {
@@ -445,9 +440,7 @@ public class HudRendererManager {
             if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
                 return;
             }
-            if (albumImageThumbnailSize <= 0) {
-                refreshThumbnailSize();
-            }
+            refreshThumbnailSize();
 
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
             MusicDetail musicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
@@ -508,6 +501,15 @@ public class HudRendererManager {
     }
 
     public void preloadAlbumImage(Album album) {
-        ImageUtils.downloadAsync(album.getImageThumbnailUrl(albumImageThumbnailSize));
+        if (albumImageThumbnailSize <= 0) {
+            return;
+        }
+        ImageUtils.downloadScaledAsync(album.getPicUrl(), albumImageThumbnailSize, albumImageThumbnailSize);
+    }
+
+    private record QueuedLyric(ScrollingLyricLineRenderer.Line line1,
+                               ScrollingLyricLineRenderer.Line line2,
+                               long enqueueNanos,
+                               long generation) {
     }
 }

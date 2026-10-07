@@ -112,6 +112,9 @@ public class NowPlayingInfo {
             lyricUpdaterVThread = null;
         }
     };
+    private Path tempDirectory;
+    private Path albumImagesTempDirectory;
+    private Path lastTempFile;
 
     private NowPlayingInfo() {
         jmtcExecutor.execute(this::initJmtc);
@@ -231,16 +234,29 @@ public class NowPlayingInfo {
                     if (splits.length > 1) {
                         suffix = splits[splits.length - 1];
                     }
-                    Path tempFile = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
-                    tempFile.toFile().deleteOnExit();
+                    if (lastTempFile != null) {
+                        try {
+                            Files.deleteIfExists(lastTempFile);
+                        } catch (Exception e) {
+                            logger.warn("Failed to delete last JMTC album image", e);
+                        }
+                    }
+                    if (tempDirectory == null) {
+                        tempDirectory = Files.createTempDirectory("MusicHUD_");
+                        tempDirectory.toFile().deleteOnExit();
+                        albumImagesTempDirectory = tempDirectory.resolve("./albums");
+                        Files.createDirectories(albumImagesTempDirectory);
+                    }
+                    lastTempFile = Files.createTempFile(albumImagesTempDirectory, "", "." + suffix);
+                    lastTempFile.toFile().deleteOnExit();
                     artUri = ImageUtils.downloadAsync(picUrl, (url, inputStream) -> {
                         try {
-                            Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                            return tempFile.toUri();
+                            Files.copy(inputStream, lastTempFile, StandardCopyOption.REPLACE_EXISTING);
+                            return lastTempFile.toUri();
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
-                    }, false).join();
+                    }).join();
                 } catch (Exception e) {
                     logger.warn("Failed to download album art for SMTC", e);
                 }

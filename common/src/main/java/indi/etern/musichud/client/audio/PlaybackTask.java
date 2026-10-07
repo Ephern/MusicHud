@@ -101,7 +101,22 @@ public class PlaybackTask {
     private final CountDownLatch gate = new CountDownLatch(1);
     private final Set<Consumer<PlaybackState>> stateListeners = new CopyOnWriteArraySet<>();
     private final PlaybackLedger ledger = new PlaybackLedger();
-    private final AtomicBoolean cleanupGuard = new AtomicBoolean();
+    /**
+     * Serializes OpenAL source creation (play worker) against teardown
+     * ({@link #cancel()}/{@link #finish()} via {@link #cleanupInternal()}), so a
+     * source can never be created after cancellation has already closed the
+     * field. Without this, {@code cancel()} could observe {@code source == null}
+     * on a still-loading task and then the play worker's late source would play
+     * alongside the successor.
+     */
+    private final ReentrantLock sourceLock = new ReentrantLock();
+    /**
+     * Serializes {@link #cleanup()} invocations. A concurrent cancel()/finish()
+     * teardown waits for the running one and then runs as well, instead of the
+     * former compare-and-set design that silently dropped it and could leave a
+     * just-created resource open.
+     */
+    private final ReentrantLock cleanupLock = new ReentrantLock();
     /** Sync reference: server broadcast start time, lazily set to the local wall start. */
     private volatile ZonedDateTime serverStartTime;
     /** Cross-fade duration set by the scheduler; -1 uses the task's own fade-in. */
@@ -328,6 +343,19 @@ public class PlaybackTask {
                     return;
                 }
                 currentDecoder = decoder;
+                // A cancel()/restart may have run its cleanup between the check
+                // above and this assignment, closing the (then-null) decoder
+                // field. Drop the orphan so it does not stay open.
+                if (cancelled || restartRequested) {
+                    if (currentDecoder == decoder) {
+                        currentDecoder = null;
+                    }
+                    try {
+                        decoder.close();
+                    } catch (Exception ignored) {
+                    }
+                    return;
+                }
                 // A freshly opened decoder starts at byte 0; make sure a stale
                 // count from a previous decoder (e.g. this loop restarted after
                 // the download thread died) can't make syncPlaying() skip the
@@ -647,6 +675,38 @@ public class PlaybackTask {
         }
     }
 
+    /**
+     * Close and drop the OpenAL source when the task was cancelled or its play
+     * worker interrupted. This is the safety net for the cancel/creation race:
+     * {@link #cancel()}'s teardown may have run while {@code source} was still
+     * null (a LOADING task), so any source the play worker creates afterwards
+     * must be torn down here rather than relying on a later {@code finish()}
+     * cleanup that could be dropped or delayed.
+     *
+     * @return true when the caller must abort the current playback round
+     */
+    private boolean abortSourceIfAborted() {
+        if (!cancelled && !Thread.currentThread().isInterrupted()) {
+            return false;
+        }
+        OpenAlSource aborted;
+        sourceLock.lock();
+        try {
+            aborted = source;
+            source = null;
+        } finally {
+            sourceLock.unlock();
+        }
+        if (aborted != null) {
+            try {
+                aborted.close();
+            } catch (Exception e) {
+                LOGGER.warn("Failed to close source of aborted task", e);
+            }
+        }
+        return true;
+    }
+
     /** One playback session from source creation to the main loop. */
     private PlayResult playOnce() {
         // Block until any in-progress SoundEngine reload has rebuilt the context.
@@ -688,7 +748,19 @@ public class PlaybackTask {
         // does a network round-trip first), so configure the source only now that
         // the real stream format is known.
         OpenAlSource.DirectChannels directChannels = OpenAlSource.directChannelsFor(format);
-        source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
+        sourceLock.lock();
+        try {
+            // cancel() sets cancelled before tearing the source down under this
+            // same lock, so re-checking here makes "created after cancellation"
+            // impossible: either we see cancelled and bail, or our source is
+            // visible to cancel()'s teardown.
+            if (cancelled || Thread.currentThread().isInterrupted()) {
+                return PlayResult.RESTARTED;
+            }
+            source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
+        } finally {
+            sourceLock.unlock();
+        }
 
         boolean firstChunk = true;
         for (int i = 0; i < BUFFER_COUNT; i++) {
@@ -720,9 +792,17 @@ public class PlaybackTask {
                     Minecraft.getInstance().getSoundManager().stop(null, SoundSource.MUSIC));
         }
 
+        // A cancel may have raced the create/queue above; never start a source
+        // belonging to an aborted task.
+        if (abortSourceIfAborted()) {
+            return PlayResult.RESTARTED;
+        }
         source.setGain(0);
         lastSetGain = 0;
         source.play();
+        if (abortSourceIfAborted()) {
+            return PlayResult.RESTARTED;
+        }
 
         // Fade progress and startFuture start together, so buffer waits don't consume it.
         long fadeDuration = transitionFadeInMs >= 0 ? transitionFadeInMs : fadeIn.durationMs();
@@ -1349,8 +1429,17 @@ public class PlaybackTask {
 
     private void finish() {
         stopDownloadWorker();
-        scrobbleOnQuitUnregister.unregister();
-        scrobble();
+        // These steps must never prevent cleanup()/finishFuture from running: a
+        // throw here used to skip both, leaking a live OpenAL source and wedging
+        // the orchestrator's current/pending promotion.
+        try {
+            if (scrobbleOnQuitUnregister != null) {
+                scrobbleOnQuitUnregister.unregister();
+            }
+            scrobble();
+        } catch (Exception e) {
+            LOGGER.warn("Pre-cleanup step failed, finishing task anyway", e);
+        }
         cleanup();
         // Complete the finish future FIRST: its listener promotes any pending task
         // and updates the global status. Broadcasting FINISHED before that would
@@ -1387,21 +1476,28 @@ public class PlaybackTask {
     }
 
     private void cleanup() {
-        if (!cleanupGuard.compareAndSet(false, true)) {
-            return;
-        }
+        // Serialize concurrent teardowns (cancel() vs the play worker's finish())
+        // instead of dropping one: the former compare-and-set silently skipped the
+        // second caller, which could leave a source created just before the call
+        // open and audible next to the successor task.
+        cleanupLock.lock();
         try {
             cleanupInternal();
         } finally {
-            cleanupGuard.set(false);
+            cleanupLock.unlock();
         }
     }
 
     private void cleanupInternal() {
         try {
-            if (source != null) {
-                source.close();
-                source = null;
+            sourceLock.lock();
+            try {
+                if (source != null) {
+                    source.close();
+                    source = null;
+                }
+            } finally {
+                sourceLock.unlock();
             }
 
             lastVolume = 1;
