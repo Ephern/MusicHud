@@ -11,19 +11,8 @@ import indi.etern.musichud.client.ui.hud.pipelines.HudTextureSetup;
 import net.minecraft.client.Minecraft;
 
 public class BackgroundRenderer implements HudRenderer {
-    private static volatile BackgroundRenderer instance;
     private HudRenderData currentData;
     private final DynamicStatusUniform dynamicStatusUniform = DynamicStatusUniform.getInstance();
-
-    public static BackgroundRenderer getInstance() {
-        if (instance == null) {
-            synchronized (BackgroundRenderer.class) {
-                if (instance == null)
-                    instance = new BackgroundRenderer();
-            }
-        }
-        return instance;
-    }
 
     public void configure(HudRenderData data) {
         this.currentData = data;

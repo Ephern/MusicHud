@@ -90,16 +90,13 @@ public class MainFragment extends Fragment {
     private int lyricsPanelWidth = -1;
     private boolean lyricsPanelShown = false;
     private AnimatorSet lyricsAnimator = null;
-    // Double-buffered music info card (album cover + info merged)
     private FrameLayout cardWrapper;
     private MusicInfoCard activeCard;
     private MusicInfoCard stagedCard;
     private AnimatorSet cardAnimator;
     private AnimatorSet coverScaleAnimator;
     private boolean cardSwitching = false;
-    // Latest-wins slot: a switch arriving mid-animation replaces any earlier pending one
     private Traceable<MusicDetail> pendingSwitch;
-    // MusicDetail currently settled on the active card
     private MusicDetail displayedDetail;
 
     private MainFragment() {
@@ -135,7 +132,7 @@ public class MainFragment extends Fragment {
             if (homeView != null) {
                 homeView.switchMusic(current, nextToPlay, lines);
             }
-            if (instance.lyricsScrollView != null) {
+            if (instance.lyricsScrollView != null && hasValidLyric()) {
                 instance.lyricsScrollView.switchLyrics(current == null ? MusicDetail.NONE : current.value(), lines);
             }
             instance.updateLyricsPanelVisibility();
@@ -254,7 +251,7 @@ public class MainFragment extends Fragment {
         if (homeView != null) {
             homeView.switchMusic(musicDetailTrace, nextToPlayTrace, lines);
         }
-        if (lyricsScrollView != null) {
+        if (lyricsScrollView != null && hasValidLyric()) {
             lyricsScrollView.switchLyrics(musicDetail, lines);
         }
         updateLyricsPanelVisibility();
@@ -568,11 +565,13 @@ public class MainFragment extends Fragment {
             lyricsSidebar.setTranslationX(lyricsPanelWidth);
 
             lyricsScrollView = new StaggeredLyricScrollView(context);
+            lyricsScrollView.setMainLyricSize(Theme.SIDEBAR_MAIN_LYRIC_SIZE);
+            lyricsScrollView.setSubLyricSize(Theme.SIDEBAR_SUB_LYRIC_SIZE);
             lyricsSidebar.addView(lyricsScrollView, new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
             Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
-            if (currentMusic != null && currentLyrics != null && !currentMusic.equals(MusicDetail.NONE)) {
+            if (currentMusic != null && currentLyrics != null && !currentMusic.equals(MusicDetail.NONE) && hasValidLyric()) {
                 lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
             }
 
@@ -657,12 +656,15 @@ public class MainFragment extends Fragment {
         if (!clientConfig.getEnableLyricsSidebar()) {
             return false;
         }
-        NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
         MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
         boolean musicInvalid = detail == null || detail.equals(MusicDetail.NONE);
         if (musicInvalid) {
             return false;
         }
+        return hasValidLyric();
+    }
+
+    private static boolean hasValidLyric() {
         Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
         return lines != null && !lines.isEmpty()
                 && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;

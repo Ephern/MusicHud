@@ -17,10 +17,10 @@ public class ColorExtractor {
     private static final int SHIFT = 8 - BITS;
     private static final int HIST_SIZE = 1 << (BITS * 3);
     private static final int CHANNEL_MASK = (1 << BITS) - 1;
-    private static final float PRIMARY_SAT_WEIGHT = 0.3f;
-    private static final float SECONDARY_SAT_WEIGHT = 0.25f;
+    private static final float PRIMARY_SAT_WEIGHT = 0.35f;
+    private static final float SECONDARY_SAT_WEIGHT = 0.3f;
     private static final float LUM_WEIGHT = 0.3f;
-    private static final float FREQ_WEIGHT = 0.8f;
+    private static final float FREQ_WEIGHT = 0.7f;
     private static final float DIST_EPSILON = 0.001f;
     private static final float BD_SAT_TARGET = 0.4f;
     private static final float BD_SAT_SPREAD = 0.5f;
