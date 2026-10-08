@@ -31,8 +31,6 @@ public interface IClientDistUtil {
 
     void showToast(CharSequence message);
 
-    void refreshMainGUI();
-
     boolean inIntegratedServer();
 
     boolean inSinglePlayer();

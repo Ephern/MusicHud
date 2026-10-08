@@ -90,20 +90,20 @@ public class HudRendererManager {
                     new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis)
             );
         });
-        PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
-            try {
-                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-                return PlayerInfoUtil.getPlayerSkinPath(pusherPlayerInfo);
-            } catch (Exception e) {
-                // Render-thread supplier: a lookup failure must never break the HUD frame
-                return null;
-            }
-        });
         IClientEventService.getInstance().registerClientPlayerJoin((player) -> MusicHud.EXECUTOR.execute(() -> {
             MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
             if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
                 reset();
             }
+            PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
+                try {
+                    PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
+                    return PlayerInfoUtil.getPlayerSkinPath(pusherPlayerInfo);
+                } catch (Exception e) {
+                    // Render-thread supplier: a lookup failure must never break the HUD frame
+                    return null;
+                }
+            });
         }));
         IClientEventService.getInstance().registerClientPlayerQuit((player) -> MusicHud.EXECUTOR.execute(
                 () -> PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(null)
@@ -449,16 +449,16 @@ public class HudRendererManager {
             refreshThumbnailSize();
 
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
-            MusicDetail musicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-            if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
+            TextRenderer.TextStyle currentTextData = TITLE_RENDERER.getCurrentTextData();
+            if (currentTextData == null || currentTextData.text.isBlank()) {
                 //To prevent i18n lazy loading result in wrong text
                 IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
                 if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
                     TITLE_RENDERER.setText(IDLE_MESSAGE);
                 }
-                if (clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()) {
-                    return;
-                }
+            }
+            if (clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()) {
+                return;
             }
             hudBaseData.getTransitionableBackground().updateTransition();
 

@@ -116,27 +116,11 @@ public class MainFragment extends Fragment {
             accountBaseView.refresh();
         }
         if (instance != null && instance.visible && instance.activeCard != null) {
-            // Restore the current playback instead of blanking it to "idle": a failed connect
-            // attempt no longer stops the ongoing playback, so a blanket clear would wrongly
-            // wipe the GUI while the HUD keeps playing.
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             Traceable<MusicDetail> current = nowPlayingInfo.getCurrentlyPlayingMusic();
             Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayMusic();
             Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
-            // Don't rebuild contents while a card transition is in flight; it settles on its own.
-            if (!instance.cardSwitching) {
-                instance.activeCard.bind(current, instance.sideWidth);
-                instance.displayedDetail = current == null ? null : current.value();
-                instance.updateCoverScale(false);
-            }
-            if (homeView != null) {
-                homeView.switchMusic(current, nextToPlay, lines);
-            }
-            if (instance.lyricsScrollView != null && hasValidLyric()) {
-                instance.lyricsScrollView.switchLyrics(current == null ? MusicDetail.NONE : current.value(), lines);
-            }
-            instance.updateLyricsPanelVisibility();
-            instance.refreshServerConnectStatus();
+            instance.applyMusic(current, nextToPlay, lines, true);
         }
     }
 

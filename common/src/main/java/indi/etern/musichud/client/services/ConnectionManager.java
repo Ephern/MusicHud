@@ -152,7 +152,7 @@ public class ConnectionManager implements IConnectionManager {
         // (after the transition the payload would fall back to the local loopback branch).
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         ConnectionStateMachine.enterDisconnected();
-        MusicService.resetCurrentMusicStatus();
+        MusicService.resetCurrentMusicStatus(false);
         NowPlayingInfo.getInstance().stop();
         StreamAudioPlayer.getInstance().stop();
         connectGeneration.incrementAndGet();
@@ -268,7 +268,7 @@ public class ConnectionManager implements IConnectionManager {
             if (!clientDistUtil.inIntegratedServer()
                     && clientConfig.getEnableIsolatedMode()) {
                 // Stop leftover isolated-mode playback before switching to server tracks.
-                MusicService.resetCurrentMusicStatus();
+                MusicService.resetCurrentMusicStatus(false);
                 NowPlayingInfo.getInstance().stop();
                 StreamAudioPlayer.getInstance().stop();
             }
@@ -294,7 +294,6 @@ public class ConnectionManager implements IConnectionManager {
             logger.info("Disconnected by server, falling back to isolated mode");
             switchToIsolate();
         }
-        clientDistUtil.refreshMainGUI();
     }
 
     private void requestInitialState() {
