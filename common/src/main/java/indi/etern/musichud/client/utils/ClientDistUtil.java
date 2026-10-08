@@ -1,8 +1,6 @@
 package indi.etern.musichud.client.utils;
 
-import icyllis.modernui.mc.MuiModApi;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.utils.IClientDistUtil;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
@@ -36,11 +34,6 @@ public class ClientDistUtil implements IClientDistUtil {
     @Override
     public void showToast(CharSequence message) {
         ToastUtil.show(message);
-    }
-
-    @Override
-    public void refreshMainGUI() {
-        MuiModApi.postToUiThread(MainFragment::refresh);
     }
 
     @Override

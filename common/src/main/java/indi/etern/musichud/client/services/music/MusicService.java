@@ -70,12 +70,12 @@ public class MusicService implements IClientMusicService {
     private final Set<Consumer<QueueItem>> musicQueuePushListeners = ConcurrentHashMap.newKeySet();
     @Getter
     private final Set<BiConsumer<Integer, QueueItem>> musicQueueRemoveListeners = ConcurrentHashMap.newKeySet();
-    long lastPressTime = 0;
-    private UserCollections currentUserCollections;
-    private volatile CompletableFuture<UserCollections> loadingCollectionsFuture;
     private final ConcurrentHashMap<Long, CompletableFuture<Playlist>> loadingPlaylists = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, CompletableFuture<Album>> loadingAlbums = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, CompletableFuture<Artist>> loadingArtists = new ConcurrentHashMap<>();
+    long lastPressTime = 0;
+    private UserCollections currentUserCollections;
+    private volatile CompletableFuture<UserCollections> loadingCollectionsFuture;
 
     private static boolean isPlaylistComplete(Playlist playlist) {
         return playlist.getMusicDetails() != null
@@ -98,20 +98,36 @@ public class MusicService implements IClientMusicService {
         return instance;
     }
 
-    public static void resetCurrentMusicStatus() {
+    public static void resetCurrentMusicStatus(boolean switchToNone) {
         MusicService inst = instance;
         if (inst != null) {
             // Hold the instance monitor so the queue clear cannot interleave with the
             // peek/iterate patterns in switchMusic/refreshQueue on network threads
             synchronized (inst) {
-                inst.switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, "");
+                if (switchToNone) {
+                    inst.switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, "");
+                }
                 inst.getIdlePlaySourceState().local().reset();
                 inst.musicQueue.clear();
             }
         }
-        if (HudRendererManager.isLoaded()) {
-            HudRendererManager.getInstance().reset();
+        HudRendererManager hudRendererManager = HudRendererManager.getActiveInstance();
+        if (switchToNone && hudRendererManager != null) {
+            hudRendererManager.reset();
         }
+    }
+
+    private static boolean sameItem(QueueItem a, QueueItem b) {
+        return a.queueUniqueID().equals(b.queueUniqueID());
+    }
+
+    private static UserCollections emptyCollections() {
+        UserCollections collections = new UserCollections();
+        collections.setUserCategoryPlaylists(UserCategoryPlaylists.EMPTY);
+        collections.setSubscribedAlbums(new ObservableSequencedSet<>(0));
+        collections.setSubscribedArtists(new ObservableSequencedSet<>(0));
+        collections.setLoaded(true);
+        return collections;
     }
 
     /**
@@ -121,10 +137,6 @@ public class MusicService implements IClientMusicService {
      */
     public synchronized QueueItem peekQueueItem() {
         return musicQueue.peek();
-    }
-
-    private static boolean sameItem(QueueItem a, QueueItem b) {
-        return a.queueUniqueID().equals(b.queueUniqueID());
     }
 
     private void pushDownToUserCollections(Playlist full) {
@@ -648,15 +660,6 @@ public class MusicService implements IClientMusicService {
         }
     }
 
-    private static UserCollections emptyCollections() {
-        UserCollections collections = new UserCollections();
-        collections.setUserCategoryPlaylists(UserCategoryPlaylists.EMPTY);
-        collections.setSubscribedAlbums(new ObservableSequencedSet<>(0));
-        collections.setSubscribedArtists(new ObservableSequencedSet<>(0));
-        collections.setLoaded(true);
-        return collections;
-    }
-
     private CompletableFuture<UserCollections> rememberCollectionsLoad(CompletableFuture<UserCollections> future) {
         loadingCollectionsFuture = future;
         future.whenComplete((r, e) -> {
@@ -666,6 +669,7 @@ public class MusicService implements IClientMusicService {
         });
         return future;
     }
+
     @SuppressWarnings("unchecked")
     public <T extends MusicCollection> CompletableFuture<T> loadMusicCollectionDetail(long id, Class<T> type) {
         if (type == Album.class) {
@@ -686,7 +690,9 @@ public class MusicService implements IClientMusicService {
                 .exceptionally(e -> MessagedResult.fail(CloudTracksPage.EMPTY));
     }
 
-    /** On-demand track detail fetch; {@code cloudSource} marks the user's own cloud-drive tracks. */
+    /**
+     * On-demand track detail fetch; {@code cloudSource} marks the user's own cloud-drive tracks.
+     */
     public CompletableFuture<List<MusicDetail>> loadMusicDetails(List<Long> ids, boolean cloudSource) {
         if (ids == null || ids.isEmpty()) {
             return CompletableFuture.completedFuture(List.of());
@@ -709,18 +715,18 @@ public class MusicService implements IClientMusicService {
                         e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), null));
     }
 
+    public synchronized Queue<QueueItem> getMusicQueue() {
+        return new ArrayDeque<>(musicQueue);
+    }
+
     @RegisterMark
     public static class RegisterImpl implements ClientRegister {
         @Override
         public void register() {
             IClientEventService.getInstance().registerClientPlayerQuit((player) ->
-                    MusicHud.EXECUTOR.execute(MusicService::resetCurrentMusicStatus)
+                    MusicHud.EXECUTOR.execute(() -> MusicService.resetCurrentMusicStatus(true))
             );
         }
-    }
-
-    public synchronized Queue<QueueItem> getMusicQueue() {
-        return new ArrayDeque<>(musicQueue);
     }
 
 }
