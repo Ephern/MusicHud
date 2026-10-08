@@ -11,21 +11,10 @@ import lombok.Setter;
 import org.joml.Matrix3x2f;
 
 public class ProgressRenderer implements HudRenderer {
-    private static volatile ProgressRenderer instance;
     private final DynamicStatusUniform hudDynamicStatus = DynamicStatusUniform.getInstance();
     @Setter
     @Getter
     private ProgressBarData progressData;
-
-    public static ProgressRenderer getInstance() {
-        if (instance == null) {
-            synchronized (ProgressRenderer.class) {
-                if (instance == null)
-                    instance = new ProgressRenderer();
-            }
-        }
-        return instance;
-    }
 
     public void configure(ProgressBarData data) {
         this.progressData = data;

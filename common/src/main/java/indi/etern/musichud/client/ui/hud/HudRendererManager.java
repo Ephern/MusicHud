@@ -41,11 +41,11 @@ public class HudRendererManager {
     private static volatile HudRendererManager instance;
     @Getter
     private static volatile boolean loaded = false;
-    private final BackgroundRenderer BACKGROUND_RENDERER = BackgroundRenderer.getInstance();
-    private final AlbumImageRenderer IMAGE_RENDERER = AlbumImageRenderer.getInstance();
+    private final BackgroundRenderer BACKGROUND_RENDERER = new BackgroundRenderer();
+    private final AlbumImageRenderer IMAGE_RENDERER = new AlbumImageRenderer();
     private final PlayerHeadRenderer PLAYER_HEAD_RENDERER = new PlayerHeadRenderer();
-    private final PlayingStatusRenderer PLAYING_STATUS_RENDERER = PlayingStatusRenderer.getInstance();
-    private final ProgressRenderer PROGRESS_RENDERER = ProgressRenderer.getInstance();
+    private final PlayingStatusRenderer PLAYING_STATUS_RENDERER = new PlayingStatusRenderer();
+    private final ProgressRenderer PROGRESS_RENDERER = new ProgressRenderer();
     private final TextRenderer TITLE_RENDERER = new TextRenderer();
     private final TextRenderer ARTISTS_AND_ALBUM_RENDERER = new TextRenderer();
     private final TextRenderer PLAY_TIME_RENDERER = new TextRenderer();
@@ -105,8 +105,11 @@ public class HudRendererManager {
                 reset();
             }
         }));
-        StreamAudioPlayer.getInstance().getStatusChangeListener().add(HudRendererManager::updateStatus);
-        ConnectionStateMachine.getConnectStatusListeners().add((connectStatus) -> HudRendererManager.updateStatus(null));
+        IClientEventService.getInstance().registerClientPlayerQuit((player) -> MusicHud.EXECUTOR.execute(
+                () -> PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(null)
+        ));
+        StreamAudioPlayer.getInstance().getStatusChangeListener().add(this::updateStatus);
+        ConnectionStateMachine.getConnectStatusListeners().add((connectStatus) -> updateStatus(null));
         updateLayoutFromConfig();
         refreshStyle();
         reset();
@@ -117,7 +120,7 @@ public class HudRendererManager {
             synchronized (HudRendererManager.class) {
                 if (instance == null) {
                     instance = new HudRendererManager();
-                    updateStatus(StreamAudioPlayer.Status.IDLE);
+                    instance.updateStatus(StreamAudioPlayer.Status.IDLE);
                     loaded = true;
                 }
             }
@@ -125,10 +128,13 @@ public class HudRendererManager {
         return instance;
     }
 
-    private static void updateStatus(@Nullable StreamAudioPlayer.Status status) {
-        if (instance != null) {
-            instance.PLAYING_STATUS_RENDERER.updateStatus(status);
-        }
+    @Nullable
+    public static HudRendererManager getActiveInstance() {
+        return instance;
+    }
+
+    public void updateStatus(@Nullable StreamAudioPlayer.Status status) {
+        PLAYING_STATUS_RENDERER.updateStatus(status);
     }
 
     private void scheduleLyricLines(ScrollingLyricLineRenderer.Line line1, ScrollingLyricLineRenderer.Line line2) {
@@ -258,7 +264,7 @@ public class HudRendererManager {
             float subLyricsSize = showSubLyrics ? contentUnit * 5 : 0;
 
             float lyricsY = contentPadding + titleSize + contentInterval;
-            float aboveProgressY = progressY - infoTextSize - contentInterval;
+            float aboveProgressY = progressY - infoTextSize - contentInterval / 2;
             float progressRightX = mainContentX + contentWidth;
 
             Layout statusLayout = new Layout(statusX, titleY, titleSize, titleSize, 0f);

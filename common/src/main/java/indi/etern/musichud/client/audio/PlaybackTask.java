@@ -6,7 +6,7 @@ import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.decoder.*;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.hud.renderer.PlayingStatusRenderer;
+import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
@@ -1117,7 +1117,10 @@ public class PlaybackTask {
         float targetGain = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
                 (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
         if (lastVolume != targetGain && source != null) {
-            PlayingStatusRenderer.getInstance().updateStatus(null);
+            HudRendererManager rendererManager = HudRendererManager.getActiveInstance();
+            if (rendererManager != null) {
+                rendererManager.updateStatus(null);
+            }
             lastVolume = targetGain;
         }
         if (source == null) return;

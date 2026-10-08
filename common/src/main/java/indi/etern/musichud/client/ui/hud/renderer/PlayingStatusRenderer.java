@@ -9,15 +9,13 @@ import lombok.Getter;
 import lombok.Setter;
 
 public class PlayingStatusRenderer implements HudRenderer {
-    // From Lucide Icons. Plain resource paths so this file stays identical across the
-    // ResourceLocation -> Identifier rename.
+    // From Lucide Icons
     public static final String LOADING_ICON_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/loader_circle.png";
     public static final String RETRYING_ICON_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/rotate_cw.png";
     public static final String ERROR_ICON_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/circle_x.png";
     public static final String PLAYING_CONNECTED_ICON_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/link.png";
     public static final String PLAYING_ISOLATED_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/unlink.png";
     public static final String MUTED_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/volume_x.png";
-    private static volatile PlayingStatusRenderer instance;
 
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     StreamAudioPlayer.Status status;
@@ -26,16 +24,6 @@ public class PlayingStatusRenderer implements HudRenderer {
     @Setter
     private boolean visibility = true;
     private String currentResourceLocation;
-
-    public static PlayingStatusRenderer getInstance() {
-        if (instance == null) {
-            synchronized (PlayingStatusRenderer.class) {
-                if (instance == null)
-                    instance = new PlayingStatusRenderer();
-            }
-        }
-        return instance;
-    }
 
     public void configure(Layout layout) {
         this.layout = layout;
@@ -85,9 +73,9 @@ public class PlayingStatusRenderer implements HudRenderer {
                     .translate(centerX, centerY)
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
-                    .end(transforming -> {
-                        hudRenderContext.graphics().blitTextured(currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height);
-                    });
+                    .end(transforming ->
+                            hudRenderContext.graphics().blitTextured(currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height)
+                    );
         }
     }
 

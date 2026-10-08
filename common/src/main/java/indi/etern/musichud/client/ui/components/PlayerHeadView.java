@@ -42,11 +42,7 @@ public class PlayerHeadView extends FrameLayout {
     private ResourceLocation skin;
     private ResourceLocation lastRenderedSkin;
     private final ViewTreeObserver.OnPreDrawListener preDrawListener = () -> {
-//        if (RenderSystem.isOnRenderThread()) {
         updateHeadImage();
-//        } else {
-//            Minecraft.getInstance().submit(this::updateHeadImage);
-//        }
         return true;
     };
 
@@ -88,17 +84,20 @@ public class PlayerHeadView extends FrameLayout {
 
     public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
-        skin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
-//        if (RenderSystem.isOnRenderThread()) {
+        if (playerSkinSupplier == null) {
+            skin = null;
+        }
         updateHeadImage();
-//        } else {
-//            Minecraft.getInstance().submit(this::updateHeadImage);
-//        }
     }
 
     private void updateHeadImage() {
         if (playerSkinSupplier != null) {
-            skin = playerSkinSupplier.get();
+            var skin1 = playerSkinSupplier.get();
+            if (skin1 != null) {
+                skin = skin1;
+            }
+        } else {
+            skin = null;
         }
         if (skin == null) {
             faceView.setImageDrawable(null);

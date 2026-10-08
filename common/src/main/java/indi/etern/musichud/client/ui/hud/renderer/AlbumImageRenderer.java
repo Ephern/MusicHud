@@ -15,19 +15,8 @@ import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.jetbrains.annotations.NotNull;
 
 public class AlbumImageRenderer implements HudRenderer {
-    private static volatile AlbumImageRenderer instance;
     private HudRenderData currentData;
     private ImageTextureData icon;
-
-    public static AlbumImageRenderer getInstance() {
-        if (instance == null) {
-            synchronized (AlbumImageRenderer.class) {
-                if (instance == null)
-                    instance = new AlbumImageRenderer();
-            }
-        }
-        return instance;
-    }
 
     public void configure(HudRenderData data) {
         this.currentData = data;
