@@ -59,7 +59,6 @@ public class NowPlayingInfo {
     @Setter
     @Getter
     private Duration updateInAdvanceDuration = Duration.of(500, ChronoUnit.MILLIS);
-    @Getter
     private volatile Traceable<MusicDetail> currentlyPlaying = Traceable.of(MusicDetail.NONE);
     private volatile Traceable<MusicDetail> nextToPlayIdleMusic = Traceable.of(MusicDetail.NONE);
     @Getter

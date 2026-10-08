@@ -68,6 +68,7 @@ public class HudRendererManager {
     private Logger logger;
     private int albumImageThumbnailSize = -1;
     private Window window;
+    private boolean idle = true;
 
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
@@ -365,7 +366,8 @@ public class HudRendererManager {
 
     public void switchMusic(MusicDetail musicDetail) {
         try {
-            if (musicDetail == null || musicDetail.equals(MusicDetail.NONE)) {
+            idle = musicDetail == null || musicDetail.equals(MusicDetail.NONE);
+            if (idle) {
                 reset();
             } else {
                 TITLE_RENDERER.setText(musicDetail.getName());
@@ -457,7 +459,7 @@ public class HudRendererManager {
                     TITLE_RENDERER.setText(IDLE_MESSAGE);
                 }
             }
-            if (clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()) {
+            if (idle && clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()) {
                 return;
             }
             hudBaseData.getTransitionableBackground().updateTransition();
