@@ -17,6 +17,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
+import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
 import indi.etern.musichud.client.utils.ui.Easing;
@@ -46,8 +47,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
     private static final float SPACER_HEIGHT_RATIO = 0.7f;
     private static final int SWITCH_DURATION = 400;
-    private static final int SCROLL_RESPONSE_MILLIS = 600;
-    private static final float SCROLL_DAMPING = 1f;
+    private static final int SCROLL_RESPONSE_MILLIS = 550;
+    private static final float SCROLL_DAMPING = 0.95f;
     // The parent scroll delta is scaled by this before it is fed into each row's live decoupling.
     // It must stay 0.5: icyllis.modernui.graphics.RenderProperties.computeTransform applies the
     // view's x/y translation twice (preTranslate + postTranslate both carry it), so a rendered
@@ -68,6 +69,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private static Logger logger;
     private final Map<LyricLine, LyricLineView> lyricLines = new LinkedHashMap<>();
     @Getter
+    @Setter
+    private int mainLyricSize = Theme.MAIN_LYRIC_SIZE;
+    @Getter
+    @Setter
+    private int subLyricSize = Theme.SUB_LYRIC_SIZE;
+    @Getter
     private final List<LyricLineView> lyricLineViewList = new ArrayList<>();
     private final LinearLayout container;
     private final SpringValue scrollSpring;
@@ -82,7 +89,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             if (scrollStatus == ScrollStatus.MANUAL) {
                 if (MuiModApi.getElapsedTime() - lastUserScrollTime >= AUTO_RECENTER_DELAY_MILLIS) {
                     scrollStatus = ScrollStatus.IDLE;
-                    recenter();
+                    recenter(false);
                 } else {
                     postDelayed(this, 50);
                 }
@@ -165,7 +172,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             int lastHeight = oldBottom - oldTop;
             if ((width != lastWidth || height != lastHeight)
                     && (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.MANUAL)) {
-                recenter();
+                recenter(false);
             }
         });
 
@@ -241,7 +248,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
         rows.clear();
         for (LyricLine line : lyrics) {
-            LyricLineView row = new LyricLineView(context, line);
+            LyricLineView row = new LyricLineView(context, line, mainLyricSize, subLyricSize);
             container.addView(row);
             lyricLines.put(line, row);
             lyricLineViewList.add(row);
@@ -397,7 +404,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         scrollToLyric(target);
     }
 
-    private void recenter() {
+    private void recenter(boolean useJump) {
         LyricLine targetLine = justHighlightedLyricLine;
         if (targetLine == null) return;
         // Resolve the target before switching state: entering RECENTER without a valid
@@ -407,7 +414,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (scrollStatus == ScrollStatus.RECENTER) return;
         scrollStatus = ScrollStatus.RECENTER;
         scrollFinished = false;
-        scrollToLyric(target);
+        if (useJump) {
+            jumpToLyric(target);
+        } else {
+            scrollToLyric(target);
+        }
     }
 
     private void jumpToTop() {
@@ -453,15 +464,15 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int targetScrollY = Math.clamp(targetTop - dp(80), 0, maxScroll);
         lastTargetScrollPosition = targetScrollY;
 
-        if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.RECENTER) {
-            scrollStatus = ScrollStatus.FOLLOW_LYRICS;
-        }
-
         long now = MuiModApi.getFrameTimeNanos();
         int targetIndex = lyricLineViewList.indexOf(target);
         int n = rows.size();
 
         calcLoggedDelay(targetIndex, justHighlightedLyricLine);
+
+        if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.RECENTER) {
+            scrollStatus = ScrollStatus.FOLLOW_LYRICS;
+        }
         // Rebase the live compensation for this wave while keeping every running spring continuous:
         // the old compensation is shifted into the base spring via translate() (value, velocity and
         // the running segment are preserved), so a rapid highlight never freezes a row.
@@ -506,9 +517,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int totalLines = lyricLineViewList.size();
         delayMillis = new float[totalLines];
         double max = Math.max(5, Math.log(1 + totalLines));
-        float factor = durationFactor(highlighted);
+        boolean inRecenter = scrollStatus == ScrollStatus.RECENTER;
+        float factor = durationFactor(highlighted) * (inRecenter ? 0.5f : 1);
         for (int i = 0; i < totalLines; i++) {
-            int distance = Math.abs(i - targetIndex + 1);
+            int distance = Math.abs(i - targetIndex + (inRecenter ? 0 : 1));
             float delayFactor = (float) Math.clamp(Math.log(1 + distance) / max, 0, 1);
             delayMillis[i] = delayFactor * MAX_DELAY_MILLIS * (i < targetIndex ? 0.5f : 1) * factor;
         }
@@ -971,7 +983,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     public void refreshLinesStyle() {
         lyricLineViewList.forEach(LyricLineView::refreshSubLyricLine);
-        post(this::recenter);
+        post(() -> recenter(true));
     }
 
     public void reinitialize() {

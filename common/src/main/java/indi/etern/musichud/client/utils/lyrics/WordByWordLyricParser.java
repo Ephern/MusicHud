@@ -61,11 +61,7 @@ public class WordByWordLyricParser {
                 }
             }
             String lyric1 = metaData.lyric();
-            if (lyric1 != null) {
-                lyricLine.setTranslatedText(lyric1.replace('\u00A0', ' ').trim());
-            } else {
-                lyricLine.setTranslatedText("");
-            }
+            lyricLine.setTranslatedText(lyric1 == null ? "" : LyricsNormalizer.normalize(lyric1));
         });
         ArrayDeque<LyricLine> lyricLines = new ArrayDeque<>(lyricLinesWithoutValidTimestamp);
         lyricLines.addAll(map.values());
@@ -165,7 +161,7 @@ public class WordByWordLyricParser {
 //                String unknown = phraseMatcher.group(3);
                     String phraseText = phraseMatcher.group(4);
                     String suffix = phraseText.endsWith(" ") ? " " : "";
-                    phraseText = phraseText.replace('\u00A0', ' ').replace('\n', ' ').trim() + suffix;
+                    phraseText = LyricsNormalizer.normalize(phraseText) + suffix;
                     lineText.append(phraseText);
                     charIndex += phraseText.length();
                     nextPhraseStart = nextPhraseStart.plusMillis(phraseDurationMillis);

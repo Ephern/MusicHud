@@ -182,6 +182,14 @@ public class LyricLine implements Comparable<LyricLine> {
         private int[] charCodeUnitLengths;
         private int cacheStart;
         private int cacheEnd;
+        // Paint metrics captured when the glyph cache was built. Shaping depends on the text
+        // size (px, which already folds in density/GUI scale) and the typeface, so glyphs
+        // shaped with one paint must not be reused by a view using another. The same LyricLine
+        // (and thus the same HighlightSpan instances) is shared by the home lyric view and the
+        // sidebar lyric view, which use different sizes; the spans also outlive a GUI re-open
+        // while the display density may have changed.
+        private float cacheTextSize = -1f;
+        private Typeface cacheTypeface;
 
         public HighlightSpan(int charStartInPhrase, int charCount) {
             this.charStartInPhrase = charStartInPhrase;
@@ -211,9 +219,14 @@ public class LyricLine implements Comparable<LyricLine> {
 
         private void ensureShaped(@NonNull TextPaint paint, CharSequence text,
                                   int start, int end) {
-            if (charShapedTexts != null && start >= cacheStart && end <= cacheEnd) {
+            boolean paintChanged = charShapedTexts == null
+                    || paint.getTextSize() != cacheTextSize
+                    || !Objects.equals(paint.getTypeface(), cacheTypeface);
+            if (!paintChanged && start >= cacheStart && end <= cacheEnd) {
                 return;
             }
+            cacheTextSize = paint.getTextSize();
+            cacheTypeface = paint.getTypeface();
             cacheStart = start;
             cacheEnd = end;
             int count = Math.min(Character.codePointCount(text, start, end), charYOffsets.length);

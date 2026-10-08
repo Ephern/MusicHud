@@ -22,15 +22,20 @@ public class PlayerHeadRenderer implements HudRenderer {
 
     public void setPlayerSkinSupplier(@Nullable Supplier<String> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
-        String newSkin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
-        long now = System.currentTimeMillis();
-        if (now - lastUpdateTime > TRANSITION_DURATION) {
-            previousSkinResource = skinResource;
-        } else {
-            previousSkinResource = null;
+        String newSkin = null;
+        if (playerSkinSupplier != null) {
+            newSkin = playerSkinSupplier.get();
         }
-        lastUpdateTime = now;
-        skinResource = newSkin;
+        if (newSkin != null || playerSkinSupplier == null) {
+            long now = System.currentTimeMillis();
+            if (now - lastUpdateTime > TRANSITION_DURATION) {
+                previousSkinResource = skinResource;
+            } else {
+                previousSkinResource = null;
+            }
+            lastUpdateTime = now;
+            skinResource = newSkin;
+        }
     }
 
     public boolean isVisible() {
@@ -49,7 +54,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         try {
             if (playerSkinSupplier != null) {
                 String skin = playerSkinSupplier.get();
-                if (!Objects.equals(skinResource, skin)) {
+                if (skin != null && !Objects.equals(skinResource, skin)) {
                     if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
                         previousSkinResource = skinResource;
                     } else {
