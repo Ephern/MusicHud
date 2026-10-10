@@ -134,7 +134,8 @@ public class ApiServerFetcher {
         CLOUDFLARE_IPV4("https://gh-proxy.org/"),
         CLOUDFLARE_CN_IPV4("https://v4.gh-proxy.org/"),
         CLOUDFLARE_CN_DUAL("https://v6.gh-proxy.org/"),
-        FASTLY_IPV4("https://cdn.gh-proxy.org/");
+        FASTLY_IPV4("https://cdn.gh-proxy.org/"),
+        AXIS_NOW_IPV4("https://axisnow.gh-proxy.org/");
 
         private final String proxyBase;
 
@@ -309,16 +310,16 @@ public class ApiServerFetcher {
                 HttpResponse<String> response = HTTP.send(request, HttpResponse.BodyHandlers.ofString());
                 if (response.statusCode() == 403 || response.statusCode() == 429) {
                     LOGGER.warn("GitHub API rate limit reached. Set a token via ApiServerFetcher.setGitHubToken() to raise the limit, or wait for reset.");
-                    return List.<Release>of();
+                    return List.of();
                 }
                 if (response.statusCode() != 200) {
                     LOGGER.error("GitHub API returned status {}", response.statusCode());
-                    return List.<Release>of();
+                    return List.of();
                 }
                 return JsonUtil.gson.fromJson(response.body(), new TypeToken<List<Release>>() {}.getType());
             } catch (Exception e) {
                 LOGGER.error("Failed to fetch releases", e);
-                return List.<Release>of();
+                return List.of();
             }
         }, MusicHud.EXECUTOR);
     }

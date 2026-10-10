@@ -2,7 +2,7 @@ package indi.etern.musichud.client.utils.ui;
 
 import icyllis.modernui.graphics.RectF;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 
 public final class HudLayoutMath {
@@ -12,7 +12,7 @@ public final class HudLayoutMath {
     public static RectF computeGuiRect(int guiWidth, int guiHeight,
                                        HorizontalAlign horizontalAlign, VerticalAlign verticalAlign,
                                        int offsetX, int offsetY, int width, int height) {
-        Layout root = new Layout(offsetX, offsetY, width, height, 0, horizontalAlign, verticalAlign);
+        HudStyle root = new HudStyle(offsetX, offsetY, width, height, 0, horizontalAlign, verticalAlign);
         float x = horizontalAlign.calcX(offsetX, guiWidth, root);
         float y = verticalAlign.calcY(offsetY, guiHeight, root);
         return new RectF(x, y, x + width, y + height);

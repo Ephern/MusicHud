@@ -55,6 +55,35 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
     private DynamicIntegerOption radiusOption;
     private int syncedHeight;
 
+    private static void applyLayoutTransitionWithChildren(LinearLayout layoutCategory) {
+        applyLayoutTransition(layoutCategory);
+        int childCount = layoutCategory.getChildCount();
+        for (int i = 0; i < childCount; i++) {
+            View child = layoutCategory.getChildAt(i);
+            if (child instanceof ViewGroup viewGroup) {
+                applyLayoutTransition(viewGroup);
+            }
+        }
+    }
+
+    private static void applyLayoutTransition(ViewGroup view) {
+        LayoutTransition transition = new LayoutTransition();
+        transition.enableTransitionType(LayoutTransition.CHANGING);
+        view.setLayoutTransition(transition);
+    }
+
+    private static int windowWidth() {
+        return Minecraft.getInstance().getWindow().getWidth();
+    }
+
+    private static int windowHeight() {
+        return Minecraft.getInstance().getWindow().getHeight();
+    }
+
+    private static boolean intersects(RectF a, float left, float top, float right, float bottom) {
+        return a.left < right && a.right > left && a.top < bottom && a.bottom > top;
+    }
+
     @Override
     public boolean hasDefaultBackground() {
         return false;
@@ -92,11 +121,7 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         panel.addOnLayoutChangeListener((v, l, t, r, b, ol, ot, or, ob) -> updatePanelPosition());
         root.post(this::updatePanelPosition);
 
-        root.post(() -> {
-            LayoutTransition transition = new LayoutTransition();
-            transition.enableTransitionType(LayoutTransition.CHANGING);
-            root.setLayoutTransition(transition);
-        });
+        root.post(() -> applyLayoutTransition(root));
         return root;
     }
 
@@ -186,6 +211,14 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
                 .setDefaultValue(clientConfig.getDefaultHudBackgroundMixAlpha())
                 .create(appearanceCategory);
         content.addView(appearanceCategory);
+
+        panel.post(() -> {
+            applyLayoutTransition(panel);
+            applyLayoutTransition(content);
+            applyLayoutTransitionWithChildren(layoutCategory);
+            applyLayoutTransitionWithChildren(behaviorCategory);
+            applyLayoutTransitionWithChildren(appearanceCategory);
+        });
 
         return panel;
     }
@@ -357,18 +390,6 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
     private int panelWidth(int divisor) {
         int screenW = windowWidth();
         return Math.clamp(screenW - 2L * margin, 0, screenW / divisor);
-    }
-
-    private static int windowWidth() {
-        return Minecraft.getInstance().getWindow().getWidth();
-    }
-
-    private static int windowHeight() {
-        return Minecraft.getInstance().getWindow().getHeight();
-    }
-
-    private static boolean intersects(RectF a, float left, float top, float right, float bottom) {
-        return a.left < right && a.right > left && a.top < bottom && a.bottom > top;
     }
 
     private static class MaxHeightScrollView extends ScrollView {

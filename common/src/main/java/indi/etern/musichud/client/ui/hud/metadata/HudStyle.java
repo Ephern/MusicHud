@@ -11,17 +11,20 @@ import org.joml.Matrix4f;
 
 @EqualsAndHashCode
 @Getter
-public class Layout implements HudUniform {
-    public static final int UBO_SIZE = Std140Sizes.calc().putMat4f().putVec3().align(16).get(); // pad to 16-byte alignment (std140)
+public class HudStyle implements HudUniform {
+    public static final int UBO_SIZE = Std140Sizes.calc().putMat4f().putVec4().align(16).get(); // pad to 16-byte alignment (std140)
     private volatile float x, y, width, height;
     private volatile float radius;
+    private volatile float alpha = 1;
     private volatile HorizontalAlign horizontalAlign;
     private volatile VerticalAlign verticalAlign;
-    private volatile Layout parent;
-    private boolean dirty;
-    private AbsolutePosition lastAbsolutePosition;
+    private volatile HudStyle parent;
 
-    public Layout(float x, float y, float width, float height, float radius) {
+    private boolean dirty;
+    private AbsolutePosition effectiveAbsolutePosition;
+    private float effectiveAbsoluteAlpha;
+
+    public HudStyle(float x, float y, float width, float height, float radius) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -31,7 +34,7 @@ public class Layout implements HudUniform {
         verticalAlign = VerticalAlign.TOP;
     }
 
-    public Layout(float x, float y, float width, float height, float radius, HorizontalAlign horizontalAlign, VerticalAlign verticalAlign) {
+    public HudStyle(float x, float y, float width, float height, float radius, HorizontalAlign horizontalAlign, VerticalAlign verticalAlign) {
         this.x = x;
         this.y = y;
         this.width = width;
@@ -41,8 +44,8 @@ public class Layout implements HudUniform {
         this.verticalAlign = verticalAlign;
     }
 
-    public static Layout ofTextLayout(float x, float y, float maxWidth, float fontSize) {
-        return new Layout(x, y, maxWidth, fontSize, 0);
+    public static HudStyle ofTextLayout(float x, float y, float maxWidth, float fontSize) {
+        return new HudStyle(x, y, maxWidth, fontSize, 0);
     }
 
     @Override
@@ -57,10 +60,10 @@ public class Layout implements HudUniform {
 
     @Override
     public void write(Std140Writer builder) {
+        checkAbsoluteValuesDirty();
         Matrix3x2f localMatrix = new Matrix3x2f();
-        Layout.AbsolutePosition absolutePosition = calcAbsoluteCenterPosition(HudRenderContext.getCurrent());
-        localMatrix.translate(absolutePosition.x(), absolutePosition.y());
-        builder.putMat4f(new Matrix4f().mul(localMatrix)).putVec3(width / 2, height / 2, radius);
+        localMatrix.translate(effectiveAbsolutePosition.x(), effectiveAbsolutePosition.y());
+        builder.putMat4f(new Matrix4f().mul(localMatrix)).putVec4(width / 2, height / 2, radius, effectiveAbsoluteAlpha);
         if (dirty) {
             dirty = false;
         }
@@ -68,15 +71,20 @@ public class Layout implements HudUniform {
 
     @Override
     public boolean shouldUseBuffer(HudUniform lastBuffered) {
-        checkAbsolutePositionDirty();
+        checkAbsoluteValuesDirty();
         return equals(lastBuffered) && !dirty;
     }
 
-    private void checkAbsolutePositionDirty() {
+    private void checkAbsoluteValuesDirty() {
         AbsolutePosition absolutePosition = calcAbsoluteCenterPosition(HudRenderContext.getCurrent());
-        if (!absolutePosition.equals(lastAbsolutePosition)) {
+        if (!absolutePosition.equals(effectiveAbsolutePosition)) {
             dirty = true;
-            lastAbsolutePosition = absolutePosition;
+            effectiveAbsolutePosition = absolutePosition;
+        }
+        float absoluteAlpha = calcAbsoluteAlpha();
+        if (absoluteAlpha != effectiveAbsoluteAlpha) {
+            dirty = true;
+            effectiveAbsoluteAlpha = absoluteAlpha;
         }
     }
 
@@ -102,7 +110,15 @@ public class Layout implements HudUniform {
         return new AbsolutePosition(centerX, centerY);
     }
 
-    public Layout getRootLayout() {
+    public float calcAbsoluteAlpha() {
+        if (parent != null) {
+            return parent.calcAbsoluteAlpha() * alpha;
+        } else {
+            return alpha;
+        }
+    }
+
+    public HudStyle getRootLayout() {
         if (parent != null) {
             return parent.getRootLayout();
         } else {
@@ -135,6 +151,12 @@ public class Layout implements HudUniform {
         this.radius = radius;
     }
 
+    public void setAlpha(float alpha) {
+        float clamped = Math.clamp(alpha, 0, 1);
+        this.dirty = this.alpha != clamped;
+        this.alpha = clamped;
+    }
+
     public void setHorizontalAlign(HorizontalAlign horizontalAlign) {
         this.dirty = true;
         this.horizontalAlign = horizontalAlign;
@@ -145,7 +167,7 @@ public class Layout implements HudUniform {
         this.verticalAlign = verticalAlign;
     }
 
-    public void setParent(Layout parent) {
+    public void setParent(HudStyle parent) {
         this.dirty = true;
         this.parent = parent;
     }

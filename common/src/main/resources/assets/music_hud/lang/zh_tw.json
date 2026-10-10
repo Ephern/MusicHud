@@ -173,6 +173,7 @@
   "music_hud.modal.downloadApiServer.existingVersion": "已存在版本為 \"{version}\" 的發布 (tag \"{tag}\")",
   "music_hud.modal.downloadApiServer.hide": "隱藏對話框",
   "music_hud.modal.downloadApiServer.proxy": "GH Proxy 代理選項",
+  "music_hud.modal.downloadApiServer.proxy.AXIS_NOW_IPV4": "Axis Now CDN (全球 IPv4)",
   "music_hud.modal.downloadApiServer.proxy.CLOUDFLARE_CN_DUAL": "CloudFlare (最佳化 IPv4/IPv6)",
   "music_hud.modal.downloadApiServer.proxy.CLOUDFLARE_CN_IPV4": "CloudFlare (最佳化 IPv4)",
   "music_hud.modal.downloadApiServer.proxy.CLOUDFLARE_IPV4": "CloudFlare (全球 IPv4)",

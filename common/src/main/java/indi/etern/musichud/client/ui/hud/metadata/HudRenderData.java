@@ -8,20 +8,20 @@ import lombok.Setter;
 @Getter
 public class HudRenderData {
     private static final int TRANSITION_DURATION_MS = 500;
-    volatile Layout layout;
+    volatile HudStyle hudStyle;
     volatile Transitionable<BackgroundData> transitionableBackground;
     volatile HudRenderData fallback;
     private long initTimestamp;
 
-    public HudRenderData(Layout layout, BackgroundImages backgroundImages) {
-        this.layout = layout;
+    public HudRenderData(HudStyle hudStyle, BackgroundImages backgroundImages) {
+        this.hudStyle = hudStyle;
         BackgroundData backgroundData = backgroundImages == null ? BackgroundData.NONE : new BackgroundData(backgroundImages);
         transitionableBackground = new Transitionable<>(backgroundData, TRANSITION_DURATION_MS);
         initTimestamp = System.currentTimeMillis();
     }
 
-    public HudRenderData(Layout layout) {
-        this.layout = layout;
+    public HudRenderData(HudStyle hudStyle) {
+        this.hudStyle = hudStyle;
         initTimestamp = System.currentTimeMillis();
     }
 

@@ -168,7 +168,7 @@ public class ApiServerManager implements ServerRegister {
         if (triedCount >= maxTries) {
             apiLogger.error("Embedded API Server has been stopped due to maximum tries reached.");
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
-                IClientDistUtil.getInstance().showToast(IClientDistUtil.getInstance().getI18n(MusicHud.MOD_ID + "."));
+                IClientDistUtil.getInstance().showToast(IClientDistUtil.getInstance().getI18n(MusicHud.MOD_ID + ".error.launchApiServer"));
             }
             return;
         }

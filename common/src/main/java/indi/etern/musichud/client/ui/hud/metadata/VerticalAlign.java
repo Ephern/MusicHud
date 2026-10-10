@@ -10,18 +10,18 @@ import net.minecraft.client.resources.language.I18n;
 public enum VerticalAlign {
     TOP(MusicHud.MOD_ID + ".config.layout.verticalAlign.TOP", Gravity.TOP) {
         @Override
-        public float calcY(float y, int guiHeight, Layout hudLayout) {
+        public float calcY(float y, int guiHeight, HudStyle hudHudStyle) {
             return y;
         }
     }, CENTER(MusicHud.MOD_ID + ".config.layout.verticalAlign.CENTER", Gravity.CENTER) {
         @Override
-        public float calcY(float y, int guiHeight, Layout hudLayout) {
-            return (float) guiHeight / 2 + y - hudLayout.getHeight() / 2;
+        public float calcY(float y, int guiHeight, HudStyle hudHudStyle) {
+            return (float) guiHeight / 2 + y - hudHudStyle.getHeight() / 2;
         }
     }, BOTTOM(MusicHud.MOD_ID + ".config.layout.verticalAlign.BOTTOM", Gravity.BOTTOM) {
         @Override
-        public float calcY(float y, int guiHeight, Layout hudLayout) {
-            return guiHeight - hudLayout.getHeight() - y;
+        public float calcY(float y, int guiHeight, HudStyle hudHudStyle) {
+            return guiHeight - hudHudStyle.getHeight() - y;
         }
     };
 
@@ -34,11 +34,11 @@ public enum VerticalAlign {
     }
 
 
-    public float calcY(float y, HudRenderContext hudRenderContext, Layout hudLayout) {
-        return calcY(y, hudRenderContext.guiHeight(), hudLayout);
+    public float calcY(float y, HudRenderContext hudRenderContext, HudStyle hudHudStyle) {
+        return calcY(y, hudRenderContext.guiHeight(), hudHudStyle);
     }
 
-    public abstract float calcY(float y, int guiHeight, Layout hudLayout);
+    public abstract float calcY(float y, int guiHeight, HudStyle hudHudStyle);
 
     @Override
     public String toString() {

@@ -4,7 +4,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.client.ui.hud.pipelines.GpuTextureViewRef;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
@@ -27,15 +27,15 @@ public class AlbumImageRenderer implements HudRenderer {
         if (currentData == null) return;
 
         HudTextureSetup textureSetup = getMixedTextureSetup();
-        Layout layout = currentData.getLayout();
+        HudStyle hudStyle = currentData.getHudStyle();
 
         HudRenderState hudRenderState = new HudRenderState(
                 HudRenderPipelines.ROUNDED_ALBUM,
                 textureSetup,
                 context.currentPose(),
-                layout,
+                hudStyle,
                 "album",
-                layout,
+                hudStyle,
                 DynamicStatusUniform.getInstance()
         );
         context.submitHudRenderState(hudRenderState);

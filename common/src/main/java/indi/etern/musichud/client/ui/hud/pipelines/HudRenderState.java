@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.hud.pipelines;
 
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.client.utils.ui.UniformDataUtils;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -27,11 +27,11 @@ public record HudRenderState(
     public HudRenderState(@NonNull HudPipeline pipeline,
                           @NonNull HudTextureSetup textureSetup,
                           @NonNull Matrix3x2f pose,
-                          @NonNull Layout layout,
+                          @NonNull HudStyle hudStyle,
                           @Nullable String elementKey,
                           HudUniform... uniforms) {
-        this(pipeline, textureSetup, pose, layout.getWidth(), layout.getHeight(),
-                UniformDataUtils.getBounds(-layout.getWidth() / 2f, -layout.getHeight() / 2f, layout.getWidth() / 2f, layout.getHeight() / 2f, pose),
+        this(pipeline, textureSetup, pose, hudStyle.getWidth(), hudStyle.getHeight(),
+                UniformDataUtils.getBounds(-hudStyle.getWidth() / 2f, -hudStyle.getHeight() / 2f, hudStyle.getWidth() / 2f, hudStyle.getHeight() / 2f, pose),
                 elementKey, uniforms);
     }
 }

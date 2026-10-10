@@ -6,7 +6,7 @@ import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.client.ui.lyric.LyricHighlightCalculator;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringValue;
@@ -40,7 +40,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     @Setter
     private float line2Height;
     @Setter
-    private Layout layout;
+    private HudStyle hudStyle;
     private int cachedContainerWidth;
     @Setter
     private int lineSpacing = 0;
@@ -96,7 +96,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         Line line1 = pending.line1();
         Line line2 = pending.line2();
-        float height = layout.getHeight();
+        float height = hudStyle.getHeight();
 
         // Non-animated update (e.g. clear): drop every running pair and snap to the new lines.
         if (!pending.animate()) {
@@ -257,17 +257,17 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     }
 
     public void render(HudRenderContext context) {
-        if (layout == null) {
+        if (hudStyle == null) {
             return;
         }
 
         // 计算实际布局绝对坐标和尺寸
-        Layout.AbsolutePosition absPos = layout.calcAbsolutePosition(context);
+        HudStyle.AbsolutePosition absPos = hudStyle.calcAbsolutePosition(context);
         // 布局缓存（每次渲染时更新）
         int cachedContainerX = (int) absPos.x();
         int cachedContainerY = (int) absPos.y();
-        cachedContainerWidth = (int) layout.getWidth();
-        int cachedContainerHeight = (int) layout.getHeight();
+        cachedContainerWidth = (int) hudStyle.getWidth();
+        int cachedContainerHeight = (int) hudStyle.getHeight();
 
         if (cachedContainerWidth <= 0 || cachedContainerHeight <= 0) return;
 
@@ -275,11 +275,11 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         int totalHeight = (int) (line1Height + line2Height);
         int startY = cachedContainerY + (cachedContainerHeight - totalHeight) / 2; // 垂直居中
-        Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
+        HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
 
         float x = absolutePosition.x();
         float y = absolutePosition.y();
-        context.pushScissor((int) x, (int) y, (int) (x + layout.getWidth()), (int) (y + layout.getHeight()));
+        context.pushScissor((int) x, (int) y, (int) (x + hudStyle.getWidth()), (int) (y + hudStyle.getHeight()));
         for (LinePair pair : pairs) {
             float yOffset = pair.offset.getValue();
             Line line1 = pair.line1.line;
@@ -350,12 +350,13 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         // 始终左对齐：起始X = baseX + scrollOffset
         float drawX = baseX + scrollOffset;
         float drawY = baseY + yOffset;
+        int drawColor = applyStyleAlpha(color);
 
         context.transform()
                 .translate(drawX, drawY)
                 .scale(scale)
                 .end(transforming ->
-                        context.drawString(Minecraft.getInstance().font, text, 0, 0, color, false)
+                        context.drawString(Minecraft.getInstance().font, text, 0, 0, drawColor, false)
                 );
     }
 
@@ -370,15 +371,21 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
             float drawX = baseX + scrollOffset;
             float drawY = baseY + yOffset;
             int toX = (int) (drawX + highlightToX);
-            context.pushScissor((int) highlightFromX, (int) positionY, toX, (int) (positionY + layout.getHeight()));
+            context.pushScissor((int) highlightFromX, (int) positionY, toX, (int) (positionY + hudStyle.getHeight()));
+            int drawColor = applyStyleAlpha(line.line.emphasizeColor);
             context.transform()
                     .translate(drawX, drawY)
                     .scale(scale)
                     .end(transforming ->
-                            context.drawString(Minecraft.getInstance().font, text, 0, 0, line.line.emphasizeColor, false)
+                            context.drawString(Minecraft.getInstance().font, text, 0, 0, drawColor, false)
                     );
             context.popScissor();
         }
+    }
+
+    private int applyStyleAlpha(int color) {
+        int alpha = (int) (((color >>> 24) & 0xFF) * hudStyle.calcAbsoluteAlpha());
+        return (Math.clamp(alpha, 0, 255) << 24) | (color & 0x00FFFFFF);
     }
 
     private record PendingLines(Line line1, Line line2, boolean animate, float maxScroll1, float maxScroll2) {
