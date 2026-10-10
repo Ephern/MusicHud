@@ -235,8 +235,12 @@ public class MainFragment extends Fragment {
         if (homeView != null) {
             homeView.switchMusic(musicDetailTrace, nextToPlayTrace, lines);
         }
-        if (lyricsScrollView != null && hasValidLyric()) {
-            lyricsScrollView.switchLyrics(musicDetail, lines);
+        if (lyricsScrollView != null) {
+            if (notAbsoluteMusicLyric()) {
+                lyricsScrollView.switchLyrics(musicDetail, lines);
+            } else {
+                lyricsScrollView.clearLyrics();
+            }
         }
         updateLyricsPanelVisibility();
     }
@@ -555,8 +559,12 @@ public class MainFragment extends Fragment {
 
             MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
             Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
-            if (currentMusic != null && currentLyrics != null && !currentMusic.equals(MusicDetail.NONE) && hasValidLyric()) {
-                lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
+            if (currentMusic != null && currentLyrics != null && !currentMusic.equals(MusicDetail.NONE)) {
+                if (notAbsoluteMusicLyric()) {
+                    lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
+                } else {
+                    lyricsScrollView.clearLyrics();
+                }
             }
 
             routerContainer.setOnPageChangeListener(new RouterContainer.OnPageChangeListener() {
@@ -645,10 +653,10 @@ public class MainFragment extends Fragment {
         if (musicInvalid) {
             return false;
         }
-        return hasValidLyric();
+        return notAbsoluteMusicLyric();
     }
 
-    private static boolean hasValidLyric() {
+    private static boolean notAbsoluteMusicLyric() {
         Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
         return lines != null && !lines.isEmpty()
                 && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
