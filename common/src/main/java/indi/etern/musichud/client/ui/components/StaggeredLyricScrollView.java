@@ -270,6 +270,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         });
     }
 
+    public void clearLyrics() {
+        switchLyrics(MusicDetail.NONE, null);
+    }
+
     /**
      * One lyric row's animation state: an absolute {@link SpringValue} driving the rendered
      * translationY (minus the live decoupling), plus a normalized progress {@link SpringValue} that
