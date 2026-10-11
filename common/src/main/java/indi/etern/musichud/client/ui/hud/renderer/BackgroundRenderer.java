@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import icyllis.modernui.mc.ModernUIMod;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
@@ -50,16 +50,16 @@ public class BackgroundRenderer implements HudRenderer {
     public void render(HudRenderContext hudRenderContext) {
         if (currentData == null) return;
 
-        Layout layout = currentData.getLayout();
+        HudStyle hudStyle = currentData.getHudStyle();
         dynamicStatusUniform.setTransitionable(currentData.getTransitionableBackground());
 
         HudRenderState hudRenderState = new HudRenderState(
                 HudRenderPipelines.BACKGROUND,
                 HudTextureSetup.NONE,
                 hudRenderContext.currentPose(),
-                layout,
+                hudStyle,
                 "background",
-                layout,
+                hudStyle,
                 currentData.getTransitionableBackground().getMixed(),
                 dynamicStatusUniform
         );

@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.ARGB;
@@ -12,7 +12,7 @@ import java.util.function.Supplier;
 public class PlayerHeadRenderer implements HudRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
     @Getter
-    private Layout layout;
+    private HudStyle hudStyle;
     private String previousSkinResource;
     private String skinResource;
     @Getter
@@ -42,8 +42,8 @@ public class PlayerHeadRenderer implements HudRenderer {
         return skinResource != null;
     }
 
-    public void configure(Layout layout) {
-        this.layout = layout;
+    public void configure(HudStyle hudStyle) {
+        this.hudStyle = hudStyle;
     }
 
     @Override
@@ -67,21 +67,22 @@ public class PlayerHeadRenderer implements HudRenderer {
             if (skinResource == null) return;
         } catch (Exception ignored) {}
 
-        Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
-        int w = (int) layout.getWidth();
-        int h = (int) layout.getHeight();
+        HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
+        int w = (int) hudStyle.getWidth();
+        int h = (int) hudStyle.getHeight();
+        float styleAlpha = hudStyle.calcAbsoluteAlpha();
 
         if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
             renderHead(context.graphics(), skinResource,
-                    absolutePosition.x(), absolutePosition.y(), w, h, 1);
+                    absolutePosition.x(), absolutePosition.y(), w, h, styleAlpha);
         } else {
             float transitionProgress = Math.clamp((float) (currentTimeMillis - lastUpdateTime) / TRANSITION_DURATION, 0, 1);
             if (previousSkinResource != null) {
                 renderHead(context.graphics(), previousSkinResource,
-                        absolutePosition.x(), absolutePosition.y(), w, h, 1 - transitionProgress);
+                        absolutePosition.x(), absolutePosition.y(), w, h, (1 - transitionProgress) * styleAlpha);
             }
             renderHead(context.graphics(), skinResource,
-                    absolutePosition.x(), absolutePosition.y(), w, h, transitionProgress);
+                    absolutePosition.x(), absolutePosition.y(), w, h, transitionProgress * styleAlpha);
         }
     }
 

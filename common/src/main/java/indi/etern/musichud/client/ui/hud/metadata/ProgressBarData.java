@@ -19,10 +19,10 @@ public class ProgressBarData implements HudUniform {
     public final float transitionBorderRate;
     @Getter
     @Setter
-    private Layout layout;
+    private HudStyle hudStyle;
 
-    public ProgressBarData(Layout layout, int playedColor, int currentColor, int backgroundColor, float gradientLength, float gradientRightOffset, float transitionBorderRate) {
-        this.layout = layout;
+    public ProgressBarData(HudStyle hudStyle, int playedColor, int currentColor, int backgroundColor, float gradientLength, float gradientRightOffset, float transitionBorderRate) {
+        this.hudStyle = hudStyle;
         this.playedColor = playedColor;
         this.currentColor = currentColor;
         this.backgroundColor = backgroundColor;
@@ -44,6 +44,7 @@ public class ProgressBarData implements HudUniform {
 
     @Override
     public void write(Std140Writer builder) {
+        //noinspection SuspiciousNameCombination
         builder.putVec3(gradientLength, gradientRightOffset, transitionBorderRate)
                .putVec4(UniformDataUtils.colorToVector(playedColor))
                .putVec4(UniformDataUtils.colorToVector(currentColor))
@@ -59,6 +60,6 @@ public class ProgressBarData implements HudUniform {
                 && Objects.equals(gradientLength, progressBarData.gradientLength)
                 && Objects.equals(gradientRightOffset, progressBarData.gradientRightOffset)
                 && Objects.equals(transitionBorderRate, progressBarData.transitionBorderRate)
-                && layout.shouldUseBuffer(progressBarData.layout);
+                && hudStyle.shouldUseBuffer(progressBarData.hudStyle);
     }
 }

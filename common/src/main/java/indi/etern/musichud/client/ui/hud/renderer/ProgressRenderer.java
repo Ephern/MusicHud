@@ -1,7 +1,7 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.client.ui.hud.metadata.ProgressBarData;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
 import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
@@ -22,17 +22,17 @@ public class ProgressRenderer implements HudRenderer {
 
     @Override
     public void render(HudRenderContext hudRenderContext) {
-        if (progressData == null || progressData.getLayout().getHeight() <= 0) return;
+        if (progressData == null || progressData.getHudStyle().getHeight() <= 0) return;
 
-        Layout layout = progressData.getLayout();
+        HudStyle hudStyle = progressData.getHudStyle();
         hudRenderContext.submitHudRenderState(
                 new HudRenderState(
                         HudRenderPipelines.PROGRESS_BAR,
                         HudTextureSetup.NONE,
                         new Matrix3x2f(hudRenderContext.currentPose()),
-                        layout,
+                        hudStyle,
                         "progress",
-                        layout,
+                        hudStyle,
                         progressData,
                         hudDynamicStatus
                 )

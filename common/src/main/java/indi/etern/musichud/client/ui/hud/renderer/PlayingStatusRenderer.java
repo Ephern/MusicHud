@@ -2,11 +2,12 @@ package indi.etern.musichud.client.ui.hud.renderer;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
+import net.minecraft.util.ARGB;
 
 public class PlayingStatusRenderer implements HudRenderer {
     // From Lucide Icons
@@ -20,13 +21,13 @@ public class PlayingStatusRenderer implements HudRenderer {
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     StreamAudioPlayer.Status status;
     @Getter
-    private Layout layout;
+    private HudStyle hudStyle;
     @Setter
     private boolean visibility = true;
     private String currentResourceLocation;
 
-    public void configure(Layout layout) {
-        this.layout = layout;
+    public void configure(HudStyle hudStyle) {
+        this.hudStyle = hudStyle;
     }
 
     public void updateStatus(StreamAudioPlayer.Status status) {
@@ -60,21 +61,23 @@ public class PlayingStatusRenderer implements HudRenderer {
                 rotationRadians = 0;
             }
 
-            Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(hudRenderContext);
+            HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(hudRenderContext);
             int screenX = (int) absolutePosition.x();
             int screenY = (int) absolutePosition.y();
-            int width = (int) layout.getWidth();
-            int height = (int) layout.getHeight();
+            int width = (int) hudStyle.getWidth();
+            int height = (int) hudStyle.getHeight();
 
             float centerX = screenX + width / 2f;
             float centerY = screenY + height / 2f;
+
+            int iconColor = ARGB.color(Math.min(hudStyle.calcAbsoluteAlpha(), 1), 0xFFFFFF);
 
             hudRenderContext.transform()
                     .translate(centerX, centerY)
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
                     .end(transforming ->
-                            hudRenderContext.graphics().blitTextured(currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height)
+                            hudRenderContext.graphics().blitTextured(currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height, width, height, iconColor)
                     );
         }
     }

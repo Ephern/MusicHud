@@ -4,10 +4,10 @@
 #include <minecraft:dynamictransforms.glsl>
 #include <minecraft:projection.glsl>
 
-// u_Layout: (halfWidth, halfHeight, cornerRadius)
+// u_Style: (halfWidth, halfHeight, cornerRadius, alpha)
 layout(std140) uniform MHPosition {
     mat4 u_Translation;
-    vec3 u_Layout;
+    vec4 u_Style;
 };
 
 layout(location = 0) in vec3 Position;
