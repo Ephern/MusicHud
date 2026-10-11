@@ -15,6 +15,7 @@ import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
+import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
@@ -38,6 +39,7 @@ public class HudRendererManager {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final long LYRIC_DELAY_NANOS = 300_000_000L;
     private static final int DOWN_SCALE_TARGET_LENGTH = (int) Math.sqrt(ColorExtractor.MAX_SAMPLES);
+    private static final long HUD_FADE_MS = 500;
     private static volatile HudRendererManager instance;
     @Getter
     private static volatile boolean loaded = false;
@@ -62,13 +64,19 @@ public class HudRendererManager {
     private volatile HudRenderData hudBaseData;
     private volatile HudRenderData imageDisplayData;
     @Setter
-    private volatile Layout baseLayout;
+    private volatile HudStyle baseHudStyle;
     private float contentInterval;
     private String musicDurationString = "";
     private Logger logger;
     private int albumImageThumbnailSize = -1;
     private Window window;
     private boolean idle = true;
+    private volatile float hudAlpha = 1f;
+    private volatile long hudFadeStartMs;
+    private volatile float hudFadeFrom = 1f;
+    private volatile float hudFadeTo = 1f;
+    private volatile long hudFadeDurationMs;
+    private volatile boolean pendingSwitchToEmpty;
 
     protected HudRendererManager() {
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
@@ -194,7 +202,7 @@ public class HudRendererManager {
 
     public void updateLayoutFromConfig() {
         try {
-            Layout layout = new Layout(
+            HudStyle hudStyle = new HudStyle(
                     clientConfig.getHudOffsetX(),
                     clientConfig.getHudOffsetY(),
                     clientConfig.getHudWidth(),
@@ -203,7 +211,7 @@ public class HudRendererManager {
                     HorizontalAlign.valueOf(clientConfig.getHudHorizontalPosition()),
                     VerticalAlign.valueOf(clientConfig.getHudVerticalPosition())
             );
-            setBaseLayout(layout);
+            setBaseHudStyle(hudStyle);
         } catch (Exception e) {
             if (logger == null) {
                 logger = MusicHud.getLogger(HudRendererManager.class);
@@ -214,26 +222,26 @@ public class HudRendererManager {
 
     public void refreshStyle() {
         try {
-            float height = baseLayout.getHeight();
+            float height = this.baseHudStyle.getHeight();
             float halfHeight = height / 2;
-            if (baseLayout.getRadius() > halfHeight) {
-                baseLayout.setRadius(halfHeight);
+            if (this.baseHudStyle.getRadius() > halfHeight) {
+                this.baseHudStyle.setRadius(halfHeight);
             }
 
-            configureBaseRenderer(baseLayout);
+            configureBaseRenderer(this.baseHudStyle);
 
-            Layout baseLayout = hudBaseData.getLayout();
+            HudStyle baseHudStyle = hudBaseData.getHudStyle();
             float contentPadding = Math.max(height / 10, 3);
 
             float imageHeightAndWidth = height - 2 * contentPadding;
-            float imageRadius = Math.clamp(baseLayout.getRadius() - contentPadding, 0, imageHeightAndWidth / 2f);
-            Layout imageLayout = new Layout(contentPadding, contentPadding, imageHeightAndWidth, imageHeightAndWidth, imageRadius);
-            imageLayout.setParent(baseLayout);
+            float imageRadius = Math.clamp(baseHudStyle.getRadius() - contentPadding, 0, imageHeightAndWidth / 2f);
+            HudStyle imageHudStyle = new HudStyle(contentPadding, contentPadding, imageHeightAndWidth, imageHeightAndWidth, imageRadius);
+            imageHudStyle.setParent(baseHudStyle);
 
-            configureImageRenderer(imageLayout);
+            configureImageRenderer(imageHudStyle);
 
             float contentHeight = height - contentPadding * 2;
-            float contentWidth = baseLayout.getWidth() - imageHeightAndWidth - 3 * contentPadding - baseLayout.getRadius() / 3;
+            float contentWidth = baseHudStyle.getWidth() - imageHeightAndWidth - 3 * contentPadding - baseHudStyle.getRadius() / 3;
             float contentUnit = Math.max(contentHeight / 32f, 1);
             float titleSize = contentUnit * 7;
             boolean showProgress = contentHeight > 14f;
@@ -242,10 +250,10 @@ public class HudRendererManager {
             float mainContentX = contentPadding + imageHeightAndWidth + contentPadding;
             float progressY = contentPadding + imageHeightAndWidth - progressHeight - 1;
             float progressRadius = progressHeight / 2;
-            Layout progressLayout = new Layout(mainContentX, progressY, contentWidth, progressHeight, progressRadius);
-            progressLayout.setParent(baseLayout);
+            HudStyle progressHudStyle = new HudStyle(mainContentX, progressY, contentWidth, progressHeight, progressRadius);
+            progressHudStyle.setParent(baseHudStyle);
 
-            configureProgressRenderer(progressLayout);
+            configureProgressRenderer(progressHudStyle);
 
             contentInterval = Math.min(contentUnit * 2.5f, 2f);
 
@@ -268,33 +276,33 @@ public class HudRendererManager {
             float aboveProgressY = progressY - infoTextSize - contentInterval / 2;
             float progressRightX = mainContentX + contentWidth;
 
-            Layout statusLayout = new Layout(statusX, titleY, titleSize, titleSize, 0f);
-            statusLayout.setParent(baseLayout);
-            PLAYING_STATUS_RENDERER.configure(statusLayout);
+            HudStyle statusHudStyle = new HudStyle(statusX, titleY, titleSize, titleSize, 0f);
+            statusHudStyle.setParent(baseHudStyle);
+            PLAYING_STATUS_RENDERER.configure(statusHudStyle);
             PLAYING_STATUS_RENDERER.setVisibility(statusVisible);
 
-            Layout layout1 = new Layout(headX, titleY, titleSize, titleSize, 0f);
-            layout1.setParent(baseLayout);
-            PLAYER_HEAD_RENDERER.configure(layout1);
+            HudStyle hudStyle1 = new HudStyle(headX, titleY, titleSize, titleSize, 0f);
+            hudStyle1.setParent(baseHudStyle);
+            PLAYER_HEAD_RENDERER.configure(hudStyle1);
 
-            Layout titleLayout = Layout.ofTextLayout(mainContentX, titleY, maxTitleWidth, titleSize);
-            titleLayout.setParent(baseLayout);
-            TITLE_RENDERER.configure(titleLayout, Theme.EMPHASIZE_TEXT_COLOR, TextRenderer.Position.LEFT);
+            HudStyle titleHudStyle = HudStyle.ofTextLayout(mainContentX, titleY, maxTitleWidth, titleSize);
+            titleHudStyle.setParent(baseHudStyle);
+            TITLE_RENDERER.configure(titleHudStyle, Theme.EMPHASIZE_TEXT_COLOR, TextRenderer.Position.LEFT);
 
             float lyricHeight = contentHeight - titleSize - progressHeight - infoTextSize - contentInterval * 2;
-            Layout layout = new Layout(mainContentX, lyricsY, contentWidth, lyricHeight, 0);
-            layout.setParent(baseLayout);
-            LYRICS_LINE_RENDERER.setLayout(layout);
+            HudStyle hudStyle = new HudStyle(mainContentX, lyricsY, contentWidth, lyricHeight, 0);
+            hudStyle.setParent(baseHudStyle);
+            LYRICS_LINE_RENDERER.setHudStyle(hudStyle);
             LYRICS_LINE_RENDERER.setLine1Height(lyricsSize);
             LYRICS_LINE_RENDERER.setLine2Height(subLyricsSize);
             LYRICS_LINE_RENDERER.setLineSpacing((int) contentInterval);
 
-            Layout artistAndAlbumLayout = Layout.ofTextLayout(mainContentX, aboveProgressY, contentWidth, infoTextSize);
-            artistAndAlbumLayout.setParent(baseLayout);
-            Layout playTimeLayout = Layout.ofTextLayout(progressRightX, aboveProgressY, contentWidth, infoTextSize);
-            playTimeLayout.setParent(baseLayout);
-            ARTISTS_AND_ALBUM_RENDERER.configure(artistAndAlbumLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.LEFT);
-            PLAY_TIME_RENDERER.configure(playTimeLayout, Theme.HUD_FADE_COLOR, TextRenderer.Position.RIGHT);
+            HudStyle artistAndAlbumHudStyle = HudStyle.ofTextLayout(mainContentX, aboveProgressY, contentWidth, infoTextSize);
+            artistAndAlbumHudStyle.setParent(baseHudStyle);
+            HudStyle playTimeHudStyle = HudStyle.ofTextLayout(progressRightX, aboveProgressY, contentWidth, infoTextSize);
+            playTimeHudStyle.setParent(baseHudStyle);
+            ARTISTS_AND_ALBUM_RENDERER.configure(artistAndAlbumHudStyle, Theme.HUD_FADE_COLOR, TextRenderer.Position.LEFT);
+            PLAY_TIME_RENDERER.configure(playTimeHudStyle, Theme.HUD_FADE_COLOR, TextRenderer.Position.RIGHT);
 
             refreshThumbnailSize();
         } catch (Exception e) {
@@ -311,7 +319,7 @@ public class HudRendererManager {
         }
         //noinspection ConstantValue
         if (window != null) {
-            int thumbnailSize = (int) (imageDisplayData.getLayout().getWidth() * window.getGuiScale());
+            int thumbnailSize = (int) (imageDisplayData.getHudStyle().getWidth() * window.getGuiScale());
             if (albumImageThumbnailSize != thumbnailSize) {
                 albumImageThumbnailSize = thumbnailSize;
                 MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
@@ -322,34 +330,34 @@ public class HudRendererManager {
         }
     }
 
-    private void configureProgressRenderer(Layout layout) {
+    private void configureProgressRenderer(HudStyle hudStyle) {
         PROGRESS_RENDERER.setProgressData(new ProgressBarData(
-                layout,
+                hudStyle,
                 Theme.HUD_PROGRESS_LEFT,
                 Theme.HUD_PROGRESS_CURRENT,
                 Theme.HUD_PROGRESS_BACKGROUND,
-                layout.getHeight() * 6,
+                hudStyle.getHeight() * 6,
                 2f,
                 0.01f
         ));
     }
 
-    private void configureBaseRenderer(@NotNull Layout layout) {
+    private void configureBaseRenderer(@NotNull HudStyle hudStyle) {
         BackgroundImages bgImage = getBackgroundImagesOrElse(null);
         if (hudBaseData == null) {
-            hudBaseData = new HudRenderData(layout, bgImage);
+            hudBaseData = new HudRenderData(hudStyle, bgImage);
         } else {
-            hudBaseData.setLayout(layout);
+            hudBaseData.setHudStyle(hudStyle);
         }
         BACKGROUND_RENDERER.configure(hudBaseData);
     }
 
-    private void configureImageRenderer(Layout imageLayout) {
+    private void configureImageRenderer(HudStyle imageHudStyle) {
         if (imageDisplayData == null) {
-            imageDisplayData = new HudRenderData(imageLayout);
+            imageDisplayData = new HudRenderData(imageHudStyle);
             imageDisplayData.setFallback(hudBaseData);
         } else {
-            imageDisplayData.setLayout(imageLayout);
+            imageDisplayData.setHudStyle(imageHudStyle);
         }
         IMAGE_RENDERER.configure(imageDisplayData);
     }
@@ -366,9 +374,19 @@ public class HudRendererManager {
 
     public void switchMusic(MusicDetail musicDetail) {
         try {
-            idle = musicDetail == null || musicDetail.equals(MusicDetail.NONE);
-            if (idle) {
-                reset();
+            boolean wasIdle = idle;
+            boolean nowIdle = musicDetail == null || musicDetail.equals(MusicDetail.NONE);
+            idle = nowIdle;
+            boolean autoHide = clientConfig.getHideHudWhenNotPlaying();
+            if (nowIdle) {
+                if (autoHide && !wasIdle) {
+                    // Fade the whole HUD out while keeping the outgoing track's content; the switch
+                    // to the empty content is deferred until the fade-out has fully completed.
+                    pendingSwitchToEmpty = true;
+                    startHudFade(0f);
+                } else {
+                    reset();
+                }
             } else {
                 TITLE_RENDERER.setText(musicDetail.getName());
                 String artists = musicDetail.getArtists().stream()
@@ -379,6 +397,17 @@ public class HudRendererManager {
                 // Lyrics are reset synchronously at music-switch time (NowPlayingInfo.switchMusicInfo),
                 // not here: this HUD update is delayed ~500ms and would otherwise drop the first line.
                 loadAndSwitchAlbumImageWithRetry(musicDetail);
+                if (autoHide && wasIdle) {
+                    // Empty -> track: content is switched immediately and the whole HUD fades in.
+                    // Cancel any deferred empty switch in case a fade-out is being interrupted.
+                    pendingSwitchToEmpty = false;
+                    startHudFade(1f);
+                } else {
+                    // Track -> track (or auto-hide disabled): keep the content transition, stay visible.
+                    pendingSwitchToEmpty = false;
+                    hudFadeDurationMs = 0;
+                    hudAlpha = 1f;
+                }
             }
         } catch (Exception e) {
             if (logger == null) {
@@ -432,7 +461,12 @@ public class HudRendererManager {
 
     public void reset() {
         IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
-        if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
+        boolean autoHide = clientConfig.getHideHudWhenNotPlaying();
+        if (autoHide) {
+            // With auto-hide the idle HUD stays fully transparent, so clear the text instead of
+            // showing the idle message; a following fade-in then reveals the new track from nothing.
+            TITLE_RENDERER.setText("");
+        } else if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
             TITLE_RENDERER.setText(IDLE_MESSAGE);
         }
         ARTISTS_AND_ALBUM_RENDERER.setText("");
@@ -441,6 +475,46 @@ public class HudRendererManager {
         musicDurationString = "";
         var nextData = BackgroundData.NONE;
         hudBaseData.getTransitionableBackground().startTransition(nextData);
+        pendingSwitchToEmpty = false;
+        hudFadeDurationMs = 0;
+        hudAlpha = autoHide ? 0f : 1f;
+        hudFadeTo = hudAlpha;
+    }
+
+    private void startHudFade(float to) {
+        hudFadeFrom = hudAlpha;
+        hudFadeTo = to;
+        hudFadeDurationMs = HUD_FADE_MS;
+        hudFadeStartMs = System.currentTimeMillis();
+    }
+
+    /**
+     * Advances the HUD-wide alpha fade. Must run on the render thread before any HUD element is
+     * submitted for the current frame, so the frame reflects the up-to-date alpha instead of the
+     * previous one. A deferred switch to the empty content only happens once a fade-out completed.
+     */
+    private void updateHudFade() {
+        long now = System.currentTimeMillis();
+        if (hudFadeDurationMs > 0) {
+            float t = Math.clamp((float) (now - hudFadeStartMs) / hudFadeDurationMs, 0f, 1f);
+            float eased = Easing.EASE_IN_OUT_SINE.getInterpolation(t);
+            hudAlpha = hudFadeFrom + (hudFadeTo - hudFadeFrom) * eased;
+            if (t >= 1f) {
+                hudAlpha = hudFadeTo;
+                hudFadeDurationMs = 0;
+                if (pendingSwitchToEmpty) {
+                    pendingSwitchToEmpty = false;
+                    reset();
+                }
+            }
+        } else if (idle && clientConfig.getHideHudWhenNotPlaying()) {
+            hudAlpha = 0f;
+        } else if (!clientConfig.getHideHudWhenNotPlaying()) {
+            hudAlpha = 1f;
+        }
+        float effective = (!clientConfig.getHideHudWhenNotPlaying() || HudConfigScreen.isVisible())
+                ? 1f : hudAlpha;
+        baseHudStyle.setAlpha(effective);
     }
 
     public void renderFrame(HudGraphics graphics) {
@@ -450,16 +524,23 @@ public class HudRendererManager {
             }
             refreshThumbnailSize();
 
+            // Advance the HUD-wide fade before anything is drawn so this frame uses the
+            // up-to-date alpha instead of the previous frame's value.
+            updateHudFade();
+
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
-            TextRenderer.TextStyle currentTextData = TITLE_RENDERER.getCurrentTextData();
-            if (currentTextData == null || currentTextData.text.isBlank()) {
-                //To prevent i18n lazy loading result in wrong text
-                IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
-                if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
-                    TITLE_RENDERER.setText(IDLE_MESSAGE);
+            if (!clientConfig.getHideHudWhenNotPlaying()) {
+                TextRenderer.TextStyle currentTextData = TITLE_RENDERER.getCurrentTextData();
+                if (currentTextData == null || currentTextData.text.isBlank()) {
+                    //To prevent i18n lazy loading result in wrong text
+                    IDLE_MESSAGE = I18n.get(MusicHud.MOD_ID + ".text.idle");
+                    if (!IDLE_MESSAGE.equals(MusicHud.MOD_ID + ".text.idle")) {
+                        TITLE_RENDERER.setText(IDLE_MESSAGE);
+                    }
                 }
             }
-            if (idle && clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()) {
+            if (idle && clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()
+                    && hudAlpha <= 1e-4f) {
                 return;
             }
             hudBaseData.getTransitionableBackground().updateTransition();
@@ -485,17 +566,17 @@ public class HudRendererManager {
             PLAYING_STATUS_RENDERER.render(hudRenderContext);
             PROGRESS_RENDERER.render(hudRenderContext);
 
-            float progressWidth = PROGRESS_RENDERER.getProgressData().getLayout().getWidth();
-            Layout titleLayout = TITLE_RENDERER.getLayout();
-            float headSpace = PLAYER_HEAD_RENDERER.isVisible() ? PLAYER_HEAD_RENDERER.getLayout().getWidth() + Math.max(4, contentInterval) : 0;
-            float statusSpace = PLAYING_STATUS_RENDERER.isVisible() ? PLAYING_STATUS_RENDERER.getLayout().getWidth() + Math.max(4, contentInterval) : 0;
+            float progressWidth = PROGRESS_RENDERER.getProgressData().getHudStyle().getWidth();
+            HudStyle titleHudStyle = TITLE_RENDERER.getHudStyle();
+            float headSpace = PLAYER_HEAD_RENDERER.isVisible() ? PLAYER_HEAD_RENDERER.getHudStyle().getWidth() + Math.max(4, contentInterval) : 0;
+            float statusSpace = PLAYING_STATUS_RENDERER.isVisible() ? PLAYING_STATUS_RENDERER.getHudStyle().getWidth() + Math.max(4, contentInterval) : 0;
             float maxTitleWidth = progressWidth - headSpace - statusSpace;
-            titleLayout.setWidth(maxTitleWidth);
+            titleHudStyle.setWidth(maxTitleWidth);
 
             TITLE_RENDERER.render(hudRenderContext);
             LYRICS_LINE_RENDERER.render(hudRenderContext);
 
-            ARTISTS_AND_ALBUM_RENDERER.getLayout().setWidth(progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - contentInterval);
+            ARTISTS_AND_ALBUM_RENDERER.getHudStyle().setWidth(progressWidth - PLAY_TIME_RENDERER.calcDisplayWidth() - contentInterval);
             ARTISTS_AND_ALBUM_RENDERER.render(hudRenderContext);
             PLAY_TIME_RENDERER.render(hudRenderContext);
 

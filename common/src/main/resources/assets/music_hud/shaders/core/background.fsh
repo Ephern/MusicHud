@@ -1,10 +1,11 @@
 #version 150
 
-// u_Layout: (halfWidth, halfHeight, cornerRadius)
+// u_Style: (halfWidth, halfHeight, cornerRadius, alpha)
 layout(std140) uniform MHPosition {
     mat4 u_Translation;
-    vec3 u_Layout;
+    vec4 u_Style;
 };
+
 layout(std140) uniform MHNowPlayingThemeColor {
     vec4 u_Primary;
     vec4 u_Secondary;
@@ -93,18 +94,21 @@ float aastep(float x) {
 }
 
 void main() {
-    float halfWidth  = u_Layout[0];
-    float halfHeight = u_Layout[1];
-    float radius     = u_Layout[2];
+    float halfWidth  = u_Style[0];
+    float halfHeight = u_Style[1];
+    float radius     = u_Style[2];
     float timestamp  = u_Dynamic1[0];
 
-    vec2 noiseUv = f_Position / 40;
+    float hudHeight = halfHeight * 2.0;
+    float sizeScale = max(1.0, hudHeight / 52.0);
+
+    vec2 noiseUv = f_Position / (40.0 * sizeScale);
     float speed = 0.014;
-    vec2 scrollVec = vec2(timestamp * speed, timestamp * speed * 0.7);
+    vec2 scrollVec = vec2(timestamp * speed, timestamp * speed * 0.7) / sizeScale;
 
     float wx = snoise(noiseUv * 0.015 + scrollVec * 0.3);
     float wy = snoise(noiseUv * 0.02 + scrollVec * 0.4 + vec2(2.7, 1.3));
-    vec2 warped = noiseUv + vec2(wx, wy) * 3.0;
+    vec2 warped = noiseUv + vec2(wx, wy) * (3.0 / sizeScale);
 
     float a = 0.03;
     float w0 = fbm(warped * (a) + scrollVec);
@@ -154,5 +158,5 @@ void main() {
     float dis = length(max(d, 0.0)) + min(max(d.x, d.y), 0.0) - radius;
     float mask = 1.0 - aastep(dis);
 
-    fragColor = vec4(rgb, mask);
+    fragColor = vec4(rgb, mask * u_Style.a);
 }
