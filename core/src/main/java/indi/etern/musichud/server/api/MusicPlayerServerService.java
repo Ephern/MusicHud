@@ -232,9 +232,19 @@ public class MusicPlayerServerService {
     };
 
     private boolean hasAvailableIdlePlaySourcesMusic(Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources) {
-        return !idlePlaySources.isEmpty() && idlePlaySources.values().stream()
-                .flatMap(Set::stream)
+        return idlePlaySources.entrySet().stream()
+                .filter(entry -> hasPusherLoginInfo(entry.getKey()))
+                .flatMap(entry -> entry.getValue().stream())
                 .anyMatch(playSource -> playSource.getPlayMode().isAvailable(playSource));
+    }
+
+    /**
+     * A source is only samplable while its owner is registered in the login map. Sources left
+     * behind for an unknown owner (e.g. {@link PusherInfo#EMPTY}) must not enter the candidate
+     * pool: the pusher would sample them, fail the ownership check and {@code continue} forever.
+     */
+    private boolean hasPusherLoginInfo(PusherInfo pusherInfo) {
+        return pusherInfo != null && loginApiService.getPlayerInfoMap().containsKey(pusherInfo.getPlayerUUID());
     }
 
     /**
@@ -250,6 +260,9 @@ public class MusicPlayerServerService {
             List<PusherInfo> readyUsers = new ArrayList<>();
             List<PusherInfo> availableUsers = new ArrayList<>();
             for (Map.Entry<PusherInfo, Set<IdlePlaySource>> entry : idlePlaySources.entrySet()) {
+                if (!hasPusherLoginInfo(entry.getKey())) {
+                    continue;
+                }
                 boolean ready = false;
                 boolean available = false;
                 for (IdlePlaySource playSource : entry.getValue()) {
@@ -541,7 +554,7 @@ public class MusicPlayerServerService {
             serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
                     new RefreshMusicQueueMessage(musicQueue));
             updateContinuable(true);
-        } catch (InterruptedException | TimeoutException e) {
+        } catch (Throwable e) {//TODO add response in next protocol change
             logger.error("Failed to load music and pushed to queue, ID: {}", musicDetailId, e);
         }
     }
@@ -648,15 +661,27 @@ public class MusicPlayerServerService {
     public void removeIdlePlaySource(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
         synchronized (idleSourceKeyLock(pusherInfo.getPlayerUUID(), idlePlaySource)) {
             Set<IdlePlaySource> musicCollections = idlePlaySources.get(pusherInfo);
-            if (musicCollections != null) {
-                idlePlaySource.setPusherInfo(pusherInfo);
-                musicCollections.remove(idlePlaySource);
-                if (musicCollections.isEmpty()) {
-                    idlePlaySources.remove(pusherInfo);
-                }
-                idlePlaySource.getPlayMode().onRemoved(idlePlaySource, pusherInfo);
-                debouncedUpdateAllIdlePlaySources();
+            if (musicCollections == null) {
+                logger.warn("Failed to remove idle play source: no sources registered for {} (id: {}, type: {})",
+                        pusherInfo, idlePlaySource.getId(), idlePlaySource.getType().getSimpleName());
+                return;
             }
+            IdlePlaySource target = musicCollections.stream()
+                    .filter(source -> source.getId() == idlePlaySource.getId()
+                            && source.getType() == idlePlaySource.getType())
+                    .findFirst().orElse(null);
+            if (target == null) {
+                logger.warn("Failed to remove idle play source: not found for {} (id: {}, type: {}, mode: {}); present: {}",
+                        pusherInfo, idlePlaySource.getId(), idlePlaySource.getType().getSimpleName(),
+                        idlePlaySource.getPlayMode(), musicCollections);
+                return;
+            }
+            musicCollections.remove(target);
+            if (musicCollections.isEmpty()) {
+                idlePlaySources.remove(pusherInfo);
+            }
+            target.getPlayMode().onRemoved(target, pusherInfo);
+            debouncedUpdateAllIdlePlaySources();
         }
     }
 
@@ -695,7 +720,7 @@ public class MusicPlayerServerService {
                 onMusicResourceLoadFailure(id);
                 return MusicResourceInfo.NONE;
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             onMusicResourceLoadFailure(id);
             return MusicResourceInfo.NONE;
         }
@@ -800,7 +825,9 @@ public class MusicPlayerServerService {
     }
 
     public void removeAllIdlePlaySource(PusherInfo pusherInfo) {
-        idlePlaySources.remove(pusherInfo);
+        if (idlePlaySources.remove(pusherInfo) == null) {
+            logger.debug("Remove all idle play sources: none registered for {}", pusherInfo);
+        }
         PlayMode.onAllRemoved(pusherInfo.getPlayerUUID());
         debouncedUpdateAllIdlePlaySources();
     }
