@@ -39,7 +39,7 @@ public class HudRendererManager {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final long LYRIC_DELAY_NANOS = 300_000_000L;
     private static final int DOWN_SCALE_TARGET_LENGTH = (int) Math.sqrt(ColorExtractor.MAX_SAMPLES);
-    private static final long HUD_FADE_MS = 500;
+    private static final long HUD_FADE_MS = 300;
     private static volatile HudRendererManager instance;
     @Getter
     private static volatile boolean loaded = false;
@@ -70,7 +70,7 @@ public class HudRendererManager {
     private Logger logger;
     private int albumImageThumbnailSize = -1;
     private Window window;
-    private boolean idle = true;
+    private volatile boolean idle = true;
     private volatile float hudAlpha = 1f;
     private volatile long hudFadeStartMs;
     private volatile float hudFadeFrom = 1f;
@@ -380,10 +380,9 @@ public class HudRendererManager {
             boolean autoHide = clientConfig.getHideHudWhenNotPlaying();
             if (nowIdle) {
                 if (autoHide && !wasIdle) {
-                    // Fade the whole HUD out while keeping the outgoing track's content; the switch
-                    // to the empty content is deferred until the fade-out has fully completed.
+                    // Keep the outgoing track's content while the HUD fades out; the switch to the
+                    // empty content is deferred until the fade-out (targetAlpha() == 0) completes.
                     pendingSwitchToEmpty = true;
-                    startHudFade(0f);
                 } else {
                     reset();
                 }
@@ -397,17 +396,9 @@ public class HudRendererManager {
                 // Lyrics are reset synchronously at music-switch time (NowPlayingInfo.switchMusicInfo),
                 // not here: this HUD update is delayed ~500ms and would otherwise drop the first line.
                 loadAndSwitchAlbumImageWithRetry(musicDetail);
-                if (autoHide && wasIdle) {
-                    // Empty -> track: content is switched immediately and the whole HUD fades in.
-                    // Cancel any deferred empty switch in case a fade-out is being interrupted.
-                    pendingSwitchToEmpty = false;
-                    startHudFade(1f);
-                } else {
-                    // Track -> track (or auto-hide disabled): keep the content transition, stay visible.
-                    pendingSwitchToEmpty = false;
-                    hudFadeDurationMs = 0;
-                    hudAlpha = 1f;
-                }
+                // Content is switched immediately; whether the HUD fades in, stays visible or
+                // cancels a deferred empty switch is derived from state by updateHudFade().
+                pendingSwitchToEmpty = false;
             }
         } catch (Exception e) {
             if (logger == null) {
@@ -477,56 +468,82 @@ public class HudRendererManager {
         hudBaseData.getTransitionableBackground().startTransition(nextData);
         pendingSwitchToEmpty = false;
         hudFadeDurationMs = 0;
-        hudAlpha = autoHide ? 0f : 1f;
+        // Snap to the state-derived target instead of the raw auto-hide value so a disabled HUD
+        // never flashes visible when reset() is reached while it should stay hidden.
+        hudAlpha = targetAlpha();
         hudFadeTo = hudAlpha;
     }
 
-    private void startHudFade(float to) {
+    private void transitiveHudAlphaTo(float target) {
         hudFadeFrom = hudAlpha;
-        hudFadeTo = to;
+        hudFadeTo = target;
         hudFadeDurationMs = HUD_FADE_MS;
         hudFadeStartMs = System.currentTimeMillis();
     }
 
     /**
+     * Desired HUD-wide alpha derived purely from state. Every visibility source (master/HUD
+     * toggles, the HUD config screen, auto-hide) converges here so that updateHudFade() can
+     * animate any of them through the same transition.
+     */
+    private float targetAlpha() {
+        if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
+            return 0f;
+        }
+        if (HudConfigScreen.isVisible()) {
+            return 1f;
+        }
+        if (!clientConfig.getHideHudWhenNotPlaying()) {
+            return 1f;
+        }
+        return idle ? 0f : 1f;
+    }
+
+    /**
      * Advances the HUD-wide alpha fade. Must run on the render thread before any HUD element is
      * submitted for the current frame, so the frame reflects the up-to-date alpha instead of the
-     * previous one. A deferred switch to the empty content only happens once a fade-out completed.
+     * previous one. Any change of {@link #targetAlpha()} starts a transition, so toggling
+     * visibility (config screen, enable toggles, auto-hide) also fades instead of snapping. A
+     * deferred switch to the empty content only happens once a fade-out (target 0) completed.
      */
     private void updateHudFade() {
-        long now = System.currentTimeMillis();
+        float target = targetAlpha();
+        if (target != hudFadeTo) {
+            transitiveHudAlphaTo(target);
+        }
         if (hudFadeDurationMs > 0) {
+            long now = System.currentTimeMillis();
             float t = Math.clamp((float) (now - hudFadeStartMs) / hudFadeDurationMs, 0f, 1f);
             float eased = Easing.EASE_IN_OUT_SINE.getInterpolation(t);
             hudAlpha = hudFadeFrom + (hudFadeTo - hudFadeFrom) * eased;
             if (t >= 1f) {
                 hudAlpha = hudFadeTo;
                 hudFadeDurationMs = 0;
-                if (pendingSwitchToEmpty) {
+                // Only clear content once a fade-out actually completed; a fade that was
+                // re-targeted to visible (e.g. config screen opened) must not wipe the content.
+                if (pendingSwitchToEmpty && hudFadeTo <= 1e-4f) {
                     pendingSwitchToEmpty = false;
                     reset();
                 }
             }
-        } else if (idle && clientConfig.getHideHudWhenNotPlaying()) {
-            hudAlpha = 0f;
-        } else if (!clientConfig.getHideHudWhenNotPlaying()) {
-            hudAlpha = 1f;
+        } else {
+            hudAlpha = hudFadeTo;
         }
-        float effective = (!clientConfig.getHideHudWhenNotPlaying() || HudConfigScreen.isVisible())
-                ? 1f : hudAlpha;
-        baseHudStyle.setAlpha(effective);
+        baseHudStyle.setAlpha(hudAlpha);
     }
 
     public void renderFrame(HudGraphics graphics) {
         try {
-            if (!clientConfig.getEnable() || !clientConfig.getEnableHud()) {
+            // Advance the HUD-wide fade and detect visibility changes first. This is cheap and
+            // must run even while fully transparent, otherwise a re-show could never start its
+            // fade-in.
+            updateHudFade();
+            if (hudAlpha <= 1e-4f) {
+                // Fully transparent: skip every remaining render step to save CPU.
                 return;
             }
-            refreshThumbnailSize();
 
-            // Advance the HUD-wide fade before anything is drawn so this frame uses the
-            // up-to-date alpha instead of the previous frame's value.
-            updateHudFade();
+            refreshThumbnailSize();
 
             NowPlayingInfo nowPlayingInfo = this.nowPlayingInfo;
             if (!clientConfig.getHideHudWhenNotPlaying()) {
@@ -538,10 +555,6 @@ public class HudRendererManager {
                         TITLE_RENDERER.setText(IDLE_MESSAGE);
                     }
                 }
-            }
-            if (idle && clientConfig.getHideHudWhenNotPlaying() && !HudConfigScreen.isVisible()
-                    && hudAlpha <= 1e-4f) {
-                return;
             }
             hudBaseData.getTransitionableBackground().updateTransition();
 
