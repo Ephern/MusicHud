@@ -369,7 +369,12 @@ public class MainFragment extends Fragment {
 
     private void startProgressUpdater(MusicDetail musicDetail) {
         int token = progressUpdaterToken.incrementAndGet();
+        // The volatile field may be nulled by a concurrent switch-to-idle/stop between the UI task
+        // being posted and running, so fall back to the track's own duration instead of NPE-ing.
         Duration musicDuration = nowPlayingInfo.getMusicDuration();
+        if (musicDuration == null) {
+            musicDuration = Duration.ofMillis(musicDetail.getDurationMillis());
+        }
         DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
                 formatterWithHour :
                 formatterWithoutHour;

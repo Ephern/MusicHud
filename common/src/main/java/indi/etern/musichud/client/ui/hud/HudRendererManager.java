@@ -89,7 +89,12 @@ public class HudRendererManager {
                 if (duration != null) {
                     scrollMillis = duration.toMillis();
                 } else {
-                    scrollMillis = nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime()).toMillis();
+                    // The field can be nulled by a concurrent switch-to-idle/stop; fall back to a
+                    // zero-length scroll rather than dereferencing null.
+                    Duration musicDuration = nowPlayingInfo.getMusicDuration();
+                    scrollMillis = musicDuration == null
+                            ? 0
+                            : musicDuration.minus(lyricLine.getStartTime()).toMillis();
                 }
                 scrollMillis = (long) (scrollMillis * 0.8);
             }
