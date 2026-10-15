@@ -30,23 +30,20 @@ import java.util.function.Supplier;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
 public class PlayerHeadView extends FrameLayout {
-    private static final Logger LOGGER = MusicHud.getLogger(PlayerHeadView.class);
     private static final int HEAD_SIZE = 8;
     private static final int SKIN_FACE_U = 8;
     private static final int SKIN_FACE_V = 8;
     private static final int SKIN_HAT_U = 40;
     private static final int SKIN_HAT_V = 8;
     private static final float FACE_SCALE = 0.87f;
-
+    private static final Logger logger = MusicHud.getLogger(PlayerHeadView.class);
+    private final ImageView faceView;
+    private final ImageView hatView;
     @Getter
     private Supplier<ResourceLocation> playerSkinSupplier;
-
     @Setter
     @Getter
     private ResourceLocation skin;
-
-    private final ImageView faceView;
-    private final ImageView hatView;
     private ResourceLocation lastRenderedSkin;
     private String pendingDownloadUrl;
     private CompletableFuture<?> pendingDownload;
@@ -64,7 +61,7 @@ public class PlayerHeadView extends FrameLayout {
                 }
             }
         } catch (Throwable t) {
-            LOGGER.error("Failed to init VarHandle for HttpTexture url", t);
+            logger.error("Failed to init VarHandle for HttpTexture url", t);
         }
         HTTP_TEXTURE_URL_HANDLE = handle;
     }
@@ -117,14 +114,6 @@ public class PlayerHeadView extends FrameLayout {
             skin = null;
         }
         updateHeadImage();
-    }
-
-    private void cancelPendingDownload() {
-        if (pendingDownload != null) {
-            pendingDownload.cancel(true);
-            pendingDownload = null;
-        }
-        pendingDownloadUrl = null;
     }
 
     private void updateHeadImage() {
@@ -222,15 +211,23 @@ public class PlayerHeadView extends FrameLayout {
                                     renderFromNativeImage(skinImage, skin);
                                 }
                             } catch (Exception e) {
-                                LOGGER.debug("Failed to render skin from download: {}", url, e);
+                                logger.debug("Failed to render skin from download: {}", url, e);
                             }
                         });
                     }
                 })
                 .exceptionally(e -> {
-                    LOGGER.warn("Failed to download skin: {}", url, e);
+                    logger.warn("Failed to download skin: {}", url, e);
                     return null;
                 });
+    }
+
+    private void cancelPendingDownload() {
+        if (pendingDownload != null) {
+            pendingDownload.cancel(true);
+            pendingDownload = null;
+        }
+        pendingDownloadUrl = null;
     }
 
     @Nullable

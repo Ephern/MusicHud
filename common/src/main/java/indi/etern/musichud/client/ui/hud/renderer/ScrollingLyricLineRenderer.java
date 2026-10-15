@@ -385,7 +385,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
     private int applyStyleAlpha(int color) {
         int alpha = (int) (((color >>> 24) & 0xFF) * hudStyle.calcAbsoluteAlpha());
-        return (Math.clamp(alpha, 0, 255) << 24) | (color & 0x00FFFFFF);
+        return (alpha << 24) | (color & 0x00FFFFFF);
     }
 
     private record PendingLines(Line line1, Line line2, boolean animate, float maxScroll1, float maxScroll2) {

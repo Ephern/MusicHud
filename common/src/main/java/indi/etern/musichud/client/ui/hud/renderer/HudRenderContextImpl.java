@@ -261,7 +261,17 @@ public class HudRenderContextImpl implements HudRenderContext {
     }
 
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
-        graphics.drawString(font, text, x, y, color, dropShadow);
+        int alpha = (color >>> 24) & 0xFF;
+        if (alpha == 0) return;
+        // Font.adjustColor (1.21.1) forces a vertex color with alpha<4 to fully opaque, which
+        // makes low-alpha text jump to opaque. Keep the vertex color opaque and carry the real
+        // alpha via ColorModulator instead: rendertype_text.fsh multiplies it in and discards
+        // the glyph when the result drops below 0.1, giving a correct fade-out.
+        int opaque = 0xFF000000 | (color & 0x00FFFFFF);
+        float[] prevColor = RenderSystem.getShaderColor().clone();
+        RenderSystem.setShaderColor(1f, 1f, 1f, alpha / 255f);
+        graphics.drawString(font, text, x, y, opaque, dropShadow);
+        RenderSystem.setShaderColor(prevColor[0], prevColor[1], prevColor[2], prevColor[3]);
     }
 
     public void fill(int fromX, int fromY, int toX, int toY, int color) {

@@ -6,6 +6,9 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 
+import static org.lwjgl.opengl.GL11.GL_BLEND;
+import static org.lwjgl.opengl.GL11.glIsEnabled;
+
 /**
  * Adapter: exposes a {@link GuiGraphics} behind the neutral {@link HudGraphics}.
  */
@@ -32,16 +35,37 @@ public class VanillaHudGraphics implements HudGraphics {
 
     @Override
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int textureWidth, int textureHeight) {
-        graphics.blit(ResourceLocation.parse(texturePath), x, y, width, height, (float)u0, (float)v0, textureWidth, textureHeight, textureWidth, textureHeight);
+        withBlend(() -> graphics.blit(
+                ResourceLocation.parse(texturePath), x, y, width, height,
+                (float)u0, (float)v0, textureWidth, textureHeight, textureWidth, textureHeight));
     }
 
     @Override
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int u1, int v1, int textureWidth, int textureHeight, int color) {
-        float[] prevColor = RenderSystem.getShaderColor();
+        float[] prevColor = RenderSystem.getShaderColor().clone();
 
-        applyArgbColor(graphics, color);
-        graphics.blit(ResourceLocation.parse(texturePath), x, y, width, height, (float)u0, (float)v0, u1, v1, textureWidth, textureHeight);
+        withBlend(() -> {
+            applyArgbColor(graphics, color);
+            graphics.blit(
+                    ResourceLocation.parse(texturePath), x, y, width, height,
+                    (float)u0, (float)v0, u1, v1, textureWidth, textureHeight);
+        });
         graphics.setColor(prevColor[0], prevColor[1], prevColor[2], prevColor[3]);
+    }
+
+    /**
+     * Vanilla GUI blits rely on GL blend being enabled for the texture's/ColorModulator's alpha to
+     * take effect (position_tex.fsh only multiplies by ColorModulator). The custom HUD pipeline
+     * leaves blend disabled between draws, so restore the pre-existing state around the blit.
+     */
+    private static void withBlend(Runnable draw) {
+        boolean blendWasEnabled = glIsEnabled(GL_BLEND);
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        draw.run();
+        if (!blendWasEnabled) {
+            RenderSystem.disableBlend();
+        }
     }
 
     @Override

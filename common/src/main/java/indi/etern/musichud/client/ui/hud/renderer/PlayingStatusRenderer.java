@@ -7,7 +7,7 @@ import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.util.ARGB;
+import net.minecraft.util.Mth;
 
 public class PlayingStatusRenderer implements HudRenderer {
     // From Lucide Icons
@@ -41,7 +41,7 @@ public class PlayingStatusRenderer implements HudRenderer {
             default -> {
                 if (clientConfig.getMuted()) {
                     yield MUTED_LOCATION;
-                } else if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
+                } else if (ConnectionStateMachine.getConnectStatus() == ConnectionStateMachine.ConnectStatus.CONNECTED) {
                     yield PLAYING_CONNECTED_ICON_LOCATION;
                 } else {
                     yield PLAYING_ISOLATED_LOCATION;
@@ -70,7 +70,7 @@ public class PlayingStatusRenderer implements HudRenderer {
             float centerX = screenX + width / 2f;
             float centerY = screenY + height / 2f;
 
-            int iconColor = ARGB.color(Math.min(hudStyle.calcAbsoluteAlpha(), 1), 0xFFFFFF);
+            int iconColor = Mth.floor(Math.min(hudStyle.calcAbsoluteAlpha(), 1) * 255.0F) << 24 | 0xFFFFFF;// 0x[alpha(2)]FFFFFF
 
             hudRenderContext.transform()
                     .translate(centerX, centerY)

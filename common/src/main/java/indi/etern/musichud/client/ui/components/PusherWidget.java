@@ -6,18 +6,15 @@ import icyllis.modernui.view.Gravity;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.beans.music.PusherInfo;
-import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import lombok.NonNull;
-import net.minecraft.client.multiplayer.PlayerInfo;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class PusherWidget extends LinearLayout {
     private final PlayerHeadView pusherHeadView;
     private final TextView pusherText;
-    private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
 
     public PusherWidget(Context context) {
         super(context);
@@ -46,8 +43,7 @@ public class PusherWidget extends LinearLayout {
     public void bind(@NonNull PusherInfo pusherInfo) {
         pusherHeadView.setPlayerSkinSupplier(() -> {
             try {
-                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-                var skin = PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo);
+                var skin = PlayerInfoUtil.getPlayerSkin(PlayerInfoUtil.getPlayerInfoByUUID(pusherInfo.getPlayerUUID()));
                 pusherHeadView.setVisibility(skin == null ? GONE : VISIBLE);
                 return skin;
             } catch (Exception ignored) {
