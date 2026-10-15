@@ -3,7 +3,7 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
@@ -18,7 +18,7 @@ public class TextRenderer implements HudRenderer {
     private int vanillaLineHeight = -1;
     private ModernStringSplitter modernStringSplitter = null;
     private TextStyle currentTextData;
-    private Layout layout;
+    private HudStyle hudStyle;
     private int baseColor;
     private Position position;
     private int marqueeIntervalMillis = 5000;
@@ -39,8 +39,8 @@ public class TextRenderer implements HudRenderer {
         }
     }
 
-    public void configure(Layout layout, int baseColor, Position position) {
-        this.layout = layout;
+    public void configure(HudStyle hudStyle, int baseColor, Position position) {
+        this.hudStyle = hudStyle;
         this.baseColor = baseColor;
         this.position = position;
     }
@@ -115,7 +115,7 @@ public class TextRenderer implements HudRenderer {
         // 更新过渡进度
         updateTransition();
 
-        if (currentTextData == null || layout.getHeight() <= 0 || layout.getWidth() <= 0) {
+        if (currentTextData == null || hudStyle.getHeight() <= 0 || hudStyle.getWidth() <= 0) {
             return;
         }
 
@@ -123,9 +123,9 @@ public class TextRenderer implements HudRenderer {
             vanillaLineHeight = Minecraft.getInstance().font.lineHeight;
         }
 
-        float scale = layout.getHeight() / vanillaLineHeight;
+        float scale = hudStyle.getHeight() / vanillaLineHeight;
 
-        Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
+        HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
 
         if (!isTransitioning || nextTextData == null) {
             renderText(context, currentTextData, absolutePosition, scale, 1.0f);
@@ -142,18 +142,18 @@ public class TextRenderer implements HudRenderer {
         }
     }
 
-    private void renderText(HudRenderContext context, TextStyle textData, Layout.AbsolutePosition absolutePosition,
+    private void renderText(HudRenderContext context, TextStyle textData, HudStyle.AbsolutePosition absolutePosition,
                             float scale, float alpha) {
         String text = textData.text;
         if (text == null || text.isEmpty()) return;
 
         // 计算带透明度的颜色
-        int color = getColorWithAlpha(textData.baseColor, alpha);
+        int color = getColorWithAlpha(textData.baseColor, alpha * hudStyle.calcAbsoluteAlpha());
 
         // 计算位置
         float measuredWidth = measureWidth(text);
         float textRenderWidth = scale * measuredWidth;
-        float layoutWidth = layout.getWidth();
+        float layoutWidth = hudStyle.getWidth();
         float x = position.computeX(absolutePosition.x(), text, Math.min(textRenderWidth, layoutWidth));
         float y = absolutePosition.y();
         boolean overflow = textRenderWidth > layoutWidth;
@@ -170,11 +170,11 @@ public class TextRenderer implements HudRenderer {
             marqueeOffset = overflow ? marqueeProgress * marqueeWidth : 0;
             x1 -= marqueeOffset;
         } else {
-            float maxWidth = layout.getWidth() / scale;
+            float maxWidth = hudStyle.getWidth() / scale;
             text = trimToWidth(text, maxWidth);
             if (text.isEmpty()) return;
         }
-        context.pushScissor((int) x, (int) y, (int) (x + layoutWidth), (int) (y + layout.getHeight() + 1));
+        context.pushScissor((int) x, (int) y, (int) (x + layoutWidth), (int) (y + hudStyle.getHeight() + 1));
         Transforming transform = context.transform();
         String finalText = text;
         transform.translate(x1, y)
@@ -212,7 +212,7 @@ public class TextRenderer implements HudRenderer {
         if (currentTextData == null || currentTextData.text == null || currentTextData.text.isEmpty()) {
             return 0f;
         } else {
-            return Math.min(layout.getWidth(), measureWidth(currentTextData.text) * (layout.getHeight() / vanillaLineHeight));
+            return Math.min(hudStyle.getWidth(), measureWidth(currentTextData.text) * (hudStyle.getHeight() / vanillaLineHeight));
         }
     }
 

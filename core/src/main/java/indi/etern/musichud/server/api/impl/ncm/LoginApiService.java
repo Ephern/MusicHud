@@ -188,15 +188,10 @@ public class LoginApiService implements ILoginApiService {
 
     @Override
     public PusherInfo getPusherInfo(IPlayerClient player) {
-        PlayerLoginInfo loginInfo = playerInfoMap.get(player.getUUID());
-        PusherInfo pusherInfo = PusherInfo.EMPTY;
-        if (loginInfo != null) {
-            pusherInfo = new PusherInfo(
-                    player.getUUID(),
-                    player.getName()
-            );
-        }
-        return pusherInfo;
+        return new PusherInfo(
+                player.getUUID(),
+                player.getName()
+        );
     }
 
     @SneakyThrows
@@ -284,6 +279,10 @@ public class LoginApiService implements ILoginApiService {
     @Override
     public Profile loadUserProfile(IPlayerClient player, LoginCookieInfo loginCookieInfo) {
         if (loginCookieInfo.type() == LoginType.ANONYMOUS) {
+            PlayerLoginInfo playerLoginInfo = PlayerLoginInfo.of(player, loginCookieInfo);
+            playerLoginInfo.appendProfile(Profile.ANONYMOUS);
+            playerInfoMap.put(player.getUUID(), playerLoginInfo);
+            loginStateChangeListeners.forEach(mapConsumer -> mapConsumer.accept(playerInfoMap.values()));
             return Profile.ANONYMOUS;
         }
         AccountDetail accountDetail = ApiClient.get(ApiServerEndpointsMeta.User.ACCOUNT, loginCookieInfo.rawCookie(), true);

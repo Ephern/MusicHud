@@ -1,9 +1,9 @@
 #version 150
 
-// u_Layout: (halfWidth, halfHeight, cornerRadius)
+// u_Style: (halfWidth, halfHeight, cornerRadius, alpha)
 layout(std140) uniform MHPosition {
     mat4 u_Translation;
-    vec3 u_Layout;
+    vec4 u_Style;
 };
 
 // u_Gradient: (gradientLength, rightOffset, transitionBorderRate)
@@ -36,8 +36,8 @@ float roundedRectSDF(vec2 position, vec2 halfSize, float radius) {
 }
 
 void main() {
-    vec2 halfSize = vec2(u_Layout.x, u_Layout.y);
-    float radius = u_Layout.z;
+    vec2 halfSize = vec2(u_Style.x, u_Style.y);
+    float radius = u_Style.z;
     float progress = clamp(u_Dynamic1[1], 0.0, 1.0);
 
     float gradientLength = u_Gradient.x;
@@ -74,5 +74,5 @@ void main() {
     float outAlpha = srcAlpha + dstAlpha * (1.0 - srcAlpha);
     vec3 finalRGB = (srcColor.rgb * srcAlpha + dstColor.rgb * dstAlpha * (1.0 - srcAlpha)) / max(outAlpha, 0.0001);
 
-    fragColor = vec4(finalRGB, outAlpha);
+    fragColor = vec4(finalRGB, outAlpha * u_Style.a);
 }

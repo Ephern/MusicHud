@@ -49,16 +49,16 @@ public class NowPlayingInfo {
     private final Set<BiConsumer<MusicDetail, MusicDetail>> musicSwitchListener = new CopyOnWriteArraySet<>();
     private final AtomicReference<ArrayDeque<LyricLine>> atomicLyricLines = new AtomicReference<>();
     private final ClientConfig clientConfig = ClientConfig.getInstance();
-    private volatile JMTC jmtc;
     private final ExecutorService jmtcExecutor = Executors.newSingleThreadExecutor(r -> {
         Thread t = new Thread(r, "MH-JMTC");
         t.setDaemon(true);
         return t;
     });
+    private final AtomicLong lyricUpdaterGeneration = new AtomicLong(0);
+    private volatile JMTC jmtc;
     @Setter
     @Getter
     private Duration updateInAdvanceDuration = Duration.of(500, ChronoUnit.MILLIS);
-    @Getter
     private volatile Traceable<MusicDetail> currentlyPlaying = Traceable.of(MusicDetail.NONE);
     private volatile Traceable<MusicDetail> nextToPlayIdleMusic = Traceable.of(MusicDetail.NONE);
     @Getter
@@ -70,9 +70,11 @@ public class NowPlayingInfo {
     @Getter
     private volatile LyricLine currentLyricLine;
     private volatile Thread lyricUpdaterVThread;
-    private final AtomicLong lyricUpdaterGeneration = new AtomicLong(0);
+    private Path tempDirectory;
+    private Path albumImagesTempDirectory;
+    private Path lastTempFile;
 
-    final Runnable lyricUpdater = () -> {
+    private final Runnable lyricUpdater = () -> {
         Thread thread = Thread.currentThread();
         lyricUpdaterVThread = thread;
         thread.setName("MHWorker-Lyrics-Updater");
@@ -224,6 +226,23 @@ public class NowPlayingInfo {
         String picUrl = musicDetail.getAlbum().getPicUrl();
         MusicHud.EXECUTOR.submit(() -> {
             URI artUri = null;
+            if (lastTempFile != null) {
+                try {
+                    Files.deleteIfExists(lastTempFile);
+                } catch (Exception e) {
+                    logger.warn("Failed to delete last JMTC album image", e);
+                }
+            }
+            if (tempDirectory == null) {
+                try {
+                    tempDirectory = Files.createTempDirectory("MusicHUD_");
+                    tempDirectory.toFile().deleteOnExit();
+                    albumImagesTempDirectory = tempDirectory.resolve("albums");
+                    Files.createDirectories(albumImagesTempDirectory);
+                } catch (Exception e) {
+                    logger.warn("Failed to create album temp directory", e);
+                }
+            }
             if (picUrl.startsWith("http")) {
                 try {
                     String suffix = "png";
@@ -231,29 +250,32 @@ public class NowPlayingInfo {
                     if (splits.length > 1) {
                         suffix = splits[splits.length - 1];
                     }
-                    Path tempFile = Files.createTempFile("MusicHUD-SMTC-Album", "." + suffix);
-                    tempFile.toFile().deleteOnExit();
+                    lastTempFile = Files.createTempFile(albumImagesTempDirectory, "", "." + suffix);
+                    lastTempFile.toFile().deleteOnExit();
                     artUri = ImageUtils.downloadAsync(picUrl, (url, inputStream) -> {
                         try {
-                            Files.copy(inputStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                            return tempFile.toUri();
+                            Files.copy(inputStream, lastTempFile, StandardCopyOption.REPLACE_EXISTING);
+                            return lastTempFile.toUri();
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
-                    }, false).join();
+                    }).join();
                 } catch (Exception e) {
                     logger.warn("Failed to download album art for SMTC", e);
                 }
             } else {
                 try {
-                    Path tempFile = Files.createTempFile("MusicHUD-SMTC-Icon", ".png");
-                    tempFile.toFile().deleteOnExit();
-                    try (InputStream iconStream = getClass().getResourceAsStream("/assets/music_hud/icon.png")) {
-                        if (iconStream != null) {
-                            Files.copy(iconStream, tempFile, StandardCopyOption.REPLACE_EXISTING);
-                            artUri = tempFile.toUri();
+                    Path iconPath = albumImagesTempDirectory.resolve("MusicHUD_Icon.png");
+                    if (!Files.exists(iconPath)) {
+                        Files.createFile(iconPath);
+                        iconPath.toFile().deleteOnExit();
+                        try (InputStream iconStream = getClass().getResourceAsStream("/assets/music_hud/icon.png")) {
+                            if (iconStream != null) {
+                                Files.copy(iconStream, iconPath, StandardCopyOption.REPLACE_EXISTING);
+                            }
                         }
                     }
+                    artUri = iconPath.toUri();
                 } catch (Exception e) {
                     logger.warn("Failed to set default SMTC icon", e);
                 }
@@ -318,7 +340,8 @@ public class NowPlayingInfo {
             // 补偿音频过渡
             try {
                 Thread.sleep(500);
-            } catch (InterruptedException ignored) {}
+            } catch (InterruptedException ignored) {
+            }
             HudRendererManager.getInstance().switchMusic(musicDetail);
         });
         List.copyOf(musicSwitchListener).forEach(consumer -> consumer.accept(previous, musicDetail));
@@ -328,7 +351,9 @@ public class NowPlayingInfo {
         callLyricsUpdateListeners(null);
     }
 
-    /** Replaces only the idle "next to play" (e.g. after a reroll) without touching playback/lyrics. */
+    /**
+     * Replaces only the idle "next to play" (e.g. after a reroll) without touching playback/lyrics.
+     */
     public void updateNextToPlayIdle(Traceable<MusicDetail> idleNextToPlayTrace) {
         nextToPlayIdleMusic = idleNextToPlayTrace == null ? Traceable.of(MusicDetail.NONE) : idleNextToPlayTrace;
         try {
@@ -393,18 +418,24 @@ public class NowPlayingInfo {
         }
     }
 
-    /** Traceable view of the currently playing track; never null (NONE when idle). */
+    /**
+     * Traceable view of the currently playing track; never null (NONE when idle).
+     */
     public Traceable<MusicDetail> getCurrentlyPlayingMusic() {
         return Objects.requireNonNullElse(currentlyPlaying, Traceable.of(MusicDetail.NONE));
     }
 
-    /** Derived accessor for consumers that only need the track itself. */
+    /**
+     * Derived accessor for consumers that only need the track itself.
+     */
     public MusicDetail getCurrentlyPlayingMusicDetail() {
         Traceable<MusicDetail> traceable = currentlyPlaying;
         return traceable == null ? null : traceable.value();
     }
 
-    /** Traceable view of the next idle track (queue peek preferred); never null. */
+    /**
+     * Traceable view of the next idle track (queue peek preferred); never null.
+     */
     public Traceable<MusicDetail> getNextToPlayMusic() {
         // Single synchronized peek: the client queue is a plain ArrayDeque mutated on
         // network threads, so an isEmpty+peek pair here would race its clear()

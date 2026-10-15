@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.util.Mth;
@@ -13,7 +13,7 @@ public class PlayerHeadRenderer implements HudRenderer {
     private static final int SKIN_TEXTURE_SIZE = 64;
     private static final int TRANSITION_DURATION = 400;
     @Getter
-    private Layout layout;
+    private HudStyle hudStyle;
     private String previousSkinResource;
     private String skinResource;
     @Getter
@@ -46,23 +46,28 @@ public class PlayerHeadRenderer implements HudRenderer {
 
     public void setPlayerSkinSupplier(@Nullable Supplier<String> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
-        String newSkin = playerSkinSupplier == null ? null : playerSkinSupplier.get();
-        long now = System.currentTimeMillis();
-        if (now - lastUpdateTime > TRANSITION_DURATION) {
-            previousSkinResource = skinResource;
-        } else {
-            previousSkinResource = null;
+        String newSkin = null;
+        if (playerSkinSupplier != null) {
+            newSkin = playerSkinSupplier.get();
         }
-        lastUpdateTime = now;
-        skinResource = newSkin;
+        if (newSkin != null || playerSkinSupplier == null) {
+            long now = System.currentTimeMillis();
+            if (now - lastUpdateTime > TRANSITION_DURATION) {
+                previousSkinResource = skinResource;
+            } else {
+                previousSkinResource = null;
+            }
+            lastUpdateTime = now;
+            skinResource = newSkin;
+        }
     }
 
     public boolean isVisible() {
         return skinResource != null;
     }
 
-    public void configure(Layout layout) {
-        this.layout = layout;
+    public void configure(HudStyle hudStyle) {
+        this.hudStyle = hudStyle;
     }
 
     @Override
@@ -73,7 +78,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         try {
             if (playerSkinSupplier != null) {
                 String skin = playerSkinSupplier.get();
-                if (!Objects.equals(skinResource, skin)) {
+                if (skin != null && !Objects.equals(skinResource, skin)) {
                     if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
                         previousSkinResource = skinResource;
                     } else {
@@ -87,21 +92,22 @@ public class PlayerHeadRenderer implements HudRenderer {
         } catch (Exception ignored) {
         }
 
-        Layout.AbsolutePosition absolutePosition = layout.calcAbsolutePosition(context);
-        int w = (int) layout.getWidth();
-        int h = (int) layout.getHeight();
+        HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
+        int w = (int) hudStyle.getWidth();
+        int h = (int) hudStyle.getHeight();
+        float styleAlpha = hudStyle.calcAbsoluteAlpha();
 
         if (currentTimeMillis - lastUpdateTime > TRANSITION_DURATION) {
             renderHead(context.graphics(), skinResource,
-                    absolutePosition.x(), absolutePosition.y(), w, h, 1);
+                    absolutePosition.x(), absolutePosition.y(), w, h, styleAlpha);
         } else {
             float transitionProgress = Math.clamp((float) (currentTimeMillis - lastUpdateTime) / TRANSITION_DURATION, 0, 1);
             if (previousSkinResource != null) {
                 renderHead(context.graphics(), previousSkinResource,
-                        absolutePosition.x(), absolutePosition.y(), w, h, 1 - transitionProgress);
+                        absolutePosition.x(), absolutePosition.y(), w, h, (1 - transitionProgress) * styleAlpha);
             }
             renderHead(context.graphics(), skinResource,
-                    absolutePosition.x(), absolutePosition.y(), w, h, transitionProgress);
+                    absolutePosition.x(), absolutePosition.y(), w, h, transitionProgress * styleAlpha);
         }
     }
 }

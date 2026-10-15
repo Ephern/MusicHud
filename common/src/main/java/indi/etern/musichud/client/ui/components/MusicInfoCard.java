@@ -254,11 +254,6 @@ public class MusicInfoCard extends LinearLayout {
         }
     }
 
-    /**
-     * Binds the given music to this card. Idle / null / NONE renders the idle placeholder.
-     *
-     * @param sideWidth current side panel width in px, used for the album thumbnail size
-     */
     public void bind(Traceable<MusicDetail> musicDetailTrace, int sideWidth) {
         if (musicDetailTrace == null || musicDetailTrace.value() == null || musicDetailTrace.value().equals(MusicDetail.NONE)) {
             albumImage.loadUrl(MusicHud.ICON_BASE64);
@@ -280,7 +275,7 @@ public class MusicInfoCard extends LinearLayout {
             MusicDetail musicDetail = musicDetailTrace.value();
             titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
             Album album = musicDetail.getAlbum();
-            albumImage.loadUrl(album.getImageThumbnailUrl(sideWidth));
+            albumImage.loadUrl(album.getPicUrl(), sideWidth, sideWidth);
             titleText.setText(musicDetail.getName());
             PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
             String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().getName() : null;

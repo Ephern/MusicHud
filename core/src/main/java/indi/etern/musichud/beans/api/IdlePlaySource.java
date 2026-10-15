@@ -17,7 +17,6 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import java.util.concurrent.TimeoutException;
 
 @Getter
 @ToString
@@ -97,7 +96,7 @@ public final class IdlePlaySource {
             long id = sampledTrack.getId();
             try {
                 detailByIds = musicApiService.getMusicDetailByIds(List.of(id), null);
-            } catch (TimeoutException | InterruptedException e) {
+            } catch (Throwable e) {
                 throw new MusicResourceLoadingException(e, id, false);
             }
             if (detailByIds.size() == 1) {

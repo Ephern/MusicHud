@@ -3,10 +3,10 @@
 uniform mat4 ProjMat;
 uniform mat4 ModelViewMat;
 
-// u_Layout: (halfWidth, halfHeight, cornerRadius)
+// u_Style: (halfWidth, halfHeight, cornerRadius, alpha)
 layout(std140) uniform MHPosition {
     mat4 u_Translation;
-    vec3 u_Layout;
+    vec4 u_Style;
 };
 layout(std140) uniform MHProgressStyle {
     vec3 u_Gradient; // (gradientLength, rightOffset, transitionBorderRate)
