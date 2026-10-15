@@ -22,6 +22,7 @@ import indi.etern.musichud.client.utils.ui.RhythmAnimator;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.client.utils.ui.SpringValue;
 import indi.etern.musichud.interfaces.ClientConfig;
+import lombok.Getter;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -41,10 +42,14 @@ public class LyricLineView extends LinearLayout {
     private static Logger logger;
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private final int height = dp(30);
-    TextView subText;
+    @Getter
+    private final int mainLyricSize;
+    @Getter
+    private final int subLyricSize;
+    private final LyricLine lyricLine;
+    private TextView subText;
     private LinearLayout mainLine;
     private LinearLayout row;
-    private LyricLine lyricLine;
     private View mainText;
     private Animator emphasizeAnim;
 
@@ -54,12 +59,15 @@ public class LyricLineView extends LinearLayout {
     private float blurRadius = 0f;
     private float blurTarget = 0f;
     private boolean blurDisabled = false;
+    @Getter
     private boolean blurInitialized = false;
 
-    public LyricLineView(Context context, LyricLine lyricLine) {
+    public LyricLineView(Context context, LyricLine lyricLine, int mainLyricSize, int subLyricSize) {
         super(context);
+        this.lyricLine = lyricLine;
+        this.mainLyricSize = mainLyricSize;
+        this.subLyricSize = subLyricSize;
         try {
-            this.lyricLine = lyricLine;
             setOrientation(LinearLayout.VERTICAL);
 
             row = new LinearLayout(context);
@@ -97,9 +105,9 @@ public class LyricLineView extends LinearLayout {
 //                mainText.setAlpha(Theme.FADE_LYRIC_ALPHA);
                     mainLine.addView(mainText);
                     if (lyricLine.getType() == LyricLine.Type.META_DATA) {
-                        mainText.setTextSize(Theme.SUB_LYRIC_SIZE);
+                        mainText.setTextSize(subLyricSize);
                     } else {
-                        mainText.setTextSize(Theme.MAIN_LYRIC_SIZE);
+                        mainText.setTextSize(mainLyricSize);
 
                         refreshSubLyricLine();
                     }
@@ -139,7 +147,7 @@ public class LyricLineView extends LinearLayout {
                 if (subLyric != null && !subLyric.isEmpty()) {
                     subText = new TextView(getContext());
                     subText.setText(subLyric);
-                    subText.setTextSize(Theme.SUB_LYRIC_SIZE);
+                    subText.setTextSize(subLyricSize);
                     subText.setTextStyle(TextPaint.BOLD);
                     subText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
                     subText.setAlpha(Theme.FADE_LYRIC_ALPHA);
@@ -293,10 +301,6 @@ public class LyricLineView extends LinearLayout {
         blurSpring.jumpTo(blurTarget);
     }
 
-    public boolean isBlurInitialized() {
-        return blurInitialized;
-    }
-
     public void markBlurInitialized() {
         blurInitialized = true;
     }
@@ -326,7 +330,7 @@ public class LyricLineView extends LinearLayout {
         }
         try {
             if (!LineBlurRenderer.drawBlurred(arcCanvas, getWidth(), getHeight(),
-                    blurRadius, computeBlurContentStamp(), blurResources, this::drawBlurredContent)) {
+                    blurRadius, computeBlurContentStamp(), blurResources, super::dispatchDraw)) {
                 super.dispatchDraw(canvas);
             }
         } catch (Throwable t) {
@@ -338,10 +342,6 @@ public class LyricLineView extends LinearLayout {
             logger.error("Disabling lyric blur after an error", t);
             super.dispatchDraw(canvas);
         }
-    }
-
-    private void drawBlurredContent(Canvas canvas) {
-        super.dispatchDraw(canvas);
     }
 
     /**

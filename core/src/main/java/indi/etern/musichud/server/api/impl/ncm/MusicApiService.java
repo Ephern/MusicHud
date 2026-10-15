@@ -193,14 +193,19 @@ public class MusicApiService implements IMusicApiService {
         return response.code() + (response.msg() == null || response.msg().isBlank() ? "" : " " + response.msg());
     }
 
-    private List<MusicDetail> appendArtistMusic(int offset, Artist artist, UUID playerUUID) throws InterruptedException, TimeoutException {
+    private List<MusicDetail> appendArtistMusic(int offset, Artist artist, UUID playerUUID) {
         String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
         GetArtistMusicResponse response = ApiClient.post(ApiServerEndpointsMeta.Artist.ALL_SONGS, new ArtistAllMusicRequest(artist.getId(), 50, offset, "time"), rawCookie, true);
         List<Long> musicDetailIds = response.songs.stream().map(MusicDetail::getId).toList();
         artist.setTotalMusicCount(response.total);
-        List<MusicDetail> musicDetails = getMusicDetailByIds(musicDetailIds, null);
-        artist.getMusicDetails().addAll(musicDetails);
-        return musicDetails;
+        try {
+            List<MusicDetail> musicDetails = getMusicDetailByIds(musicDetailIds, null);
+            artist.getMusicDetails().addAll(musicDetails);
+            return musicDetails;
+        } catch (Throwable e) {
+            logger.error("Failed to load artist({} \"{}\")'s tracks with offset {}", artist.getId(), artist.getName(), offset, e);
+            return artist.getMusicDetails();
+        }
     }
 
     @Override
@@ -354,6 +359,9 @@ public class MusicApiService implements IMusicApiService {
                 );
                 MusicDetailsResponse response = ApiClient.post(ApiServerEndpointsMeta.Music.DETAIL, requestBody, userCookie, true);
                 List<MusicDetail> musicDetails = response.musicDetails();
+                if (musicDetails == null) {
+                    return List.of();
+                }
                 for (MusicDetail musicDetail : musicDetails) {
                     musicDetailCache.put(musicDetail.getId(), musicDetail);
                 }

@@ -21,6 +21,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.audio.PlaybackTask;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.services.ConnectionManager;
@@ -40,7 +41,6 @@ import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.sounds.SoundSource;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -90,16 +90,13 @@ public class MainFragment extends Fragment {
     private int lyricsPanelWidth = -1;
     private boolean lyricsPanelShown = false;
     private AnimatorSet lyricsAnimator = null;
-    // Double-buffered music info card (album cover + info merged)
     private FrameLayout cardWrapper;
     private MusicInfoCard activeCard;
     private MusicInfoCard stagedCard;
     private AnimatorSet cardAnimator;
     private AnimatorSet coverScaleAnimator;
     private boolean cardSwitching = false;
-    // Latest-wins slot: a switch arriving mid-animation replaces any earlier pending one
     private Traceable<MusicDetail> pendingSwitch;
-    // MusicDetail currently settled on the active card
     private MusicDetail displayedDetail;
 
     private MainFragment() {
@@ -119,27 +116,11 @@ public class MainFragment extends Fragment {
             accountBaseView.refresh();
         }
         if (instance != null && instance.visible && instance.activeCard != null) {
-            // Restore the current playback instead of blanking it to "idle": a failed connect
-            // attempt no longer stops the ongoing playback, so a blanket clear would wrongly
-            // wipe the GUI while the HUD keeps playing.
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             Traceable<MusicDetail> current = nowPlayingInfo.getCurrentlyPlayingMusic();
             Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayMusic();
             Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
-            // Don't rebuild contents while a card transition is in flight; it settles on its own.
-            if (!instance.cardSwitching) {
-                instance.activeCard.bind(current, instance.sideWidth);
-                instance.displayedDetail = current == null ? null : current.value();
-                instance.updateCoverScale(false);
-            }
-            if (homeView != null) {
-                homeView.switchMusic(current, nextToPlay, lines);
-            }
-            if (instance.lyricsScrollView != null) {
-                instance.lyricsScrollView.switchLyrics(current == null ? MusicDetail.NONE : current.value(), lines);
-            }
-            instance.updateLyricsPanelVisibility();
-            instance.refreshServerConnectStatus();
+            instance.applyMusic(current, nextToPlay, lines, true);
         }
     }
 
@@ -160,9 +141,7 @@ public class MainFragment extends Fragment {
      */
     private static boolean isCoverExpanded() {
         MusicDetail detail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-        float targetGain = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
-                (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
-        if (detail == null || detail.equals(MusicDetail.NONE) || targetGain == 0) {
+        if (detail == null || detail.equals(MusicDetail.NONE) || PlaybackTask.getTargetGain() == 0) {
             return false;
         }
         StreamAudioPlayer.Status status = StreamAudioPlayer.getInstance().getStatus();
@@ -255,7 +234,11 @@ public class MainFragment extends Fragment {
             homeView.switchMusic(musicDetailTrace, nextToPlayTrace, lines);
         }
         if (lyricsScrollView != null) {
-            lyricsScrollView.switchLyrics(musicDetail, lines);
+            if (notAbsoluteMusicLyric()) {
+                lyricsScrollView.switchLyrics(musicDetail, lines);
+            } else {
+                lyricsScrollView.clearLyrics();
+            }
         }
         updateLyricsPanelVisibility();
     }
@@ -568,12 +551,18 @@ public class MainFragment extends Fragment {
             lyricsSidebar.setTranslationX(lyricsPanelWidth);
 
             lyricsScrollView = new StaggeredLyricScrollView(context);
+            lyricsScrollView.setMainLyricSize(Theme.SIDEBAR_MAIN_LYRIC_SIZE);
+            lyricsScrollView.setSubLyricSize(Theme.SIDEBAR_SUB_LYRIC_SIZE);
             lyricsSidebar.addView(lyricsScrollView, new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
             Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
             if (currentMusic != null && currentLyrics != null && !currentMusic.equals(MusicDetail.NONE)) {
-                lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
+                if (notAbsoluteMusicLyric()) {
+                    lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
+                } else {
+                    lyricsScrollView.clearLyrics();
+                }
             }
 
             routerContainer.setOnPageChangeListener(new RouterContainer.OnPageChangeListener() {
@@ -657,12 +646,15 @@ public class MainFragment extends Fragment {
         if (!clientConfig.getEnableLyricsSidebar()) {
             return false;
         }
-        NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
         MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
         boolean musicInvalid = detail == null || detail.equals(MusicDetail.NONE);
         if (musicInvalid) {
             return false;
         }
+        return notAbsoluteMusicLyric();
+    }
+
+    private static boolean notAbsoluteMusicLyric() {
         Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
         return lines != null && !lines.isEmpty()
                 && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;

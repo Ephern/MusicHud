@@ -24,6 +24,9 @@ public interface IClientEventService extends IClientEventServiceDefinition {
         throw new UnsupportedOperationException();
     }
 
+    /**
+     * Will trigger every server join, even sub-servers
+     * */
     Unregister registerClientPlayerJoin(Consumer<Player> listener);
     Unregister registerClientPlayerQuit(Consumer<Player> listener);
     Unregister registerClientTickPost(Runnable listener);

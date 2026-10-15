@@ -7,17 +7,17 @@ import net.fabricmc.fabric.api.client.networking.v1.ClientPlayConnectionEvents;
 import net.minecraft.client.multiplayer.ServerData;
 import net.minecraft.world.entity.player.Player;
 
-import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 
 @SuppressWarnings("unused")
 public class FabricClientEventService implements IClientEventService {
     private String serverIp = null;
     private static volatile FabricClientEventService instance;
-    private final Set<Consumer<Player>> joinListeners = new HashSet<>();
-    private final Set<Consumer<Player>> quitListeners = new HashSet<>();
-    private final Set<Runnable> tickPostListeners = new HashSet<>();
+    private final Set<Consumer<Player>> joinListeners = ConcurrentHashMap.newKeySet();
+    private final Set<Consumer<Player>> quitListeners = ConcurrentHashMap.newKeySet();
+    private final Set<Runnable> tickPostListeners = ConcurrentHashMap.newKeySet();
 
     private FabricClientEventService() {
         ClientPlayConnectionEvents.JOIN.register((handler, sender, client) -> {
