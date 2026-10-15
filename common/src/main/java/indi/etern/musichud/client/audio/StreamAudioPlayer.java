@@ -116,8 +116,23 @@ public class StreamAudioPlayer {
             task.startFuture().whenComplete((wallStart, throwable) -> {
                 if (throwable != null) return;
                 synchronized (StreamAudioPlayer.this) {
-                    if (pendingTask == task && currentTask == current && current.isAudible()) {
+                    if (pendingTask != task || currentTask != current) return;
+                    if (current.isAudible()) {
                         current.beginFadeOut(transitionMs);
+                    } else {
+                        // Outgoing is not producing sound (loading/retrying after a
+                        // network drop): it cannot be cross-faded, and leaving it
+                        // current would let its retry resurrect and play alongside
+                        // the incoming task. Adopt the incoming task and stop it.
+                        pendingTask = null;
+                        currentTask = task;
+                        setStatus(switch (task.state()) {
+                            case FADING_IN, PLAYING, FADING_OUT -> Status.PLAYING;
+                            case RETRYING -> Status.RETRYING;
+                            case ERROR -> Status.ERROR;
+                            default -> Status.BUFFERING;
+                        });
+                        current.cancel();
                     }
                 }
             });
