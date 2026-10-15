@@ -41,7 +41,7 @@ public class PlayingStatusRenderer implements HudRenderer {
             default -> {
                 if (clientConfig.getMuted()) {
                     yield MUTED_LOCATION;
-                } else if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED) {
+                } else if (ConnectionStateMachine.getConnectStatus() == ConnectionStateMachine.ConnectStatus.CONNECTED) {
                     yield PLAYING_CONNECTED_ICON_LOCATION;
                 } else {
                     yield PLAYING_ISOLATED_LOCATION;

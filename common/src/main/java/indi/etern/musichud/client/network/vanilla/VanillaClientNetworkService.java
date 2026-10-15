@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.network.vanilla;
 
-import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.IClientNetworkService;
@@ -16,7 +15,7 @@ public interface VanillaClientNetworkService extends IClientNetworkService {
     @Override
     default <T extends C2SPayload> void sendToServer(T payload) {
         Minecraft minecraft = Minecraft.getInstance();
-        if (minecraft.getCurrentServer() != null && (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.CONNECTED
+        if (minecraft.getCurrentServer() != null && (ConnectionStateMachine.getConnectStatus() == ConnectionStateMachine.ConnectStatus.CONNECTED
                 || payload instanceof ConnectRequest
                 || payload instanceof ConfirmConnectMessage)) {
             sendToNetworkServer(payload);

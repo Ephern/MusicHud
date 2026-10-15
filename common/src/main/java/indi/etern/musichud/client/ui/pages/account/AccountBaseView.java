@@ -48,7 +48,7 @@ public class AccountBaseView extends LinearLayout {
         boolean enabled = clientConfig.getEnable();
 
         Status status1;
-        if (ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED
+        if (ConnectionStateMachine.getConnectStatus() != ConnectionStateMachine.ConnectStatus.CONNECTED
                 && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
             status1 = Status.UNAVAILABLE;
         } else if (LoginService.getInstance().isLogined()) {
