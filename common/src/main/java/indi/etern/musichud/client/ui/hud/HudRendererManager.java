@@ -99,21 +99,25 @@ public class HudRendererManager {
                     new ScrollingLyricLineRenderer.Line(lyricLine, translatedText, Theme.HUD_FADE_COLOR, Theme.HUD_FADE_COLOR, scrollMillis)
             );
         });
-        IClientEventService.getInstance().registerClientPlayerJoin((player) -> MusicHud.EXECUTOR.execute(() -> {
-            MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-            if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
-                reset();
+        IClientEventService.getInstance().registerClientPlayerJoin((player) -> {
+            if (!ConnectionStateMachine.getConnectStatus().equals(ConnectionStateMachine.ConnectStatus.CONNECTED)) {
+                MusicHud.EXECUTOR.execute(() -> {
+                    MusicDetail currentlyPlayingMusicDetail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+                    if (currentlyPlayingMusicDetail == null || currentlyPlayingMusicDetail == MusicDetail.NONE) {
+                        reset();
+                    }
+                    PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
+                        try {
+                            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
+                            return PlayerInfoUtil.getPlayerSkinPath(pusherPlayerInfo);
+                        } catch (Exception e) {
+                            // Render-thread supplier: a lookup failure must never break the HUD frame
+                            return null;
+                        }
+                    });
+                });
             }
-            PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(() -> {
-                try {
-                    PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-                    return PlayerInfoUtil.getPlayerSkinPath(pusherPlayerInfo);
-                } catch (Exception e) {
-                    // Render-thread supplier: a lookup failure must never break the HUD frame
-                    return null;
-                }
-            });
-        }));
+        });
         IClientEventService.getInstance().registerClientPlayerQuit((player) -> MusicHud.EXECUTOR.execute(
                 () -> PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(null)
         ));

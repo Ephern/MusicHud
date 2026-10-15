@@ -1114,8 +1114,7 @@ public class PlaybackTask {
     }
 
     private void updateGain() {
-        float targetGain = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
-                (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
+        float targetGain = getTargetGain();
         if (lastVolume != targetGain && source != null) {
             HudRendererManager rendererManager = HudRendererManager.getActiveInstance();
             if (rendererManager != null) {
@@ -1145,6 +1144,14 @@ public class PlaybackTask {
             source.setGain(gain);
             lastSetGain = gain;
         }
+    }
+
+    public static float getTargetGain() {
+        return clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
+                (clientConfig.getMixWithVanillaSoundVolume() ?
+                        Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MASTER) * Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC)
+                        : 1
+                );
     }
 
     private void checkDecoderChangeAndFlush() {

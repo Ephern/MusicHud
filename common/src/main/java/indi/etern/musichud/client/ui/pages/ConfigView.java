@@ -219,7 +219,7 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setEnableIsolatedMode)
                     .setDefaultValue(clientConfig.getDefaultEnableIsolatedMode())
                     .setOnChanged(() -> {
-                        if (ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED) {
+                        if (ConnectionStateMachine.getConnectStatus() != ConnectionStateMachine.ConnectStatus.CONNECTED) {
                             if (clientConfig.getEnableIsolatedMode()) {
                                 connectionManager.switchToIsolate();
                             } else {

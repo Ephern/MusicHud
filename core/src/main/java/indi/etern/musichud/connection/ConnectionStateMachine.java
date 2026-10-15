@@ -1,6 +1,5 @@
 package indi.etern.musichud.connection;
 
-import indi.etern.musichud.MusicHud;
 import lombok.Getter;
 
 import java.util.*;
@@ -14,7 +13,7 @@ import java.util.function.Consumer;
  * ConnectResponse" from "isolated mode" even though both surface as {@code NOT_CONNECTED}).
  * How the last attempt ended (denied/incompatible, timeout) is NOT a state: it is recorded
  * as a {@link ConnectAttemptResult} and surfaced to the UI through the derived coarse
- * {@link MusicHud.ConnectStatus}.
+ * {@link ConnectStatus}.
  *
  * <p>Transitions are guarded: invalid ones are rejected and reported via the boolean return
  * value so the caller can skip its side effects.
@@ -22,7 +21,7 @@ import java.util.function.Consumer;
 public final class ConnectionStateMachine {
     private static final Map<ConnectionState, EnumSet<ConnectionState>> ALLOWED = new EnumMap<>(ConnectionState.class);
     @Getter
-    public static final Set<Consumer<MusicHud.ConnectStatus>> connectStatusListeners = new CopyOnWriteArraySet<>();
+    public static final Set<Consumer<ConnectStatus>> connectStatusListeners = new CopyOnWriteArraySet<>();
 
     static {
         ALLOWED.put(ConnectionState.DISCONNECTED, EnumSet.of(
@@ -68,21 +67,21 @@ public final class ConnectionStateMachine {
      */
     public static synchronized void recordResult(ConnectAttemptResult result) {
         lastConnectResult = result;
-        MusicHud.ConnectStatus status = getConnectStatus();
+        ConnectStatus status = getConnectStatus();
         connectStatusListeners.forEach(l -> l.accept(status));
     }
 
     /** Coarse status exposed to the UI. */
-    public static MusicHud.ConnectStatus getConnectStatus() {
+    public static ConnectStatus getConnectStatus() {
         if (state == ConnectionState.CONNECTED) {
-            return MusicHud.ConnectStatus.CONNECTED;
+            return ConnectStatus.CONNECTED;
         }
         if (state != ConnectionState.CONNECTING
                 && lastConnectResult != null
                 && lastConnectResult.outcome() == ConnectOutcome.INCOMPATIBLE) {
-            return MusicHud.ConnectStatus.INCOMPATIBLE;
+            return ConnectStatus.INCOMPATIBLE;
         }
-        return MusicHud.ConnectStatus.NOT_CONNECTED;
+        return ConnectStatus.NOT_CONNECTED;
     }
 
     /** @return {@code true} if the transition was accepted, {@code false} if it is not allowed. */
@@ -97,7 +96,7 @@ public final class ConnectionStateMachine {
         }
         if (state != target) {
             state = target;
-            MusicHud.ConnectStatus status = getConnectStatus();
+            ConnectStatus status = getConnectStatus();
             connectStatusListeners.forEach(l -> l.accept(status));
         }
         return true;
@@ -121,5 +120,11 @@ public final class ConnectionStateMachine {
     /** Tear down the current session. */
     public static boolean enterDisconnected() {
         return transition(ConnectionState.DISCONNECTED);
+    }
+
+    public enum ConnectStatus {
+        CONNECTED,
+        INCOMPATIBLE,
+        NOT_CONNECTED
     }
 }

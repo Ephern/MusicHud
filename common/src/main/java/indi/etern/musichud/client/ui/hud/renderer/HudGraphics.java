@@ -12,8 +12,6 @@ public interface HudGraphics {
 
     void nextStratum();
 
-    void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int textureWidth, int textureHeight);
-
     void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int u1, int v1, int textureWidth, int textureHeight, int color);
 
     void drawString(Font font, String text, int x, int y, int color, boolean dropShadow);

@@ -31,11 +31,6 @@ public class VanillaHudGraphics implements HudGraphics {
     }
 
     @Override
-    public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int textureWidth, int textureHeight) {
-        graphics.blit(RenderPipelines.GUI_TEXTURED, Identifier.parse(texturePath), x, y, u0, v0, width, height, textureWidth, textureHeight);
-    }
-
-    @Override
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int u1, int v1, int textureWidth, int textureHeight, int color) {
         graphics.blit(RenderPipelines.GUI_TEXTURED, Identifier.parse(texturePath), x, y, u0, v0, width, height, u1, v1, textureWidth, textureHeight, color);
     }
