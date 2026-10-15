@@ -34,13 +34,6 @@ public class VanillaHudGraphics implements HudGraphics {
     }
 
     @Override
-    public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int textureWidth, int textureHeight) {
-        withBlend(() -> graphics.blit(
-                ResourceLocation.parse(texturePath), x, y, width, height,
-                (float)u0, (float)v0, textureWidth, textureHeight, textureWidth, textureHeight));
-    }
-
-    @Override
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int u1, int v1, int textureWidth, int textureHeight, int color) {
         float[] prevColor = RenderSystem.getShaderColor().clone();
 
