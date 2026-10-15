@@ -20,14 +20,11 @@ import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButt
 import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
-import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.server.api.playmode.PlayMode;
 import lombok.Getter;
 import lombok.Setter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.client.resources.language.I18n;
 
 import java.time.Duration;
@@ -55,7 +52,6 @@ public class MusicTrackItem extends LinearLayout {
     private TextView feeLabel;
     private FlexWrapLayout row2;
     private TextView durationText;
-    private TextView pusherText;
     @Setter
     @Getter
     private boolean showPusherInfo = true;
@@ -63,14 +59,13 @@ public class MusicTrackItem extends LinearLayout {
     private MusicDetail musicDetail;
     @Getter
     private Traceable<MusicDetail> musicTrace;
-    private PlayerHeadView pusherHeadView;
+    private PusherWidget pusherWidget;
     private ToggleTrackLikeStateButton likeButton;
     @Getter
     private LinearLayout buttonsLayout;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
     private Button sourceButton;
     private TextView playRecordTimeText;
-    private LinearLayout pusherInfo;
     @Getter
     private LinearLayout infoRow;
 
@@ -135,30 +130,11 @@ public class MusicTrackItem extends LinearLayout {
         params1.setMargins(0, 0, dp(12), 0);
         infoRow.addView(feeLabel, params1);
 
-        pusherInfo = new LinearLayout(context);
-        pusherInfo.setOrientation(LinearLayout.HORIZONTAL);
-        pusherInfo.setGravity(Gravity.CENTER_VERTICAL);
-        pusherInfo.setVisibility(GONE);
+        pusherWidget = new PusherWidget(context);
+        pusherWidget.setVisibility(View.GONE);
         LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         params2.setMargins(0, 0, dp(12), 0);
-        infoRow.addView(pusherInfo, params2);
-
-        pusherText = new TextView(context);
-        pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        pusherText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        pusherText.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-
-        pusherHeadView = new PlayerHeadView(context);
-        int rowHeight = pusherText.dp(Theme.TEXT_SIZE_LARGER);
-        //noinspection SuspiciousNameCombination
-        pusherHeadView.setLayoutParams(new LinearLayout.LayoutParams(rowHeight, rowHeight));
-        pusherHeadView.setVisibility(View.GONE);
-
-        pusherInfo.addView(pusherHeadView);
-        LinearLayout.LayoutParams params5 = new LinearLayout.LayoutParams(WRAP_CONTENT, rowHeight);
-        params5.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
-        params5.setMargins(pusherText.dp(4), 0, 0, 0);
-        pusherInfo.addView(pusherText, params5);
+        infoRow.addView(pusherWidget, params2);
 
         sourceButton = new Button(context);
         sourceButton.setVisibility(View.GONE);
@@ -225,9 +201,8 @@ public class MusicTrackItem extends LinearLayout {
         feeLabel.setVisibility(GONE);
         durationText.setText("");
         row2.removeAllViews();
-        pusherText.setText("");
-        pusherHeadView.setVisibility(View.GONE);
-        pusherHeadView.setPlayerSkinSupplier(null);
+        pusherWidget.clear();
+        pusherWidget.setVisibility(View.GONE);
         playRecordTimeText.setText("");
         playRecordTimeText.setVisibility(GONE);
         addToPlaylistButton.bindMusicDetail(null);
@@ -357,20 +332,13 @@ public class MusicTrackItem extends LinearLayout {
 
         if (showPusherInfo) {
             PusherInfo pusherInfo = musicDetail.getPusherInfo();
-            if (!pusherInfo.getPlayerName().isEmpty()) {
-                ClientPacketListener connection = Minecraft.getInstance().getConnection();
-                if (connection == null) throw new IllegalStateException();
-                pusherText.setText(pusherInfo.getPlayerName());
-                pusherHeadView.setVisibility(VISIBLE);
-                pusherHeadView.setPlayerSkinSupplier(() -> {
-                    try {
-                        return PlayerInfoUtil.getPlayerSkin(PlayerInfoUtil.getPlayerInfoByUUID(pusherInfo.getPlayerUUID()));
-                    } catch (Exception ignored) {
-                    }
-                    return null;
-                });
+            if (pusherInfo == null) {
+                pusherWidget.clear();
+                pusherWidget.setVisibility(GONE);
+            } else {
+                pusherWidget.bind(pusherInfo);
+                pusherWidget.setVisibility(VISIBLE);
             }
-            this.pusherInfo.setVisibility(VISIBLE);
 
             SourceMeta source = musicTrace.source();
             if (source != null) {
@@ -411,9 +379,8 @@ public class MusicTrackItem extends LinearLayout {
                 sourceButton.setVisibility(GONE);
             }
         } else {
-            pusherHeadView.setVisibility(GONE);
-            pusherHeadView.setPlayerSkinSupplier(null);
-            this.pusherInfo.setVisibility(GONE);
+            pusherWidget.setVisibility(GONE);
+            pusherWidget.clear();
             sourceButton.setVisibility(GONE);
         }
 

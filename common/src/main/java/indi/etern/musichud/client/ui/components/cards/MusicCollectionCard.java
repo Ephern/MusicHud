@@ -16,12 +16,14 @@ import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.ui.components.IdlePlaySourceWidget;
+import indi.etern.musichud.client.ui.components.PusherWidget;
+import indi.etern.musichud.client.ui.components.RouterContainer;
+import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
 import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.utils.CountFormatter;
-import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.Unregister;
@@ -206,37 +208,12 @@ public class MusicCollectionCard extends LinearLayout {
                 buttons.addView(idlePlaySourceWidget, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
             }
         } else {
-            LinearLayout pusherRow = new LinearLayout(context);
-            pusherRow.setOrientation(LinearLayout.HORIZONTAL);
-            pusherRow.setGravity(Gravity.CENTER_VERTICAL);
-
-            TextView pusherText = new TextView(context);
-            pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            pusherText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            pusherText.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-            pusherText.setText(pusherInfo.getPlayerName());
-
-            PlayerHeadView pusherHeadView = new PlayerHeadView(context);
-            int rowHeight = pusherText.dp(Theme.TEXT_SIZE_LARGER);
-            //noinspection SuspiciousNameCombination
-            pusherHeadView.setLayoutParams(new LayoutParams(rowHeight, rowHeight));
-            pusherHeadView.setPlayerSkinSupplier(() -> {
-                try {
-                    return PlayerInfoUtil.getPlayerSkin(PlayerInfoUtil.getPlayerInfoByUUID(pusherInfo.getPlayerUUID()));
-                } catch (Exception ignored) {
-                }
-                return null;
-            });
-
-            pusherRow.addView(pusherHeadView);
-            LayoutParams params5 = new LayoutParams(WRAP_CONTENT, rowHeight);
-            params5.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
-            params5.setMargins(pusherText.dp(4), 0, 0, 0);
-            pusherRow.addView(pusherText, params5);
+            PusherWidget pusherWidget = new PusherWidget(context);
+            pusherWidget.bind(pusherInfo);
 
             LayoutParams pusherParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             pusherParams.setMargins(dp(4), dp(4), 0, dp(4));
-            addView(pusherRow, pusherParams);
+            addView(pusherWidget, pusherParams);
         }
 
         if (!isPrivatePlaylistToUser) {
