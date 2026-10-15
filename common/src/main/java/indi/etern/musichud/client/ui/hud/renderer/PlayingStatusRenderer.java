@@ -17,6 +17,7 @@ public class PlayingStatusRenderer implements HudRenderer {
     public static final String PLAYING_CONNECTED_ICON_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/link.png";
     public static final String PLAYING_ISOLATED_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/unlink.png";
     public static final String MUTED_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/volume_x.png";
+    private static final int ICON_TEXTURE_SIZE = 64;
 
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     StreamAudioPlayer.Status status;
@@ -77,7 +78,8 @@ public class PlayingStatusRenderer implements HudRenderer {
                     .rotate(rotationRadians)
                     .translate(-centerX, -centerY)
                     .end(transforming ->
-                            hudRenderContext.graphics().blitTextured(currentResourceLocation1, screenX, screenY, 0, 0, width, height, width, height, width, height, iconColor)
+                            hudRenderContext.graphics().blitTextured(currentResourceLocation1, screenX, screenY, 0, 0, width, height,
+                                    ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, ICON_TEXTURE_SIZE, iconColor)
                     );
         }
     }

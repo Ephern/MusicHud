@@ -1,13 +1,23 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.PoseStack;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
+import org.lwjgl.opengl.GL30;
 
 import static org.lwjgl.opengl.GL11.GL_BLEND;
+import static org.lwjgl.opengl.GL11.GL_LINEAR;
+import static org.lwjgl.opengl.GL11.GL_LINEAR_MIPMAP_LINEAR;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_MAG_FILTER;
+import static org.lwjgl.opengl.GL11.GL_TEXTURE_MIN_FILTER;
+import static org.lwjgl.opengl.GL11.glGetTexParameteri;
 import static org.lwjgl.opengl.GL11.glIsEnabled;
+import static org.lwjgl.opengl.GL11.glTexParameteri;
 
 /**
  * Adapter: exposes a {@link GuiGraphics} behind the neutral {@link HudGraphics}.
@@ -35,15 +45,40 @@ public class VanillaHudGraphics implements HudGraphics {
 
     @Override
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int u1, int v1, int textureWidth, int textureHeight, int color) {
+        ResourceLocation rl = ResourceLocation.parse(texturePath);
         float[] prevColor = RenderSystem.getShaderColor().clone();
+
+        // Only when the sampled source region is larger than the destination (i.e. downscaling)
+        // does linear+mipmap sampling help; upscaled pixel-art (e.g. the 8x8 player face) must
+        // stay NEAREST so it does not get blurred.
+        if (u1 > width || v1 > height) {
+            ensureLinearMipmap(rl);
+        }
 
         withBlend(() -> {
             applyArgbColor(graphics, color);
             graphics.blit(
-                    ResourceLocation.parse(texturePath), x, y, width, height,
+                    rl, x, y, width, height,
                     (float)u0, (float)v0, u1, v1, textureWidth, textureHeight);
         });
         graphics.setColor(prevColor[0], prevColor[1], prevColor[2], prevColor[3]);
+    }
+
+    /**
+     * Makes the texture sample trilinearly (mipmapped) so downscaled blits (e.g. the 64x64 status
+     * icons drawn into a ~9px slot) do not alias. Applied once and left in place: MC only uses
+     * these textures here (GUI icon usage goes through ModernUI's own loader), so a restore is
+     * unnecessary. A resource reload resets the filter to NEAREST and drops the mipmaps, which the
+     * MIN_FILTER check below detects so they are rebuilt on the next blit.
+     */
+    private static void ensureLinearMipmap(ResourceLocation rl) {
+        int id = Minecraft.getInstance().getTextureManager().getTexture(rl).getId();
+        GlStateManager._bindTexture(id);
+        if (glGetTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER) != GL_LINEAR_MIPMAP_LINEAR) {
+            GL30.glGenerateMipmap(GL_TEXTURE_2D);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        }
     }
 
     /**
