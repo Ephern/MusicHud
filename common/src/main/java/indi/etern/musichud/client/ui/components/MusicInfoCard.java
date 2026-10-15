@@ -16,12 +16,7 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ProgressBar;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.Album;
-import indi.etern.musichud.beans.music.Artist;
-import indi.etern.musichud.beans.music.MusicCollection;
-import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.SourceMeta;
-import indi.etern.musichud.beans.music.Traceable;
+import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
@@ -31,12 +26,10 @@ import indi.etern.musichud.client.ui.components.buttons.VoteSkipButton;
 import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
-import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.server.api.playmode.PlayMode;
 import lombok.Getter;
-import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
 
 import java.time.Duration;
@@ -57,8 +50,7 @@ public class MusicInfoCard extends LinearLayout {
     private final TextView titleText;
     private final FlexWrapLayout artists;
     private final LinearLayout albumContainer;
-    private final PlayerHeadView pusherHeadView;
-    private final TextView pusherText;
+    private final PusherWidget pusherWidget;
     private final Button sourceButton;
     private final ProgressBar progressBar;
     private final TextView playedTimeText;
@@ -104,28 +96,8 @@ public class MusicInfoCard extends LinearLayout {
         pusherRow.setOrientation(LinearLayout.HORIZONTAL);
         pusherRow.setGravity(Gravity.CENTER_VERTICAL);
 
-        pusherHeadView = new PlayerHeadView(context);
-        int rowHeight = pusherRow.dp(Theme.TEXT_SIZE_LARGER);
-        //noinspection SuspiciousNameCombination
-        pusherHeadView.setLayoutParams(new LinearLayout.LayoutParams(rowHeight, rowHeight));
-        pusherHeadView.setVisibility(View.GONE);
-        pusherHeadView.setPlayerSkinSupplier(() -> {
-            try {
-                PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-                return PlayerInfoUtil.getPlayerSkin(pusherPlayerInfo);
-            } catch (Exception ignored) {
-            }
-            return null;
-        });
-        pusherRow.addView(pusherHeadView);
-
-        pusherText = new TextView(context);
-        pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        pusherText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        LinearLayout.LayoutParams pusherTextParams = new LinearLayout.LayoutParams(WRAP_CONTENT, rowHeight);
-        pusherTextParams.gravity = Gravity.LEFT | Gravity.CENTER_HORIZONTAL;
-        pusherTextParams.setMargins(pusherText.dp(4), 0, 0, 0);
-        pusherRow.addView(pusherText, pusherTextParams);
+        pusherWidget = new PusherWidget(context);
+        pusherRow.addView(pusherWidget);
 
         LinearLayout.LayoutParams pusherRowParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         int dp2 = musicInfo.dp(2);
@@ -236,8 +208,8 @@ public class MusicInfoCard extends LinearLayout {
             titleText.setText("");
             artists.removeAllViews();
             albumContainer.removeAllViews();
-            pusherHeadView.setVisibility(View.GONE);
-            pusherText.setText("");
+            pusherWidget.clear();
+            pusherWidget.setVisibility(View.GONE);
             sourceButton.setVisibility(View.GONE);
             sourceButton.setTag(null);
             progressBar.setIndeterminate(false);
@@ -261,8 +233,8 @@ public class MusicInfoCard extends LinearLayout {
             titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             artists.removeAllViews();
             albumContainer.removeAllViews();
-            pusherHeadView.setVisibility(View.GONE);
-            pusherText.setText("");
+            pusherWidget.clear();
+            pusherWidget.setVisibility(View.GONE);
             sourceButton.setVisibility(View.GONE);
             sourceButton.setTag(null);
             progressBar.setVisibility(View.GONE);
@@ -277,14 +249,13 @@ public class MusicInfoCard extends LinearLayout {
             Album album = musicDetail.getAlbum();
             albumImage.loadUrl(album.getPicUrl(), sideWidth, sideWidth);
             titleText.setText(musicDetail.getName());
-            PlayerInfo pusherPlayerInfo = nowPlayingInfo.getPusherPlayerInfo();
-            String name = pusherPlayerInfo != null ? pusherPlayerInfo.getProfile().getName() : null;
-            if (name == null || name.isEmpty()) {
-                pusherHeadView.setVisibility(View.GONE);
-                pusherText.setText("");
+            PusherInfo pusherInfo = musicDetail.getPusherInfo();
+            if (pusherInfo == null) {
+                pusherWidget.setVisibility(View.GONE);
+                pusherWidget.clear();
             } else {
-                pusherHeadView.setVisibility(View.VISIBLE);
-                pusherText.setText(name);
+                pusherWidget.setVisibility(View.VISIBLE);
+                pusherWidget.bind(pusherInfo);
             }
             SourceMeta source = musicDetailTrace.source();
             if (source != null) {
