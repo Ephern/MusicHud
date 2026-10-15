@@ -75,13 +75,15 @@ public class Theme {
     public static final int TEXT_SIZE_NORMAL = 12;
     public static final int TEXT_SIZE_LARGE = 15;
     public static final int TEXT_SIZE_LARGER = 18;
-    public static final int MAIN_LYRIC_SIZE = 24;
-    public static final int SUB_LYRIC_SIZE = 15;
+    public static final int MAIN_LYRIC_SIZE = 28;
+    public static final int SUB_LYRIC_SIZE = 16;
+    public static final int SIDEBAR_MAIN_LYRIC_SIZE = 22;
+    public static final int SIDEBAR_SUB_LYRIC_SIZE = 14;
     public static final float EMPHASIZE_LYRIC_ALPHA = 0.9f;
     public static final float FADE_LYRIC_ALPHA = 0.25f;
     public static final int EMPHASIZE_LYRIC_COLOR = 0xD6FFFFFF;
     public static final int GLOW_LYRIC_COLOR = 0xFFFFFFFF;
-    public static final int FADE_LYRIC_COLOR = 0x4BFFFFFF;
+    public static final int FADE_LYRIC_COLOR = 0x3BFFFFFF;
     public static final int HUD_EMPHASIZE_COLOR = 0xD0FFFFFF;
     public static final int HUD_FADE_COLOR = 0x70FFFFFF;
     public static final int HUD_PROGRESS_LEFT = 0x00000000;
@@ -108,9 +110,9 @@ public class Theme {
         textView.setTextSize(TEXT_SIZE_NORMAL);
         textView.setTextColor(EMPHASIZE_TEXT_COLOR);
         if (enabled) {
-            if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode()) {
+            if (ConnectionStateMachine.getConnectStatus() == ConnectionStateMachine.ConnectStatus.NOT_CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode()) {
                 textView.setText(I18n.get(MusicHud.MOD_ID + ".text.notConnected"));
-            } else if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.INCOMPATIBLE) {
+            } else if (ConnectionStateMachine.getConnectStatus() == ConnectionStateMachine.ConnectStatus.INCOMPATIBLE) {
                 textView.setText(I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer"));
             }
         } else {

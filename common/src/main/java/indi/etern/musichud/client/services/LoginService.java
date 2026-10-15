@@ -210,33 +210,35 @@ public class LoginService implements IClientLoginService {
         public void register() {
             IClientEventService eventService = IClientEventService.getInstance();
             eventService.registerClientPlayerJoin((player) -> {
-                MusicHud.EXECUTOR.execute(() -> {
-                    ServerData currentServer = Minecraft.getInstance().getCurrentServer();
-                    if (currentServer != null) {
-                        boolean autoConnectToServer = clientConfig.getEnableAutoConnect();
-                        if (autoConnectToServer) {
-                            AutoConnectServerFilterType connectServerFilterType = clientConfig.getConnectServerFilterType();
-                            if ((connectServerFilterType == AutoConnectServerFilterType.BLACK_LIST
-                                    && clientConfig.getBlackList().stream().noneMatch(i -> Pattern.matches(i, currentServer.ip)))
-                                    || (connectServerFilterType == AutoConnectServerFilterType.WHITE_LIST
-                                    && clientConfig.getWhiteList().stream().anyMatch(i -> Pattern.matches(i, currentServer.ip)))) {
-                                IConnectionManager.getInstance().connectToExternalServer();
+                if (!ConnectionStateMachine.getConnectStatus().equals(ConnectionStateMachine.ConnectStatus.CONNECTED)) {
+                    MusicHud.EXECUTOR.execute(() -> {
+                        ServerData currentServer = Minecraft.getInstance().getCurrentServer();
+                        if (currentServer != null) {
+                            boolean autoConnectToServer = clientConfig.getEnableAutoConnect();
+                            if (autoConnectToServer) {
+                                AutoConnectServerFilterType connectServerFilterType = clientConfig.getConnectServerFilterType();
+                                if ((connectServerFilterType == AutoConnectServerFilterType.BLACK_LIST
+                                        && clientConfig.getBlackList().stream().noneMatch(i -> Pattern.matches(i, currentServer.ip)))
+                                        || (connectServerFilterType == AutoConnectServerFilterType.WHITE_LIST
+                                        && clientConfig.getWhiteList().stream().anyMatch(i -> Pattern.matches(i, currentServer.ip)))) {
+                                    IConnectionManager.getInstance().connectToExternalServer();
+                                } else {
+                                    IConnectionManager.getInstance().launchIsolated();
+                                }
                             } else {
                                 IConnectionManager.getInstance().launchIsolated();
                             }
                         } else {
-                            IConnectionManager.getInstance().launchIsolated();
+                            // Single Player: try external first, fall back to isolated on timeout
+                            IConnectionManager.getInstance().connectToExternalServer();
                         }
-                    } else {
-                        // Single Player: try external first, fall back to isolated on timeout
-                        IConnectionManager.getInstance().connectToExternalServer();
-                    }
-                });
+                    });
+                }
             });
             eventService.registerClientPlayerQuit((player) -> {
                 MusicHud.EXECUTOR.execute(() -> {
                     IConnectionManager.getInstance().onPlayerQuit();
-                    if (ConnectionStateMachine.getConnectStatus() == MusicHud.ConnectStatus.NOT_CONNECTED) {
+                    if (ConnectionStateMachine.getConnectStatus() == ConnectionStateMachine.ConnectStatus.NOT_CONNECTED) {
                         if (clientConfig.getEnableIsolatedMode()) {
                             LoginApiService.getInstance().logout(VanillaPlayerProxy.ofPlayer(player));
                         }

@@ -494,7 +494,12 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
                 return;
             }
             for (IdlePlaySource source : sources) {
-                if (!pendingAdds.contains(source) && !serverSources.contains(source)
+                // Match by collection identity only: a play-mode divergence must not make
+                // reconciliation silently drop a source the server still holds.
+                boolean stillOnServer = serverSources.stream()
+                        .anyMatch(serverSource -> serverSource.getId() == source.getId()
+                                && serverSource.getType() == source.getType());
+                if (!pendingAdds.contains(source) && !stillOnServer
                         && sources.remove(source)) {
                     if (notifications == null) {
                         notifications = new ArrayList<>();

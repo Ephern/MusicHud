@@ -23,6 +23,7 @@ import org.jetbrains.annotations.NotNull;
  * content signature or the target size changes, and the blur is only re-run when the radius or
  * the source changes.
  */
+@SuppressWarnings("UnstableApiUsage")
 public final class LineBlurRenderer {
     /** Visible blur radius to Gaussian sigma. */
     private static final float SIGMA_FACTOR = 0.5f;

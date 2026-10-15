@@ -65,12 +65,6 @@ public final class MusicHud {
         RegistrationManager.performSideAutoRegistration();
     }
 
-    public enum ConnectStatus {
-        CONNECTED,
-        INCOMPATIBLE,
-        NOT_CONNECTED
-    }
-
     public static ScheduledTask scheduleWithFixedDelay(Runnable task,
                                                        Duration initialDelay,
                                                        Duration delayBetween) {
