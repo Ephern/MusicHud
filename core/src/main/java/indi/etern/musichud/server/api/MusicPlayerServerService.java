@@ -45,6 +45,17 @@ public class MusicPlayerServerService {
     private static final long ROTATE_TIMEOUT_MILLIS = INTELLIGENT_LOAD_WAIT_MILLIS + 5_000;
     /** Consecutive resource loading failures for the current music before it is skipped. */
     private static final int MUSIC_RESOURCE_LOAD_FAILURE_THRESHOLD = 5;
+    /**
+     * A resource request only counts as the current instance's initial load when it reaches the
+     * server within this window after the switch. Requests for the same id arriving later are the
+     * client preloading that id as its own successor and must not extend this await.
+     */
+    private static final long AWAIT_RESET_WINDOW_MAX_MILLIS = 15_000;
+    /**
+     * The tail of a track only ever yields a successor-preload request, so the acceptance window
+     * always ends this long before the track's end, whichever is earlier.
+     */
+    private static final long AWAIT_RESET_TAIL_EXCLUSION_MILLIS = 10_000;
     private static volatile MusicPlayerServerService instance;
     final Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources = new ConcurrentHashMap<>();
     /** Per (player, collection) monitors; entries live for the server uptime. */
@@ -68,6 +79,8 @@ public class MusicPlayerServerService {
     private long awaitedMusicId = -1;
     /** Music id whose one-shot await-deadline reset has already been claimed. */
     private long awaitDeadlineResetClaimedMusicId = -1;
+    /** Wall-clock bound: resource requests received after this do not count as the awaited instance's initial load. */
+    private long awaitResetAcceptBeforeMillis = 0;
     /**
      * Players that received the current track's switch. Only they can justify a resource-load
      * extension; a player who was absent at the switch and joins mid-track is wall-clock synced
@@ -153,7 +166,9 @@ public class MusicPlayerServerService {
                     if (playingMusic.getLyricInfo() == null || playingMusic.getLyricInfo().equals(LyricInfo.NONE)) {
                         playingMusic.setLyricInfo(musicApiService.getLyricInfo(playingMusic));
                     }
-                    beginAwaitForMusic(playingMusic.getId());
+                    int musicMixMillis = 1200;
+                    long waitMillis = Math.max(1000, playingMusic.getDurationMillis() - musicMixMillis);
+                    beginAwaitForMusic(playingMusic.getId(), waitMillis);
                     serverNetworkService.sendToPlayerInfos(
                             loginedPlayerInfoMap.values(),
                             new SwitchMusicMessage(nextToPlay, nextIdleMusicDetail, message)
@@ -164,8 +179,7 @@ public class MusicPlayerServerService {
                     currentMusicDetail = nextToPlay;
                     nowPlayingStartTime = ZonedDateTime.now();
                     logger.info("Switched to music: {} (ID: {})", playingMusic.getName(), playingMusic.getId());
-                    int musicMixMillis = 1200;
-                    awaitCurrentTrack(playingMusic.getId(), Math.max(1000, playingMusic.getDurationMillis() - musicMixMillis));
+                    awaitCurrentTrack(playingMusic.getId(), waitMillis);
                 } catch (InterruptedException ignored) {//When force switch
                     logger.info("Skip current, switch to nextIdle");
                     String switchMessage = pendingSwitchMessage;
@@ -218,9 +232,19 @@ public class MusicPlayerServerService {
     };
 
     private boolean hasAvailableIdlePlaySourcesMusic(Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources) {
-        return !idlePlaySources.isEmpty() && idlePlaySources.values().stream()
-                .flatMap(Set::stream)
+        return idlePlaySources.entrySet().stream()
+                .filter(entry -> hasPusherLoginInfo(entry.getKey()))
+                .flatMap(entry -> entry.getValue().stream())
                 .anyMatch(playSource -> playSource.getPlayMode().isAvailable(playSource));
+    }
+
+    /**
+     * A source is only samplable while its owner is registered in the login map. Sources left
+     * behind for an unknown owner (e.g. {@link PusherInfo#EMPTY}) must not enter the candidate
+     * pool: the pusher would sample them, fail the ownership check and {@code continue} forever.
+     */
+    private boolean hasPusherLoginInfo(PusherInfo pusherInfo) {
+        return pusherInfo != null && loginApiService.getPlayerInfoMap().containsKey(pusherInfo.getPlayerUUID());
     }
 
     /**
@@ -236,6 +260,9 @@ public class MusicPlayerServerService {
             List<PusherInfo> readyUsers = new ArrayList<>();
             List<PusherInfo> availableUsers = new ArrayList<>();
             for (Map.Entry<PusherInfo, Set<IdlePlaySource>> entry : idlePlaySources.entrySet()) {
+                if (!hasPusherLoginInfo(entry.getKey())) {
+                    continue;
+                }
                 boolean ready = false;
                 boolean available = false;
                 for (IdlePlaySource playSource : entry.getValue()) {
@@ -527,7 +554,7 @@ public class MusicPlayerServerService {
             serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
                     new RefreshMusicQueueMessage(musicQueue));
             updateContinuable(true);
-        } catch (InterruptedException | TimeoutException e) {
+        } catch (Throwable e) {//TODO add response in next protocol change
             logger.error("Failed to load music and pushed to queue, ID: {}", musicDetailId, e);
         }
     }
@@ -634,15 +661,27 @@ public class MusicPlayerServerService {
     public void removeIdlePlaySource(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
         synchronized (idleSourceKeyLock(pusherInfo.getPlayerUUID(), idlePlaySource)) {
             Set<IdlePlaySource> musicCollections = idlePlaySources.get(pusherInfo);
-            if (musicCollections != null) {
-                idlePlaySource.setPusherInfo(pusherInfo);
-                musicCollections.remove(idlePlaySource);
-                if (musicCollections.isEmpty()) {
-                    idlePlaySources.remove(pusherInfo);
-                }
-                idlePlaySource.getPlayMode().onRemoved(idlePlaySource, pusherInfo);
-                debouncedUpdateAllIdlePlaySources();
+            if (musicCollections == null) {
+                logger.warn("Failed to remove idle play source: no sources registered for {} (id: {}, type: {})",
+                        pusherInfo, idlePlaySource.getId(), idlePlaySource.getType().getSimpleName());
+                return;
             }
+            IdlePlaySource target = musicCollections.stream()
+                    .filter(source -> source.getId() == idlePlaySource.getId()
+                            && source.getType() == idlePlaySource.getType())
+                    .findFirst().orElse(null);
+            if (target == null) {
+                logger.warn("Failed to remove idle play source: not found for {} (id: {}, type: {}, mode: {}); present: {}",
+                        pusherInfo, idlePlaySource.getId(), idlePlaySource.getType().getSimpleName(),
+                        idlePlaySource.getPlayMode(), musicCollections);
+                return;
+            }
+            musicCollections.remove(target);
+            if (musicCollections.isEmpty()) {
+                idlePlaySources.remove(pusherInfo);
+            }
+            target.getPlayMode().onRemoved(target, pusherInfo);
+            debouncedUpdateAllIdlePlaySources();
         }
     }
 
@@ -651,6 +690,7 @@ public class MusicPlayerServerService {
     }
 
     public MusicResourceInfo getMusicResourceInfo(long id, Quality quality, String retryFor, UUID playerUUID) {
+        long requestReceivedAt = System.currentTimeMillis();
         try {
             List<MusicDetail> musicDetails = IMusicApiService.getInstance(ApiProvider.NCM).getMusicDetailByIds(List.of(id), null);
             if (musicDetails.size() == 1) {
@@ -667,7 +707,7 @@ public class MusicPlayerServerService {
                         musicResourceInfo = getMusicResourceInfoWithoutCache(quality, musicDetail, playerUUID);
                         musicResourceInfoCache.put(new CacheKey(id, quality), musicResourceInfo);
                     }
-                    onMusicResourceLoadSuccess(id, playerUUID);
+                    onMusicResourceLoadSuccess(id, playerUUID, requestReceivedAt);
                     return musicResourceInfo;
                 } catch (Exception e) {
                     logger.error("Failed to get resource info for music: {}", musicDetail.getName(), e);
@@ -680,7 +720,7 @@ public class MusicPlayerServerService {
                 onMusicResourceLoadFailure(id);
                 return MusicResourceInfo.NONE;
             }
-        } catch (Exception e) {
+        } catch (Throwable e) {
             onMusicResourceLoadFailure(id);
             return MusicResourceInfo.NONE;
         }
@@ -690,18 +730,26 @@ public class MusicPlayerServerService {
      * Arms the one-shot resource-load deadline reset for the given music. Called by the pusher
      * before the switch is pushed so that the client's resource request can never be missed.
      * The duration-based wait stays the fallback when no client requests the resource.
+     *
+     * <p>Only requests reaching the server shortly after the switch count as the awaited instance's
+     * initial load. The acceptance window is capped by {@link #AWAIT_RESET_WINDOW_MAX_MILLIS} and
+     * always ends before the track's tail ({@link #AWAIT_RESET_TAIL_EXCLUSION_MILLIS}), where the
+     * client preloads its successor: a same-id request from that preload must not extend this await.</p>
      */
-    private synchronized void beginAwaitForMusic(long musicId) {
+    private synchronized void beginAwaitForMusic(long musicId, long awaitMillis) {
         awaitedMusicId = musicId;
         awaitDeadlineResetClaimedMusicId = -1;
         awaitEligiblePlayers = Set.copyOf(loginApiService.getPlayerInfoMap().keySet());
         syncedStartTrackByPlayer.clear();
+        awaitResetAcceptBeforeMillis = System.currentTimeMillis()
+                + Math.clamp(awaitMillis - AWAIT_RESET_TAIL_EXCLUSION_MILLIS, 0, AWAIT_RESET_WINDOW_MAX_MILLIS);
     }
 
-    /** Drops the current await's reset state; a late resource success can no longer match. */
+    /** Drops the current awaits reset state; a late resource success can no longer match. */
     private synchronized void clearAwaitState() {
         awaitedMusicId = -1;
         awaitDeadlineResetClaimedMusicId = -1;
+        awaitResetAcceptBeforeMillis = 0;
         awaitEligiblePlayers = Set.of();
         syncedStartTrackByPlayer.clear();
     }
@@ -717,10 +765,11 @@ public class MusicPlayerServerService {
      * extend the wait. Every further successful load of the same track is ignored, and the plain
      * duration-based wait remains untouched.</p>
      */
-    private synchronized void onMusicResourceLoadSuccess(long id, UUID playerUUID) {
+    private synchronized void onMusicResourceLoadSuccess(long id, UUID playerUUID, long requestReceivedAt) {
         musicResourceLoadFailureCount = -1;
         musicResourceLoadFailureMusicId = -1;
         if (awaitedMusicId != id || awaitDeadlineResetClaimedMusicId == id
+                || requestReceivedAt > awaitResetAcceptBeforeMillis
                 || !awaitEligiblePlayers.contains(playerUUID)
                 || syncedStartTrackByPlayer.getOrDefault(playerUUID, -1L) == id) {
             return;
@@ -776,7 +825,9 @@ public class MusicPlayerServerService {
     }
 
     public void removeAllIdlePlaySource(PusherInfo pusherInfo) {
-        idlePlaySources.remove(pusherInfo);
+        if (idlePlaySources.remove(pusherInfo) == null) {
+            logger.debug("Remove all idle play sources: none registered for {}", pusherInfo);
+        }
         PlayMode.onAllRemoved(pusherInfo.getPlayerUUID());
         debouncedUpdateAllIdlePlaySources();
     }

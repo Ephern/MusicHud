@@ -69,7 +69,7 @@ public class SearchView extends LinearLayout {
         setOrientation(VERTICAL);
 
         boolean enabled = clientConfig.getEnable();
-        if (ConnectionStateMachine.getConnectStatus() != MusicHud.ConnectStatus.CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
+        if (ConnectionStateMachine.getConnectStatus() != ConnectionStateMachine.ConnectStatus.CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
             setGravity(Gravity.CENTER);
             TextView textView = Theme.getNotificationTextView(context, enabled);
             addView(textView);

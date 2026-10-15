@@ -10,7 +10,7 @@ import icyllis.modernui.view.View;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
 import indi.etern.musichud.client.utils.ui.HudLayoutMath;
-import indi.etern.musichud.client.ui.hud.metadata.Layout;
+import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
 import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Setter;
@@ -254,7 +254,7 @@ public class HudEditOverlayView extends View {
             return;
         }
 
-        hudRendererManager.setBaseLayout(new Layout(newOffsetX, newOffsetY, newWidth, newHeight, newRadius, ha, va));
+        hudRendererManager.setBaseHudStyle(new HudStyle(newOffsetX, newOffsetY, newWidth, newHeight, newRadius, ha, va));
         hudRendererManager.refreshStyle();
         if (onConfigChanged != null) {
             onConfigChanged.run();

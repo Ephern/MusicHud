@@ -173,6 +173,7 @@
   "music_hud.modal.downloadApiServer.existingVersion": "Already have version \"{version}\" with tag \"{tag}\"",
   "music_hud.modal.downloadApiServer.hide": "Hide Dialog",
   "music_hud.modal.downloadApiServer.proxy": "GH Proxy Options",
+  "music_hud.modal.downloadApiServer.proxy.AXIS_NOW_IPV4": "Axis Now CDN (Global IPv4)",
   "music_hud.modal.downloadApiServer.proxy.CLOUDFLARE_CN_DUAL": "CloudFlare (CN Optimized IPv4/IPv6)",
   "music_hud.modal.downloadApiServer.proxy.CLOUDFLARE_CN_IPV4": "CloudFlare (CN Optimized IPv4)",
   "music_hud.modal.downloadApiServer.proxy.CLOUDFLARE_IPV4": "CloudFlare (Global IPv4)",
