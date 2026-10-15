@@ -130,7 +130,9 @@ public class Playlist implements MusicCollection {
 
     @Override
     public String getImageThumbnailUrl(int size) {
-        if (coverImgUrl.startsWith("data:image")) {
+        if (coverImgUrl == null || coverImgUrl.isBlank()) {
+            return "";
+        } else if (coverImgUrl.startsWith("data:image")) {
             return coverImgUrl;
         } else {
             return size >= 0 ? coverImgUrl + "?param=" + size + "y" + size : coverImgUrl;

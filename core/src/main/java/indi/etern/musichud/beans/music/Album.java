@@ -66,6 +66,13 @@ public class Album implements MusicCollection {
         this.artists = artists;
     }
 
+    /** Id-preserving empty album, used as a failure placeholder that keeps retry/recovery by id meaningful. */
+    public static Album empty(long id) {
+        Album album = new Album();
+        album.id = id;
+        return album;
+    }
+
     public String getName() {
         return Objects.requireNonNullElse(name, "");
     }
@@ -103,7 +110,9 @@ public class Album implements MusicCollection {
 
     @Override
     public String getImageThumbnailUrl(int size) {
-        if (picUrl.startsWith("data:image")) {
+        if (picUrl == null || picUrl.isBlank()) {
+            return "";
+        } else if (picUrl.startsWith("data:image")) {
             return picUrl;
         } else {
             return size >= 0 ? picUrl + "?param=" + size + "y" + size : picUrl;

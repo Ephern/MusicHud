@@ -252,6 +252,10 @@ public class Codecs {
             @NonNull
             public S decode(@NonNull ByteBuf buf) {
                 int length = buf.readInt();
+                int allowed = buf.readableBytes();
+                if (length < 0 || length > allowed) {
+                    throw new DecoderException("Collection with size " + length + " is bigger than allowed " + allowed);
+                }
                 S ts = collectionSupplier.apply(length);
                 ByteBufCodec<T> codec = codecSupplier.get();
                 for (int i = 0; i < length; i++) {

@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.screen;
 
 import icyllis.modernui.animation.*;
 import icyllis.modernui.annotation.Nullable;
+import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.mc.MuiModApi;
@@ -20,6 +21,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.audio.PlaybackTask;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.services.ConnectionManager;
@@ -39,10 +41,10 @@ import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
-import net.minecraft.sounds.SoundSource;
 
 import java.time.Duration;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -62,6 +64,9 @@ public class MainFragment extends Fragment {
     private static final int CARD_ANIM_DURATION_MS = 350;
     private static final SpringInterpolator MUSIC_SWITCH_INTERPOLATOR =
             new SpringInterpolator((float) CARD_ANIM_DURATION_MS / 1000, 1);
+    private static final DateTimeFormatter formatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter formatterWithoutHour = DateTimeFormatter.ofPattern("mm:ss");
+    private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static volatile MainFragment instance = null;
 
     static {
@@ -73,6 +78,8 @@ public class MainFragment extends Fragment {
     }
 
     private final NowPlayingInfo playingInfo = NowPlayingInfo.getInstance();
+    long progressUpdaterStartTime = 0;
+    long progressTextUpdateCount = 0;
     private boolean visible = false;
     @Setter
     private int defaultSelectedIndex = 0;
@@ -83,17 +90,13 @@ public class MainFragment extends Fragment {
     private int lyricsPanelWidth = -1;
     private boolean lyricsPanelShown = false;
     private AnimatorSet lyricsAnimator = null;
-
-    // Double-buffered music info card (album cover + info merged)
     private FrameLayout cardWrapper;
     private MusicInfoCard activeCard;
     private MusicInfoCard stagedCard;
     private AnimatorSet cardAnimator;
     private AnimatorSet coverScaleAnimator;
     private boolean cardSwitching = false;
-    // Latest-wins slot: a switch arriving mid-animation replaces any earlier pending one
     private Traceable<MusicDetail> pendingSwitch;
-    // MusicDetail currently settled on the active card
     private MusicDetail displayedDetail;
 
     private MainFragment() {
@@ -113,27 +116,11 @@ public class MainFragment extends Fragment {
             accountBaseView.refresh();
         }
         if (instance != null && instance.visible && instance.activeCard != null) {
-            // Restore the current playback instead of blanking it to "idle": a failed connect
-            // attempt no longer stops the ongoing playback, so a blanket clear would wrongly
-            // wipe the GUI while the HUD keeps playing.
             NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
             Traceable<MusicDetail> current = nowPlayingInfo.getCurrentlyPlayingMusic();
             Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayMusic();
             Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
-            // Don't rebuild contents while a card transition is in flight; it settles on its own.
-            if (!instance.cardSwitching) {
-                instance.activeCard.bind(current, instance.sideWidth);
-                instance.displayedDetail = current == null ? null : current.value();
-                instance.updateCoverScale(false);
-            }
-            if (homeView != null) {
-                homeView.switchMusic(current, nextToPlay, lines);
-            }
-            if (instance.lyricsScrollView != null) {
-                instance.lyricsScrollView.switchLyrics(current == null ? MusicDetail.NONE : current.value(), lines);
-            }
-            instance.updateLyricsPanelVisibility();
-            instance.refreshServerConnectStatus();
+            instance.applyMusic(current, nextToPlay, lines, true);
         }
     }
 
@@ -141,6 +128,82 @@ public class MainFragment extends Fragment {
         if (instance != null && instance.visible) {
             instance.applyMusic(musicDetailTrace, nextToPlayTrace, lines, true);
         }
+    }
+
+    private static boolean isSameMusic(MusicDetail a, MusicDetail b) {
+        MusicDetail normalizedA = a == null ? MusicDetail.NONE : a;
+        MusicDetail normalizedB = b == null ? MusicDetail.NONE : b;
+        return normalizedA.equals(normalizedB);
+    }
+
+    /**
+     * The album cover is full size only when a track is actually playing and not muted.
+     */
+    private static boolean isCoverExpanded() {
+        MusicDetail detail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+        if (detail == null || detail.equals(MusicDetail.NONE) || PlaybackTask.getTargetGain() == 0) {
+            return false;
+        }
+        StreamAudioPlayer.Status status = StreamAudioPlayer.getInstance().getStatus();
+        return status == StreamAudioPlayer.Status.PLAYING;
+    }
+
+    /**
+     * Re-applies the cover scale (e.g. after a mute toggle) on the UI thread.
+     */
+    public static void refreshCoverScale() {
+        MainFragment target = instance;
+        if (target == null) {
+            return;
+        }
+        try {
+            MuiModApi.postToUiThread(() -> {
+                if (target.visible && target.activeCard != null) {
+                    target.updateCoverScale(true);
+                }
+            });
+        } catch (IllegalStateException ignored) {
+            // UI not ready or shutting down
+        }
+    }
+
+    public static void updateNextToPlay(Traceable<MusicDetail> nextToPlayTrace) {
+        if (instance != null && instance.visible) {
+            HomeView homeView = HomeView.getInstance();
+            if (homeView != null) {
+                homeView.updateNextToPlay(nextToPlayTrace);
+            }
+        }
+    }
+
+    public static void refreshLyricViews() {
+        HomeView homeView = HomeView.getInstance();
+        if (homeView != null) {
+            StaggeredLyricScrollView staggeredLyricScrollView = homeView.getStaggeredLyricScrollView();
+            if (staggeredLyricScrollView != null) {
+                MuiModApi.postToUiThread(staggeredLyricScrollView::refreshLinesStyle);
+            }
+        }
+        if (instance != null && instance.visible && instance.lyricsScrollView != null) {
+            MuiModApi.postToUiThread(instance.lyricsScrollView::refreshLinesStyle);
+        }
+    }
+
+    public static void refreshLyricsSidebarVisibility() {
+        if (instance != null && instance.visible) {
+            instance.updateLyricsPanelVisibility();
+        }
+    }
+
+    public static @NonNull MainFragment getInstance() {
+        if (instance == null) {
+            synchronized (MainFragment.class) {
+                if (instance == null) {
+                    instance = new MainFragment();
+                }
+            }
+        }
+        return instance;
     }
 
     private void applyMusic(Traceable<MusicDetail> musicDetailTrace, Traceable<MusicDetail> nextToPlayTrace,
@@ -171,7 +234,11 @@ public class MainFragment extends Fragment {
             homeView.switchMusic(musicDetailTrace, nextToPlayTrace, lines);
         }
         if (lyricsScrollView != null) {
-            lyricsScrollView.switchLyrics(musicDetail, lines);
+            if (notAbsoluteMusicLyric()) {
+                lyricsScrollView.switchLyrics(musicDetail, lines);
+            } else {
+                lyricsScrollView.clearLyrics();
+            }
         }
         updateLyricsPanelVisibility();
     }
@@ -267,25 +334,9 @@ public class MainFragment extends Fragment {
         }
     }
 
-    private static boolean isSameMusic(MusicDetail a, MusicDetail b) {
-        MusicDetail normalizedA = a == null ? MusicDetail.NONE : a;
-        MusicDetail normalizedB = b == null ? MusicDetail.NONE : b;
-        return normalizedA.equals(normalizedB);
-    }
-
-    /** The album cover is full size only when a track is actually playing and not muted. */
-    private static boolean isCoverExpanded() {
-        MusicDetail detail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-        float targetGain = clientConfig.getMuted() ? 0 : (float) clientConfig.getSoundVolume() / 100 *
-                (clientConfig.getMixWithVanillaSoundVolume() ? Minecraft.getInstance().options.getSoundSourceVolume(SoundSource.MUSIC) : 1);
-        if (detail == null || detail.equals(MusicDetail.NONE) || targetGain == 0) {
-            return false;
-        }
-        StreamAudioPlayer.Status status = StreamAudioPlayer.getInstance().getStatus();
-        return status == StreamAudioPlayer.Status.PLAYING;
-    }
-
-    /** Moves the active cover between {@link #CARD_COVER_MIN_SCALE} and 1 to match playback state. */
+    /**
+     * Moves the active cover between {@link #CARD_COVER_MIN_SCALE} and 1 to match playback state.
+     */
     private void updateCoverScale(boolean animate) {
         if (activeCard == null) {
             return;
@@ -316,90 +367,41 @@ public class MainFragment extends Fragment {
         set.start();
     }
 
-    /** Re-applies the cover scale (e.g. after a mute toggle) on the UI thread. */
-    public static void refreshCoverScale() {
-        MainFragment target = instance;
-        if (target == null) {
-            return;
-        }
-        try {
-            MuiModApi.postToUiThread(() -> {
-                if (target.visible && target.activeCard != null) {
-                    target.updateCoverScale(true);
-                }
-            });
-        } catch (IllegalStateException ignored) {
-            // UI not ready or shutting down
-        }
-    }
-
-    public static void updateNextToPlay(Traceable<MusicDetail> nextToPlayTrace) {
-        if (instance != null && instance.visible) {
-            HomeView homeView = HomeView.getInstance();
-            if (homeView != null) {
-                homeView.updateNextToPlay(nextToPlayTrace);
-            }
-        }
-    }
-
-    private static void startProgressUpdater(MusicDetail musicDetail) {
+    private void startProgressUpdater(MusicDetail musicDetail) {
         int token = progressUpdaterToken.incrementAndGet();
-        NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
         Duration musicDuration = nowPlayingInfo.getMusicDuration();
+        DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
+                formatterWithHour :
+                formatterWithoutHour;
         // 兜底退出：startAt 可能因任务被取代/失败永不触发，超时后结束进度循环防泄漏
-        long deadline = System.currentTimeMillis() + musicDuration.toMillis() + 120_000;
-        MusicHud.EXECUTOR.execute(() -> {
-            do {
-                MusicInfoCard card = instance == null ? null : instance.activeCard;
-                if (card == null || card.getProgressBar() == null
-                        || progressUpdaterToken.get() != token) {
-                    return;
+        long currentTimeMillis = System.currentTimeMillis();
+        long deadline = currentTimeMillis + musicDuration.toMillis() + 120_000;
+        progressUpdaterStartTime = currentTimeMillis;
+        progressTextUpdateCount = -1;
+        postFrameCallback(musicDetail, formatter, deadline, token);
+    }
+
+    private void postFrameCallback(MusicDetail musicDetail, DateTimeFormatter formatter, long deadline, int token) {
+        Choreographer.getInstance().postFrameCallback((choreographer, frameTimeNanos) -> {
+            if (progressUpdaterToken.get() != token) return;
+            MusicInfoCard card = activeCard;
+            if (card != null) {
+                long currentTimeMillis = System.currentTimeMillis();
+                long count = (currentTimeMillis - progressUpdaterStartTime) / 1000;
+                if (count > progressTextUpdateCount) {
+                    progressTextUpdateCount = count;
+                    Duration playedDuration = nowPlayingInfo.getPlayedDuration();
+                    String playedTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()));
+                    card.getPlayedTimeText().setText(playedTimeString);
                 }
-                MuiModApi.postToUiThread(() -> {
-                    MusicInfoCard current = instance == null ? null : instance.activeCard;
-                    if (instance != null && instance.visible && current != null) {
-                        current.getProgressBar().setProgress((int) (nowPlayingInfo.getProgressRate() * instance.sideWidth));
-                    }
-                });
-                try {
-                    Thread.sleep(Duration.of(50, ChronoUnit.MILLIS));
-                } catch (InterruptedException e) {
-                    return;
+                card.getProgressBar().setProgress((int) (nowPlayingInfo.getProgressRate() * instance.sideWidth));
+                if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())
+                        && nowPlayingInfo.getProgressRate() < 1
+                        && System.currentTimeMillis() < deadline) {
+                    postFrameCallback(musicDetail, formatter, deadline, token);
                 }
-            } while (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())
-                    && nowPlayingInfo.getProgressRate() < 1
-                    && System.currentTimeMillis() < deadline);
+            }
         });
-    }
-
-    public static void refreshLyricViews() {
-        HomeView homeView = HomeView.getInstance();
-        if (homeView != null) {
-            StaggeredLyricScrollView staggeredLyricScrollView = homeView.getStaggeredLyricScrollView();
-            if (staggeredLyricScrollView != null) {
-                MuiModApi.postToUiThread(staggeredLyricScrollView::refreshLinesStyle);
-            }
-        }
-        if (instance != null && instance.visible && instance.lyricsScrollView != null) {
-            MuiModApi.postToUiThread(instance.lyricsScrollView::refreshLinesStyle);
-        }
-    }
-
-    public static void refreshLyricsSidebarVisibility() {
-        if (instance != null && instance.visible) {
-            instance.updateLyricsPanelVisibility();
-        }
-    }
-
-    public static @NonNull MainFragment getInstance() {
-        if (instance == null) {
-            synchronized (MainFragment.class) {
-                if (instance == null) {
-                    instance = new MainFragment();
-                }
-            }
-        }
-        return instance;
     }
 
     private void reset() {
@@ -549,12 +551,18 @@ public class MainFragment extends Fragment {
             lyricsSidebar.setTranslationX(lyricsPanelWidth);
 
             lyricsScrollView = new StaggeredLyricScrollView(context);
+            lyricsScrollView.setMainLyricSize(Theme.SIDEBAR_MAIN_LYRIC_SIZE);
+            lyricsScrollView.setSubLyricSize(Theme.SIDEBAR_SUB_LYRIC_SIZE);
             lyricsSidebar.addView(lyricsScrollView, new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
             Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
             if (currentMusic != null && currentLyrics != null && !currentMusic.equals(MusicDetail.NONE)) {
-                lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
+                if (notAbsoluteMusicLyric()) {
+                    lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
+                } else {
+                    lyricsScrollView.clearLyrics();
+                }
             }
 
             routerContainer.setOnPageChangeListener(new RouterContainer.OnPageChangeListener() {
@@ -638,12 +646,15 @@ public class MainFragment extends Fragment {
         if (!clientConfig.getEnableLyricsSidebar()) {
             return false;
         }
-        NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
         MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
         boolean musicInvalid = detail == null || detail.equals(MusicDetail.NONE);
         if (musicInvalid) {
             return false;
         }
+        return notAbsoluteMusicLyric();
+    }
+
+    private static boolean notAbsoluteMusicLyric() {
         Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
         return lines != null && !lines.isEmpty()
                 && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
@@ -652,7 +663,10 @@ public class MainFragment extends Fragment {
     private void updateLyricsPanelVisibility() {
         RouterContainer rc = RouterContainer.getInstance();
         if (rc == null) return;
-        String currentKey = rc.getCurrentPageKey();
+        // Use the effective (in-transition target) key: currentPageKey is stale until the
+        // transition finishes, so a music switch landing mid-transition to Home would otherwise
+        // wrongly re-show the sidebar after the page-change listener already hid it.
+        String currentKey = rc.getEffectivePageKey();
         if ("Home".equals(currentKey) || currentKey == null) return;
         if (shouldShowLyricsPanel()) {
             showLyricsPanel();

@@ -193,14 +193,19 @@ public class MusicApiService implements IMusicApiService {
         return response.code() + (response.msg() == null || response.msg().isBlank() ? "" : " " + response.msg());
     }
 
-    private List<MusicDetail> appendArtistMusic(int offset, Artist artist, UUID playerUUID) throws InterruptedException, TimeoutException {
+    private List<MusicDetail> appendArtistMusic(int offset, Artist artist, UUID playerUUID) {
         String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
         GetArtistMusicResponse response = ApiClient.post(ApiServerEndpointsMeta.Artist.ALL_SONGS, new ArtistAllMusicRequest(artist.getId(), 50, offset, "time"), rawCookie, true);
         List<Long> musicDetailIds = response.songs.stream().map(MusicDetail::getId).toList();
         artist.setTotalMusicCount(response.total);
-        List<MusicDetail> musicDetails = getMusicDetailByIds(musicDetailIds, null);
-        artist.getMusicDetails().addAll(musicDetails);
-        return musicDetails;
+        try {
+            List<MusicDetail> musicDetails = getMusicDetailByIds(musicDetailIds, null);
+            artist.getMusicDetails().addAll(musicDetails);
+            return musicDetails;
+        } catch (Throwable e) {
+            logger.error("Failed to load artist({} \"{}\")'s tracks with offset {}", artist.getId(), artist.getName(), offset, e);
+            return artist.getMusicDetails();
+        }
     }
 
     @Override
@@ -224,6 +229,10 @@ public class MusicApiService implements IMusicApiService {
                     PlaylistResponse playlistResponse = ApiClient.post(ApiServerEndpointsMeta.Playlist.DETAIL, new IdRequest(id), rawCookie, true);
                     if (playlistResponse.getCode() == 200) {
                         Playlist loaded = playlistResponse.getPlaylist();
+                        if (!MusicCollections.isUsable(loaded)) {
+                            logger.error("Playlist detail response for id {} was empty", id);
+                            return Playlist.empty(id);
+                        }
                         if (finalCached != null) {
                             //To avoid dist crossing issues due to shared common caches in integrated server
                             finalCached.updateFrom(loaded, MusicHud.getCurrentEnvironment().getSide() == Environment.Side.SERVER || !IClientDistUtil.getInstance().inIntegratedServer());
@@ -250,7 +259,7 @@ public class MusicApiService implements IMusicApiService {
             }
         } catch (Throwable e) {
             logger.error("Failed to load playlist detail: ", e);
-            return Playlist.EMPTY;
+            return Playlist.empty(id);
         }
     }
 
@@ -350,6 +359,9 @@ public class MusicApiService implements IMusicApiService {
                 );
                 MusicDetailsResponse response = ApiClient.post(ApiServerEndpointsMeta.Music.DETAIL, requestBody, userCookie, true);
                 List<MusicDetail> musicDetails = response.musicDetails();
+                if (musicDetails == null) {
+                    return List.of();
+                }
                 for (MusicDetail musicDetail : musicDetails) {
                     musicDetailCache.put(musicDetail.getId(), musicDetail);
                 }
@@ -385,8 +397,8 @@ public class MusicApiService implements IMusicApiService {
                 return album;
             }
         } catch (Throwable e) {
-            logger.error("Failed to load playlist detail: ", e);
-            return Album.NONE;
+            logger.error("Failed to load album detail: ", e);
+            return Album.empty(id);
         }
     }
 
@@ -395,6 +407,9 @@ public class MusicApiService implements IMusicApiService {
         String rawCookie = loginApiService.getRawCookieOrElse(playerUUID, loginApiService::getAnonymousCookie);
         GetAlbumDetailResult post = ApiClient.post(ApiServerEndpointsMeta.Album.DETAIL, new IdRequest(id), rawCookie, true);
         Album album = post.album();
+        if (!MusicCollections.isUsable(album) || post.songs == null) {
+            return Album.empty(id);
+        }
         post.songs.forEach(song -> {
             song.setAlbum(album.shallowCopyBriefInfo());// prevent loop reference
         });

@@ -26,18 +26,18 @@ public class ArtistSubscribeState extends SubscribeState<Artist> {
                 ((artist, subscribed) -> {
                     musicService.loadUserCollections(false)
                             .thenAccept(userCollections -> {
-                                ObservableSequencedSet<Artist> subscribedAlbums = userCollections.getSubscribedArtists();
-                                ObservableSequencedSet.EditHandle<Artist> editHandle = subscribedAlbums.beginEdit();
+                                ObservableSequencedSet<Artist> subscribedArtists = userCollections.getSubscribedArtists();
+                                ObservableSequencedSet.EditHandle<Artist> editHandle = subscribedArtists.beginEdit();
                                 SubscribeAction action;
                                 if (subscribed) {
                                     action = SubscribeAction.SUBSCRIBE;
-                                    subscribedAlbums.addFirst(artist);
+                                    subscribedArtists.addFirst(artist);
                                 } else {
                                     action = SubscribeAction.UNSUBSCRIBE;
-                                    subscribedAlbums.remove(artist);
+                                    subscribedArtists.remove(artist);
                                 }
                                 RequestResponseManager.send(
-                                        new SubscribeRequest(id, SubscribableType.ALBUM, action),
+                                        new SubscribeRequest(id, SubscribableType.ARTIST, action),
                                         SubscribeResponse.class, Duration.ofSeconds(10)
                                 ).thenAccept(subscribeResponse -> {
                                     if (subscribeResponse.isSuccess()) {

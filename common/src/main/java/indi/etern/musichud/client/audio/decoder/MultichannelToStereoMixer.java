@@ -6,14 +6,51 @@ import java.nio.ByteOrder;
 /**
  * Downmixes interleaved PCM with more than 2 channels to stereo.
  * <p>
- * Even channel counts ({@code N=2k}) are averaged pairwise: left is the mean
- * of even-indexed channels, right the mean of odd-indexed channels, which
- * keeps energy constant and avoids clipping from naive summation. A trailing
- * odd channel (typically center/LFE) is mixed into both sides at half weight.
- * Averaging uses integer accumulation with clamping to the source bit depth;
- * bit-depth conversion (if any) is a separate downstream stage.
+ * Channel layouts follow the standard WAV/FLAC ordering
+ * ({@code FL, FR, FC, LFE, BL/BC, BR, SL, SR}). Center and surround channels are
+ * folded into stereo using the conventional -3 dB ({@code 1/sqrt(2)}) coefficients,
+ * while the LFE channel is discarded. Each side is then peak-normalized by the sum
+ * of the absolute coefficients, so even fully correlated full-scale channels cannot
+ * overflow, and clamped to the source bit depth as a final safeguard. Bit-depth
+ * conversion (if any) is a separate downstream stage.
  */
 public class MultichannelToStereoMixer implements IResampler {
+    private static final double SQRT1_2 = 0.7071067811865476;
+    private static final double HALF = 0.5;
+
+    /**
+     * Per channel-count downmix gains: {@code GAINS[channels] = {leftGains, rightGains}}.
+     * Channel order is {@code FL, FR, FC, LFE, BL/BC, BR, SL, SR}; LFE is always zero.
+     */
+    private static final double[][][] GAINS = new double[9][][];
+
+    static {
+        GAINS[3] = new double[][]{
+                {1.0, 0.0, SQRT1_2, 0.0, 0.0, 0.0, 0.0, 0.0},
+                {0.0, 1.0, SQRT1_2, 0.0, 0.0, 0.0, 0.0, 0.0},
+        };
+        GAINS[4] = new double[][]{
+                {1.0, 0.0, SQRT1_2, 0.0, 0.0, 0.0, 0.0, 0.0},
+                {0.0, 1.0, 0.0, SQRT1_2, 0.0, 0.0, 0.0, 0.0},
+        };
+        GAINS[5] = new double[][]{
+                {1.0, 0.0, SQRT1_2, SQRT1_2, 0.0, 0.0, 0.0, 0.0},
+                {0.0, 1.0, SQRT1_2, 0.0, SQRT1_2, 0.0, 0.0, 0.0},
+        };
+        GAINS[6] = new double[][]{
+                {1.0, 0.0, SQRT1_2, 0.0, SQRT1_2, 0.0, 0.0, 0.0},
+                {0.0, 1.0, SQRT1_2, 0.0, 0.0, SQRT1_2, 0.0, 0.0},
+        };
+        GAINS[7] = new double[][]{
+                {1.0, 0.0, SQRT1_2, 0.0, 0.0, SQRT1_2, 0.0, 0.0},
+                {0.0, 1.0, SQRT1_2, 0.0, 0.0, 0.0, SQRT1_2, 0.0},
+        };
+        GAINS[8] = new double[][]{
+                {1.0, 0.0, SQRT1_2, 0.0, HALF, 0.0, HALF, 0.0},
+                {0.0, 1.0, SQRT1_2, 0.0, 0.0, HALF, 0.0, HALF},
+        };
+    }
+
     private final int channels;
     private final int bytesPerSample;
     private final boolean unsigned8;
@@ -42,37 +79,60 @@ public class MultichannelToStereoMixer implements IResampler {
         int frameCount = input.length / frameBytes;
         if (frameCount == 0) return new byte[0];
 
-        int pairs = channels / 2;
-        boolean hasOddTail = (channels % 2) != 0;
-        // even channels contribute 1.0 each, odd tail contributes 0.5 to both sides
-        double divisor = pairs + (hasOddTail ? 0.5 : 0);
-
         ByteBuffer in = ByteBuffer.wrap(input).order(ByteOrder.LITTLE_ENDIAN);
         ByteBuffer out = ByteBuffer.allocate(frameCount * 2 * bytesPerSample).order(ByteOrder.LITTLE_ENDIAN);
 
-        for (int f = 0; f < frameCount; f++) {
-            long left = 0;
-            long right = 0;
-            for (int c = 0; c < channels - (hasOddTail ? 1 : 0); c++) {
-                int sample = readSample(in, f * frameBytes + c * bytesPerSample);
-                if ((c & 1) == 0) {
-                    left += sample;
-                } else {
-                    right += sample;
+        if (channels <= 8) {
+            double[] leftGains = GAINS[channels][0];
+            double[] rightGains = GAINS[channels][1];
+            double normalization = peakNormalization(leftGains);
+            for (int f = 0; f < frameCount; f++) {
+                int base = f * frameBytes;
+                double left = 0;
+                double right = 0;
+                for (int c = 0; c < channels; c++) {
+                    int sample = readSample(in, base + c * bytesPerSample);
+                    left += leftGains[c] * sample;
+                    right += rightGains[c] * sample;
                 }
+                writeSample(out, clamp(Math.round(left * normalization)));
+                writeSample(out, clamp(Math.round(right * normalization)));
             }
-            double leftAvg = left / divisor;
-            double rightAvg = right / divisor;
-            if (hasOddTail) {
-                // trailing channel (typically center/LFE) goes to both sides at half weight
-                int tail = readSample(in, f * frameBytes + (channels - 1) * bytesPerSample);
-                leftAvg += tail * 0.5 / divisor;
-                rightAvg += tail * 0.5 / divisor;
+        } else {
+            // Fallback for non-standard channel counts: pairwise averaging with an odd tail.
+            int pairs = channels / 2;
+            boolean hasOddTail = (channels % 2) != 0;
+            double divisor = pairs + (hasOddTail ? 0.5 : 0);
+            for (int f = 0; f < frameCount; f++) {
+                int base = f * frameBytes;
+                double left = 0;
+                double right = 0;
+                for (int c = 0; c < channels - (hasOddTail ? 1 : 0); c++) {
+                    int sample = readSample(in, base + c * bytesPerSample);
+                    if ((c & 1) == 0) {
+                        left += sample;
+                    } else {
+                        right += sample;
+                    }
+                }
+                if (hasOddTail) {
+                    int tail = readSample(in, base + (channels - 1) * bytesPerSample);
+                    left += tail * 0.5;
+                    right += tail * 0.5;
+                }
+                writeSample(out, clamp(Math.round(left / divisor)));
+                writeSample(out, clamp(Math.round(right / divisor)));
             }
-            writeSample(out, clamp((long) Math.round(leftAvg)));
-            writeSample(out, clamp((long) Math.round(rightAvg)));
         }
         return out.array();
+    }
+
+    private static double peakNormalization(double[] gains) {
+        double sum = 0;
+        for (double gain : gains) {
+            sum += Math.abs(gain);
+        }
+        return sum > 0 ? 1.0 / sum : 1.0;
     }
 
     private int readSample(ByteBuffer in, int offset) {

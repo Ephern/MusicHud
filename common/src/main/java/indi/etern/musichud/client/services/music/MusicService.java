@@ -34,6 +34,7 @@ import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientPushMusicToQu
 import indi.etern.musichud.network.payloads.pushMessages.c2s.ClientRemoveMusicFromQueueMessage;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.VoteSkipCurrentMusicMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.*;
+import indi.etern.musichud.throwable.MusicCollectionLoadException;
 import indi.etern.musichud.utils.IClientDistUtil;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import lombok.AccessLevel;
@@ -62,7 +63,6 @@ public class MusicService implements IClientMusicService {
 
     @Getter(lazy = true)
     private final IIdlePlaySourceState idlePlaySourceState = new IdlePlaySourceState();
-    @Getter
     private final Queue<QueueItem> musicQueue = new ArrayDeque<>();
     @Getter
     private final Set<Consumer<Queue<QueueItem>>> musicQueueRefreshListeners = ConcurrentHashMap.newKeySet();
@@ -70,12 +70,12 @@ public class MusicService implements IClientMusicService {
     private final Set<Consumer<QueueItem>> musicQueuePushListeners = ConcurrentHashMap.newKeySet();
     @Getter
     private final Set<BiConsumer<Integer, QueueItem>> musicQueueRemoveListeners = ConcurrentHashMap.newKeySet();
-    long lastPressTime = 0;
-    private UserCollections currentUserCollections;
-    private volatile CompletableFuture<UserCollections> loadingCollectionsFuture;
     private final ConcurrentHashMap<Long, CompletableFuture<Playlist>> loadingPlaylists = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, CompletableFuture<Album>> loadingAlbums = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<Long, CompletableFuture<Artist>> loadingArtists = new ConcurrentHashMap<>();
+    long lastPressTime = 0;
+    private UserCollections currentUserCollections;
+    private volatile CompletableFuture<UserCollections> loadingCollectionsFuture;
 
     private static boolean isPlaylistComplete(Playlist playlist) {
         return playlist.getMusicDetails() != null
@@ -98,20 +98,36 @@ public class MusicService implements IClientMusicService {
         return instance;
     }
 
-    public static void resetCurrentMusicStatus() {
+    public static void resetCurrentMusicStatus(boolean switchToNone) {
         MusicService inst = instance;
         if (inst != null) {
             // Hold the instance monitor so the queue clear cannot interleave with the
             // peek/iterate patterns in switchMusic/refreshQueue on network threads
             synchronized (inst) {
-                inst.switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, "");
+                if (switchToNone) {
+                    inst.switchMusic(Traceable.of(MusicDetail.NONE), Traceable.of(MusicDetail.NONE), null, "");
+                }
                 inst.getIdlePlaySourceState().local().reset();
                 inst.musicQueue.clear();
             }
         }
-        if (HudRendererManager.isLoaded()) {
-            HudRendererManager.getInstance().reset();
+        HudRendererManager hudRendererManager = HudRendererManager.getActiveInstance();
+        if (switchToNone && hudRendererManager != null) {
+            hudRendererManager.reset();
         }
+    }
+
+    private static boolean sameItem(QueueItem a, QueueItem b) {
+        return a.queueUniqueID().equals(b.queueUniqueID());
+    }
+
+    private static UserCollections emptyCollections() {
+        UserCollections collections = new UserCollections();
+        collections.setUserCategoryPlaylists(UserCategoryPlaylists.EMPTY);
+        collections.setSubscribedAlbums(new ObservableSequencedSet<>(0));
+        collections.setSubscribedArtists(new ObservableSequencedSet<>(0));
+        collections.setLoaded(true);
+        return collections;
     }
 
     /**
@@ -121,10 +137,6 @@ public class MusicService implements IClientMusicService {
      */
     public synchronized QueueItem peekQueueItem() {
         return musicQueue.peek();
-    }
-
-    private static boolean sameItem(QueueItem a, QueueItem b) {
-        return a.queueUniqueID().equals(b.queueUniqueID());
     }
 
     private void pushDownToUserCollections(Playlist full) {
@@ -222,6 +234,9 @@ public class MusicService implements IClientMusicService {
                         Duration.ofSeconds(10))
                 .thenApply(response -> {
                     Playlist loaded = response.getPlaylist();
+                    if (!MusicCollections.isUsable(loaded)) {
+                        throw new CompletionException(new MusicCollectionLoadException(id, Playlist.class));
+                    }
                     Playlist result;
                     if (finalCached != null) {
                         finalCached.updateFrom(loaded, true);
@@ -232,7 +247,7 @@ public class MusicService implements IClientMusicService {
                     }
                     pushDownToUserCollections(result);
                     return result;
-                }).exceptionally(e -> Playlist.EMPTY);
+                });
         loadingPlaylists.put(id, future);
         future.whenComplete((r, e) -> loadingPlaylists.remove(id, future));
         return future;
@@ -255,6 +270,9 @@ public class MusicService implements IClientMusicService {
                         Duration.ofSeconds(10))
                 .thenApply(response -> {
                     Album loaded = response.getAlbum();
+                    if (!MusicCollections.isUsable(loaded)) {
+                        throw new CompletionException(new MusicCollectionLoadException(id, Album.class));
+                    }
                     Album result;
                     if (cached != null) {
                         cached.updateFrom(loaded, true);
@@ -265,7 +283,7 @@ public class MusicService implements IClientMusicService {
                     }
                     pushDownToUserCollections(result);
                     return result;
-                }).exceptionally(e -> Album.NONE);
+                });
         loadingAlbums.put(id, future);
         future.whenComplete((r, e) -> loadingAlbums.remove(id, future));
         return future;
@@ -329,11 +347,11 @@ public class MusicService implements IClientMusicService {
             if (head != null) {// preload image
                 MusicDetail peek = head.musicDetail().value();
                 Album album = peek.getAlbum();
-                ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
+                ImageUtils.downloadScaledAsync(album.getPicUrl(), 240, 240);
                 HudRendererManager.getInstance().preloadAlbumImage(peek.getAlbum());
             } else if (nextIdleMusicDetail != null && !nextIdleMusicDetail.value().equals(MusicDetail.NONE)) {
                 Album album = nextIdleMusicDetail.value().getAlbum();
-                ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
+                ImageUtils.downloadScaledAsync(album.getPicUrl(), 240, 240);
                 HudRendererManager.getInstance().preloadAlbumImage(nextIdleMusicDetail.value().getAlbum());
             }
             if (!message.isEmpty()) {
@@ -345,7 +363,7 @@ public class MusicService implements IClientMusicService {
             }
             if (!musicDetail.value().equals(MusicDetail.NONE)) {
                 Album album = musicDetail.value().getAlbum();
-                ImageUtils.downloadAsync(album.getImageThumbnailUrl(240));
+                ImageUtils.downloadScaledAsync(album.getPicUrl(), 240, 240);
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 PlaybackTask task = streamAudioPlayer.obtainTaskFor(musicDetail, serverStartTime);
@@ -379,7 +397,7 @@ public class MusicService implements IClientMusicService {
         Traceable<MusicDetail> next = Objects.requireNonNullElse(nextIdleMusicDetail, Traceable.of(MusicDetail.NONE));
         MusicDetail nextDetail = next.value();
         if (!nextDetail.equals(MusicDetail.NONE)) {
-            ImageUtils.downloadAsync(nextDetail.getAlbum().getImageThumbnailUrl(240));
+            ImageUtils.downloadScaledAsync(nextDetail.getAlbum().getPicUrl(), 240, 240);
             HudRendererManager.getInstance().preloadAlbumImage(nextDetail.getAlbum());
         }
         NowPlayingInfo.getInstance().updateNextToPlayIdle(next);
@@ -642,15 +660,6 @@ public class MusicService implements IClientMusicService {
         }
     }
 
-    private static UserCollections emptyCollections() {
-        UserCollections collections = new UserCollections();
-        collections.setUserCategoryPlaylists(UserCategoryPlaylists.EMPTY);
-        collections.setSubscribedAlbums(new ObservableSequencedSet<>(0));
-        collections.setSubscribedArtists(new ObservableSequencedSet<>(0));
-        collections.setLoaded(true);
-        return collections;
-    }
-
     private CompletableFuture<UserCollections> rememberCollectionsLoad(CompletableFuture<UserCollections> future) {
         loadingCollectionsFuture = future;
         future.whenComplete((r, e) -> {
@@ -681,7 +690,9 @@ public class MusicService implements IClientMusicService {
                 .exceptionally(e -> MessagedResult.fail(CloudTracksPage.EMPTY));
     }
 
-    /** On-demand track detail fetch; {@code cloudSource} marks the user's own cloud-drive tracks. */
+    /**
+     * On-demand track detail fetch; {@code cloudSource} marks the user's own cloud-drive tracks.
+     */
     public CompletableFuture<List<MusicDetail>> loadMusicDetails(List<Long> ids, boolean cloudSource) {
         if (ids == null || ids.isEmpty()) {
             return CompletableFuture.completedFuture(List.of());
@@ -704,13 +715,17 @@ public class MusicService implements IClientMusicService {
                         e.getMessage() == null ? e.getClass().getSimpleName() : e.getMessage(), null));
     }
 
+    public synchronized Queue<QueueItem> getMusicQueue() {
+        return new ArrayDeque<>(musicQueue);
+    }
+
     @RegisterMark
     public static class RegisterImpl implements ClientRegister {
         @Override
         public void register() {
-            IClientEventService.getInstance().registerClientPlayerQuit((player) -> {
-                MusicHud.EXECUTOR.execute(MusicService::resetCurrentMusicStatus);
-            });
+            IClientEventService.getInstance().registerClientPlayerQuit((player) ->
+                    MusicHud.EXECUTOR.execute(() -> MusicService.resetCurrentMusicStatus(true))
+            );
         }
     }
 

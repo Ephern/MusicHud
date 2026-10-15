@@ -65,7 +65,9 @@ public class SubscribeState<T extends IdentifiedBeans> implements ISubscribeStat
     }
 
     private void handleThrowable(String action, Throwable throwable) {
-        logger.error("Failed to {}: ", action, throwable);
+        if (throwable != null) {
+            logger.error("Failed to {}: {}", action, throwable);
+        }
     }
 
     @Override
