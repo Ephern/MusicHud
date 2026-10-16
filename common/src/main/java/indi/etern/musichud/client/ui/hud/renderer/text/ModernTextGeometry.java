@@ -259,12 +259,12 @@ public final class ModernTextGeometry {
 
         @Override
         public void writeVertices(VertexConsumer consumer, Matrix3x2f pose, GradientSpec gradient, float alpha) {
-            int[] glyphIds = layout.getGlyphs();
+            GLBakedGlyph[] bakedGlyphs = bakedGlyphs(layout, fontSize);
             float[] positions = layout.getPositions();
             int[] flags = layout.getGlyphFlags();
             float baseline = originY + TextLayout.sBaselineOffset;
             for (int i = start; i < end; i++) {
-                GLBakedGlyph glyph = glyphAt(glyphIds[i], i, flags[i]);
+                GLBakedGlyph glyph = glyphAt(bakedGlyphs, i, flags[i]);
                 if (glyph == null || glyph.x == Integer.MIN_VALUE) {
                     continue;
                 }
