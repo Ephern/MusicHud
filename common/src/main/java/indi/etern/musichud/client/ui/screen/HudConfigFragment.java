@@ -153,7 +153,7 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         TypedValue value = new TypedValue();
         var theme = context.getTheme();
         if (theme.resolveAttribute(R.ns, R.attr.colorSurface, value, true)) {
-            bg.setColor(theme.getResources().loadColorStateList(value, theme));
+            bg.setColor(theme.getResources().loadColorStateList(value, null, theme));
         } else {
             bg.setColor(0xFF2D2D30);
         }

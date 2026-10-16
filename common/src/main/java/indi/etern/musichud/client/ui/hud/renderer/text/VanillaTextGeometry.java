@@ -6,7 +6,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.util.FormattedCharSequence;
@@ -67,6 +66,7 @@ public final class VanillaTextGeometry {
     }
 
     private static final class VanillaTextRun implements GradientTextRun {
+        public static final int FULL_BRIGHT = 15728880;
         private final List<TextRenderable> textRenderables;
         private final float originX;
         private final float totalAdvance;
@@ -97,7 +97,7 @@ public final class VanillaTextGeometry {
             VertexConsumer gradientConsumer = new GradientVertexConsumer(consumer, originX, totalAdvance, gradient, alpha);
             Matrix4f matrix4f = new Matrix4f().mul(pose);
             for (TextRenderable renderable : textRenderables) {
-                renderable.render(matrix4f, gradientConsumer, LightTexture.FULL_BRIGHT, true);
+                renderable.render(matrix4f, gradientConsumer, FULL_BRIGHT, true);
             }
         }
     }

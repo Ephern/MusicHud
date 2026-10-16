@@ -351,8 +351,8 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
             int targetCount = checked ? COUNT_COLOR_CHECKED : COUNT_COLOR_UNCHECKED;
 
             int startBg = currentBgColor;
-            int startName = nameText.getCurrentTextColor();
-            int startCount = countText.getCurrentTextColor();
+            int startName = Color.toArgb(nameText.getCurrentTextColor());
+            int startCount = Color.toArgb(countText.getCurrentTextColor());
             currentBgColor = targetBg;
 
             ValueAnimator anim = ValueAnimator.ofFloat(0f, 1f);

@@ -126,6 +126,7 @@ dependencies {
     shadowBundle "org.jflac:jflac-codec:$rootProject.jflac_version"
 
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
+    compileOnly "org.lwjgl:lwjgl-vulkan:$rootProject.lwjgl_version"
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"

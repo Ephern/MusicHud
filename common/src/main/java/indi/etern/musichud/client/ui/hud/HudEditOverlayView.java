@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.hud;
 import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.Paint;
 import icyllis.modernui.graphics.RectF;
 import icyllis.modernui.view.MotionEvent;
@@ -291,8 +292,7 @@ public class HudEditOverlayView extends View {
     }
 
     private void drawHandleMarker(Canvas canvas, Handle handle, float cx, float cy) {
-        int color = Theme.HUD_HANDLE_STATES.getColorForState(handleState(handle),
-                Theme.HUD_HANDLE_STATES.getDefaultColor());
+        int color = Color.toArgb(Theme.HUD_HANDLE_STATES.getColorForState(handleState(handle), Theme.HUD_HANDLE_STATES.getDefaultColor()));
         handlePaint.setColor(color);
         switch (handle) {
             case TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT -> {

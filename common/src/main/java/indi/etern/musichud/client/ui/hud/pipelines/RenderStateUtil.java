@@ -50,9 +50,9 @@ public class RenderStateUtil {
      * current navigation node, and it keeps adjacent glyph runs batching together.
      */
     public void submitGlyphRenderState(
-            GuiGraphics gr,
+            GuiGraphicsExtractor gr,
             GuiElementRenderState renderState
     ) {
-        getGuiRenderState(gr).submitGlyphToCurrentLayer(renderState);
+        getGuiRenderState(gr).addGlyphToCurrentLayer(renderState);
     }
 }
