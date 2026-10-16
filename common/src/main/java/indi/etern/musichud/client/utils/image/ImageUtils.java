@@ -5,7 +5,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.Weigher;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import icyllis.arc3d.core.ColorSpace;
+import icyllis.arc3d.core.ColorSpaces;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.core.Core;
 import icyllis.modernui.graphics.Bitmap;
@@ -367,7 +367,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpace.get(ColorSpace.Named.SRGB))
+                ColorSpaces.SRGB)
         ) {
             wrap.setPixels(bitmap, 0, 0, 0, 0, width, height);
         }
@@ -385,7 +385,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpace.get(ColorSpace.Named.SRGB));
+                ColorSpaces.SRGB);
     }
 
     @SuppressWarnings("unused")
