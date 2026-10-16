@@ -96,7 +96,7 @@ public class HudRendererManager {
                             ? 0
                             : musicDuration.minus(lyricLine.getStartTime()).toMillis();
                 }
-                scrollMillis = (long) (scrollMillis * 0.8);
+                scrollMillis = (long) (scrollMillis * 0.75);
             }
 
             scheduleLyricLines(

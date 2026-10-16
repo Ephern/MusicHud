@@ -10,9 +10,14 @@ import com.mojang.renderpearl.api.device.GpuDevice;
 import com.mojang.renderpearl.api.textures.FilterMode;
 import com.mojang.renderpearl.api.textures.GpuTexture;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.pipelines.*;
+import indi.etern.musichud.client.ui.hud.renderer.text.GradientSpec;
+import indi.etern.musichud.client.ui.hud.renderer.text.GradientTextRenderer;
+import indi.etern.musichud.client.ui.hud.renderer.text.GradientTextRenderState;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.DynamicGpuDataStorage;
 import net.minecraft.client.renderer.DynamicGpuDataStorageMapped;
@@ -51,6 +56,13 @@ public class HudRenderContextImpl implements HudRenderContext {
     private final Map<TextureSetup, Map<String, GpuBufferSlice>> elementSlices = new IdentityHashMap<>();
     private final Map<String, GpuBufferSlice> defaultSlices = new HashMap<>();
 
+    /**
+     * Mirror of the GUI scissor stack in GUI coordinates, kept in sync with
+     * {@code pushScissor}/{@code popScissor}. Gradient text elements carry the top rectangle as
+     * their {@code scissorArea} so {@code GuiRenderer} clips them exactly like engine text.
+     */
+    private final Deque<ScreenRectangle> scissorStack = new ArrayDeque<>();
+
     private HudGraphics graphics;
 
     public HudRenderContextImpl() {
@@ -65,6 +77,7 @@ public class HudRenderContextImpl implements HudRenderContext {
         elements.clear();
         elementSlices.clear();
         defaultSlices.clear();
+        scissorStack.clear();
         this.graphics = graphics;
     }
 
@@ -211,17 +224,53 @@ public class HudRenderContextImpl implements HudRenderContext {
 
     @Override
     public void pushScissor(int fromX, int fromY, int toX, int toY) {
+        ScreenRectangle rectangle = new ScreenRectangle(fromX, fromY, toX - fromX, toY - fromY);
+        ScreenRectangle parent = scissorStack.peek();
+        if (parent == null) {
+            scissorStack.push(rectangle);
+        } else {
+            ScreenRectangle intersection = parent.intersection(rectangle);
+            scissorStack.push(intersection == null ? ScreenRectangle.empty() : intersection);
+        }
         graphics.pushScissor(fromX, fromY, toX, toY);
     }
 
     @Override
     public void popScissor() {
+        if (!scissorStack.isEmpty()) {
+            scissorStack.pop();
+        }
         graphics.popScissor();
+    }
+
+    @Nullable
+    public ScreenRectangle currentScissor() {
+        return scissorStack.peek();
     }
 
     @Override
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
         graphics.drawString(font, text, x, y, color, dropShadow);
+    }
+
+    @Override
+    public void drawGradientString(Font font, String text, int x, int y, GradientSpec gradient, float alpha) {
+        if (font == null || text == null || text.isEmpty() || gradient == null || alpha <= 0f) {
+            return;
+        }
+        List<GradientTextRenderState> states = null;
+        try {
+            states = GradientTextRenderer.build(font, text, x, y, gradient, alpha, currentScissor(), currentPose());
+        } catch (Throwable t) {
+            MusicHud.getLogger(HudRenderContextImpl.class).debug("Gradient text geometry failed", t);
+        }
+        if (states == null || states.isEmpty()) {
+            graphics.drawString(font, text, x, y, gradient.sample(0.5f, alpha), false);
+            return;
+        }
+        for (GradientTextRenderState state : states) {
+            UNIFORM_WRITER.submitGlyphRenderState(((VanillaHudGraphics) graphics).vanilla(), state);
+        }
     }
 
     @Override
@@ -240,7 +289,7 @@ public class HudRenderContextImpl implements HudRenderContext {
 
     private record UniformAdapter(HudUniform uniform) implements DynamicGpuDataStorage.DynamicGpuData {
         @Override
-        public void write(ByteBuffer byteBuffer) {
+        public void write(@NotNull ByteBuffer byteBuffer) {
             uniform.write(byteBuffer);
         }
     }

@@ -28,6 +28,7 @@ import java.util.function.BiConsumer;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
+@SuppressWarnings("UnstableApiUsage")
 public class Modal {
     private static final int MAX_WIDTH = 400;
     private static final int CORNER_RADIUS = 12;
