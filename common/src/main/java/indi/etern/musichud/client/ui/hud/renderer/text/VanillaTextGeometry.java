@@ -11,6 +11,7 @@ import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.util.FormattedCharSequence;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
@@ -36,14 +37,14 @@ public final class VanillaTextGeometry {
         List<BakedGlyph.GlyphInstance> instances = new ArrayList<>();
         prepared.visit(new Font.GlyphVisitor() {
             @Override
-            public void acceptGlyph(BakedGlyph.GlyphInstance glyph) {
+            public void acceptGlyph(BakedGlyph.@NotNull GlyphInstance glyph) {
                 if (glyph.glyph().textureView() != null) {
                     instances.add(glyph);
                 }
             }
 
             @Override
-            public void acceptEffect(BakedGlyph glyph, BakedGlyph.Effect effect) {
+            public void acceptEffect(@NotNull BakedGlyph glyph, BakedGlyph.@NotNull Effect effect) {
                 // underline/strikethrough are intentionally not supported
             }
         });

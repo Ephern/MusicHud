@@ -283,7 +283,7 @@ public class HudRenderContextImpl implements HudRenderContext {
 
     private record UniformAdapter(HudUniform uniform) implements DynamicUniformStorage.DynamicUniform {
         @Override
-        public void write(ByteBuffer byteBuffer) {
+        public void write(@NotNull ByteBuffer byteBuffer) {
             uniform.write(byteBuffer);
         }
     }

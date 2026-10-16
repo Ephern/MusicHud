@@ -48,7 +48,6 @@ public final class ModernTextGeometry {
         int resLevel = preferredMode == TextRenderType.MODE_SDF_FILL
                 ? TextLayoutEngine.adjustPixelDensityForSDF(layout.getCreatedResLevel())
                 : layout.getCreatedResLevel();
-        float density = resLevel;
         float invDensity = 1f / resLevel;
         int fontSize = TextLayoutProcessor.computeFontSize(resLevel);
         boolean directMask = preferredMode == TextRenderType.MODE_NORMAL;
@@ -60,7 +59,7 @@ public final class ModernTextGeometry {
         for (int i = 0; i <= flags.length; i++) {
             RunKey key = i == flags.length ? null : keyOf(layout, flags[i], i, preferredMode);
             if (i > start && (key == null || !key.equals(currentKey))) {
-                GradientTextRun run = new ModernTextRun(layout, start, i, fontSize, density, invDensity,
+                GradientTextRun run = new ModernTextRun(layout, start, i, fontSize, (float) resLevel, invDensity,
                         directMask, currentKey.pipeline, currentKey.kind, currentKey.bitmapFont,
                         currentKey.isColorEmoji, x, y, totalAdvance);
                 states.add(new GradientTextRenderState(pose, run, gradient, alpha, scissor));

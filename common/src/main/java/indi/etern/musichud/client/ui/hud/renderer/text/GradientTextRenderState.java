@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.gui.render.state.GuiElementRenderState;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
@@ -38,17 +39,17 @@ public final class GradientTextRenderState implements GuiElementRenderState {
     }
 
     @Override
-    public void buildVertices(VertexConsumer consumer, float z) {
+    public void buildVertices(@NotNull VertexConsumer consumer, float z) {
         run.writeVertices(consumer, z, pose, gradient, alpha);
     }
 
     @Override
-    public RenderPipeline pipeline() {
+    public @NotNull RenderPipeline pipeline() {
         return run.pipeline();
     }
 
     @Override
-    public TextureSetup textureSetup() {
+    public @NotNull TextureSetup textureSetup() {
         if (textureSetup == null) {
             textureSetup = TextureSetup.singleTextureWithLightmap(run.texture());
         }
