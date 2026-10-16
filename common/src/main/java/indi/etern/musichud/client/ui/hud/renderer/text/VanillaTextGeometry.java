@@ -18,11 +18,7 @@ import org.joml.Matrix4f;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Geometry source for the vanilla text pipeline (no Modern UI). Glyph instances are collected
- * once from {@link Font#prepareText} and the quads are re-emitted at draw time with per-vertex
- * gradient colors, mirroring {@code BakedGlyph.renderChar} (bold double pass included).
- */
+
 public final class VanillaTextGeometry {
 
     private VanillaTextGeometry() {
