@@ -19,8 +19,11 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.WeakHashMap;
 
 /**
  * Geometry source for the Modern UI text engine, using only its public API. Layout comes from
@@ -28,9 +31,22 @@ import java.util.Random;
  * draw time (after the engine finished baking this frame's glyphs, so atlas rebuilds cannot
  * invalidate the UVs we captured), and each glyph quad is re-emitted with per-vertex gradient
  * colors, mirroring {@code TextRunRenderState.buildPass}.
+ * <p>
+ * Mode selection, device font size and pixel snapping mirror the engine's own GUI text path
+ * ({@code MixinGuiTextRenderState.onPrepareText} and {@code TextLayout.prepareTextWithDensity}):
+ * uniformly scaled text bakes glyphs at {@code resLevel * scale} and the pose translation is
+ * moved into the text origin before snapping, exactly like normally drawn GUI text.
  */
 public final class ModernTextGeometry {
     private static final Random OBFUSCATED_RANDOM = new Random();
+
+    /**
+     * Baked glyph arrays keyed by layout and font size, mirroring {@code TextLayout.getGlyphs}
+     * and {@code TextLayout.getGlyphsUniformScale} caches. Layouts are created fresh for every
+     * cached text and evicted by the engine's LRU cache, so weak keys follow the same lifetime
+     * as the engine's own baked glyph caches. Only accessed on the render thread.
+     */
+    private static final Map<TextLayout, Map<Integer, GLBakedGlyph[]>> GLYPH_CACHE = new WeakHashMap<>();
 
     private ModernTextGeometry() {
     }
@@ -44,12 +60,24 @@ public final class ModernTextGeometry {
             return List.of();
         }
 
-        int preferredMode = chooseMode(pose);
-        int resLevel = preferredMode == TextRenderType.MODE_SDF_FILL
-                ? TextLayoutEngine.adjustPixelDensityForSDF(layout.getCreatedResLevel())
-                : layout.getCreatedResLevel();
-        float invDensity = 1f / resLevel;
-        int fontSize = TextLayoutProcessor.computeFontSize(resLevel);
+        int createdResLevel = layout.getCreatedResLevel();
+        DrawSetup setup = resolveDraw(pose, x, y, createdResLevel);
+        int preferredMode = setup.mode();
+        float density;
+        if (preferredMode == TextRenderType.MODE_SDF_FILL) {
+            density = TextLayoutEngine.adjustPixelDensityForSDF(createdResLevel);
+        } else if (preferredMode == TextRenderType.MODE_UNIFORM_SCALE) {
+            if (setup.uniformScale() <= 0.001f) {
+                // drop if flipped or too small
+                return List.of();
+            }
+            density = createdResLevel * setup.uniformScale();
+            preferredMode = TextRenderType.MODE_NORMAL;
+        } else {
+            density = createdResLevel;
+        }
+        float invDensity = 1f / density;
+        int fontSize = TextLayoutProcessor.computeFontSize(density);
         boolean directMask = preferredMode == TextRenderType.MODE_NORMAL;
 
         int[] flags = layout.getGlyphFlags();
@@ -59,10 +87,10 @@ public final class ModernTextGeometry {
         for (int i = 0; i <= flags.length; i++) {
             RunKey key = i == flags.length ? null : keyOf(layout, flags[i], i, preferredMode);
             if (i > start && (key == null || !key.equals(currentKey))) {
-                GradientTextRun run = new ModernTextRun(layout, start, i, fontSize, (float) resLevel, invDensity,
+                GradientTextRun run = new ModernTextRun(layout, start, i, fontSize, density, invDensity,
                         directMask, currentKey.pipeline, currentKey.kind, currentKey.bitmapFont,
-                        currentKey.isColorEmoji, x, y, totalAdvance);
-                states.add(new GradientTextRenderState(pose, run, gradient, alpha, scissor));
+                        currentKey.isColorEmoji, setup.originX(), setup.originY(), totalAdvance);
+                states.add(new GradientTextRenderState(setup.pose(), run, gradient, alpha, scissor));
                 start = i;
             }
             currentKey = key;
@@ -70,13 +98,68 @@ public final class ModernTextGeometry {
         return states;
     }
 
-    private static int chooseMode(Matrix3x2f pose) {
-        boolean pureTranslation = Math.abs(pose.m01) < 1e-6f && Math.abs(pose.m10) < 1e-6f
-                && Math.abs(pose.m00 - 1f) < 1e-6f && Math.abs(pose.m11 - 1f) < 1e-6f;
-        if (pureTranslation) {
-            return TextRenderType.MODE_NORMAL;
+    /**
+     * Mirrors {@code MixinGuiTextRenderState.onPrepareText}: decides the render mode for the
+     * given pose, extracts the pose translation into the text origin (so that per-vertex
+     * snapping can align quads to the device pixel grid) and computes the residual uniform
+     * scale used to bake glyphs at the device font size.
+     */
+    private static DrawSetup resolveDraw(Matrix3x2f pose, float x, float y, int createdResLevel) {
+        Matrix3x2f ctm = new Matrix3x2f(pose);
+        int mode;
+        boolean pureTranslation;
+        if (!approxZero(ctm.m01) || !approxZero(ctm.m10)
+                || !approxEqual(ctm.m00, 1f) || !approxEqual(ctm.m11, 1f)) {
+            pureTranslation = false;
+            if (ModernTextRenderer.sComputeDeviceFontSize
+                    && approxZero(ctm.m01) && approxZero(ctm.m10)
+                    && approxEqual(ctm.m00, ctm.m11)) {
+                mode = TextRenderType.MODE_UNIFORM_SCALE;
+            } else if (ModernTextRenderer.sAllowSDFTextIn2D) {
+                mode = TextRenderType.MODE_SDF_FILL;
+            } else {
+                mode = TextRenderType.MODE_NORMAL;
+            }
+        } else {
+            mode = TextRenderType.MODE_NORMAL;
+            pureTranslation = true;
         }
-        return ModernTextRenderer.sAllowSDFTextIn2D ? TextRenderType.MODE_SDF_FILL : TextRenderType.MODE_NORMAL;
+        float uniformScale = 1f;
+        if (ModernTextRenderer.sComputeDeviceFontSize
+                && (pureTranslation || mode == TextRenderType.MODE_UNIFORM_SCALE)) {
+            // extract the translation vector for snapping to pixel grid
+            x += ctm.m20 / ctm.m00;
+            y += ctm.m21 / ctm.m11;
+            // the pose translation is moved into the text origin
+            ctm.m20 = 0f;
+            ctm.m21 = 0f;
+            uniformScale = ctm.m00;
+            if (approxEqual(uniformScale, 1f)) {
+                mode = TextRenderType.MODE_NORMAL;
+            } else {
+                float upperLimit = Math.max(1f,
+                        (float) TextLayoutEngine.sMinPixelDensityForSDF / createdResLevel);
+                if (uniformScale <= upperLimit) {
+                    // uniform scale smaller and not too large
+                    mode = TextRenderType.MODE_UNIFORM_SCALE;
+                } else {
+                    mode = ModernTextRenderer.sAllowSDFTextIn2D
+                            ? TextRenderType.MODE_SDF_FILL : TextRenderType.MODE_NORMAL;
+                }
+            }
+        }
+        return new DrawSetup(mode, ctm, x, y, uniformScale);
+    }
+
+    private static boolean approxZero(float value) {
+        return Math.abs(value) <= 1e-5f;
+    }
+
+    private static boolean approxEqual(float a, float b) {
+        return Math.abs(a - b) <= 1e-5f;
+    }
+
+    private record DrawSetup(int mode, Matrix3x2f pose, float originX, float originY, float uniformScale) {
     }
 
     private enum TextureKind {
@@ -99,6 +182,27 @@ public final class ModernTextGeometry {
         }
         return new RunKey(TextRenderType.getPipelineForGui(preferredMode, false),
                 TextureKind.FONT, null, false);
+    }
+
+    /**
+     * Bakes (once per layout and font size) every glyph of the layout, exactly like
+     * {@code TextLayout.prepareGlyphs}: obfuscated code points bake to their fast char set.
+     */
+    private static GLBakedGlyph[] bakedGlyphs(TextLayout layout, int fontSize) {
+        return GLYPH_CACHE
+                .computeIfAbsent(layout, k -> new HashMap<>())
+                .computeIfAbsent(fontSize, size -> {
+                    int[] glyphIds = layout.getGlyphs();
+                    int[] flags = layout.getGlyphFlags();
+                    GlyphManager manager = GlyphManager.getInstance();
+                    GLBakedGlyph[] glyphs = new GLBakedGlyph[glyphIds.length];
+                    for (int i = 0; i < glyphs.length; i++) {
+                        glyphs[i] = (flags[i] & CharacterStyle.OBFUSCATED_MASK) != 0
+                                ? manager.lookupFastChars(layout.getFont(i), size, glyphIds[i])
+                                : manager.lookupGlyph(layout.getFont(i), size, glyphIds[i]);
+                    }
+                    return glyphs;
+                });
     }
 
     private static final class ModernTextRun implements GradientTextRun {
@@ -160,7 +264,7 @@ public final class ModernTextGeometry {
             int[] flags = layout.getGlyphFlags();
             float baseline = originY + TextLayout.sBaselineOffset;
             for (int i = start; i < end; i++) {
-                GLBakedGlyph glyph = bake(glyphIds[i], flags[i], i);
+                GLBakedGlyph glyph = glyphAt(glyphIds[i], i, flags[i]);
                 if (glyph == null || glyph.x == Integer.MIN_VALUE) {
                     continue;
                 }
@@ -223,16 +327,19 @@ public final class ModernTextGeometry {
         }
 
         @Nullable
-        private GLBakedGlyph bake(int glyphId, int bits, int index) {
-            GlyphManager manager = GlyphManager.getInstance();
+        private static GLBakedGlyph glyphAt(GLBakedGlyph[] bakedGlyphs, int index, int bits) {
+            GLBakedGlyph glyph = bakedGlyphs[index];
+            if (glyph == null) {
+                return null;
+            }
             if ((bits & CharacterStyle.OBFUSCATED_MASK) != 0) {
-                GlyphManager.FastCharSet chars = manager.lookupFastChars(layout.getFont(index), fontSize, glyphId);
-                if (chars == null || chars.glyphs.isEmpty()) {
+                GlyphManager.FastCharSet chars = (GlyphManager.FastCharSet) glyph;
+                if (chars.glyphs.isEmpty()) {
                     return null;
                 }
                 return chars.glyphs.get(OBFUSCATED_RANDOM.nextInt(chars.glyphs.size()));
             }
-            return manager.lookupGlyph(layout.getFont(index), fontSize, glyphId);
+            return glyph;
         }
     }
 }
