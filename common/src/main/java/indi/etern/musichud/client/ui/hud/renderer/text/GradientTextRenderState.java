@@ -39,8 +39,8 @@ public final class GradientTextRenderState implements GuiElementRenderState {
     }
 
     @Override
-    public void buildVertices(@NotNull VertexConsumer consumer, float z) {
-        run.writeVertices(consumer, z, pose, gradient, alpha);
+    public void buildVertices(@NotNull VertexConsumer consumer) {
+        run.writeVertices(consumer, pose, gradient, alpha);
     }
 
     @Override
