@@ -154,7 +154,7 @@ public final class ModernTextGeometry {
         }
 
         @Override
-        public void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha) {
+        public void writeVertices(VertexConsumer consumer, Matrix3x2f pose, GradientSpec gradient, float alpha) {
             int[] glyphIds = layout.getGlyphs();
             float[] positions = layout.getPositions();
             int[] flags = layout.getGlyphFlags();
@@ -211,13 +211,13 @@ public final class ModernTextGeometry {
                     upSkew = 0.25f * ascent;
                     downSkew = 0.25f * (ascent - h);
                 }
-                consumer.addVertexWith2DPose(pose, rx + upSkew, ry, z)
+                consumer.addVertexWith2DPose(pose, rx + upSkew, ry)
                         .setColor(colorLeft).setUv(glyph.u1, glyph.v1).setLight(LightTexture.FULL_BRIGHT);
-                consumer.addVertexWith2DPose(pose, rx + downSkew, ry + h, z)
+                consumer.addVertexWith2DPose(pose, rx + downSkew, ry + h)
                         .setColor(colorLeft).setUv(glyph.u1, glyph.v2).setLight(LightTexture.FULL_BRIGHT);
-                consumer.addVertexWith2DPose(pose, rx + w + downSkew, ry + h, z)
+                consumer.addVertexWith2DPose(pose, rx + w + downSkew, ry + h)
                         .setColor(colorRight).setUv(glyph.u2, glyph.v2).setLight(LightTexture.FULL_BRIGHT);
-                consumer.addVertexWith2DPose(pose, rx + w + upSkew, ry, z)
+                consumer.addVertexWith2DPose(pose, rx + w + upSkew, ry)
                         .setColor(colorRight).setUv(glyph.u2, glyph.v1).setLight(LightTexture.FULL_BRIGHT);
             }
         }

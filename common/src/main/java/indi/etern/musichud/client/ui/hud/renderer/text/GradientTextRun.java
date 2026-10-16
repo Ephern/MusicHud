@@ -17,8 +17,7 @@ public interface GradientTextRun {
 
     /**
      * Emits the glyph quads of this run. {@code pose} maps text-local coordinates (origin at
-     * the text's left baseline start, {@code x} growing right) to GUI space; {@code z} is the
-     * layer value provided by {@code GuiRenderer}.
+     * the text's left baseline start, {@code x} growing right) to GUI space.
      */
-    void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha);
+    void writeVertices(VertexConsumer consumer, Matrix3x2f pose, GradientSpec gradient, float alpha);
 }

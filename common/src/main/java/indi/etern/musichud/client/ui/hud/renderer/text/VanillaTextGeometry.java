@@ -4,7 +4,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.font.glyphs.BakedGlyph;
+import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.locale.Language;
@@ -34,30 +34,28 @@ public final class VanillaTextGeometry {
         FormattedCharSequence sequence = Language.getInstance().getVisualOrder(FormattedText.of(text));
         Font.PreparedText prepared = font.prepareText(sequence, x, y, 0xFFFFFFFF, false, 0);
 
-        List<BakedGlyph.GlyphInstance> instances = new ArrayList<>();
+        List<TextRenderable> textRenderables = new ArrayList<>();
         prepared.visit(new Font.GlyphVisitor() {
             @Override
-            public void acceptGlyph(BakedGlyph.@NotNull GlyphInstance glyph) {
-                if (glyph.glyph().textureView() != null) {
-                    instances.add(glyph);
-                }
+            public void acceptGlyph(@NotNull TextRenderable textRenderable) {
+                textRenderables.add(textRenderable);
             }
 
             @Override
-            public void acceptEffect(@NotNull BakedGlyph glyph, BakedGlyph.@NotNull Effect effect) {
+            public void acceptEffect(@NotNull TextRenderable textRenderable) {
                 // underline/strikethrough are intentionally not supported
             }
         });
-        if (instances.isEmpty()) {
+        if (textRenderables.isEmpty()) {
             return List.of();
         }
 
         float totalAdvance = Math.max(1f, font.getSplitter().stringWidth(sequence));
         List<GradientTextRenderState> states = new ArrayList<>();
         int start = 0;
-        for (int i = 1; i <= instances.size(); i++) {
-            if (i == instances.size() || !sameBatch(instances.get(start), instances.get(i))) {
-                List<BakedGlyph.GlyphInstance> runInstances = instances.subList(start, i);
+        for (int i = 1; i <= textRenderables.size(); i++) {
+            if (i == textRenderables.size() || !sameBatch(textRenderables.get(start), textRenderables.get(i))) {
+                List<TextRenderable> runInstances = textRenderables.subList(start, i);
                 GradientTextRun run = new VanillaTextRun(runInstances, x, totalAdvance);
                 states.add(new GradientTextRenderState(pose, run, gradient, alpha, scissor));
                 start = i;
@@ -66,23 +64,24 @@ public final class VanillaTextGeometry {
         return states;
     }
 
-    private static boolean sameBatch(BakedGlyph.GlyphInstance a, BakedGlyph.GlyphInstance b) {
-        return a.glyph().textureView() == b.glyph().textureView()
-                && a.glyph().guiPipeline() == b.glyph().guiPipeline();
+    private static boolean sameBatch(TextRenderable a, TextRenderable b) {
+        //noinspection resource
+        return a.textureView() == b.textureView()
+                && a.guiPipeline() == b.guiPipeline();
     }
 
     private static final class VanillaTextRun implements GradientTextRun {
-        private final List<BakedGlyph.GlyphInstance> instances;
+        private final List<TextRenderable> textRenderables;
         private final float originX;
         private final float totalAdvance;
         private final GpuTextureView texture;
         private final RenderPipeline pipeline;
 
-        VanillaTextRun(List<BakedGlyph.GlyphInstance> instances, float originX, float totalAdvance) {
-            this.instances = instances;
+        VanillaTextRun(List<TextRenderable> textRenderables, float originX, float totalAdvance) {
+            this.textRenderables = textRenderables;
             this.originX = originX;
             this.totalAdvance = totalAdvance;
-            BakedGlyph first = instances.getFirst().glyph();
+            TextRenderable first = textRenderables.getFirst();
             this.texture = first.textureView();
             this.pipeline = first.guiPipeline();
         }
@@ -98,13 +97,11 @@ public final class VanillaTextGeometry {
         }
 
         @Override
-        public void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha) {
-            Matrix4f matrix = new Matrix4f().mul(pose).translate(0f, 0f, z);
-            VertexConsumer wrapper = new GradientVertexConsumer(consumer, originX, totalAdvance, gradient, alpha);
-            for (BakedGlyph.GlyphInstance instance : instances) {
-                BakedGlyph glyph = instance.glyph();
-                if (glyph.textureView() == null) continue;
-                glyph.renderChar(instance, matrix, wrapper, LightTexture.FULL_BRIGHT, true);
+        public void writeVertices(VertexConsumer consumer, Matrix3x2f pose, GradientSpec gradient, float alpha) {
+            VertexConsumer gradientConsumer = new GradientVertexConsumer(consumer, originX, totalAdvance, gradient, alpha);
+            Matrix4f matrix4f = new Matrix4f().mul(pose);
+            for (TextRenderable renderable : textRenderables) {
+                renderable.render(matrix4f, gradientConsumer, LightTexture.FULL_BRIGHT, true);
             }
         }
     }
