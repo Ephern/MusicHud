@@ -4,11 +4,13 @@ import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
+import indi.etern.musichud.client.ui.hud.renderer.text.GradientSpec;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Style;
 
 @Getter
@@ -30,6 +32,11 @@ public class TextRenderer implements HudRenderer {
     private float transitionSpeed = 4.0f;
     private long lastUpdateTime = System.currentTimeMillis();
     private float marqueeDuration = 10000;
+    /**
+     * Optional horizontal gradient; when set the text is drawn with per-vertex gradient colors
+     * instead of a single color. {@code null} keeps the legacy flat path.
+     */
+    private GradientSpec gradient;
 
     public TextRenderer() {
         try {
@@ -148,7 +155,8 @@ public class TextRenderer implements HudRenderer {
         if (text == null || text.isEmpty()) return;
 
         // 计算带透明度的颜色
-        int color = getColorWithAlpha(textData.baseColor, alpha * hudStyle.calcAbsoluteAlpha());
+        float absoluteAlpha = alpha * hudStyle.calcAbsoluteAlpha();
+        int color = getColorWithAlpha(textData.baseColor, absoluteAlpha);
 
         // 计算位置
         float measuredWidth = measureWidth(text);
@@ -181,7 +189,7 @@ public class TextRenderer implements HudRenderer {
                 .subTransform(transforming -> {
                     transforming.scale(scale)
                             .then(transforming1 -> {
-                                context.drawString(Minecraft.getInstance().font, finalText, 0, 0, color, false);
+                                drawTextRun(context, finalText, color, absoluteAlpha);
                             });
                 });
         if (overflow && enableMarqueeText) {
@@ -190,13 +198,22 @@ public class TextRenderer implements HudRenderer {
                         .subTransform(transforming -> {
                             transforming.scale(scale)
                                     .then(transforming1 -> {
-                                        context.drawString(Minecraft.getInstance().font, finalText, 0, 0, color, false);
+                                        drawTextRun(context, finalText, color, absoluteAlpha);
                                     });
                         });
             }
         }
         transform.end();
         context.popScissor();
+    }
+
+    private void drawTextRun(HudRenderContext context, String text, int color, float alpha) {
+        Font font = Minecraft.getInstance().font;
+        if (gradient != null) {
+            context.drawGradientString(font, text, 0, 0, gradient, alpha);
+        } else {
+            context.drawString(font, text, 0, 0, color, false);
+        }
     }
 
     private int getColorWithAlpha(int baseColor, float alpha) {

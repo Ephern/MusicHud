@@ -171,10 +171,17 @@ public class LyricLineView extends LinearLayout {
         if (emphasizeAnim != null) return;
         Duration delta = nowPlayingInfo.getPlayedDuration().minus(lyricLine.getStartTime());
         Duration duration = lyricLine.getDuration();
-        Duration stayEmphasizeDuration =
-                duration == null ?
-                        nowPlayingInfo.getMusicDuration().minus(lyricLine.getStartTime())
-                        : duration.minus(delta);
+        Duration stayEmphasizeDuration;
+        if (duration != null) {
+            stayEmphasizeDuration = duration.minus(delta);
+        } else {
+            // The field can be nulled by a concurrent switch-to-idle/stop; fall back to a short
+            // fixed emphasis instead of dereferencing null.
+            Duration musicDuration = nowPlayingInfo.getMusicDuration();
+            stayEmphasizeDuration = musicDuration == null
+                    ? Duration.ZERO
+                    : musicDuration.minus(lyricLine.getStartTime());
+        }
         stayEmphasizeDuration = stayEmphasizeDuration.minus(Duration.of(800, ChronoUnit.MILLIS));
         if (stayEmphasizeDuration.isNegative()) {
             stayEmphasizeDuration = Duration.ofMillis(900);

@@ -3,11 +3,17 @@ package indi.etern.musichud.client.ui.hud.renderer;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.pipelines.*;
+import indi.etern.musichud.client.ui.hud.renderer.text.GradientSpec;
+import indi.etern.musichud.client.ui.hud.renderer.text.GradientTextRenderer;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.MultiBufferSource;
 import org.joml.Matrix3x2f;
 import org.joml.Matrix4f;
 
@@ -272,6 +278,32 @@ public class HudRenderContextImpl implements HudRenderContext {
         RenderSystem.setShaderColor(1f, 1f, 1f, alpha / 255f);
         graphics.drawString(font, text, x, y, opaque, dropShadow);
         RenderSystem.setShaderColor(prevColor[0], prevColor[1], prevColor[2], prevColor[3]);
+    }
+
+    public void drawGradientString(Font font, String text, int x, int y, GradientSpec gradient, float alpha) {
+        if (font == null || text == null || text.isEmpty() || gradient == null || alpha <= 0f) {
+            return;
+        }
+        if (!(graphics instanceof VanillaHudGraphics vanillaGraphics)) {
+            // Non-vanilla graphics backend: degrade to a flat representative color.
+            graphics.drawString(font, text, x, y, gradient.sample(0.5f, alpha), false);
+            return;
+        }
+        GuiGraphics vanilla = vanillaGraphics.vanilla();
+        MultiBufferSource.BufferSource bufferSource = vanilla.bufferSource();
+        Matrix4f pose = vanilla.pose().last().pose();
+
+        // Gradient samples already fold alpha in; keep ColorModulator neutral so the text
+        // shader passes the per-vertex colors through untouched (same trick as drawString).
+        float[] prevColor = RenderSystem.getShaderColor().clone();
+        RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
+        try {
+            GradientTextRenderer.draw(font, text, x, y, gradient, alpha, pose, bufferSource, LightTexture.FULL_BRIGHT);
+        } catch (Throwable t) {
+            MusicHud.getLogger(HudRenderContextImpl.class).debug("Gradient text rendering failed", t);
+        } finally {
+            RenderSystem.setShaderColor(prevColor[0], prevColor[1], prevColor[2], prevColor[3]);
+        }
     }
 
     public void fill(int fromX, int fromY, int toX, int toY, int color) {
