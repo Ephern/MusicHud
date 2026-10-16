@@ -7,6 +7,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
+import indi.etern.musichud.client.ui.hud.renderer.text.GradientSpec;
 import indi.etern.musichud.client.ui.lyric.LyricHighlightCalculator;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringValue;
@@ -32,6 +33,9 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     private static final float MIN_RESPONSE_SECONDS = 0.05f;
     private static final float DURATION_RESPONSE_FACTOR = 0.75f;
     private static final float SWITCH_DAMPING = 1f;
+    // Gradient highlight smoothing band half width, in unscaled font pixels; it scales with the
+    // text and stays within a few pixels of the classic hard scissor sweep.
+    private static final float GRADIENT_SMOOTH_PX = 4f;
     private final List<LinePair> pairs = new ArrayList<>();
     private final ConcurrentLinkedQueue<PendingLines> pendingLines = new ConcurrentLinkedQueue<>();
     ModernStringSplitter modernStringSplitter;
@@ -287,8 +291,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                 continue;
             }
             if (line1.lyricLine.isWordByWord()) {
-                renderLine(context, pair.line1, line1.fadeColor, cachedContainerX, startY, line1Height, yOffset);
-                renderLineHighlight(context, pair.line1, cachedContainerX, startY, line1Height, y, x, calcHighlightWidth(pair.line1, line1Height), yOffset);
+                renderLineHighlight(context, pair.line1, line1.emphasizeColor, line1.fadeColor, cachedContainerX, startY, line1Height, yOffset);
             } else {
                 renderLine(context, pair.line1, line1.emphasizeColor, cachedContainerX, startY, line1Height, yOffset);
             }
@@ -347,7 +350,6 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         float scrollOffset = line.scrollOffset;
 
-        // 始终左对齐：起始X = baseX + scrollOffset
         float drawX = baseX + scrollOffset;
         float drawY = baseY + yOffset;
         int drawColor = applyStyleAlpha(color);
@@ -360,27 +362,50 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
                 );
     }
 
-    private void renderLineHighlight(HudRenderContext context, LineState line, int baseX, int baseY, float lineHeight, float positionY, float highlightFromX, float highlightToX, float yOffset) {
+    /**
+     * Highlight sweep as a per-vertex gradient: the already sung part keeps
+     * {@code sungColor} and the rest fades to {@code pendingColor} across a small smoothing
+     * band around the current character offset, so the transition runs inside a single glyph.
+     * <p>
+     * The window center travels {@code 2 * band} beyond the text span, letting the window slide
+     * completely off both ends: at sweep 0 the whole line is pending and at sweep 1 the whole
+     * line is sung, both reached continuously instead of snapping at the ends.
+     */
+    private void renderLineHighlight(HudRenderContext context, LineState line, int sungColor, int pendingColor,
+                                     int baseX, int baseY, float lineHeight, float yOffset) {
         if (line.line == null) return;
         String text = line.line.text;
         if (text.isEmpty()) return;
 
         float scale = lineHeight / Minecraft.getInstance().font.lineHeight;
-        if (!(scale <= 0)) {
-            float scrollOffset = line.scrollOffset;// 始终左对齐：起始X = baseX + scrollOffset
-            float drawX = baseX + scrollOffset;
-            float drawY = baseY + yOffset;
-            int toX = (int) (drawX + highlightToX);
-            context.pushScissor((int) highlightFromX, (int) positionY, toX, (int) (positionY + hudStyle.getHeight()));
-            int drawColor = applyStyleAlpha(line.line.emphasizeColor);
-            context.transform()
-                    .translate(drawX, drawY)
-                    .scale(scale)
-                    .end(transforming ->
-                            context.drawString(Minecraft.getInstance().font, text, 0, 0, drawColor, false)
-                    );
-            context.popScissor();
-        }
+        if (scale <= 0) return;
+
+        float scrollOffset = line.scrollOffset;
+        float drawX = baseX + scrollOffset;
+        float drawY = baseY + yOffset;
+
+        // both widths are in the same (scaled) space, so the ratio is scale independent
+        float totalWidth = calcTextWidth(text, lineHeight);
+        float sweep = totalWidth > 0
+                ? Math.clamp(calcHighlightWidth(line, lineHeight) / totalWidth, 0f, 1f)
+                : 1f;
+        // band is normalized against the unscaled width so it scales with the text
+        float rawWidth = calcTextWidth(text, Minecraft.getInstance().font.lineHeight);
+        float band = rawWidth > 0 ? Math.clamp(GRADIENT_SMOOTH_PX / rawWidth, 0.002f, 0.5f) : 0.002f;
+
+        int sung = applyStyleAlpha(sungColor);
+        int pending = applyStyleAlpha(pendingColor);
+        // overshoot: the window center travels 2*band beyond the text span, so the window can
+        // slide fully off either end (sweep 0 -> all pending, sweep 1 -> all sung) without a jump
+        float center = sweep * (1f + 2f * band) - band;
+        GradientSpec spec = GradientSpec.window(sung, pending, center, band);
+
+        context.transform()
+                .translate(drawX, drawY)
+                .scale(scale)
+                .end(transforming ->
+                        context.drawGradientString(Minecraft.getInstance().font, text, 0, 0, spec, 1f)
+                );
     }
 
     private int applyStyleAlpha(int color) {

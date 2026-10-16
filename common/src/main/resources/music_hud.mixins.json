@@ -5,6 +5,7 @@
   "compatibilityLevel": "JAVA_21",
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
+    "BakedGlyphAccessor",
     "GuiRendererHudMixin",
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
