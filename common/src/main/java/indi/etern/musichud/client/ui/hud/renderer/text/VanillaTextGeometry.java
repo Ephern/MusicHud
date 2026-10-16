@@ -3,7 +3,6 @@ package indi.etern.musichud.client.ui.hud.renderer.text;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import indi.etern.musichud.mixin.BakedGlyphAccessor;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.glyphs.BakedGlyph;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -14,6 +13,7 @@ import net.minecraft.util.FormattedCharSequence;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
+import org.joml.Matrix4f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -99,53 +99,13 @@ public final class VanillaTextGeometry {
 
         @Override
         public void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha) {
+            Matrix4f matrix = new Matrix4f().mul(pose).translate(0f, 0f, z);
+            VertexConsumer wrapper = new GradientVertexConsumer(consumer, originX, totalAdvance, gradient, alpha);
             for (BakedGlyph.GlyphInstance instance : instances) {
                 BakedGlyph glyph = instance.glyph();
-                BakedGlyphAccessor access = (BakedGlyphAccessor) glyph;
-                boolean italic = instance.style().isItalic();
-                boolean bold = instance.style().isBold();
-
-                float localLeft = instance.x() - originX + access.music_hud$left();
-                float localRight = instance.x() - originX + access.music_hud$right();
-                float tLeft = localLeft / totalAdvance;
-                float tRight = localRight / totalAdvance;
-                int colorLeft = gradient.sample(tLeft, alpha);
-                int colorRight = gradient.sample(tRight, alpha);
-
-                // main pass
-                render(consumer, z, pose, glyph, access, italic, instance.x(), instance.y(),
-                        colorLeft, colorRight, bold);
-                if (bold) {
-                    // bold pass, offset by the glyph advance-independent bold offset
-                    render(consumer, z, pose, glyph, access, italic,
-                            instance.x() + instance.boldOffset(), instance.y(),
-                            colorLeft, colorRight, true);
-                }
+                if (glyph.textureView() == null) continue;
+                glyph.renderChar(instance, matrix, wrapper, LightTexture.FULL_BRIGHT, true);
             }
-        }
-
-        private void render(VertexConsumer consumer, float z, Matrix3x2f pose, BakedGlyph glyph,
-                            BakedGlyphAccessor access, boolean italic, float x, float y,
-                            int colorLeft, int colorRight, boolean bold) {
-            float left = x + access.music_hud$left();
-            float right = x + access.music_hud$right();
-            float up = y + access.music_hud$up();
-            float down = y + access.music_hud$down();
-            float shearTop = italic ? (1.0F - 0.25F * access.music_hud$up()) : 0.0F;
-            float shearBottom = italic ? (1.0F - 0.25F * access.music_hud$down()) : 0.0F;
-            float thickness = bold ? 0.1F : 0.0F;
-            float u0 = access.music_hud$u0();
-            float u1 = access.music_hud$u1();
-            float v0 = access.music_hud$v0();
-            float v1 = access.music_hud$v1();
-            consumer.addVertexWith2DPose(pose, left + shearTop - thickness, up - thickness, z)
-                    .setColor(colorLeft).setUv(u0, v0).setLight(LightTexture.FULL_BRIGHT);
-            consumer.addVertexWith2DPose(pose, left + shearBottom - thickness, down + thickness, z)
-                    .setColor(colorLeft).setUv(u0, v1).setLight(LightTexture.FULL_BRIGHT);
-            consumer.addVertexWith2DPose(pose, right + shearBottom + thickness, down + thickness, z)
-                    .setColor(colorRight).setUv(u1, v1).setLight(LightTexture.FULL_BRIGHT);
-            consumer.addVertexWith2DPose(pose, right + shearTop + thickness, up - thickness, z)
-                    .setColor(colorRight).setUv(u1, v0).setLight(LightTexture.FULL_BRIGHT);
         }
     }
 }
