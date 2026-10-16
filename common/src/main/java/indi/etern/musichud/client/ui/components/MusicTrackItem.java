@@ -332,7 +332,7 @@ public class MusicTrackItem extends LinearLayout {
 
         if (showPusherInfo) {
             PusherInfo pusherInfo = musicDetail.getPusherInfo();
-            if (pusherInfo == null) {
+            if (pusherInfo == null || PusherInfo.EMPTY.equals(pusherInfo)) {
                 pusherWidget.clear();
                 pusherWidget.setVisibility(GONE);
             } else {

@@ -1,7 +1,7 @@
 package indi.etern.musichud.client.ui.lyric;
 
 import icyllis.arc3d.core.ColorInfo;
-import icyllis.arc3d.core.ColorSpaces;
+import icyllis.arc3d.core.ColorSpace;
 import icyllis.arc3d.core.ImageInfo;
 import icyllis.arc3d.engine.Engine;
 import icyllis.arc3d.granite.GraniteSurface;
@@ -58,7 +58,7 @@ public final class LineBlurResources {
         releaseSurfaces();
         RecordingContext rc = Core.requireUiRecordingContext();
         ImageInfo info = ImageInfo.make(width, height,
-                ColorInfo.CT_RGBA_8888, ColorInfo.AT_PREMUL, ColorSpaces.SRGB);
+                ColorInfo.CT_RGBA_8888, ColorInfo.AT_PREMUL, ColorSpace.get(ColorSpace.Named.SRGB));
         sourceSurface = GraniteSurface.makeRenderTarget(rc, info, false,
                 Engine.SurfaceOrigin.kUpperLeft, "musichud-line-blur-src");
         scratchSurface = GraniteSurface.makeRenderTarget(rc, info, false,

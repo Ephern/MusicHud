@@ -132,6 +132,12 @@ public class PlaybackTask {
     private final Condition bufferReady = bufferLock.newCondition();
     private volatile PlaybackState state = PlaybackState.PENDING;
     private volatile boolean cancelled = false;
+    /**
+     * Monotonic "this task must end" flag, set by {@link #beginFadeOut(long)} and
+     * never cleared. Unlike {@link #state} a retry cannot overwrite it, so a
+     * superseded task can never fade back in and play alongside its successor.
+     */
+    private volatile boolean ending = false;
     private volatile boolean restartRequested = false;
     private volatile boolean downloadDone = false;
     private volatile OpenAlSource source;
@@ -262,6 +268,7 @@ public class PlaybackTask {
      * longer of the outgoing fade-out and incoming fade-in). Idempotent.
      */
     public void beginFadeOut(long durationMs) {
+        ending = true;
         fadeDurationMs = Math.max(0, durationMs);
         fadeStartNanos = System.nanoTime();
         setState(PlaybackState.FADING_OUT);
@@ -639,6 +646,11 @@ public class PlaybackTask {
                     finish();
                     return;
                 }
+                if (ending) {
+                    // A retiring task must not rebuild/resurrect.
+                    finish();
+                    return;
+                }
                 if (downloadStalled) {
                     // Watchdog: rebuild the whole pipeline (decoder + source) instead
                     // of staying silent on a dead download worker.
@@ -647,6 +659,7 @@ public class PlaybackTask {
                     if (cancelled) break;
                 }
             } catch (Exception e) {
+                if (ending) break;
                 if (tryDiscreteFallback(e)) {
                     continue;
                 }
@@ -806,7 +819,15 @@ public class PlaybackTask {
 
         // Fade progress and startFuture start together, so buffer waits don't consume it.
         long fadeDuration = transitionFadeInMs >= 0 ? transitionFadeInMs : fadeIn.durationMs();
-        if (skipFadeInOnce && state != PlaybackState.FADING_OUT) {
+        if (ending) {
+            // A retry may have reset the state to RETRYING/LOADING: restore FADING_OUT
+            // and keep beginFadeOut()'s timer, so we end as soon as it elapses instead
+            // of fading back in alongside the successor task.
+            skipFadeInOnce = false;
+            if (state != PlaybackState.FADING_OUT) {
+                setState(PlaybackState.FADING_OUT);
+            }
+        } else if (skipFadeInOnce && state != PlaybackState.FADING_OUT) {
             // Source rebuild: resume at target gain to avoid an audible dip.
             skipFadeInOnce = false;
             fadeStartNanos = -1;
@@ -888,6 +909,14 @@ public class PlaybackTask {
                     // Watchdog flagged an unresponsive download worker: leave the loop
                     // so playLoop rebuilds the pipeline instead of hanging silently.
                     return LoopExitReason.STALLED;
+                }
+                if (ending && state != PlaybackState.FADING_OUT) {
+                    // beginFadeOut() raced our own FADING_IN->PLAYING transition
+                    // (updateGain may have overwritten FADING_OUT): re-assert it so
+                    // we ramp down and end instead of continuing to play.
+                    fadeStartNanos = System.nanoTime();
+                    fadeDurationMs = fadeOut.durationMs();
+                    setState(PlaybackState.FADING_OUT);
                 }
                 long iterationNow = System.nanoTime();
                 if (lastIterationNanos > 0) {
@@ -1372,6 +1401,7 @@ public class PlaybackTask {
     }
 
     private void rebuildForRetry() {
+        if (ending) return;
         setState(PlaybackState.RETRYING);
         stopDownloadWorker();
         cleanup();
