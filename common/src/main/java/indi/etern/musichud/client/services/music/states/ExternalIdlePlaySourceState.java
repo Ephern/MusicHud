@@ -43,7 +43,7 @@ public class ExternalIdlePlaySourceState extends AbstractIdlePlaySourceLayerStat
     }
 
     private static boolean isLocalOrOwnSource(PusherInfo pusherInfo, Player player) {
-        if (pusherInfo == null || pusherInfo == PusherInfo.EMPTY) {
+        if (pusherInfo == null || PusherInfo.EMPTY.equals(pusherInfo)) {
             // Sources without a pusher are local sources; they must not leak into the
             // external (server) layer, otherwise they would show up twice.
             return true;
