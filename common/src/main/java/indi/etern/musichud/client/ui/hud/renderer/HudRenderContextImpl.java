@@ -9,7 +9,6 @@ import com.mojang.blaze3d.systems.SamplerCache;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
-import com.mojang.blaze3d.textures.TextureFormat;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.pipelines.*;
 import indi.etern.musichud.client.ui.hud.renderer.text.GradientSpec;
