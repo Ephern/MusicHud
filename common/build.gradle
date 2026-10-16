@@ -34,7 +34,7 @@ dependencies {
     testRuntimeOnly "org.junit.platform:junit-platform-launcher"
     api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
 
-    compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.8-$rootProject.modernui_version.+"
+    compileOnly "icyllis.modernui:ModernUI-NeoForge:1.21.11-$rootProject.modernui_version.+"
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"

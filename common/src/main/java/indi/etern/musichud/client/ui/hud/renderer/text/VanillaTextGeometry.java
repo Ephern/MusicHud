@@ -28,12 +28,12 @@ public final class VanillaTextGeometry {
                                                       GradientSpec gradient, float alpha,
                                                       @Nullable ScreenRectangle scissor, Matrix3x2f pose) {
         FormattedCharSequence sequence = Language.getInstance().getVisualOrder(FormattedText.of(text));
-        Font.PreparedText prepared = font.prepareText(sequence, x, y, 0xFFFFFFFF, false, 0);
+        Font.PreparedText prepared = font.prepareText(text, x, y, 0xFFFFFFFF, false, 0);
 
         List<TextRenderable> textRenderables = new ArrayList<>();
         prepared.visit(new Font.GlyphVisitor() {
             @Override
-            public void acceptGlyph(@NotNull TextRenderable textRenderable) {
+            public void acceptGlyph(@NotNull TextRenderable.Styled textRenderable) {
                 textRenderables.add(textRenderable);
             }
 

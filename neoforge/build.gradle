@@ -48,7 +48,7 @@ dependencies {
 //    implementation("net.neoforged.fancymodloader:securejarhandler:${rootProject.fancymodloader_version}")
 
     // ModernUI NeoForge (replaced by fork JAR in run/client/mods/)
-    compileOnly("icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+")
+    compileOnly("icyllis.modernui:ModernUI-NeoForge:1.21.11-${rootProject.modernui_version}.+")
     // implementation("icyllis.modernui:ModernUI-NeoForge:1.21.8-${rootProject.modernui_version}.+")
     // modImplementation("icyllis.modernui:ModernUI-Core:${modernui_version}") {
     //     exclude group: "org.slf4j", module: "slf4j-api"

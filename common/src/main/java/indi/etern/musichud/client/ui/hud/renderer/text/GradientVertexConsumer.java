@@ -2,7 +2,8 @@ package indi.etern.musichud.client.ui.hud.renderer.text;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.jetbrains.annotations.NotNull;
-import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
+import org.jspecify.annotations.NonNull;
 
 /**
  * A pass-through {@link VertexConsumer} that replaces the color of every vertex emitted by a
@@ -44,7 +45,7 @@ final class GradientVertexConsumer implements VertexConsumer {
      * performs the transform exactly like it would without this wrapper.
      */
     @Override
-    public @NotNull VertexConsumer addVertex(@NotNull Matrix4f matrix, float x, float y, float z) {
+    public @NotNull VertexConsumer addVertex(@NotNull Matrix4fc matrix, float x, float y, float z) {
         this.localX = x;
         this.hasLocalX = true;
         this.delegate.addVertex(matrix, x, y, z);
@@ -103,6 +104,12 @@ final class GradientVertexConsumer implements VertexConsumer {
     @Override
     public @NotNull VertexConsumer setNormal(float x, float y, float z) {
         this.delegate.setNormal(x, y, z);
+        return this;
+    }
+
+    @Override
+    public @NonNull VertexConsumer setLineWidth(float f) {
+        this.delegate.setLineWidth(f);
         return this;
     }
 

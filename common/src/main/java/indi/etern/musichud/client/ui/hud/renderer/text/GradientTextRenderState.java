@@ -1,6 +1,8 @@
 package indi.etern.musichud.client.ui.hud.renderer.text;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
@@ -51,7 +53,7 @@ public final class GradientTextRenderState implements GuiElementRenderState {
     @Override
     public @NotNull TextureSetup textureSetup() {
         if (textureSetup == null) {
-            textureSetup = TextureSetup.singleTextureWithLightmap(run.texture());
+            textureSetup = TextureSetup.singleTextureWithLightmap(run.texture(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
         }
         return textureSetup;
     }
