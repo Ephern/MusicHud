@@ -291,7 +291,7 @@ public class HudEditOverlayView extends View {
     }
 
     private void drawHandleMarker(Canvas canvas, Handle handle, float cx, float cy) {
-        long color = Theme.HUD_HANDLE_STATES.getColorForState(handleState(handle),
+        int color = Theme.HUD_HANDLE_STATES.getColorForState(handleState(handle),
                 Theme.HUD_HANDLE_STATES.getDefaultColor());
         handlePaint.setColor(color);
         switch (handle) {
