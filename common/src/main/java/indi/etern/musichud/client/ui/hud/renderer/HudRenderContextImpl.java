@@ -269,6 +269,15 @@ public class HudRenderContextImpl implements HudRenderContext {
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
         int alpha = (color >>> 24) & 0xFF;
         if (alpha == 0) return;
+        if (!dropShadow) {
+            // Plain text shares the gradient geometry path, so it gets the same layout-local
+            // snapping and linear sampling instead of the engine's per-glyph screen snapping.
+            // Gradient samples already fold alpha in, so the ColorModulator trick below is not
+            // needed here.
+            drawGradientString(font, text, x, y, GradientSpec.flat(color), 1f);
+            return;
+        }
+        // Shadows keep the engine path; the gradient geometry path does not draw them.
         // Font.adjustColor (1.21.1) forces a vertex color with alpha<4 to fully opaque, which
         // makes low-alpha text jump to opaque. Keep the vertex color opaque and carry the real
         // alpha via ColorModulator instead: rendertype_text.fsh multiplies it in and discards

@@ -14,19 +14,23 @@ import java.util.Set;
 /**
  * Renders a string with a per-vertex horizontal gradient on 1.21.1.
  * <p>
- * 1.21.1 has no {@code GuiRenderer}/{@code GuiElementRenderState} submission model, so instead of
- * building glyph geometry ourselves we delegate to the engine that draws the text anyway
- * (Modern UI's {@code Font} overwrite, or the vanilla {@code Font}) and intercept the vertices it
- * emits: a wrapping {@link MultiBufferSource} returns a wrapping {@link VertexConsumer} that
- * replaces every glyph vertex color with the gradient sampled at that vertex's own local X.
+ * Primary path: {@link LegacyTextGeometry} emits the glyph quads itself into the shared
+ * buffer source, snapping positions in layout space (the animated text origin is excluded)
+ * and sampling the font atlas through a linear GL sampler object while its batches are
+ * flushed. That is what removes the marquee jitter and keeps sub-pixel motion smooth.
  * <p>
- * This keeps glyph shapes, atlas, pipeline/render type selection and metrics byte-for-byte
- * identical to normal text drawing; only the colors change.
+ * Fallback path (used when the Modern UI text engine is disabled or the layout cannot be
+ * prepared): the engine that draws the text anyway (Modern UI's {@code Font} overwrite, or
+ * the vanilla {@code Font}) is asked to draw it, and a wrapping {@link MultiBufferSource}
+ * returns a wrapping {@link VertexConsumer} that replaces every glyph vertex color with the
+ * gradient sampled at that vertex's own local X. Glyph shapes, atlas, pipeline/render type
+ * selection and metrics stay byte-for-byte identical to normal text drawing; only the colors
+ * change.
  * <p>
- * The caller must keep {@code ColorModulator} neutral (white) for the duration of {@link #draw}:
- * text alpha is carried by the vertex color, and the shared {@code BufferSource} would otherwise
- * multiply the gradient by whatever {@code ColorModulator} a later {@code GuiGraphics} draw
- * flushes it under.
+ * In both paths the caller must keep {@code ColorModulator} neutral (white) for the duration
+ * of {@link #draw}: text alpha is carried by the vertex color, and the shared
+ * {@code BufferSource} would otherwise multiply the gradient by whatever {@code ColorModulator}
+ * a later {@code GuiGraphics} draw flushes it under.
  */
 public final class GradientTextRenderer {
 
@@ -45,6 +49,14 @@ public final class GradientTextRenderer {
         if (font == null || text == null || text.isEmpty() || gradient == null || alpha <= 0f) {
             return;
         }
+        if (LegacyTextGeometry.draw(text, x, y, gradient, alpha, pose, bufferSource, packedLight)) {
+            return;
+        }
+        drawDelegated(font, text, x, y, gradient, alpha, pose, bufferSource, packedLight);
+    }
+
+    private static void drawDelegated(Font font, String text, float x, float y, GradientSpec gradient, float alpha,
+                                      Matrix4f pose, MultiBufferSource.BufferSource bufferSource, int packedLight) {
         // Local glyph coordinates are in unscaled font units, so normalizing by the unscaled
         // advance makes the gradient independent of any pose scale applied by the caller.
         float totalAdvance = Math.max(1f, font.width(text));
