@@ -93,6 +93,12 @@ public final class VanillaTextGeometry {
         }
 
         @Override
+        public GpuSampler sampler() {
+            // the vanilla font is pixel art; keep engine-like nearest sampling
+            return RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
+        }
+
+        @Override
         public void writeVertices(VertexConsumer consumer, Matrix3x2f pose, GradientSpec gradient, float alpha) {
             VertexConsumer gradientConsumer = new GradientVertexConsumer(consumer, originX, totalAdvance, gradient, alpha);
             Matrix4f matrix4f = new Matrix4f().mul(pose);

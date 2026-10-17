@@ -16,6 +16,12 @@ public interface GradientTextRun {
     GpuTextureView texture();
 
     /**
+     * Sampler the render state binds for {@link #texture()}: nearest while the text sits on
+     * the device pixel grid, linear while it moves off it (or for scale-independent glyphs).
+     */
+    GpuSampler sampler();
+
+    /**
      * Emits the glyph quads of this run. {@code pose} maps text-local coordinates (origin at
      * the text's left baseline start, {@code x} growing right) to GUI space.
      */

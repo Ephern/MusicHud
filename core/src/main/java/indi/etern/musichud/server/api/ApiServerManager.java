@@ -191,18 +191,7 @@ public class ApiServerManager implements ServerRegister {
                         executablePath = binaryExecutableApiServerPath;
                     }
 
-                    ProcessBuilder processBuilder = new ProcessBuilder(executablePath.toString());
-                    Map<String, String> env = processBuilder.environment();
-                    env.put("CORS_ALLOW_ORIGIN", serverConfig.getCorsAllowOrigin());
-                    env.put("ENABLE_PROXY", String.valueOf(serverConfig.getEnableProxy()));
-                    env.put("PROXY_URL", serverConfig.getProxyUrl());
-                    env.put("ENABLE_RANDOM_CN_IP", String.valueOf(serverConfig.getUseRandomCnIp()));
-                    env.put("ENABLE_GENERAL_UNBLOCK", String.valueOf(serverConfig.getEnableGeneralUnblock()));
-                    env.put("ENABLE_FLAC", String.valueOf(serverConfig.getEnableFlac()));
-                    env.put("SELECT_MAX_BR", String.valueOf(serverConfig.getSelectMaxBr()));
-                    env.put("FOLLOW_SOURCE_ORDER", String.valueOf(serverConfig.getFollowSourceOrder()));
-                    env.put("PORT", String.valueOf(serverConfig.getPort()));
-                    Process child = processBuilder.start();
+                    Process child = executeWithEnvs(executablePath);
                     process = child;
 
                     Path logFile;
@@ -304,6 +293,21 @@ public class ApiServerManager implements ServerRegister {
                 }
             }
         }
+    }
+
+    private static Process executeWithEnvs(Path executablePath) throws IOException {
+        ProcessBuilder processBuilder = new ProcessBuilder(executablePath.toString());
+        Map<String, String> env = processBuilder.environment();
+        env.put("CORS_ALLOW_ORIGIN", serverConfig.getCorsAllowOrigin());
+        env.put("ENABLE_PROXY", String.valueOf(serverConfig.getEnableProxy()));
+        env.put("PROXY_URL", serverConfig.getProxyUrl());
+        env.put("ENABLE_RANDOM_CN_IP", String.valueOf(serverConfig.getUseRandomCnIp()));
+        env.put("ENABLE_GENERAL_UNBLOCK", String.valueOf(serverConfig.getEnableGeneralUnblock()));
+        env.put("ENABLE_FLAC", String.valueOf(serverConfig.getEnableFlac()));
+        env.put("SELECT_MAX_BR", String.valueOf(serverConfig.getSelectMaxBr()));
+        env.put("FOLLOW_SOURCE_ORDER", String.valueOf(serverConfig.getFollowSourceOrder()));
+        env.put("PORT", String.valueOf(serverConfig.getPort()));
+        return processBuilder.start();
     }
 
     public Path getLogDir() {

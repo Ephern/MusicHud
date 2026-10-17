@@ -48,7 +48,7 @@ public class ExternalIdlePlaySourceState extends AbstractIdlePlaySourceLayerStat
             // external (server) layer, otherwise they would show up twice.
             return true;
         }
-        return player != null && pusherInfo.getPlayerUUID().equals(player.getUUID());
+        return player != null && pusherInfo.playerUUID().equals(player.getUUID());
     }
 
     @Override

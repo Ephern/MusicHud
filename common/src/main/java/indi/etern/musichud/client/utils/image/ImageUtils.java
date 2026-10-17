@@ -55,7 +55,7 @@ public class ImageUtils {
             .maximumSize(256)
             .build();
     private static final Cache<String, byte[]> cachedRemoteBytes = CacheBuilder.newBuilder()
-            .expireAfterAccess(2, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(2))
             .maximumWeight(64L * 1024 * 1024)
             .weigher((Weigher<String, byte[]>) (key, value) -> value.length)
             .build();
