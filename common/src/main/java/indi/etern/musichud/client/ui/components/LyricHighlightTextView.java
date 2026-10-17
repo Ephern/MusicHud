@@ -15,6 +15,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.lyric.LyricHighlightCalculator;
 import indi.etern.musichud.client.utils.ui.SmoothBumpInterpolator;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 
@@ -34,6 +35,7 @@ public class LyricHighlightTextView extends TextView {
     private final Duration fadeAt;
     private final List<LyricLine.Phrase> phrases;
     private final LyricHighlightCalculator highlightCalculator;
+    @Getter
     private HighlightStatus status = HighlightStatus.WAITING;
     private Duration statusUpdateTime = Duration.ZERO;
     private boolean statusUpdateProcessing = false;
@@ -65,10 +67,6 @@ public class LyricHighlightTextView extends TextView {
 
     public void emphasize() {
         setStatus(HighlightStatus.PERFORMING);
-    }
-
-    public HighlightStatus getStatus() {
-        return status;
     }
 
     /**

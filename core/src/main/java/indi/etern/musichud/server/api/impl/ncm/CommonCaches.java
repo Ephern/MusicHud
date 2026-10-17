@@ -11,7 +11,7 @@ import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
-import java.util.concurrent.TimeUnit;
+import java.time.Duration;
 
 public class CommonCaches {
     @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -34,15 +34,15 @@ public class CommonCaches {
         }
     }
     public static final Cache<PlaylistCacheKey, Playlist> playlistsCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(5))
             .maximumSize(50)
             .build();
     public static final Cache<Long, Album> albumsCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(5))
             .maximumSize(50)
             .build();
     public static final Cache<Long, Artist> artistsCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(5))
             .maximumSize(50)
             .build();
 }
