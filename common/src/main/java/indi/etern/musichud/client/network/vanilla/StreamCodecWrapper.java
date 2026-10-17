@@ -10,7 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 public class StreamCodecWrapper {
-    static Map<ByteBufCodec<?>, StreamCodec<?,?>> codecMap = new HashMap<>();
+    static final Map<ByteBufCodec<?>, StreamCodec<?,?>> codecMap = new HashMap<>();
     public static <T extends IPayload> StreamCodec<? super RegistryFriendlyByteBuf, CustomPacketPayloadWrapper<T>> of(ByteBufCodec<T> codec) {
         //noinspection unchecked
         return (StreamCodec<? super RegistryFriendlyByteBuf, CustomPacketPayloadWrapper<T>>)

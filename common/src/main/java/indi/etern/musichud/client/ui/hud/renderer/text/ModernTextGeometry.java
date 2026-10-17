@@ -1,6 +1,10 @@
 package indi.etern.musichud.client.ui.hud.renderer.text;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.systems.SamplerCache;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import icyllis.modernui.mc.text.BitmapFont;
@@ -12,6 +16,7 @@ import icyllis.modernui.mc.text.TextLayout;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import icyllis.modernui.mc.text.TextLayoutProcessor;
 import icyllis.modernui.mc.text.TextRenderType;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import org.jetbrains.annotations.Nullable;
@@ -33,8 +38,11 @@ import java.util.WeakHashMap;
  * <p>
  * Mode selection, device font size and pixel snapping mirror the engine's own GUI text path
  * ({@code MixinGuiTextRenderState.onPrepareText} and {@code TextLayout.prepareTextWithDensity}):
- * uniformly scaled text bakes glyphs at {@code resLevel * scale} and the pose translation is
- * moved into the text origin before snapping, exactly like normally drawn GUI text.
+ * uniformly scaled text bakes glyphs at {@code resLevel * scale}. Unlike the engine's own
+ * renderer, snapping is performed in layout space (the animated text origin is excluded) so
+ * scrolling text keeps rigid glyph spacing, and direct-mask runs bind a linear sampler
+ * (see {@link #samplerFor}) while the text is off the device pixel grid, so sub-pixel
+ * motion stays smooth without a custom fragment shader.
  */
 public final class ModernTextGeometry {
     private static final Random OBFUSCATED_RANDOM = new Random();
@@ -78,6 +86,15 @@ public final class ModernTextGeometry {
         float invDensity = 1f / density;
         int fontSize = TextLayoutProcessor.computeFontSize(density);
         boolean directMask = preferredMode == TextRenderType.MODE_NORMAL;
+        boolean linearSampling = needsLinear(setup.pose(), setup.originX(), setup.originY(), density,
+                Minecraft.getInstance().getWindow().getGuiScale());
+
+        // Bake every glyph now, while this element is merely being submitted: a newly baked
+        // glyph can grow or rebuild the font atlas, and that rebuild must never happen while
+        // the GUI renderer is already recording this element's vertices, otherwise the UVs
+        // written in that pass would no longer match the atlas texture bound for the draw
+        // (visible as corrupted, diagonally clipped or entirely missing glyphs).
+        bakedGlyphs(layout, fontSize);
 
         int[] flags = layout.getGlyphFlags();
         List<GradientTextRenderState> states = new ArrayList<>();
@@ -88,7 +105,8 @@ public final class ModernTextGeometry {
             if (i > start && (key == null || !key.equals(currentKey))) {
                 GradientTextRun run = new ModernTextRun(layout, start, i, fontSize, density, invDensity,
                         directMask, currentKey.pipeline, currentKey.kind, currentKey.bitmapFont,
-                        currentKey.isColorEmoji, setup.originX(), setup.originY(), totalAdvance);
+                        currentKey.isColorEmoji, samplerFor(currentKey.kind, directMask, linearSampling),
+                        setup.originX(), setup.originY(), totalAdvance);
                 states.add(new GradientTextRenderState(setup.pose(), run, gradient, alpha, scissor));
                 start = i;
             }
@@ -184,6 +202,43 @@ public final class ModernTextGeometry {
     }
 
     /**
+     * Mirrors the engine's own GUI text sampling heuristic (its {@code TextSampling.needsLinear}):
+     * direct-mask text is sampled linearly only while it is off the device pixel grid
+     * (scrolling, fractional scale or rotation); pixel-aligned text keeps nearest sampling so
+     * it stays crisp.
+     */
+    private static boolean needsLinear(Matrix3x2f pose, float x, float y, float density, float guiScale) {
+        if (near(pose.m00() * guiScale / density, 1.0)
+                && near(pose.m11() * guiScale / density, 1.0)
+                && pose.m01() == 0f && pose.m10() == 0f) {
+            float originX = (pose.m00() * x + pose.m20()) * guiScale;
+            float originY = (pose.m11() * y + pose.m21()) * guiScale;
+            return !near(originX, Math.rint(originX)) || !near(originY, Math.rint(originY));
+        }
+        return true;
+    }
+
+    private static boolean near(float value, double target) {
+        return Math.abs((double) value - target) <= 1e-4;
+    }
+
+    /**
+     * Picks the sampler for one run, mirroring the engine's own GUI text choices: bitmap
+     * replacements (emoji, bitmap fonts) always stay nearest, direct-mask glyphs sample
+     * linearly only while off the pixel grid, and SDF glyphs sample linearly with mipmaps.
+     */
+    private static GpuSampler samplerFor(TextureKind kind, boolean directMask, boolean linearSampling) {
+        SamplerCache cache = RenderSystem.getSamplerCache();
+        if (kind != TextureKind.FONT) {
+            return cache.getClampToEdge(FilterMode.NEAREST);
+        }
+        if (directMask) {
+            return cache.getClampToEdge(linearSampling ? FilterMode.LINEAR : FilterMode.NEAREST);
+        }
+        return cache.getClampToEdge(FilterMode.LINEAR, true);
+    }
+
+    /**
      * Bakes (once per layout and font size) every glyph of the layout, exactly like
      * {@code TextLayout.prepareGlyphs}: obfuscated code points bake to their fast char set.
      */
@@ -218,13 +273,14 @@ public final class ModernTextGeometry {
         @Nullable
         private final BitmapFont bitmapFont;
         private final boolean isColorEmoji;
+        private final GpuSampler sampler;
         private final float originX;
         private final float originY;
         private final float totalAdvance;
 
         ModernTextRun(TextLayout layout, int start, int end, int fontSize, float density, float invDensity,
                       boolean directMask, RenderPipeline pipeline, TextureKind kind,
-                      @Nullable BitmapFont bitmapFont, boolean isColorEmoji,
+                      @Nullable BitmapFont bitmapFont, boolean isColorEmoji, GpuSampler sampler,
                       float originX, float originY, float totalAdvance) {
             this.layout = layout;
             this.start = start;
@@ -237,6 +293,7 @@ public final class ModernTextGeometry {
             this.kind = kind;
             this.bitmapFont = bitmapFont;
             this.isColorEmoji = isColorEmoji;
+            this.sampler = sampler;
             this.originX = originX;
             this.originY = originY;
             this.totalAdvance = totalAdvance;
@@ -258,24 +315,29 @@ public final class ModernTextGeometry {
         }
 
         @Override
+        public GpuSampler sampler() {
+            return sampler;
+        }
+
+        @Override
         public void writeVertices(VertexConsumer consumer, Matrix3x2f pose, GradientSpec gradient, float alpha) {
             ModernBakedGlyph[] bakedGlyphs = bakedGlyphs(layout, fontSize);
             float[] positions = layout.getPositions();
             int[] flags = layout.getGlyphFlags();
-            float baseline = originY + TextLayout.sBaselineOffset;
             for (int i = start; i < end; i++) {
                 ModernBakedGlyph glyph = glyphAt(bakedGlyphs, i, flags[i]);
                 if (glyph == null || glyph.x == Integer.MIN_VALUE) {
                     continue;
                 }
                 int bits = flags[i];
-                float rx;
-                float ry;
+                boolean bitmapReplacement = (bits & CharacterStyle.ANY_BITMAP_REPLACEMENT) != 0;
+                float localX;
+                float localY;
                 float w;
                 float h;
                 boolean fakeItalic = false;
                 int ascent = 0;
-                if ((bits & CharacterStyle.ANY_BITMAP_REPLACEMENT) != 0) {
+                if (bitmapReplacement) {
                     float scaleFactor;
                     if (!isColorEmoji) {
                         ascent = -glyph.y / TextLayoutEngine.BITMAP_SCALE;
@@ -285,19 +347,22 @@ public final class ModernTextGeometry {
                         scaleFactor = TextLayoutProcessor.sBaseFontSize / GlyphManager.EMOJI_BASE;
                     }
                     fakeItalic = (bits & CharacterStyle.ITALIC_MASK) != 0;
-                    rx = originX + positions[i << 1] + glyph.x * scaleFactor;
-                    ry = baseline + positions[i << 1 | 1] + glyph.y * scaleFactor;
+                    localX = positions[i << 1] + glyph.x * scaleFactor;
+                    localY = TextLayout.sBaselineOffset + positions[i << 1 | 1] + glyph.y * scaleFactor;
                     w = glyph.width * scaleFactor;
                     h = glyph.height * scaleFactor;
                 } else {
-                    rx = originX + positions[i << 1] + glyph.x * invDensity;
-                    ry = baseline + positions[i << 1 | 1] + glyph.y * invDensity;
+                    localX = positions[i << 1] + glyph.x * invDensity;
+                    localY = TextLayout.sBaselineOffset + positions[i << 1 | 1] + glyph.y * invDensity;
                     w = glyph.width * invDensity;
                     h = glyph.height * invDensity;
                 }
+                // Snapping happens in layout space: the animated text origin must not take
+                // part in it, otherwise every glyph snaps on its own schedule and the glyph
+                // spacing pulses while the text scrolls (the marquee jitter this class fixes).
                 if (directMask) {
-                    rx = Math.round(rx * density) * invDensity;
-                    ry = Math.round(ry * density) * invDensity;
+                    localX = Math.round(localX * density) * invDensity;
+                    localY = Math.round(localY * density) * invDensity;
                 }
                 int colorLeft;
                 int colorRight;
@@ -306,8 +371,8 @@ public final class ModernTextGeometry {
                     colorLeft = (a << 24) | 0xFFFFFF;
                     colorRight = colorLeft;
                 } else {
-                    colorLeft = gradient.sample((rx - originX) / totalAdvance, alpha);
-                    colorRight = gradient.sample((rx + w - originX) / totalAdvance, alpha);
+                    colorLeft = gradient.sample(localX / totalAdvance, alpha);
+                    colorRight = gradient.sample((localX + w) / totalAdvance, alpha);
                 }
                 float upSkew = 0f;
                 float downSkew = 0f;
@@ -315,14 +380,34 @@ public final class ModernTextGeometry {
                     upSkew = 0.25f * ascent;
                     downSkew = 0.25f * (ascent - h);
                 }
+                float rx = originX + localX;
+                float ry = originY + localY;
+                float u1 = glyph.u1;
+                float v1 = glyph.v1;
+                float u2 = glyph.u2;
+                float v2 = glyph.v2;
+                // One texel of bleed (position + UV) so the linear sampler never clips
+                // at the quad edge; the atlas reserves a border around every glyph.
+                if (directMask && !bitmapReplacement) {
+                    float du = (u2 - u1) / (float) glyph.width;
+                    float dv = (v2 - v1) / (float) glyph.height;
+                    rx -= invDensity;
+                    ry -= invDensity;
+                    w += 2f * invDensity;
+                    h += 2f * invDensity;
+                    u1 -= du;
+                    v1 -= dv;
+                    u2 += du;
+                    v2 += dv;
+                }
                 consumer.addVertexWith2DPose(pose, rx + upSkew, ry)
-                        .setColor(colorLeft).setUv(glyph.u1, glyph.v1).setLight(FULL_BRIGHT);
+                        .setColor(colorLeft).setUv(u1, v1).setLight(FULL_BRIGHT);
                 consumer.addVertexWith2DPose(pose, rx + downSkew, ry + h)
-                        .setColor(colorLeft).setUv(glyph.u1, glyph.v2).setLight(FULL_BRIGHT);
+                        .setColor(colorLeft).setUv(u1, v2).setLight(FULL_BRIGHT);
                 consumer.addVertexWith2DPose(pose, rx + w + downSkew, ry + h)
-                        .setColor(colorRight).setUv(glyph.u2, glyph.v2).setLight(FULL_BRIGHT);
+                        .setColor(colorRight).setUv(u2, v2).setLight(FULL_BRIGHT);
                 consumer.addVertexWith2DPose(pose, rx + w + upSkew, ry)
-                        .setColor(colorRight).setUv(glyph.u2, glyph.v1).setLight(FULL_BRIGHT);
+                        .setColor(colorRight).setUv(u2, v1).setLight(FULL_BRIGHT);
             }
         }
 

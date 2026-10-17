@@ -1,6 +1,9 @@
 package indi.etern.musichud.client.ui.hud.renderer.text;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.Font;
@@ -90,6 +93,12 @@ public final class VanillaTextGeometry {
         @Override
         public GpuTextureView texture() {
             return texture;
+        }
+
+        @Override
+        public GpuSampler sampler() {
+            // the vanilla font is pixel art; keep engine-like nearest sampling
+            return RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST);
         }
 
         @Override

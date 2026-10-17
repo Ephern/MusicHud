@@ -27,6 +27,7 @@ import indi.etern.musichud.utils.IClientDistUtil;
 import lombok.*;
 import org.apache.logging.log4j.Logger;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -66,7 +67,7 @@ public class MusicPlayerServerService {
     private final CurrentVoteInfo currentVoteInfo = new CurrentVoteInfo();
     private final Logger logger = MusicHud.getLogger(MusicPlayerServerService.class);
     private final Cache<CacheKey, MusicResourceInfo> musicResourceInfoCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(5))
             .maximumSize(20)
             .build();
     /** Consecutive resource loading failures of the current music; reset on any success. */
@@ -142,7 +143,7 @@ public class MusicPlayerServerService {
                             PusherInfo pusherInfo = nextToPlay.value().getPusherInfo();
                             if (pusherInfo != null &&
                                     loginedPlayerInfoMap.keySet().stream().noneMatch(
-                                            uuid -> uuid.equals(pusherInfo.getPlayerUUID())
+                                            uuid -> uuid.equals(pusherInfo.playerUUID())
                                     )
                             ) {
                                 continue;
@@ -244,7 +245,7 @@ public class MusicPlayerServerService {
      * pool: the pusher would sample them, fail the ownership check and {@code continue} forever.
      */
     private boolean hasPusherLoginInfo(PusherInfo pusherInfo) {
-        return pusherInfo != null && loginApiService.getPlayerInfoMap().containsKey(pusherInfo.getPlayerUUID());
+        return pusherInfo != null && loginApiService.getPlayerInfoMap().containsKey(pusherInfo.playerUUID());
     }
 
     /**
@@ -402,7 +403,7 @@ public class MusicPlayerServerService {
 
     private void notifySourceRemoved(PusherInfo pusherInfo) {
         LoginApiService.PlayerLoginInfo ownerLoginInfo =
-                loginApiService.getLoginInfoByPlayerUUID(pusherInfo.getPlayerUUID());
+                loginApiService.getLoginInfoByPlayerUUID(pusherInfo.playerUUID());
         if (ownerLoginInfo != null) {
             serverNetworkService.sendToPlayer(ownerLoginInfo.getPlayer(),
                     new CommonNotificationMessage(MessagedResult.fail(MusicHud.MOD_ID + ".text.idleSourceLoadFailed", null)));
@@ -544,7 +545,7 @@ public class MusicPlayerServerService {
     public void pushMusicToQueue(Traceable<Long> music, PusherInfo pusherInfo) {
         long musicDetailId = music.value();
         try {
-            List<MusicDetail> musicDetailByIds = musicApiService.getMusicDetailByIds(List.of(musicDetailId), pusherInfo.getPlayerUUID());
+            List<MusicDetail> musicDetailByIds = musicApiService.getMusicDetailByIds(List.of(musicDetailId), pusherInfo.playerUUID());
             if (musicDetailByIds.size() != 1) {
                 throw new IllegalStateException();
             }
@@ -573,7 +574,7 @@ public class MusicPlayerServerService {
             return;
         }
         PusherInfo pusher = target.musicDetail().value().getPusherInfo();
-        if (pusher != null && playerUUID.equals(pusher.getPlayerUUID())) {
+        if (pusher != null && playerUUID.equals(pusher.playerUUID())) {
             musicQueue.remove(target);
             serverNetworkService.sendToPlayerInfos(loginApiService.getPlayerInfoMap().values(),
                     new RefreshMusicQueueMessage(musicQueue));
@@ -597,7 +598,7 @@ public class MusicPlayerServerService {
      * processed request win.</p>
      */
     public MessagedResult<Void> addIdlePlaySource(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
-        synchronized (idleSourceKeyLock(pusherInfo.getPlayerUUID(), idlePlaySource)) {
+        synchronized (idleSourceKeyLock(pusherInfo.playerUUID(), idlePlaySource)) {
             return addIdlePlaySourceLocked(idlePlaySource, pusherInfo);
         }
     }
@@ -614,12 +615,12 @@ public class MusicPlayerServerService {
                 return MessagedResult.success(null);
             }
             if (existing == null) {
-                idlePlaySource.serverLoadMusicCollection(pusherInfo.getPlayerUUID());
+                idlePlaySource.serverLoadMusicCollection(pusherInfo.playerUUID());
             } else {
                 // Mode switch: reuse the loaded collection, keep the old entry until the new mode is ready
                 idlePlaySource.setMusicCollection(existing.getMusicCollection());
                 if (idlePlaySource.getMusicCollection() == null) {
-                    idlePlaySource.serverLoadMusicCollection(pusherInfo.getPlayerUUID());
+                    idlePlaySource.serverLoadMusicCollection(pusherInfo.playerUUID());
                 }
             }
             MusicCollection collection = idlePlaySource.getMusicCollection();
@@ -659,7 +660,7 @@ public class MusicPlayerServerService {
     }
 
     public void removeIdlePlaySource(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
-        synchronized (idleSourceKeyLock(pusherInfo.getPlayerUUID(), idlePlaySource)) {
+        synchronized (idleSourceKeyLock(pusherInfo.playerUUID(), idlePlaySource)) {
             Set<IdlePlaySource> musicCollections = idlePlaySources.get(pusherInfo);
             if (musicCollections == null) {
                 logger.warn("Failed to remove idle play source: no sources registered for {} (id: {}, type: {})",
@@ -828,7 +829,7 @@ public class MusicPlayerServerService {
         if (idlePlaySources.remove(pusherInfo) == null) {
             logger.debug("Remove all idle play sources: none registered for {}", pusherInfo);
         }
-        PlayMode.onAllRemoved(pusherInfo.getPlayerUUID());
+        PlayMode.onAllRemoved(pusherInfo.playerUUID());
         debouncedUpdateAllIdlePlaySources();
     }
 
@@ -992,7 +993,7 @@ public class MusicPlayerServerService {
                 votedPlayers.add(playerUUID);
                 voteRate += 1.0f / totalPlayers;
                 PusherInfo pusherInfo = current.getPusherInfo();
-                if (pusherInfo != null && playerUUID.equals(pusherInfo.getPlayerUUID())) {
+                if (pusherInfo != null && playerUUID.equals(pusherInfo.playerUUID())) {
                     voteRate += (float) serverConfig.getPusherVoteAdditionalRate();
                     logger.info("Pusher player \"{}\" voted for skip current music {}:{}", playerUUID, id, current.getName());
                 } else {
