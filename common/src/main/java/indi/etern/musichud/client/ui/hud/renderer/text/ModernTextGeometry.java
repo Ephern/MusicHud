@@ -1,6 +1,10 @@
 package indi.etern.musichud.client.ui.hud.renderer.text;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.systems.SamplerCache;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import icyllis.modernui.mc.text.BitmapFont;
@@ -12,7 +16,7 @@ import icyllis.modernui.mc.text.TextLayout;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import icyllis.modernui.mc.text.TextLayoutProcessor;
 import icyllis.modernui.mc.text.TextRenderType;
-import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.renderer.LightTexture;
@@ -37,9 +41,9 @@ import java.util.WeakHashMap;
  * ({@code MixinGuiTextRenderState.onPrepareText} and {@code TextLayout.prepareTextWithDensity}):
  * uniformly scaled text bakes glyphs at {@code resLevel * scale}. Unlike the engine's own
  * renderer, snapping is performed in layout space (the animated text origin is excluded) so
- * scrolling text keeps rigid glyph spacing, and direct-mask runs are drawn through
- * {@link HudRenderPipelines#GRADIENT_TEXT}, whose fragment shader performs manual bilinear
- * filtering for smooth sub-pixel motion.
+ * scrolling text keeps rigid glyph spacing, and direct-mask runs bind a linear sampler
+ * (see {@link #samplerFor}) while the text is off the device pixel grid, so sub-pixel
+ * motion stays smooth without a custom fragment shader.
  */
 public final class ModernTextGeometry {
     private static final Random OBFUSCATED_RANDOM = new Random();
@@ -83,6 +87,8 @@ public final class ModernTextGeometry {
         float invDensity = 1f / density;
         int fontSize = TextLayoutProcessor.computeFontSize(density);
         boolean directMask = preferredMode == TextRenderType.MODE_NORMAL;
+        boolean linearSampling = needsLinear(setup.pose(), setup.originX(), setup.originY(), density,
+                Minecraft.getInstance().getWindow().getGuiScale());
 
         // Bake every glyph now, while this element is merely being submitted: a newly baked
         // glyph can grow or rebuild the font atlas, and that rebuild must never happen while
@@ -96,11 +102,12 @@ public final class ModernTextGeometry {
         int start = 0;
         RunKey currentKey = null;
         for (int i = 0; i <= flags.length; i++) {
-            RunKey key = i == flags.length ? null : keyOf(layout, flags[i], i, preferredMode, directMask);
+            RunKey key = i == flags.length ? null : keyOf(layout, flags[i], i, preferredMode);
             if (i > start && (key == null || !key.equals(currentKey))) {
                 GradientTextRun run = new ModernTextRun(layout, start, i, fontSize, density, invDensity,
                         directMask, currentKey.pipeline, currentKey.kind, currentKey.bitmapFont,
-                        currentKey.isColorEmoji, setup.originX(), setup.originY(), totalAdvance);
+                        currentKey.isColorEmoji, samplerFor(currentKey.kind, directMask, linearSampling),
+                        setup.originX(), setup.originY(), totalAdvance);
                 states.add(new GradientTextRenderState(setup.pose(), run, gradient, alpha, scissor));
                 start = i;
             }
@@ -182,7 +189,7 @@ public final class ModernTextGeometry {
     private record RunKey(RenderPipeline pipeline, TextureKind kind, @Nullable BitmapFont bitmapFont, boolean isColorEmoji) {
     }
 
-    private static RunKey keyOf(TextLayout layout, int bits, int index, int preferredMode, boolean directMask) {
+    private static RunKey keyOf(TextLayout layout, int bits, int index, int preferredMode) {
         if ((bits & CharacterStyle.ANY_BITMAP_REPLACEMENT) != 0) {
             if (layout.getFont(index) instanceof BitmapFont bitmapFont) {
                 return new RunKey(TextRenderType.getPipelineForGui(TextRenderType.MODE_NORMAL, true),
@@ -191,10 +198,45 @@ public final class ModernTextGeometry {
             return new RunKey(TextRenderType.getPipelineForGui(TextRenderType.MODE_NORMAL, false),
                     TextureKind.EMOJI, null, true);
         }
-        // direct-mask runs use our manual-bilinear pipeline; every other mode keeps the engine's
-        return new RunKey(directMask ? HudRenderPipelines.GRADIENT_TEXT
-                        : TextRenderType.getPipelineForGui(preferredMode, false),
+        return new RunKey(TextRenderType.getPipelineForGui(preferredMode, false),
                 TextureKind.FONT, null, false);
+    }
+
+    /**
+     * Mirrors the engine's own GUI text sampling heuristic (its {@code TextSampling.needsLinear}):
+     * direct-mask text is sampled linearly only while it is off the device pixel grid
+     * (scrolling, fractional scale or rotation); pixel-aligned text keeps nearest sampling so
+     * it stays crisp.
+     */
+    private static boolean needsLinear(Matrix3x2f pose, float x, float y, float density, float guiScale) {
+        if (near(pose.m00() * guiScale / density, 1.0)
+                && near(pose.m11() * guiScale / density, 1.0)
+                && pose.m01() == 0f && pose.m10() == 0f) {
+            float originX = (pose.m00() * x + pose.m20()) * guiScale;
+            float originY = (pose.m11() * y + pose.m21()) * guiScale;
+            return !near(originX, Math.rint(originX)) || !near(originY, Math.rint(originY));
+        }
+        return true;
+    }
+
+    private static boolean near(float value, double target) {
+        return Math.abs((double) value - target) <= 1e-4;
+    }
+
+    /**
+     * Picks the sampler for one run, mirroring the engine's own GUI text choices: bitmap
+     * replacements (emoji, bitmap fonts) always stay nearest, direct-mask glyphs sample
+     * linearly only while off the pixel grid, and SDF glyphs sample linearly with mipmaps.
+     */
+    private static GpuSampler samplerFor(TextureKind kind, boolean directMask, boolean linearSampling) {
+        SamplerCache cache = RenderSystem.getSamplerCache();
+        if (kind != TextureKind.FONT) {
+            return cache.getClampToEdge(FilterMode.NEAREST);
+        }
+        if (directMask) {
+            return cache.getClampToEdge(linearSampling ? FilterMode.LINEAR : FilterMode.NEAREST);
+        }
+        return cache.getClampToEdge(FilterMode.LINEAR, true);
     }
 
     /**
@@ -231,13 +273,14 @@ public final class ModernTextGeometry {
         @Nullable
         private final BitmapFont bitmapFont;
         private final boolean isColorEmoji;
+        private final GpuSampler sampler;
         private final float originX;
         private final float originY;
         private final float totalAdvance;
 
         ModernTextRun(TextLayout layout, int start, int end, int fontSize, float density, float invDensity,
                       boolean directMask, RenderPipeline pipeline, TextureKind kind,
-                      @Nullable BitmapFont bitmapFont, boolean isColorEmoji,
+                      @Nullable BitmapFont bitmapFont, boolean isColorEmoji, GpuSampler sampler,
                       float originX, float originY, float totalAdvance) {
             this.layout = layout;
             this.start = start;
@@ -250,6 +293,7 @@ public final class ModernTextGeometry {
             this.kind = kind;
             this.bitmapFont = bitmapFont;
             this.isColorEmoji = isColorEmoji;
+            this.sampler = sampler;
             this.originX = originX;
             this.originY = originY;
             this.totalAdvance = totalAdvance;
@@ -268,6 +312,11 @@ public final class ModernTextGeometry {
                 case EMOJI -> manager.getEmojiTexture();
                 case BITMAP -> manager.getCurrentTexture(bitmapFont);
             };
+        }
+
+        @Override
+        public GpuSampler sampler() {
+            return sampler;
         }
 
         @Override
@@ -337,7 +386,7 @@ public final class ModernTextGeometry {
                 float v1 = glyph.v1;
                 float u2 = glyph.u2;
                 float v2 = glyph.v2;
-                // One texel of bleed (position + UV) so the manual bilinear taps never clip
+                // One texel of bleed (position + UV) so the linear sampler never clips
                 // at the quad edge; the atlas reserves a border around every glyph.
                 if (directMask && !bitmapReplacement) {
                     float du = (u2 - u1) / (float) glyph.width;

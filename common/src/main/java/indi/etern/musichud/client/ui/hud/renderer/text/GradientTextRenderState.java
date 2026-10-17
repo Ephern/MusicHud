@@ -1,8 +1,6 @@
 package indi.etern.musichud.client.ui.hud.renderer.text;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
@@ -19,7 +17,8 @@ import org.joml.Matrix3x2f;
  * <p>
  * The texture setup is resolved lazily when the GUI renderer starts sorting elements; that is
  * after the engines have baked their glyphs for this frame, so the font atlas view cannot go
- * stale before the draw.
+ * stale before the draw. The run decides the sampler so that sub-pixel text is filtered
+ * linearly while pixel-aligned text stays nearest.
  */
 public final class GradientTextRenderState implements GuiElementRenderState {
     private final Matrix3x2f pose;
@@ -53,7 +52,7 @@ public final class GradientTextRenderState implements GuiElementRenderState {
     @Override
     public @NotNull TextureSetup textureSetup() {
         if (textureSetup == null) {
-            textureSetup = TextureSetup.singleTextureWithLightmap(run.texture(), RenderSystem.getSamplerCache().getClampToEdge(FilterMode.NEAREST));
+            textureSetup = TextureSetup.singleTextureWithLightmap(run.texture(), run.sampler());
         }
         return textureSetup;
     }

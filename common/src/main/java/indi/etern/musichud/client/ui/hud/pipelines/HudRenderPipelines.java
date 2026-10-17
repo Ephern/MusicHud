@@ -22,19 +22,6 @@ public class HudRenderPipelines {
 
     public static final HudPipeline PROGRESS_BAR;
 
-    public static final RenderPipeline GRADIENT_TEXT = RenderPipeline.builder()
-            .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/gradient_text"))
-            .withVertexShader(ResourceLocation.withDefaultNamespace("core/rendertype_text_intensity"))
-            .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/gradient_text"))
-            .withSampler("Sampler0")
-            .withSampler("Sampler2")
-            .withUniform("Fog", UniformType.UNIFORM_BUFFER)
-            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
-            .withUniform("Projection", UniformType.UNIFORM_BUFFER)
-            .withBlend(BlendFunction.TRANSLUCENT)
-            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP, VertexFormat.Mode.QUADS)
-            .build();
-
     static {
         BACKGROUND = wrap("background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
                 .withLocation(Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/background"))

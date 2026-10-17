@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.hud.renderer.text;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.joml.Matrix3x2f;
@@ -14,6 +15,12 @@ public interface GradientTextRun {
     RenderPipeline pipeline();
 
     GpuTextureView texture();
+
+    /**
+     * Sampler the render state binds for {@link #texture()}: nearest while the text sits on
+     * the device pixel grid, linear while it moves off it (or for scale-independent glyphs).
+     */
+    GpuSampler sampler();
 
     /**
      * Emits the glyph quads of this run. {@code pose} maps text-local coordinates (origin at
