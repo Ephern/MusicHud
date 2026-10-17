@@ -73,7 +73,7 @@ public class RegisterMarkProcessor extends AbstractProcessor {
         if (isServer && !isClient && !isCommon) return "SERVER";
         if (isCommon && !isClient && !isServer) return "COMMON";
 
-        if (isClient || isServer || isCommon) {
+        if (isClient || isServer) {
             processingEnv.getMessager().printMessage(
                     Diagnostic.Kind.ERROR,
                     "@RegisterMark class " + typeElement.getQualifiedName()

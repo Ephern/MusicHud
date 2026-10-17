@@ -2,11 +2,11 @@ package indi.etern.musichud.client.ui.hud.renderer;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
 import lombok.NonNull;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
 import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
@@ -22,35 +22,19 @@ public class HudGuiElementRenderState implements GuiElementRenderState {
     private final float height;
     @Nullable
     private final ScreenRectangle bounds;
-    @Nullable
-    private final String elementKey;
-    private final HudUniform[] uniforms;
 
     public HudGuiElementRenderState(@NonNull RenderPipeline pipeline,
                                     @NonNull TextureSetup textureSetup,
                                     @NonNull Matrix3x2f pose,
                                     float width,
                                     float height,
-                                    @Nullable ScreenRectangle bounds,
-                                    @Nullable String elementKey,
-                                    HudUniform[] uniforms) {
+                                    @Nullable ScreenRectangle bounds) {
         this.pipeline = pipeline;
         this.textureSetup = textureSetup;
         this.pose = pose;
         this.width = width;
         this.height = height;
         this.bounds = bounds;
-        this.elementKey = elementKey;
-        this.uniforms = uniforms;
-    }
-
-    @Nullable
-    public String elementKey() {
-        return elementKey;
-    }
-
-    public HudUniform[] uniforms() {
-        return uniforms;
     }
 
     @Override
@@ -66,12 +50,12 @@ public class HudGuiElementRenderState implements GuiElementRenderState {
     }
 
     @Override
-    public RenderPipeline pipeline() {
+    public @NotNull RenderPipeline pipeline() {
         return pipeline;
     }
 
     @Override
-    public TextureSetup textureSetup() {
+    public @NotNull TextureSetup textureSetup() {
         return textureSetup;
     }
 

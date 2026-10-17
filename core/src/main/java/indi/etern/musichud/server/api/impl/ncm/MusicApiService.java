@@ -38,6 +38,7 @@ import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.time.Duration;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -51,19 +52,19 @@ import static indi.etern.musichud.server.api.impl.ncm.CommonCaches.*;
 public class MusicApiService implements IMusicApiService {
     private static final Logger logger = MusicHud.getLogger(MusicApiService.class);
     private static final Cache<Long, MusicDetail> musicDetailCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(10))
             .maximumSize(400)
             .build();
     private static final Cache<Long, UserCategoryPlaylists> userPlaylistCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(10))
             .maximumSize(50)
             .build();
     private static final Cache<Long, LinkedHashSet<Artist>> userSubscribedArtistsCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(10))
             .maximumSize(50)
             .build();
     private static final Cache<Long, LinkedHashSet<Album>> userSubscribedAlbumsCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(10, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(10))
             .maximumSize(50)
             .build();
     private static volatile MusicApiService musicApiService;

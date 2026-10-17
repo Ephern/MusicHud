@@ -43,7 +43,7 @@ public class PusherWidget extends LinearLayout {
     public void bind(@NonNull PusherInfo pusherInfo) {
         pusherHeadView.setPlayerSkinSupplier(() -> {
             try {
-                var skin = PlayerInfoUtil.getPlayerSkin(PlayerInfoUtil.getPlayerInfoByUUID(pusherInfo.getPlayerUUID()));
+                var skin = PlayerInfoUtil.getPlayerSkin(PlayerInfoUtil.getPlayerInfoByUUID(pusherInfo.playerUUID()));
                 pusherHeadView.setVisibility(skin == null ? GONE : VISIBLE);
                 return skin;
             } catch (Exception ignored) {
@@ -51,6 +51,6 @@ public class PusherWidget extends LinearLayout {
             pusherHeadView.setVisibility(GONE);
             return null;
         });
-        pusherText.setText(pusherInfo.getPlayerName());
+        pusherText.setText(pusherInfo.playerName());
     }
 }

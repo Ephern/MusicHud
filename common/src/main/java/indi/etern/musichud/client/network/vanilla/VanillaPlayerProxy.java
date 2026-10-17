@@ -10,15 +10,15 @@ import lombok.Getter;
 import lombok.SneakyThrows;
 import net.minecraft.world.entity.player.Player;
 
+import java.time.Duration;
 import java.util.UUID;
-import java.util.concurrent.TimeUnit;
 
 public class VanillaPlayerProxy implements IPlayerClient {
     @Getter
     private final Player player;
 
     private static final Cache<Player, VanillaPlayerProxy> playerProxyCache = CacheBuilder.newBuilder()
-            .expireAfterAccess(5, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(5))
             .build();
     private final ClientType clientType;
 

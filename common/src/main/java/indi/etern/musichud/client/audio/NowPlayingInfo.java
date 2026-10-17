@@ -412,7 +412,7 @@ public class NowPlayingInfo {
     public PlayerInfo getPusherPlayerInfo() {
         MusicDetail currentlyPlayingMusicDetail = getCurrentlyPlayingMusicDetail();
         if (currentlyPlayingMusicDetail != null) {
-            return PlayerInfoUtil.getPlayerInfoByUUID(currentlyPlayingMusicDetail.getPusherInfo().getPlayerUUID());//Mainly just a Map.get call, no need to cache
+            return PlayerInfoUtil.getPlayerInfoByUUID(currentlyPlayingMusicDetail.getPusherInfo().playerUUID());//Mainly just a Map.get call, no need to cache
         } else {
             return null;
         }
