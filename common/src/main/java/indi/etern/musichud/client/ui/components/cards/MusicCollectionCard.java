@@ -201,7 +201,7 @@ public class MusicCollectionCard extends LinearLayout {
 
         LocalPlayer localPlayer = Minecraft.getInstance().player;
         if (pusherInfo == null || pusherInfo.equals(PusherInfo.EMPTY)
-                || (localPlayer != null && pusherInfo.getPlayerUUID().equals(localPlayer.getUUID()))) {
+                || (localPlayer != null && pusherInfo.playerUUID().equals(localPlayer.getUUID()))) {
             nameView.setMinLines(2);
             {
                 var idlePlaySourceWidget = new IdlePlaySourceWidget(context, this.musicCollection, dp(22));

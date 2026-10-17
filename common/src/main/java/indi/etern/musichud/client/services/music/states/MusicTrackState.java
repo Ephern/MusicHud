@@ -62,7 +62,7 @@ public class MusicTrackState implements IMusicTrackState {
     public class PlaylistSubState implements IPlaylistSubState {
         long playlistId;
         Playlist playlist;
-        Supplier<CompletableFuture<Playlist>> playlistLazyLoader;
+        final Supplier<CompletableFuture<Playlist>> playlistLazyLoader;
 
         PlaylistSubState(long playlistId, Supplier<CompletableFuture<Playlist>> playlistLazyLoader) {
             this.playlistId = playlistId;

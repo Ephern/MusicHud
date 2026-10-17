@@ -31,6 +31,14 @@ public final class GradientSpec {
     }
 
     /**
+     * A flat single-color spec, used to route plain (non-gradient) text through the gradient
+     * geometry path so it shares the same layout-local snapping and bilinear sampling.
+     */
+    public static GradientSpec flat(int argb) {
+        return twoStop(argb, argb);
+    }
+
+    /**
      * Builds a gradient from stop positions and ARGB colors. Input arrays are copied, sorted and
      * de-duplicated; a stop colliding with an earlier one wins.
      * <p>

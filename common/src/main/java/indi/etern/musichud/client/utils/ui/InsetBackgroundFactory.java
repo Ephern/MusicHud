@@ -59,7 +59,8 @@ public class InsetBackgroundFactory {
 
             @Override
             public Integer get(View target) {
-                return background.getColor().getDefaultColor();
+                ColorStateList color = background.getColor();
+                return color == null ? 0x0000000 : color.getDefaultColor();
             }
         };
         StateListAnimator stateListAnimator = new StateListAnimator();
