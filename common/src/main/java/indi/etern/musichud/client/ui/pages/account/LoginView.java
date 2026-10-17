@@ -38,6 +38,7 @@ public class LoginView extends FrameLayout implements ILoginView{
             pager.setKeyboardNavigationCluster(true);
 
             OneShotPreDrawListener.add(pager, () -> {
+                //noinspection UnstableApiUsage
                 var animator = ObjectAnimator.ofFloat(pager,
                         View.ROTATION_Y, pager.isLayoutRtl() ? -45 : 45, 0);
                 animator.setInterpolator(MotionEasingUtils.MOTION_EASING_EMPHASIZED);
@@ -100,6 +101,7 @@ public class LoginView extends FrameLayout implements ILoginView{
         public Object instantiateItem(@NonNull ViewGroup container, int position) {
             var context = container.getContext();
 
+            //noinspection UnstableApiUsage
             ClampingScrollView sv = new ClampingScrollView(context);
 
             container.addView(sv);

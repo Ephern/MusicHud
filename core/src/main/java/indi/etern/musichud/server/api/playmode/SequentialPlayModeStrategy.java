@@ -98,7 +98,7 @@ class SequentialPlayModeStrategy implements PlayModeStrategy {
 
     private record SeqKey(UUID playerUUID, Class<?> collectionType, long collectionId) {
         static SeqKey of(IdlePlaySource source) {
-            return new SeqKey(source.getPusherInfo().getPlayerUUID(), source.getType(), source.getId());
+            return new SeqKey(source.getPusherInfo().playerUUID(), source.getType(), source.getId());
         }
     }
 }

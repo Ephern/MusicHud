@@ -42,6 +42,7 @@ public class SearchResultTabPage extends FrameLayout {
 
             // 添加进入动画
             OneShotPreDrawListener.add(pager, () -> {
+                //noinspection UnstableApiUsage
                 var animator = ObjectAnimator.ofFloat(pager,
                         View.ROTATION_Y, pager.isLayoutRtl() ? -45 : 45, 0);
                 animator.setInterpolator(MotionEasingUtils.MOTION_EASING_EMPHASIZED);
@@ -118,6 +119,7 @@ public class SearchResultTabPage extends FrameLayout {
         public Object instantiateItem(@NonNull ViewGroup container, int position) {
             var context = container.getContext();
 
+            //noinspection UnstableApiUsage
             ClampingScrollView sv = new ClampingScrollView(context);
             sv.setTag(position);
 
@@ -196,7 +198,7 @@ public class SearchResultTabPage extends FrameLayout {
             return sv;
         }
 
-        private void checkInfiniteScroll(int scrollY, ClampingScrollView sv) {
+        private void checkInfiniteScroll(int scrollY, @SuppressWarnings("UnstableApiUsage") ClampingScrollView sv) {
             if (sv.getChildCount() > 0) {
                 View child = sv.getChildAt(0);
                 int contentHeight = child.getHeight();

@@ -379,6 +379,7 @@ public class ApiServerFetcher {
                 }
                 // make executable on non-Windows
                 if (!Platform.detect().getAssetName().endsWith(".exe")) {
+                    //noinspection ResultOfMethodCallIgnored
                     target.toFile().setExecutable(true);
                 }
                 LOGGER.info("Downloaded {} -> {}", target.getFileName(), target);

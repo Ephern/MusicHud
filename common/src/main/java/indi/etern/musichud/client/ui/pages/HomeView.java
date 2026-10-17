@@ -129,7 +129,7 @@ public class HomeView extends LinearLayout {
     private final Consumer<IdlePlaySource> serverAddListener = collection -> {
         MuiModApi.postToUiThread(() -> {
             CardKey key = CardKey.of(false, collection);
-            if ((localPlayer != null && collection.getPusherInfo().getPlayerUUID() != localPlayer.getUUID())
+            if ((localPlayer != null && collection.getPusherInfo().playerUUID() != localPlayer.getUUID())
                     && !idlePlaySourceCardMap.containsKey(key)) {
                 addIdlePlaySourceTo(collection, serverIdlePlaySourceCardsList, false);
                 checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
@@ -311,7 +311,7 @@ public class HomeView extends LinearLayout {
                 }
             });
             serverIdlePlaySources.forEach(idlePlaySource -> {
-                if (localPlayer != null && !idlePlaySource.getPusherInfo().getPlayerUUID().equals(localPlayer.getUUID()) && !idlePlaySourceCardMap.containsKey(CardKey.of(false, idlePlaySource))) {
+                if (localPlayer != null && !idlePlaySource.getPusherInfo().playerUUID().equals(localPlayer.getUUID()) && !idlePlaySourceCardMap.containsKey(CardKey.of(false, idlePlaySource))) {
                     addIdlePlaySourceTo(idlePlaySource, serverIdlePlaySourceCardsList, false);
                 }
             });
@@ -561,7 +561,7 @@ public class HomeView extends LinearLayout {
     private void updateNextToPlayRotateButton(Traceable<MusicDetail> nextIdle) {
         MusicDetail next = nextIdle == null ? null : nextIdle.value();
         rotateNextToPlayButton.setVisibility(
-                next != null && isLocalPlayer(next.getPusherInfo().getPlayerUUID()) ? VISIBLE : GONE);
+                next != null && isLocalPlayer(next.getPusherInfo().playerUUID()) ? VISIBLE : GONE);
     }
 
     /** Re-renders only the idle "next to play" row (e.g. after a server-side reroll). */
@@ -583,7 +583,7 @@ public class HomeView extends LinearLayout {
         layoutParams.setMargins(0, 0, 0, dp(16));
 
         assert Minecraft.getInstance().player != null;
-        if (musicDetail.getPusherInfo().getPlayerUUID().equals(Minecraft.getInstance().player.getUUID())) {
+        if (musicDetail.getPusherInfo().playerUUID().equals(Minecraft.getInstance().player.getUUID())) {
             ImageButton removeButton = new ImageButton(getContext());
             Image removeIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/trash_2.png");
             removeButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
