@@ -1,7 +1,10 @@
 package indi.etern.musichud.client.ui.hud.renderer.text;
 
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import com.mojang.renderpearl.api.textures.FilterMode;
+import com.mojang.renderpearl.api.textures.GpuSampler;
 import com.mojang.renderpearl.api.textures.GpuTextureView;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.TextRenderable;
