@@ -40,7 +40,7 @@ public class SynchronizedSequencedSet<E> implements SequencedSet<E> {
     }
 
     @Override
-    public synchronized <T> T @NotNull [] toArray(@NotNull T[] a) {
+    public synchronized <T> T @NotNull [] toArray(T @NotNull [] a) {
         return delegate.toArray(a);
     }
 
@@ -141,7 +141,8 @@ public class SynchronizedSequencedSet<E> implements SequencedSet<E> {
 
     @Override
     public synchronized boolean equals(Object obj) {
-        return delegate.equals(obj);
+        //noinspection rawtypes
+        return (obj instanceof SynchronizedSequencedSet set && set.delegate.equals(delegate)) || delegate.equals(obj);
     }
 
     @Override

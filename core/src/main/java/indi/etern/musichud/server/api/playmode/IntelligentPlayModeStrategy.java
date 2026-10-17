@@ -44,7 +44,7 @@ class IntelligentPlayModeStrategy implements PlayModeStrategy {
     }
 
     private IntelligentKey key(IdlePlaySource source) {
-        return new IntelligentKey(source.getId(), source.getPusherInfo().getPlayerUUID());
+        return new IntelligentKey(source.getId(), source.getPusherInfo().playerUUID());
     }
 
     @Override
@@ -129,7 +129,7 @@ class IntelligentPlayModeStrategy implements PlayModeStrategy {
         List<MusicDetail> tracks = owned.getMusicDetails().snapshot();
         MusicDetail seed = tracks.get(MusicHud.RANDOM.nextInt(tracks.size()));
         List<MusicDetail> data = IMusicApiService.getInstance(ApiProvider.NCM)
-                .getIntelligentList(seed.getId(), owned.getId(), null, pusher.getPlayerUUID());
+                .getIntelligentList(seed.getId(), owned.getId(), null, pusher.playerUUID());
         if (data.isEmpty()) {
             throw new ApiException("empty intelligent list for playlist " + owned.getId());
         }
@@ -169,7 +169,7 @@ class IntelligentPlayModeStrategy implements PlayModeStrategy {
             long sid = currentList != null && !currentList.isEmpty() ? currentList.getLast().getId() : state.seedId;
             long playlistId = source.getId();
             long seedId = state.seedId;
-            UUID ownerUUID = source.getPusherInfo().getPlayerUUID();
+            UUID ownerUUID = source.getPusherInfo().playerUUID();
             CompletableFuture<List<MusicDetail>> future = CompletableFuture.supplyAsync(
                     () -> IMusicApiService.getInstance(ApiProvider.NCM).getIntelligentList(seedId, playlistId, sid, ownerUUID),
                     MusicHud.EXECUTOR);

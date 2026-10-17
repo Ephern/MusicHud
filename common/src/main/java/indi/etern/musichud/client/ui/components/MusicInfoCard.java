@@ -250,7 +250,7 @@ public class MusicInfoCard extends LinearLayout {
             albumImage.loadUrl(album.getPicUrl(), sideWidth, sideWidth);
             titleText.setText(musicDetail.getName());
             PusherInfo pusherInfo = musicDetail.getPusherInfo();
-            if (pusherInfo == null) {
+            if (pusherInfo == null || PusherInfo.EMPTY.equals(pusherInfo)) {
                 pusherWidget.setVisibility(View.GONE);
                 pusherWidget.clear();
             } else {
