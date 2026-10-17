@@ -242,7 +242,14 @@ public class HudRenderContextImpl implements HudRenderContext {
 
     @Override
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
-        graphics.drawString(font, text, x, y, color, dropShadow);
+        if (dropShadow) {
+            // shadows keep the engine path; the flat geometry path does not draw them
+            graphics.drawString(font, text, x, y, color, dropShadow);
+            return;
+        }
+        // Plain text shares the gradient geometry path, so it gets the same layout-local
+        // snapping and bilinear sampling instead of the engine's per-glyph screen snapping.
+        drawGradientString(font, text, x, y, GradientSpec.flat(color), 1f);
     }
 
     @Override
