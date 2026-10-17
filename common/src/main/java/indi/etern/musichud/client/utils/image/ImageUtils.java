@@ -34,6 +34,7 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URI;
 import java.net.URL;
+import java.time.Duration;
 import java.util.Base64;
 import java.util.Map;
 import java.util.concurrent.*;
@@ -48,11 +49,11 @@ public class ImageUtils {
     private static final int DEFAULT_MAX_CONCURRENT_DOWNLOADS = 40;
     @Getter(AccessLevel.PACKAGE)
     private static final Cache<String, ImageTextureData> cachedTexturesData = CacheBuilder.newBuilder()
-            .expireAfterAccess(20, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(20))
             .maximumSize(256)
             .build();
     private static final Cache<String, byte[]> cachedRemoteBytes = CacheBuilder.newBuilder()
-            .expireAfterAccess(2, TimeUnit.MINUTES)
+            .expireAfterAccess(Duration.ofMinutes(2))
             .maximumWeight(64L * 1024 * 1024)
             .weigher((Weigher<String, byte[]>) (key, value) -> value.length)
             .build();

@@ -3,30 +3,19 @@ package indi.etern.musichud.beans.music;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.network.IPlayerClient;
-import lombok.Getter;
 import lombok.NonNull;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 import java.util.UUID;
 
-public final class PusherInfo {
+public record PusherInfo(@NonNull UUID playerUUID, @NonNull String playerName) {
     public static final ByteBufCodec<PusherInfo> CODEC = ByteBufCodec.composite(
-            Codecs.UUID, PusherInfo::getPlayerUUID,
-            Codecs.STRING_UTF8, PusherInfo::getPlayerName,
+            Codecs.UUID, PusherInfo::playerUUID,
+            Codecs.STRING_UTF8, PusherInfo::playerName,
             PusherInfo::new
     );
     public static final PusherInfo EMPTY = new PusherInfo(new UUID(0L, 0L), "");
-    @Getter
-    @NonNull
-    private final UUID playerUUID;
-    @Getter
-    @NonNull
-    private final  String playerName;
-
-    public PusherInfo(@NonNull UUID playerUUID, @NonNull String playerName) {
-        this.playerUUID = playerUUID;
-        this.playerName = playerName;
-    }
 
     public static PusherInfo ofPlayer(IPlayerClient player) {
         return new PusherInfo(
@@ -46,7 +35,7 @@ public final class PusherInfo {
     }
 
     @Override
-    public String toString() {
+    public @NotNull String toString() {
         return "PusherInfo[" +
                 "playerUUID=" + playerUUID + ", " +
                 "playerName=" + playerName + ']';

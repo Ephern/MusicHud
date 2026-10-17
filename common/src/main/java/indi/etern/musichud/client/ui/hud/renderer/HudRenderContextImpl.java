@@ -96,9 +96,7 @@ public class HudRenderContextImpl implements HudRenderContext {
                 state.pose(),
                 state.width(),
                 state.height(),
-                state.bounds(),
-                state.elementKey(),
-                state.uniforms()
+                state.bounds()
         );
         UNIFORM_WRITER.submitGuiElementRenderState(((VanillaHudGraphics) graphics).vanilla(), element);
         elementSlices.put(textureSetup, new HashMap<>());

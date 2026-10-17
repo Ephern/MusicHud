@@ -1494,7 +1494,7 @@ public class PlaybackTask {
             switch (clientConfig.getScrobbleOption()) {
                 case ALL -> sendScrobbleOptionally();
                 case ONLY_SELF -> {
-                    if (musicDetail.getPusherInfo().getPlayerUUID().equals(PlayerInfoUtil.getSelfUUID())) {
+                    if (musicDetail.getPusherInfo().playerUUID().equals(PlayerInfoUtil.getSelfUUID())) {
                         sendScrobbleOptionally();
                     }
                 }

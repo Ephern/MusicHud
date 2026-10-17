@@ -168,9 +168,9 @@ public class MultichannelToStereoMixer implements IResampler {
 
     private int clamp(long sample) {
         return switch (bytesPerSample) {
-            case 1 -> (int) Math.clamp(sample, -128, 127);
-            case 2 -> (int) Math.clamp(sample, Short.MIN_VALUE, Short.MAX_VALUE);
-            case 3 -> (int) Math.clamp(sample, -(1 << 23), (1 << 23) - 1);
+            case 1 -> Math.clamp(sample, -128, 127);
+            case 2 -> Math.clamp(sample, Short.MIN_VALUE, Short.MAX_VALUE);
+            case 3 -> Math.clamp(sample, -(1 << 23), (1 << 23) - 1);
             case 4 -> sample > Integer.MAX_VALUE ? Integer.MAX_VALUE : (sample < Integer.MIN_VALUE ? Integer.MIN_VALUE : (int) sample);
             default -> throw new IllegalStateException();
         };
