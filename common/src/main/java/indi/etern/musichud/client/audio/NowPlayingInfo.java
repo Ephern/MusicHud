@@ -132,6 +132,7 @@ public class NowPlayingInfo {
 
     private void initJmtc() {
         jmtc = JMTC.getInstance(new JMTCSettings("Minecraft-MusicHUD", "Minecraft-MusicHUD"));
+        if (jmtc == null) return;
         JMTCCallbacks jmtcCallbacks = new JMTCCallbacks();
         jmtcCallbacks.onPlay = () -> {
             MusicHud.EXECUTOR.execute(() -> {
@@ -171,13 +172,15 @@ public class NowPlayingInfo {
     }
 
     private void postJmtc(Runnable task) {
-        jmtcExecutor.execute(() -> {
-            try {
-                task.run();
-            } catch (Exception e) {
-                logger.warn("JMTC task failed", e);
-            }
-        });
+        if (jmtc != null) {
+            jmtcExecutor.execute(() -> {
+                try {
+                    task.run();
+                } catch (Exception e) {
+                    logger.warn("JMTC task failed", e);
+                }
+            });
+        }
     }
 
     /**

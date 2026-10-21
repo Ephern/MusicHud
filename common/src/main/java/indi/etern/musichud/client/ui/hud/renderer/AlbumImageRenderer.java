@@ -37,11 +37,10 @@ public class AlbumImageRenderer implements RenderLayer {
                 textureSetup,
                 context.currentPose(),
                 hudStyle,
-                "album",
                 hudStyle,
                 DynamicStatusUniform.getInstance()
         );
-        context.submit(hudRenderState);
+        context.submit(this, hudRenderState);
     }
 
     private @NotNull SceneTextureSetup getMixedTextureSetup() {

@@ -28,13 +28,12 @@ public class ProgressRenderer implements RenderLayer {
         if (progressData == null || progressData.getHudStyle().getHeight() <= 0) return;
 
         SceneStyle hudStyle = progressData.getHudStyle();
-        hudRenderContext.submit(
+        hudRenderContext.submit(this,
                 new SceneElementRenderState(
                         SceneRenderPipelines.PROGRESS_BAR,
                         SceneTextureSetup.NONE,
                         new Matrix3x2f(hudRenderContext.currentPose()),
                         hudStyle,
-                        "progress",
                         hudStyle,
                         progressData,
                         hudDynamicStatus

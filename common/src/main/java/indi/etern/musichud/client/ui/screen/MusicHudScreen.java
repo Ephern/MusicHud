@@ -23,17 +23,26 @@ package indi.etern.musichud.client.ui.screen;
  */
 
 import icyllis.modernui.fragment.Fragment;
-import icyllis.modernui.graphics.Color;
 import icyllis.modernui.mc.*;
+import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
+import indi.etern.musichud.client.ui.hud.renderer.BackgroundRenderer;
+import indi.etern.musichud.client.ui.render.HorizontalAlign;
+import indi.etern.musichud.client.ui.render.RenderService;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
+import indi.etern.musichud.client.ui.render.VerticalAlign;
+import indi.etern.musichud.client.utils.ui.ColorExtractor;
+import indi.etern.musichud.client.utils.ui.ThemedColors;
 import indi.etern.musichud.interfaces.ClientConfig;
-import lombok.Getter;
 import lombok.NonNull;
-import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -53,17 +62,19 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         });
     }
 
+    private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
+    private static final Logger LOGGER = MusicHud.getLogger(MusicHudScreen.class);
+    private static final BackgroundRenderer BACKGROUND_RENDERER = new BackgroundRenderer();
     private final UIManager mHost;
     @Nullable
     private final Screen mPrevious;
     private final Fragment mFragment;
     @Nullable
     private final ScreenCallback mCallback;
+    private final SceneStyle backgroundStyle = new SceneStyle(
+            0, 0, 0, 0, 0, HorizontalAlign.CENTER, VerticalAlign.CENTER);
 
     private final static int FADE_IN_DURATION_MILLIS = 200;
-    @Getter
-    @Setter
-    private static double darken = ClientConfig.getInstance().getMainScreenAdditionalBackgroundDarken();
 
     MusicHudScreen(UIManager host, Fragment fragment,
                    @Nullable ScreenCallback callback, @Nullable Screen previous,
@@ -100,14 +111,48 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Override
     public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
-        if (callback == null || callback.hasDefaultBackground()) {
-            if (minecraft != null && minecraft.level == null) {
-                super.renderBackground(gr, mouseX, mouseY, deltaTick);
-            } else {
-                BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
+        if (callback != null && !callback.hasDefaultBackground()) {
+            return;
+        }
+        if (minecraft != null && minecraft.level == null) {
+            super.renderBackground(gr, mouseX, mouseY, deltaTick);
+        } else {
+            BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
+        }
+        float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
+        float alpha = (float) CLIENT_CONFIG.getGuiBackgroundAlpha() * progress;
+        if (alpha <= 1e-4f) {
+            return;
+        }
+        float brightness = (float) CLIENT_CONFIG.getGuiBackgroundBrightness();
+        if (CLIENT_CONFIG.getEnableGuiFluidBackground()) {
+            renderFluidBackground(gr, alpha, brightness);
+        } else {
+            int baseColor = ColorExtractor.brightnessToBaseColor(brightness);
+            int alphaByte = Math.clamp((int) (alpha * 255), 0, 255);
+            gr.fill(0, 0, this.width, this.height, (alphaByte << 24) | (baseColor & 0x00FFFFFF));
+        }
+    }
+
+    private void renderFluidBackground(GuiGraphics gr, float alpha, float brightness) {
+        try {
+            var colors = HudPresentationService.getInstance().getGuiBackgroundColors();
+            colors.update();
+            ThemedColors mixed = colors.getMixed();
+            if (mixed == null) {
+                return;
             }
-            float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
-            gr.fill(0, 0, this.width, this.height, Color.argb((int) (progress * darken * 255), 0, 0, 0));//additional darken
+            ThemedColors adjusted = ColorExtractor.adjustColors(mixed, 1f, brightness, 1f);
+            BackgroundData backgroundData = BackgroundData.NONE.withThemeColors(adjusted);
+            backgroundStyle.setAlpha(alpha);
+            backgroundStyle.setBounds(0, 0, this.width, this.height);
+            gr.nextStratum();
+            RenderService.getInstance().renderFrame(
+                    new VanillaSceneGraphics(gr),
+                    context -> BACKGROUND_RENDERER.render(context, backgroundStyle, backgroundData)
+            );
+        } catch (Exception e) {
+            LOGGER.error("While rendering main GUI background", e);
         }
     }
 

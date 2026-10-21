@@ -4,6 +4,7 @@ import indi.etern.musichud.client.ui.render.*;
 import indi.etern.musichud.client.ui.render.pipeline.*;
 import indi.etern.musichud.client.ui.render.text.*;
 
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
 import indi.etern.musichud.client.ui.render.SceneStyle;
@@ -19,24 +20,27 @@ public class BackgroundRenderer implements RenderLayer {
     }
 
     @Override
-    public void render(SceneRenderContext hudRenderContext) {
+    public void render(SceneRenderContext context) {
         if (currentData == null) return;
 
-        SceneStyle hudStyle = currentData.getHudStyle();
         dynamicStatusUniform.setTransitionable(currentData.getTransitionableBackground());
+        render(context, currentData.getHudStyle(), currentData.getTransitionableBackground().getMixed());
+    }
+
+    public void render(SceneRenderContext context, SceneStyle style, BackgroundData backgroundData) {
+        if (style == null || backgroundData == null) return;
 
         SceneElementRenderState hudRenderState = new SceneElementRenderState(
                 SceneRenderPipelines.BACKGROUND,
                 SceneTextureSetup.NONE,
-                hudRenderContext.currentPose(),
-                hudStyle,
-                "background",
-                hudStyle,
-                currentData.getTransitionableBackground().getMixed(),
+                context.currentPose(),
+                style,
+                style,
+                backgroundData,
                 dynamicStatusUniform
         );
 
-        hudRenderContext.submit(hudRenderState);
-        hudRenderContext.nextStratum();
+        context.submit(this, hudRenderState);
+        context.nextStratum();
     }
 }

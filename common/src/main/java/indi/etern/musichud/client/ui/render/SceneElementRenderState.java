@@ -12,9 +12,8 @@ import org.joml.Matrix3x2f;
 /**
  * Version-neutral description of a single HUD element.
  * <p>
- * {@code elementKey} identifies the logical element (e.g. {@code "background"}) so that
- * multiple elements sharing the same pipeline but carrying different uniform content are
- * kept in separate draws and get their own uniform binding.
+ * The owning {@link RenderLayer} is supplied when the element is submitted, so elements
+ * sharing the same pipeline stay separated by renderer identity.
  */
 public record SceneElementRenderState(
         @NonNull ScenePipeline pipeline,
@@ -23,17 +22,15 @@ public record SceneElementRenderState(
         float width,
         float height,
         @Nullable ScreenRectangle bounds,
-        @Nullable String elementKey,
         SceneUniform[] uniforms
 ) {
     public SceneElementRenderState(@NonNull ScenePipeline pipeline,
                           @NonNull SceneTextureSetup textureSetup,
                           @NonNull Matrix3x2f pose,
                           @NonNull SceneStyle hudStyle,
-                          @Nullable String elementKey,
                           SceneUniform... uniforms) {
         this(pipeline, textureSetup, pose, hudStyle.getWidth(), hudStyle.getHeight(),
                 UniformDataUtils.getBounds(-hudStyle.getWidth() / 2f, -hudStyle.getHeight() / 2f, hudStyle.getWidth() / 2f, hudStyle.getHeight() / 2f, pose),
-                elementKey, uniforms);
+                uniforms);
     }
 }

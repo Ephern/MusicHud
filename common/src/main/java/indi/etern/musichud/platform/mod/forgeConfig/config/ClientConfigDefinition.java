@@ -44,7 +44,9 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
     private final ModConfigSpec.ConfigValue<String> scrobbleOption;
     private final ModConfigSpec.ConfigValue<String> multichannelMode;
-    private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
+    private final ModConfigSpec.ConfigValue<Boolean> enableGuiFluidBackground;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundAlpha;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundBrightness;
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundMixAlpha;
 
     private final ModConfigSpec.ConfigValue<String> hudVerticalPosition;
@@ -119,10 +121,18 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("How to handle audio with more than 2 channels (discrete multichannel via AL_EXT_MCFORMATS vs software downmix to stereo)")
                 .translation(MusicHud.MOD_ID + ".config.common.multichannelMode")
                 .define("multichannelMode", MultichannelMode.PREFER_DISCRETE.name());
-        mainScreenAdditionalBackgroundDarken = builder
-                .comment("Main Screen Additional Background Darken Rate")
-                .translation(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken")
-                .defineInRange("mainScreenAdditionalBackgroundDarken", 0.5, 0, 1);
+        enableGuiFluidBackground = builder
+                .comment("Enable fluid background on the main GUI")
+                .translation(MusicHud.MOD_ID + ".config.common.enableGuiFluidBackground")
+                .define("enableGuiFluidBackground", true);
+        guiBackgroundAlpha = builder
+                .comment("Main GUI background overall opacity")
+                .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundAlpha")
+                .defineInRange("guiBackgroundAlpha", 0.75, 0, 1);
+        guiBackgroundBrightness = builder
+                .comment("Main GUI background brightness (fluid uses theme color brightness, flat overlay uses neutral gray)")
+                .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundBrightness")
+                .defineInRange("guiBackgroundBrightness", 0.1, 0, 1);
         hudBackgroundMixAlpha = builder
                 .comment("Hud Background Mix Alpha")
                 .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha")
@@ -585,18 +595,48 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public double getMainScreenAdditionalBackgroundDarken() {
-        return mainScreenAdditionalBackgroundDarken.get();
+    public boolean getEnableGuiFluidBackground() {
+        return enableGuiFluidBackground.get();
     }
 
     @Override
-    public double getDefaultMainScreenAdditionalBackgroundDarken() {
-        return mainScreenAdditionalBackgroundDarken.getDefault();
+    public boolean getDefaultEnableGuiFluidBackground() {
+        return enableGuiFluidBackground.getDefault();
     }
 
     @Override
-    public void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken) {
-        mainScreenAdditionalBackgroundDarken.set(additionalBackgroundDarken);
+    public void setEnableGuiFluidBackground(boolean enableGuiFluidBackground) {
+        this.enableGuiFluidBackground.set(enableGuiFluidBackground);
+    }
+
+    @Override
+    public double getGuiBackgroundAlpha() {
+        return guiBackgroundAlpha.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundAlpha() {
+        return guiBackgroundAlpha.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundAlpha(double guiBackgroundAlpha) {
+        this.guiBackgroundAlpha.set(guiBackgroundAlpha);
+    }
+
+    @Override
+    public double getGuiBackgroundBrightness() {
+        return guiBackgroundBrightness.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundBrightness() {
+        return guiBackgroundBrightness.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundBrightness(double guiBackgroundBrightness) {
+        this.guiBackgroundBrightness.set(guiBackgroundBrightness);
     }
 
     @Override

@@ -45,7 +45,7 @@ public interface SceneRenderContext {
 
     void nextStratum();
 
-    void submit(SceneElementRenderState state);
+    void submit(RenderLayer owner, SceneElementRenderState state);
 
     int guiWidth();
 

@@ -100,10 +100,10 @@ void main() {
     float timestamp  = u_Dynamic1[0];
 
     float hudHeight = halfHeight * 2.0;
-    float sizeScale = max(1.0, hudHeight / 52.0);
+    float sizeScale = max(1.0, 1.0 + (hudHeight / 52.0 - 1.0) * 0.4);
 
     vec2 noiseUv = f_Position / (40.0 * sizeScale);
-    float speed = 0.014;
+    float speed = 0.014 * sizeScale;
     vec2 scrollVec = vec2(timestamp * speed, timestamp * speed * 0.7) / sizeScale;
 
     float wx = snoise(noiseUv * 0.015 + scrollVec * 0.3);

@@ -45,8 +45,10 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     @Getter
     private static SceneRenderContext current;
 
-    private final Map<String, DynamicUniformStorage<UniformAdapter>> storageMap = new HashMap<>();
-    private final Map<CacheKey, LastWritten> lastWrittenUniforms = new HashMap<>();
+    private final Map<RenderLayer, Map<CacheKey, DynamicUniformStorage<UniformAdapter>>> storageMap =
+            new IdentityHashMap<>();
+    private final Map<RenderLayer, Map<CacheKey, LastWritten>> lastWrittenUniforms =
+            new IdentityHashMap<>();
 
     private final List<ElementRecord> elements = new ArrayList<>();
     private final Map<TextureSetup, Map<String, GpuBufferSlice>> elementSlices = new IdentityHashMap<>();
@@ -87,8 +89,10 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         elementSlices.clear();
         defaultSlices.clear();
         scissorStack.clear();
-        for (DynamicUniformStorage<?> storage : storageMap.values()) {
-            storage.endFrame();
+        for (Map<CacheKey, DynamicUniformStorage<UniformAdapter>> ownerStorages : storageMap.values()) {
+            for (DynamicUniformStorage<?> storage : ownerStorages.values()) {
+                storage.endFrame();
+            }
         }
     }
 
@@ -108,8 +112,9 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     }
 
     @Override
-    public void submit(SceneElementRenderState state) {
-        TextureSetup textureSetup = toVanillaTextureSetup(state.textureSetup(), state.elementKey());
+    public void submit(RenderLayer owner, SceneElementRenderState state) {
+        Objects.requireNonNull(owner, "owner");
+        TextureSetup textureSetup = toVanillaTextureSetup(state.textureSetup(), owner);
         SceneGuiElementRenderState element = new SceneGuiElementRenderState(
                 ((VanillaScenePipeline) state.pipeline()).renderPipeline(),
                 textureSetup,
@@ -120,56 +125,62 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         );
         UNIFORM_WRITER.submitGuiElementRenderState(((VanillaSceneGraphics) graphics).vanilla(), element);
         elementSlices.put(textureSetup, new HashMap<>());
-        elements.add(new ElementRecord(state.elementKey(), state.pipeline(), textureSetup, state.uniforms()));
+        elements.add(new ElementRecord(owner, state.pipeline(), textureSetup, state.uniforms()));
     }
 
     /**
-     * Distinct 1x1 texture view per logical element (elementKey). It is placed in
-     * {@code texure2} of the element's {@link TextureSetup} so that elements of different
-     * profiles are record-unequal and {@code GuiRenderer} never merges them into one draw,
-     * while elements of the same profile stay mergeable. No mod pipeline declares
-     * {@code Sampler2}, so binding this view is a no-op.
+     * Distinct 1x1 texture view per render layer. It is placed in {@code texure2} of the
+     * element's {@link TextureSetup} so that elements of different profiles are
+     * record-unequal and {@code GuiRenderer} never merges them into one draw. No mod
+     * pipeline declares {@code Sampler2}, so binding this view is a no-op.
      */
-    private final Map<String, GpuTextureView> discriminatorViews = new HashMap<>();
+    private final Map<RenderLayer, GpuTextureView> discriminatorViews =
+            new IdentityHashMap<>();
+    private int discriminatorSerial;
 
-    private GpuTextureView discriminatorView(String elementKey) {
-        if (elementKey == null) {
-            elementKey = "";
-        }
-        return discriminatorViews.computeIfAbsent(elementKey, key -> {
+    private GpuTextureView discriminatorView(RenderLayer owner) {
+        return discriminatorViews.computeIfAbsent(owner, layer -> {
+            String type = layer.getClass().getSimpleName();
+            if (type.isEmpty()) {
+                type = layer.getClass().getName();
+            }
             GpuDevice device = RenderSystem.getDevice();
             GpuTexture texture = device.createTexture(
-                    "music_hud_" + key, GpuTexture.USAGE_TEXTURE_BINDING,
+                    "music_hud_element_" + type + "_" + discriminatorSerial++,
+                    GpuTexture.USAGE_TEXTURE_BINDING,
                     TextureFormat.RGBA8, 1, 1, 1, 1);
             return device.createTextureView(texture);
         });
     }
 
-    private TextureSetup toVanillaTextureSetup(SceneTextureSetup setup, @Nullable String elementKey) {
+    private TextureSetup toVanillaTextureSetup(SceneTextureSetup setup, RenderLayer owner) {
         GpuTextureView primary = setup.primary() == null ? null : ((GpuTextureViewRef) setup.primary()).view();
         GpuTextureView secondary = setup.secondary() == null ? null : ((GpuTextureViewRef) setup.secondary()).view();
-        return new TextureSetup(primary, secondary, discriminatorView(elementKey));
+        return new TextureSetup(primary, secondary, discriminatorView(owner));
     }
 
     public void prepareUniforms() {
         for (ElementRecord element : elements) {
             if (element.uniforms == null) continue;
             Map<String, GpuBufferSlice> slices = elementSlices.get(element.textureSetup);
+            Map<CacheKey, LastWritten> ownerCache = lastWrittenUniforms.computeIfAbsent(
+                    element.owner, key -> new HashMap<>());
             for (SceneUniform uniform : element.uniforms) {
-                CacheKey cacheKey = new CacheKey(element.elementKey, element.pipeline, uniform.getUBOName());
+                CacheKey cacheKey = new CacheKey(element.pipeline, uniform.getUBOName());
                 GpuBufferSlice slice;
-                LastWritten last = lastWrittenUniforms.get(cacheKey);
+                LastWritten last = ownerCache.get(cacheKey);
                 if (last != null && last.uniform.shouldUseBuffer(uniform)
                         && last.slice != null && !last.slice.buffer().isClosed()) {
                     slice = last.slice;
                 } else {
-                    DynamicUniformStorage<UniformAdapter> storage = storageMap.computeIfAbsent(
-                            uniform.getUBOName(),
-                            k -> new DynamicUniformStorage<>(uniform.getUBOName(), uniform.getUBOSize(), 256)
-                    );
+                    DynamicUniformStorage<UniformAdapter> storage = storageMap
+                            .computeIfAbsent(element.owner, key -> new HashMap<>())
+                            .computeIfAbsent(cacheKey,
+                                    key -> new DynamicUniformStorage<>(
+                                            uniform.getUBOName(), uniform.getUBOSize(), 256));
                     slice = storage.writeUniform(new UniformAdapter(uniform));
                 }
-                lastWrittenUniforms.put(cacheKey, new LastWritten(uniform, slice));
+                ownerCache.put(cacheKey, new LastWritten(uniform, slice));
                 if (slices != null) {
                     slices.put(uniform.getUBOName(), slice);
                 }
@@ -297,13 +308,13 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         graphics.fill(fromX, fromY, toX, toY, color);
     }
 
-    private record CacheKey(String elementKey, ScenePipeline pipeline, String uboName) {
+    private record CacheKey(ScenePipeline pipeline, String uboName) {
     }
 
     private record LastWritten(SceneUniform uniform, GpuBufferSlice slice) {
     }
 
-    private record ElementRecord(String elementKey, ScenePipeline pipeline, TextureSetup textureSetup, SceneUniform[] uniforms) {
+    private record ElementRecord(RenderLayer owner, ScenePipeline pipeline, TextureSetup textureSetup, SceneUniform[] uniforms) {
     }
 
     private record UniformAdapter(SceneUniform uniform) implements DynamicUniformStorage.DynamicUniform {

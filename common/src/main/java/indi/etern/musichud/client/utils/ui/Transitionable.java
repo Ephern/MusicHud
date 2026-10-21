@@ -7,7 +7,7 @@ import net.minecraft.util.Mth;
 import java.util.function.Consumer;
 
 public class Transitionable<T extends Mixable<T>> {
-    private static int durationMs;
+    private final int durationMs;
     @Getter
     public volatile float progress = 0.0f;
     @Getter
@@ -23,7 +23,7 @@ public class Transitionable<T extends Mixable<T>> {
 
     public Transitionable(T current, int durationMs) {
         this.current = current;
-        Transitionable.durationMs = durationMs;
+        this.durationMs = durationMs;
     }
 
     public void startTransition(T next) {

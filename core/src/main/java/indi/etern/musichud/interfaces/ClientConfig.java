@@ -183,11 +183,23 @@ public interface ClientConfig {
 
     void setWhiteList(List<String> whiteList);
 
-    double getMainScreenAdditionalBackgroundDarken();
+    boolean getEnableGuiFluidBackground();
 
-    double getDefaultMainScreenAdditionalBackgroundDarken();
+    boolean getDefaultEnableGuiFluidBackground();
 
-    void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken);
+    void setEnableGuiFluidBackground(boolean enableGuiFluidBackground);
+
+    double getGuiBackgroundAlpha();
+
+    double getDefaultGuiBackgroundAlpha();
+
+    void setGuiBackgroundAlpha(double guiBackgroundAlpha);
+
+    double getGuiBackgroundBrightness();
+
+    double getDefaultGuiBackgroundBrightness();
+
+    void setGuiBackgroundBrightness(double guiBackgroundBrightness);
 
     double getHudBackgroundMixAlpha();
 

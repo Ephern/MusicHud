@@ -1,9 +1,9 @@
 package indi.etern.musichud.client.ui.hud.renderer.debug;
 
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
-import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import indi.etern.musichud.client.ui.render.RenderLayer;
 import indi.etern.musichud.client.ui.render.SceneRenderContext;
+import indi.etern.musichud.client.utils.ui.ThemedColors;
 import indi.etern.musichud.client.utils.ui.Transitionable;
 import net.minecraft.client.Minecraft;
 

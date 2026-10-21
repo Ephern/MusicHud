@@ -22,10 +22,10 @@ import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.modals.ApiServerDownloadDialog;
 import indi.etern.musichud.client.ui.components.modals.Modal;
+import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
 import indi.etern.musichud.client.ui.screen.HudConfigFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
-import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -177,15 +177,28 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setScrobbleOption)
                     .setDefaultValue(clientConfig.getDefaultScrobbleOption())
                     .create(commonCategory);
-            new PreferencesFragment.FloatOption(
+            new PreferencesFragment.BooleanOption(
                     context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken"),
-                    clientConfig::getMainScreenAdditionalBackgroundDarken,
-                    clientConfig::setMainScreenAdditionalBackgroundDarken)
-                    .setRange(0, 1)
-                    .setDefaultValue(clientConfig.getDefaultMainScreenAdditionalBackgroundDarken())
-                    .setOnChanged(() -> MusicHudScreen.setDarken(clientConfig.getMainScreenAdditionalBackgroundDarken()))
-                    .setDefaultValue(0.5)
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enableGuiFluidBackground"),
+                    clientConfig::getEnableGuiFluidBackground,
+                    clientConfig::setEnableGuiFluidBackground)
+                    .setDefaultValue(clientConfig.getDefaultEnableGuiFluidBackground())
+                    .create(commonCategory);
+            new AdaptiveFloatOption(//FIXME slider width
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundAlpha"),
+                    clientConfig::getGuiBackgroundAlpha,
+                    clientConfig::setGuiBackgroundAlpha)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundAlpha())
+                    .create(commonCategory);
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundBrightness"),
+                    clientConfig::getGuiBackgroundBrightness,
+                    clientConfig::setGuiBackgroundBrightness)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundBrightness())
                     .create(commonCategory);
 
             Button openHudConfigButton = new Button(context);

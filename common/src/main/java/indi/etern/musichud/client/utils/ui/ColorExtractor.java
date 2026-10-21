@@ -1,7 +1,6 @@
 package indi.etern.musichud.client.utils.ui;
 
 import com.mojang.blaze3d.platform.NativeImage;
-import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 
 import static indi.etern.musichud.client.utils.ui.UniformDataUtils.interpolateARGB;
@@ -446,11 +445,20 @@ public class ColorExtractor {
             bLin = (bLin - midpoint) * contrast + midpoint;
         }
 
-        int rOut = (int) (Math.clamp(rLin, 0.0f, 1.0f) * 255);
-        int gOut = (int) (Math.clamp(gLin, 0.0f, 1.0f) * 255);
-        int bOut = (int) (Math.clamp(bLin, 0.0f, 1.0f) * 255);
+        int rOut = toSrgbByte(rLin);
+        int gOut = toSrgbByte(gLin);
+        int bOut = toSrgbByte(bLin);
         // Preserve the share stored in alpha.
         return (argb & 0xFF000000) | (rOut << 16) | (gOut << 8) | bOut;
+    }
+
+    private static int toSrgbByte(float linear) {
+        return (int) Math.round(Math.pow(Math.clamp(linear, 0.0f, 1.0f), 1.0f / 2.2f) * 255);
+    }
+
+    public static int brightnessToBaseColor(double brightness) {
+        int gray = (int) Math.round(Math.clamp(brightness, 0, 1) * 0x80);
+        return 0xFF000000 | (gray << 16) | (gray << 8) | gray;
     }
 
     /**
