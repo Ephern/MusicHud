@@ -18,7 +18,6 @@ import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
@@ -222,7 +221,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             }
         } catch (Exception e) {
             if (logger == null) {
-                logger = MusicHud.getLogger(HudRendererManager.class);
+                logger = MusicHud.getLogger(StaggeredLyricScrollView.class);
             }
             logger.error("While switch lyrics", e);
         }

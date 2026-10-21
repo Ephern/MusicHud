@@ -560,8 +560,35 @@ public class ConfigView extends LinearLayout {
                 envVarCategory.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
             }
             LayoutParams envVarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            envVarParams.setMargins(0, dp(6), 0, dp(128));
+            envVarParams.setMargins(0, dp(6), 0, dp(6));
             view.addView(envVarCategory, envVarParams);
+
+            var debugCategory = PreferencesFragment.createCategoryList(view, null);
+            {
+                var transition = new LayoutTransition();
+                transition.enableTransitionType(LayoutTransition.CHANGING);
+                debugCategory.setLayoutTransition(transition);
+
+                final Button title = new ToggleButton(context, null, R.attr.borderlessButtonStyle);
+                title.setText(I18n.get(MusicHud.MOD_ID + ".config.category.debug"));
+                title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+                {
+                    var icon = new StateListDrawable();
+                    icon.addState(new int[]{R.attr.state_checked}, new BuiltinIconDrawable(
+                            context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_UP
+                    ));
+                    icon.addState(StateSet.WILD_CARD, new BuiltinIconDrawable(
+                            context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_DOWN
+                    ));
+                    icon.setTintList(title.getTextColors());
+                    title.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon, null);
+                }
+                title.setOnClickListener(new DebugAccordion(debugCategory));
+                debugCategory.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            }
+            LayoutParams debugParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            debugParams.setMargins(0, dp(6), 0, dp(128));
+            view.addView(debugCategory, debugParams);
 
             Consumer<ApiServerManager.BinaryApiServerStatus> listener = apiServerStatus -> MuiModApi.postToUiThread(
                     () -> {
@@ -710,6 +737,50 @@ public class ConfigView extends LinearLayout {
                     serverConfig.getCorsAllowOrigin(), serverConfig::setCorsAllowOrigin);
             createEnvVarInputBox(context, mContent, MusicHud.MOD_ID + ".config.apiServer.proxyUrl",
                     serverConfig.getProxyUrl(), serverConfig::setProxyUrl);
+
+            var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params.setMargins(0, mContent.dp(6), 0, 0);
+            mParent.addView(mContent, params);
+        }
+    }
+
+    private static final class DebugAccordion implements View.OnClickListener {
+        final ViewGroup mParent;
+        LinearLayout mContent;
+
+        DebugAccordion(ViewGroup parent) {
+            mParent = parent;
+        }
+
+        @Override
+        public void onClick(View v) {
+            if (mContent != null) {
+                mContent.setVisibility(mContent.getVisibility() == View.GONE
+                        ? View.VISIBLE
+                        : View.GONE);
+                return;
+            }
+            addContent();
+        }
+
+        private void addContent() {
+            var context = mParent.getContext();
+            mContent = new LinearLayout(context);
+            mContent.setOrientation(LinearLayout.VERTICAL);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.showHudLayoutBoxes"),
+                    clientConfig::getShowHudLayoutBoxes,
+                    clientConfig::setShowHudLayoutBoxes)
+                    .setDefaultValue(clientConfig.getDefaultShowHudLayoutBoxes())
+                    .create(mContent);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.showThemeColor"),
+                    clientConfig::getShowThemeColor,
+                    clientConfig::setShowThemeColor)
+                    .setDefaultValue(clientConfig.getDefaultShowThemeColor())
+                    .create(mContent);
 
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params.setMargins(0, mContent.dp(6), 0, 0);

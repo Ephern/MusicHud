@@ -201,6 +201,18 @@ public interface ClientConfig {
 
     void setEnableMarqueeText(boolean aBoolean);
 
+    boolean getShowHudLayoutBoxes();
+
+    boolean getDefaultShowHudLayoutBoxes();
+
+    void setShowHudLayoutBoxes(boolean showHudLayoutBoxes);
+
+    boolean getShowThemeColor();
+
+    boolean getDefaultShowThemeColor();
+
+    void setShowThemeColor(boolean showThemeColor);
+
     void save();
 
     boolean isConfigured();

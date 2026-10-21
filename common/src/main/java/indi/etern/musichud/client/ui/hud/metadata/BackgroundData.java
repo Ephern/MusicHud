@@ -1,8 +1,8 @@
 package indi.etern.musichud.client.ui.hud.metadata;
 
-import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
-import indi.etern.musichud.client.ui.hud.pipelines.Std140Sizes;
-import indi.etern.musichud.client.ui.hud.pipelines.Std140Writer;
+import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
+import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;
+import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.Mixable;
@@ -13,7 +13,7 @@ import lombok.EqualsAndHashCode;
 import java.util.Objects;
 
 @EqualsAndHashCode
-public final class BackgroundData implements Mixable<BackgroundData>, HudUniform {
+public final class BackgroundData implements Mixable<BackgroundData>, SceneUniform {
     private final BackgroundImages image;
     private final ThemedColors themedColors;
     private ThemedColors mixedColors;
@@ -116,7 +116,7 @@ public final class BackgroundData implements Mixable<BackgroundData>, HudUniform
     }
 
     @Override
-    public boolean shouldUseBuffer(HudUniform lastBuffered) {
+    public boolean shouldUseBuffer(SceneUniform lastBuffered) {
         if (lastBuffered instanceof BackgroundData data) {
             float mixAlpha = (float) clientConfig.getHudBackgroundMixAlpha();
             if (mixAlpha != this.mixAlpha) {

@@ -7,8 +7,8 @@ import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.beans.option.ScrobbleOption;
 import indi.etern.musichud.beans.option.MultichannelMode;
-import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
-import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
+import indi.etern.musichud.client.ui.render.HorizontalAlign;
+import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.utils.JsonUtil;
 import lombok.Getter;
@@ -35,6 +35,8 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> enableLyricsSidebar;
     private final ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
     private final ModConfigSpec.ConfigValue<Boolean> enableMarqueeText;
+    private final ModConfigSpec.ConfigValue<Boolean> showHudLayoutBoxes;
+    private final ModConfigSpec.ConfigValue<Boolean> showThemeColor;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -93,6 +95,14 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Enable marquee animation on overflow text")
                 .translation(MusicHud.MOD_ID + ".config.common.enableMarqueeText")
                 .define("enableMarqueeText", true);
+        showHudLayoutBoxes = builder
+                .comment("Show HUD layout debug boxes")
+                .translation(MusicHud.MOD_ID + ".config.debug.showHudLayoutBoxes")
+                .define("showHudLayoutBoxes", false);
+        showThemeColor = builder
+                .comment("Show extracted theme color debug")
+                .translation(MusicHud.MOD_ID + ".config.debug.showThemeColor")
+                .define("showThemeColor", false);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -683,5 +693,35 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setEnableMarqueeText(boolean enable) {
         enableMarqueeText.set(enable);
+    }
+
+    @Override
+    public boolean getShowHudLayoutBoxes() {
+        return showHudLayoutBoxes.get();
+    }
+
+    @Override
+    public boolean getDefaultShowHudLayoutBoxes() {
+        return showHudLayoutBoxes.getDefault();
+    }
+
+    @Override
+    public void setShowHudLayoutBoxes(boolean showHudLayoutBoxes) {
+        this.showHudLayoutBoxes.set(showHudLayoutBoxes);
+    }
+
+    @Override
+    public boolean getShowThemeColor() {
+        return showThemeColor.get();
+    }
+
+    @Override
+    public boolean getDefaultShowThemeColor() {
+        return showThemeColor.getDefault();
+    }
+
+    @Override
+    public void setShowThemeColor(boolean showThemeColor) {
+        this.showThemeColor.set(showThemeColor);
     }
 }

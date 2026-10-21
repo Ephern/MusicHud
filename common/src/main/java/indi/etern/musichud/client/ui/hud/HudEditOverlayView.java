@@ -8,10 +8,11 @@ import icyllis.modernui.graphics.RectF;
 import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
-import indi.etern.musichud.client.utils.ui.HudLayoutMath;
-import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
-import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
+import indi.etern.musichud.client.ui.hud.scene.HudScene;
+import indi.etern.musichud.client.ui.render.HorizontalAlign;
+import indi.etern.musichud.client.utils.ui.HudRootPlacement;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -33,7 +34,7 @@ public class HudEditOverlayView extends View {
     private static final int[] EMPTY_STATE = {};
 
     private final ClientConfig clientConfig = ClientConfig.getInstance();
-    private final HudRendererManager hudRendererManager = HudRendererManager.getInstance();
+    private final HudScene hudScene = HudScene.getInstance();
     private final Paint borderPaint = new Paint();
     private final Paint handlePaint = new Paint();
 
@@ -60,7 +61,7 @@ public class HudEditOverlayView extends View {
     }
 
     private RectF currentGuiRect() {
-        return HudLayoutMath.computeGuiRect(scaledWidth(), scaledHeight(),
+        return HudRootPlacement.computeGuiRect(scaledWidth(), scaledHeight(),
                 HorizontalAlign.valueOf(clientConfig.getHudHorizontalPosition()),
                 VerticalAlign.valueOf(clientConfig.getHudVerticalPosition()),
                 clientConfig.getHudOffsetX(), clientConfig.getHudOffsetY(),
@@ -223,7 +224,7 @@ public class HudEditOverlayView extends View {
 
         HorizontalAlign ha = HorizontalAlign.valueOf(clientConfig.getHudHorizontalPosition());
         VerticalAlign va = VerticalAlign.valueOf(clientConfig.getHudVerticalPosition());
-        HudLayoutMath.Values values = HudLayoutMath.reverseGuiRect(scaledWidth(), scaledHeight(), ha, va,
+        HudRootPlacement.Values values = HudRootPlacement.reverseGuiRect(scaledWidth(), scaledHeight(), ha, va,
                 rect.left, rect.top, rect.right, rect.bottom);
         int newOffsetX = Math.clamp(values.offsetX(), -OFFSET_LIMIT, OFFSET_LIMIT);
         int newOffsetY = Math.clamp(values.offsetY(), -OFFSET_LIMIT, OFFSET_LIMIT);
@@ -254,8 +255,8 @@ public class HudEditOverlayView extends View {
             return;
         }
 
-        hudRendererManager.setBaseHudStyle(new HudStyle(newOffsetX, newOffsetY, newWidth, newHeight, newRadius, ha, va));
-        hudRendererManager.refreshStyle();
+        hudScene.setBaseHudStyle(new SceneStyle(newOffsetX, newOffsetY, newWidth, newHeight, newRadius, ha, va));
+        hudScene.refreshStyle();
         if (onConfigChanged != null) {
             onConfigChanged.run();
         }
