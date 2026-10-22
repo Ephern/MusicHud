@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.pages.routes;
 
 import icyllis.modernui.animation.LayoutTransition;
+import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
@@ -17,22 +18,29 @@ import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
 import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.ThemeColorStack;
+import indi.etern.musichud.client.utils.ui.ThemedColors;
+import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import net.minecraft.client.resources.language.I18n;
 
+import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class ArtistDetailView extends LinearLayout {
+public class ArtistDetailView extends LinearLayout implements RouterContainer.RouteAware {
     private final LinearLayout musicList;
     private final TextView noMoreResultText;
     private final ProgressBar loadingProgressRing;
@@ -41,12 +49,21 @@ public class ArtistDetailView extends LinearLayout {
     private final TextView description;
     private final UrlImageView avatarImageView;
     private static final IClientMusicService musicService = MusicService.getInstance();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final int AVATAR_SIZE = 1024;
     private final InsetBackgroundFactory itemBackgroundFactory = InsetBackgroundFactory.builder()
             .cornerRadius(dp(7))
             .inset(dp(1))
             .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build();
     private final int imageSize = dp(128);
     Artist artist;
+    private String currentAvatarUrl = null;
+    private boolean routeActive;
+    private ThemeColorStack.Layer backgroundThemeLayer;
+    private ThemedColors themeColors;
+    private String themeColorsUrl;
+    private int themeColorsGeneration;
+    private boolean artistDetailLoaded;
 
     public ArtistDetailView(Context context, Artist artist) {
         super(context);
@@ -87,6 +104,7 @@ public class ArtistDetailView extends LinearLayout {
         LayoutParams imageParams = new LayoutParams(imageSize, imageSize);
         avatarImageView.setCornerRadius(dp(8));
         topBar.addView(avatarImageView, imageParams);
+        loadAvatarImage();
 
         LinearLayout artistInfoView = new LinearLayout(context);
         artistInfoView.setGravity(Gravity.LEFT | Gravity.TOP);
@@ -221,6 +239,40 @@ public class ArtistDetailView extends LinearLayout {
         loadData(false);
     }
 
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (routeActive) {
+            syncBackgroundTheme();
+        }
+    }
+
+    @Override
+    protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        if (visibility == VISIBLE && routeActive) {
+            syncBackgroundTheme();
+        }
+    }
+
+    @Override
+    public void onRoutePushed() {
+        routeActive = true;
+        syncBackgroundTheme();
+    }
+
+    @Override
+    public void onRoutePopped() {
+        routeActive = false;
+        popBackgroundTheme();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        super.onDetachedFromWindow();
+        popBackgroundTheme();
+    }
+
     private void loadData(boolean ignoreCache) {
         noMoreResult = false;
         loadingMore = false;
@@ -267,7 +319,9 @@ public class ArtistDetailView extends LinearLayout {
                         productionCounts.setVisibility(GONE);
                     }
                     description.setText(artist1.getDescription());
-                    avatarImageView.loadUrl(artist1.getAvatarThumbnailUrl(imageSize));
+                    artistDetailLoaded = true;
+                    loadAvatarImage();
+                    syncBackgroundTheme();
                     musicList.removeAllViews();
                     for (MusicDetail musicDetail : artist1.getMusicDetails()) {
                         addItem(getContext(), musicDetail);
@@ -276,6 +330,110 @@ public class ArtistDetailView extends LinearLayout {
                 });
             }
         }, MusicHud.EXECUTOR);
+    }
+
+    private void loadAvatarImage() {
+        Artist current = artist;
+        if (current == null) {
+            return;
+        }
+        if (current.getAvatarUrl().isBlank()) {
+            if (artistDetailLoaded) {
+                avatarImageView.loadUrl(current.getAvatarThumbnailUrl(imageSize));
+                currentAvatarUrl = null;
+            }
+            return;
+        }
+        String avatarUrl = current.getAvatarThumbnailUrl(AVATAR_SIZE);
+        if (Objects.equals(currentAvatarUrl, avatarUrl)) {
+            return;
+        }
+        currentAvatarUrl = avatarUrl;
+        avatarImageView.loadUrl(avatarUrl, imageSize, imageSize);
+    }
+
+    private void syncBackgroundTheme() {
+        if (!routeActive || !clientConfig.getEnableGuiFluidBackground()) {
+            popBackgroundTheme();
+            return;
+        }
+        Artist current = artist;
+        if (current == null || current.getAvatarUrl().isBlank()) {
+            return;
+        }
+        String resolvedAvatarUrl = currentAvatarUrl;
+        if (resolvedAvatarUrl == null || resolvedAvatarUrl.isBlank()) {
+            resolvedAvatarUrl = current.getAvatarThumbnailUrl(AVATAR_SIZE);
+        }
+        if (resolvedAvatarUrl == null || resolvedAvatarUrl.isBlank()) {
+            return;
+        }
+        final String avatarUrl = resolvedAvatarUrl;
+        if (themeColors != null && Objects.equals(themeColorsUrl, avatarUrl)) {
+            pushBackgroundTheme(themeColors);
+            return;
+        }
+        if (Objects.equals(themeColorsUrl, avatarUrl)) {
+            return;
+        }
+        themeColorsUrl = avatarUrl;
+        themeColors = null;
+        int generation = ++themeColorsGeneration;
+        if (avatarUrl.startsWith("data:image")) {
+            CompletableFuture.supplyAsync(() -> {
+                try (var imageTextureData = ImageUtils.loadBase64(avatarUrl)) {
+                    return ColorExtractor.extractColors(imageTextureData.getTexture());
+                }
+            }, MusicHud.EXECUTOR).whenComplete((colors, throwable) ->
+                    handleThemeColors(generation, avatarUrl, colors, throwable));
+        } else {
+            ImageUtils.downloadScaledAsync(avatarUrl, AVATAR_SIZE, AVATAR_SIZE)
+                    .thenApplyAsync(image -> image == null
+                                    ? null
+                                    : ColorExtractor.extractColors(image.getTexture()),
+                            MusicHud.EXECUTOR)
+                    .whenComplete((colors, throwable) ->
+                            handleThemeColors(generation, avatarUrl, colors, throwable));
+        }
+    }
+
+    private void handleThemeColors(int generation, String avatarUrl,
+                                   ThemedColors colors, Throwable throwable) {
+        MuiModApi.postToUiThread(() -> {
+            if (generation != themeColorsGeneration || !Objects.equals(themeColorsUrl, avatarUrl)) {
+                return;
+            }
+            if (throwable != null || colors == null) {
+                themeColorsUrl = null;
+                return;
+            }
+            themeColors = colors;
+            pushBackgroundTheme(colors);
+        });
+    }
+
+    private void pushBackgroundTheme(ThemedColors colors) {
+        if (!routeActive || !isAttachedToWindow() || colors == null) {
+            return;
+        }
+        RouterContainer router = RouterContainer.getInstance();
+        if (router == null || router.getEffectivePage() != this) {
+            return;
+        }
+        ThemeColorStack stack = HudPresentationService.getInstance().getGuiBackgroundColors();
+        if (backgroundThemeLayer == null) {
+            backgroundThemeLayer = stack.push(colors);
+        } else if (!stack.update(backgroundThemeLayer, colors)) {
+            backgroundThemeLayer = stack.push(colors);
+        }
+    }
+
+    private void popBackgroundTheme() {
+        if (backgroundThemeLayer == null) {
+            return;
+        }
+        HudPresentationService.getInstance().getGuiBackgroundColors().pop(backgroundThemeLayer);
+        backgroundThemeLayer = null;
     }
 
     boolean noMoreResult = false;

@@ -165,6 +165,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     public void removed() {
         super.removed();
         mHost.removed(this);
+        HudPresentationService.getInstance().getGuiBackgroundColors().clearLayers();
     }
 
     @Override

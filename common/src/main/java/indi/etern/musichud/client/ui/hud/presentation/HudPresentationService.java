@@ -16,7 +16,7 @@ import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.Easing;
-import indi.etern.musichud.client.utils.ui.ThemeColorSource;
+import indi.etern.musichud.client.utils.ui.ThemeColorStack;
 import indi.etern.musichud.client.utils.ui.Transitionable;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -50,7 +50,7 @@ public final class HudPresentationService {
     private final Transitionable<BackgroundData> backgroundTransition =
             new Transitionable<>(BackgroundData.NONE, 500);
     @Getter
-    private final ThemeColorSource guiBackgroundColors = new ThemeColorSource(500);
+    private final ThemeColorStack guiBackgroundColors = new ThemeColorStack(500);
     private final ConcurrentLinkedQueue<QueuedLyric> lyricQueue = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean lyricWorkerRunning = new AtomicBoolean();
     private final AtomicLong lyricGeneration = new AtomicLong();
@@ -186,7 +186,7 @@ public final class HudPresentationService {
         musicDurationString = "";
         invalidateLyrics();
         backgroundTransition.startTransition(BackgroundData.NONE);
-        guiBackgroundColors.reset();
+        guiBackgroundColors.setBase(ColorExtractor.getDefaultColors());
         pendingSwitchToEmpty = false;
         hudFadeDurationMs = 0;
         hudAlpha = targetAlpha();
@@ -342,7 +342,7 @@ public final class HudPresentationService {
         CompletableFuture<Void> future = loadAlbumImage(musicDetail);
         future.exceptionallyAsync(e -> {
             backgroundTransition.startTransition(BackgroundData.NONE);
-            guiBackgroundColors.reset();
+            guiBackgroundColors.setBase(ColorExtractor.getDefaultColors());
             try {
                 Thread.sleep(1000);
             } catch (InterruptedException ignored) {
@@ -375,7 +375,7 @@ public final class HudPresentationService {
                                 BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
                                 backgroundTransition.startTransition(
                                         new BackgroundData(backgroundImages, ColorExtractor.extractColors(downscaled.getTexture())));
-                                guiBackgroundColors.switchTo(downscaled.getTexture());
+                                guiBackgroundColors.setBase(ColorExtractor.extractColors(downscaled.getTexture()));
                             }
                         });
     }
