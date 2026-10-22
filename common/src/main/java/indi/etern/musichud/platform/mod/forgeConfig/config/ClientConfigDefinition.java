@@ -7,8 +7,8 @@ import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.beans.option.ScrobbleOption;
 import indi.etern.musichud.beans.option.MultichannelMode;
-import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
-import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
+import indi.etern.musichud.client.ui.render.HorizontalAlign;
+import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.utils.JsonUtil;
 import lombok.Getter;
@@ -35,6 +35,8 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> enableLyricsSidebar;
     private final ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
     private final ModConfigSpec.ConfigValue<Boolean> enableMarqueeText;
+    private final ModConfigSpec.ConfigValue<Boolean> showHudLayoutBoxes;
+    private final ModConfigSpec.ConfigValue<Boolean> showThemeColor;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -42,7 +44,9 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
     private final ModConfigSpec.ConfigValue<String> scrobbleOption;
     private final ModConfigSpec.ConfigValue<String> multichannelMode;
-    private final ModConfigSpec.ConfigValue<Double> mainScreenAdditionalBackgroundDarken;
+    private final ModConfigSpec.ConfigValue<Boolean> enableGuiFluidBackground;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundAlpha;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundBrightness;
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundMixAlpha;
 
     private final ModConfigSpec.ConfigValue<String> hudVerticalPosition;
@@ -93,6 +97,14 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Enable marquee animation on overflow text")
                 .translation(MusicHud.MOD_ID + ".config.common.enableMarqueeText")
                 .define("enableMarqueeText", true);
+        showHudLayoutBoxes = builder
+                .comment("Show HUD layout debug boxes")
+                .translation(MusicHud.MOD_ID + ".config.debug.showHudLayoutBoxes")
+                .define("showHudLayoutBoxes", false);
+        showThemeColor = builder
+                .comment("Show extracted theme color debug")
+                .translation(MusicHud.MOD_ID + ".config.debug.showThemeColor")
+                .define("showThemeColor", false);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -109,10 +121,18 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("How to handle audio with more than 2 channels (discrete multichannel via AL_EXT_MCFORMATS vs software downmix to stereo)")
                 .translation(MusicHud.MOD_ID + ".config.common.multichannelMode")
                 .define("multichannelMode", MultichannelMode.PREFER_DISCRETE.name());
-        mainScreenAdditionalBackgroundDarken = builder
-                .comment("Main Screen Additional Background Darken Rate")
-                .translation(MusicHud.MOD_ID + ".config.common.mainScreenAdditionalBackgroundDarken")
-                .defineInRange("mainScreenAdditionalBackgroundDarken", 0.5, 0, 1);
+        enableGuiFluidBackground = builder
+                .comment("Enable fluid background on the main GUI")
+                .translation(MusicHud.MOD_ID + ".config.common.enableGuiFluidBackground")
+                .define("enableGuiFluidBackground", true);
+        guiBackgroundAlpha = builder
+                .comment("Main GUI background overall opacity")
+                .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundAlpha")
+                .defineInRange("guiBackgroundAlpha", 0.75, 0, 1);
+        guiBackgroundBrightness = builder
+                .comment("Main GUI background brightness (fluid uses theme color brightness, flat overlay uses neutral gray)")
+                .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundBrightness")
+                .defineInRange("guiBackgroundBrightness", 0.1, 0, 1);
         hudBackgroundMixAlpha = builder
                 .comment("Hud Background Mix Alpha")
                 .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha")
@@ -575,18 +595,48 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public double getMainScreenAdditionalBackgroundDarken() {
-        return mainScreenAdditionalBackgroundDarken.get();
+    public boolean getEnableGuiFluidBackground() {
+        return enableGuiFluidBackground.get();
     }
 
     @Override
-    public double getDefaultMainScreenAdditionalBackgroundDarken() {
-        return mainScreenAdditionalBackgroundDarken.getDefault();
+    public boolean getDefaultEnableGuiFluidBackground() {
+        return enableGuiFluidBackground.getDefault();
     }
 
     @Override
-    public void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken) {
-        mainScreenAdditionalBackgroundDarken.set(additionalBackgroundDarken);
+    public void setEnableGuiFluidBackground(boolean enableGuiFluidBackground) {
+        this.enableGuiFluidBackground.set(enableGuiFluidBackground);
+    }
+
+    @Override
+    public double getGuiBackgroundAlpha() {
+        return guiBackgroundAlpha.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundAlpha() {
+        return guiBackgroundAlpha.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundAlpha(double guiBackgroundAlpha) {
+        this.guiBackgroundAlpha.set(guiBackgroundAlpha);
+    }
+
+    @Override
+    public double getGuiBackgroundBrightness() {
+        return guiBackgroundBrightness.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundBrightness() {
+        return guiBackgroundBrightness.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundBrightness(double guiBackgroundBrightness) {
+        this.guiBackgroundBrightness.set(guiBackgroundBrightness);
     }
 
     @Override
@@ -683,5 +733,35 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setEnableMarqueeText(boolean enable) {
         enableMarqueeText.set(enable);
+    }
+
+    @Override
+    public boolean getShowHudLayoutBoxes() {
+        return showHudLayoutBoxes.get();
+    }
+
+    @Override
+    public boolean getDefaultShowHudLayoutBoxes() {
+        return showHudLayoutBoxes.getDefault();
+    }
+
+    @Override
+    public void setShowHudLayoutBoxes(boolean showHudLayoutBoxes) {
+        this.showHudLayoutBoxes.set(showHudLayoutBoxes);
+    }
+
+    @Override
+    public boolean getShowThemeColor() {
+        return showThemeColor.get();
+    }
+
+    @Override
+    public boolean getDefaultShowThemeColor() {
+        return showThemeColor.getDefault();
+    }
+
+    @Override
+    public void setShowThemeColor(boolean showThemeColor) {
+        this.showThemeColor.set(showThemeColor);
     }
 }

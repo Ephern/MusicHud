@@ -1,74 +1,46 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import icyllis.modernui.mc.ModernUIMod;
-import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
-import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
-import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
-import indi.etern.musichud.client.ui.hud.metadata.ThemedColors;
-import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
-import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
-import indi.etern.musichud.client.ui.hud.pipelines.HudTextureSetup;
-import net.minecraft.client.Minecraft;
+import indi.etern.musichud.client.ui.render.*;
+import indi.etern.musichud.client.ui.render.pipeline.*;
+import indi.etern.musichud.client.ui.render.text.*;
 
-public class BackgroundRenderer implements HudRenderer {
-    private HudRenderData currentData;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
+import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
+import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
+import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
+
+public class BackgroundRenderer implements RenderLayer {
+    private SceneRenderData currentData;
     private final DynamicStatusUniform dynamicStatusUniform = DynamicStatusUniform.getInstance();
 
-    public void configure(HudRenderData data) {
+    public void configure(SceneRenderData data) {
         this.currentData = data;
     }
 
-    private static final int SWATCH_SIZE = 20;
-    private static final int PADDING = 4;
-    private static final int START_X = 4;
-    private static final int START_Y = 4;
-
-    public void drawColorDebug(HudRenderContext renderContext, ThemedColors colors) {
-        if (colors == null) return;
-        int currentY = START_Y;
-        drawColorDebugLine(renderContext, currentY, colors.primary, "Primary");
-        currentY += SWATCH_SIZE + PADDING;
-        drawColorDebugLine(renderContext, currentY, colors.secondary, "Secondary");
-        currentY += SWATCH_SIZE + PADDING;
-        drawColorDebugLine(renderContext, currentY, colors.bright, "Bright");
-        currentY += SWATCH_SIZE + PADDING;
-        drawColorDebugLine(renderContext, currentY, colors.dark, "Dark");
-    }
-
-    private static void drawColorDebugLine(HudRenderContext renderContext, int currentY, int color, String label) {
-        // Force opaque display; alpha holds the share weight, not opacity.
-        int opaque = 0xFF000000 | (color & 0x00FFFFFF);
-        int share = (color >>> 24) & 0xFF;
-        renderContext.fill(START_X, currentY, START_X + SWATCH_SIZE, currentY + SWATCH_SIZE, 0xFF000000);
-        renderContext.fill(START_X + 1, currentY + 1, START_X + SWATCH_SIZE - 1, currentY + SWATCH_SIZE - 1, opaque);
-        String hex = String.format("#%06X A=%d", color & 0x00FFFFFF, share);
-        renderContext.drawString(Minecraft.getInstance().font, label + ": " + hex,
-                START_X + SWATCH_SIZE + PADDING, currentY + (SWATCH_SIZE - 8) / 2, 0xFFFFFFFF, true);
-    }
-
     @Override
-    public void render(HudRenderContext hudRenderContext) {
+    public void render(SceneRenderContext context) {
         if (currentData == null) return;
 
-        HudStyle hudStyle = currentData.getHudStyle();
         dynamicStatusUniform.setTransitionable(currentData.getTransitionableBackground());
+        render(context, currentData.getHudStyle(), currentData.getTransitionableBackground().getMixed());
+    }
 
-        HudRenderState hudRenderState = new HudRenderState(
-                HudRenderPipelines.BACKGROUND,
-                HudTextureSetup.NONE,
-                hudRenderContext.currentPose(),
-                hudStyle,
-                "background",
-                hudStyle,
-                currentData.getTransitionableBackground().getMixed(),
+    public void render(SceneRenderContext context, SceneStyle style, BackgroundData backgroundData) {
+        if (style == null || backgroundData == null) return;
+
+        SceneElementRenderState hudRenderState = new SceneElementRenderState(
+                SceneRenderPipelines.BACKGROUND,
+                SceneTextureSetup.NONE,
+                context.currentPose(),
+                style,
+                style,
+                backgroundData,
                 dynamicStatusUniform
         );
 
-        if (ModernUIMod.isDeveloperMode()) {
-            drawColorDebug(hudRenderContext, currentData.getTransitionableBackground().getMixed().color());
-        }
-
-        hudRenderContext.submitHudRenderState(hudRenderState);
-        hudRenderContext.nextStratum();
+        context.submit(this, hudRenderState);
+        context.nextStratum();
     }
 }

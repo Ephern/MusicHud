@@ -183,11 +183,23 @@ public interface ClientConfig {
 
     void setWhiteList(List<String> whiteList);
 
-    double getMainScreenAdditionalBackgroundDarken();
+    boolean getEnableGuiFluidBackground();
 
-    double getDefaultMainScreenAdditionalBackgroundDarken();
+    boolean getDefaultEnableGuiFluidBackground();
 
-    void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken);
+    void setEnableGuiFluidBackground(boolean enableGuiFluidBackground);
+
+    double getGuiBackgroundAlpha();
+
+    double getDefaultGuiBackgroundAlpha();
+
+    void setGuiBackgroundAlpha(double guiBackgroundAlpha);
+
+    double getGuiBackgroundBrightness();
+
+    double getDefaultGuiBackgroundBrightness();
+
+    void setGuiBackgroundBrightness(double guiBackgroundBrightness);
 
     double getHudBackgroundMixAlpha();
 
@@ -200,6 +212,18 @@ public interface ClientConfig {
     boolean getDefaultEnableMarqueeText();
 
     void setEnableMarqueeText(boolean aBoolean);
+
+    boolean getShowHudLayoutBoxes();
+
+    boolean getDefaultShowHudLayoutBoxes();
+
+    void setShowHudLayoutBoxes(boolean showHudLayoutBoxes);
+
+    boolean getShowThemeColor();
+
+    boolean getDefaultShowThemeColor();
+
+    void setShowThemeColor(boolean showThemeColor);
 
     void save();
 

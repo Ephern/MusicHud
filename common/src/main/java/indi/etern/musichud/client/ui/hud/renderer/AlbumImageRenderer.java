@@ -1,47 +1,49 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import indi.etern.musichud.client.ui.render.*;
+import indi.etern.musichud.client.ui.render.pipeline.*;
+import indi.etern.musichud.client.ui.render.text.*;
+
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
-import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
-import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
-import indi.etern.musichud.client.ui.hud.pipelines.GpuTextureViewRef;
-import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
-import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
-import indi.etern.musichud.client.ui.hud.pipelines.HudTextureSetup;
+import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.pipeline.GpuTextureViewRef;
+import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
+import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.jetbrains.annotations.NotNull;
 
-public class AlbumImageRenderer implements HudRenderer {
-    private HudRenderData currentData;
+public class AlbumImageRenderer implements RenderLayer {
+    private SceneRenderData currentData;
     private ImageTextureData icon;
 
-    public void configure(HudRenderData data) {
+    public void configure(SceneRenderData data) {
         this.currentData = data;
     }
 
     @Override
-    public void render(HudRenderContext context) {
+    public void render(SceneRenderContext context) {
         if (currentData == null) return;
 
-        HudTextureSetup textureSetup = getMixedTextureSetup();
-        HudStyle hudStyle = currentData.getHudStyle();
+        SceneTextureSetup textureSetup = getMixedTextureSetup();
+        SceneStyle hudStyle = currentData.getHudStyle();
 
-        HudRenderState hudRenderState = new HudRenderState(
-                HudRenderPipelines.ROUNDED_ALBUM,
+        SceneElementRenderState hudRenderState = new SceneElementRenderState(
+                SceneRenderPipelines.ROUNDED_ALBUM,
                 textureSetup,
                 context.currentPose(),
                 hudStyle,
-                "album",
                 hudStyle,
                 DynamicStatusUniform.getInstance()
         );
-        context.submitHudRenderState(hudRenderState);
+        context.submit(this, hudRenderState);
     }
 
-    private @NotNull HudTextureSetup getMixedTextureSetup() {
+    private @NotNull SceneTextureSetup getMixedTextureSetup() {
         var background = currentData.getTransitionableBackground();
         BackgroundData next = background.getNext();
         BackgroundData current = background.getCurrent();
@@ -49,15 +51,15 @@ public class AlbumImageRenderer implements HudRenderer {
         DynamicTexture nextTexture = next == null || next.image() == null || next.image().current == null ? getIconTexture() : next.image().current.getTexture();
         DynamicTexture transitionTexture = background.isTransitioning() ? nextTexture : currentTexture;
         if (currentTexture == null) {
-            return HudTextureSetup.NONE;
+            return SceneTextureSetup.NONE;
         }
         if (transitionTexture != null) {
-            return HudTextureSetup.doubleTexture(
+            return SceneTextureSetup.doubleTexture(
                     new GpuTextureViewRef(currentTexture.getTextureView()),
                     new GpuTextureViewRef(transitionTexture.getTextureView())
             );
         }
-        return HudTextureSetup.single(new GpuTextureViewRef(currentTexture.getTextureView()));
+        return SceneTextureSetup.single(new GpuTextureViewRef(currentTexture.getTextureView()));
     }
 
     private DynamicTexture getIconTexture() {

@@ -24,9 +24,9 @@ import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
 import indi.etern.musichud.client.ui.components.options.DynamicIntegerOption;
 import indi.etern.musichud.client.ui.components.options.SignedIntegerOption;
 import indi.etern.musichud.client.ui.hud.HudEditOverlayView;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.metadata.HorizontalAlign;
-import indi.etern.musichud.client.ui.hud.metadata.VerticalAlign;
+import indi.etern.musichud.client.ui.hud.scene.HudScene;
+import indi.etern.musichud.client.ui.render.HorizontalAlign;
+import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import net.minecraft.client.Minecraft;
@@ -69,6 +69,10 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
     private static void applyLayoutTransition(ViewGroup view) {
         LayoutTransition transition = new LayoutTransition();
         transition.enableTransitionType(LayoutTransition.CHANGING);
+        transition.disableTransitionType(LayoutTransition.CHANGE_APPEARING);
+        transition.disableTransitionType(LayoutTransition.CHANGE_DISAPPEARING);
+        transition.disableTransitionType(LayoutTransition.APPEARING);
+        transition.disableTransitionType(LayoutTransition.DISAPPEARING);
         view.setLayoutTransition(transition);
     }
 
@@ -310,9 +314,9 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
     }
 
     private void onLayoutOptionChanged() {
-        HudRendererManager hudRendererManager = HudRendererManager.getInstance();
-        hudRendererManager.updateLayoutFromConfig();
-        hudRendererManager.refreshStyle();
+        HudScene hudScene = HudScene.getInstance();
+        hudScene.updateLayoutFromConfig();
+        hudScene.refreshStyle();
         if (overlay != null) {
             overlay.refresh();
         }

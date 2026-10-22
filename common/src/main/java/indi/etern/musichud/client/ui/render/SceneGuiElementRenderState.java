@@ -1,0 +1,73 @@
+package indi.etern.musichud.client.ui.render;
+
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.renderpearl.api.pipeline.RenderPipeline;
+import lombok.NonNull;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.render.TextureSetup;
+import net.minecraft.client.renderer.state.gui.GuiElementRenderState;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix3x2f;
+
+/**
+ * Adapter: turns a neutral {@link SceneElementRenderState}
+ * into a {@link GuiElementRenderState} consumable by {@code GuiRenderer}.
+ */
+public class SceneGuiElementRenderState implements GuiElementRenderState {
+    private final RenderPipeline pipeline;
+    private final TextureSetup textureSetup;
+    private final Matrix3x2f pose;
+    private final float width;
+    private final float height;
+    @Nullable
+    private final ScreenRectangle bounds;
+
+    public SceneGuiElementRenderState(@NonNull RenderPipeline pipeline,
+                                    @NonNull TextureSetup textureSetup,
+                                    @NonNull Matrix3x2f pose,
+                                    float width,
+                                    float height,
+                                    @Nullable ScreenRectangle bounds) {
+        this.pipeline = pipeline;
+        this.textureSetup = textureSetup;
+        this.pose = pose;
+        this.width = width;
+        this.height = height;
+        this.bounds = bounds;
+    }
+
+    @Override
+    public void buildVertices(VertexConsumer consumer) {
+        float left = -width / 2f;
+        float right = width / 2f;
+        float top = -height / 2f;
+        float bottom = height / 2f;
+        consumer.addVertexWith2DPose(pose, right, bottom).setColor(-1);
+        consumer.addVertexWith2DPose(pose, right, top).setColor(-1);
+        consumer.addVertexWith2DPose(pose, left, top).setColor(-1);
+        consumer.addVertexWith2DPose(pose, left, bottom).setColor(-1);
+    }
+
+    @Override
+    public @NotNull RenderPipeline pipeline() {
+        return pipeline;
+    }
+
+    @Override
+    public @NotNull TextureSetup textureSetup() {
+        return textureSetup;
+    }
+
+    @Nullable
+    @Override
+    public ScreenRectangle scissorArea() {
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public ScreenRectangle bounds() {
+        return bounds;
+    }
+}

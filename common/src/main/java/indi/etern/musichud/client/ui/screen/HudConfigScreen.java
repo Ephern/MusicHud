@@ -26,8 +26,9 @@ import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.mc.MuiScreen;
 import icyllis.modernui.mc.ScreenCallback;
 import icyllis.modernui.mc.UIManager;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
+import indi.etern.musichud.client.ui.hud.scene.HudScene;
+import indi.etern.musichud.client.ui.render.RenderService;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import lombok.Getter;
 import lombok.NonNull;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -88,7 +89,7 @@ public class HudConfigScreen extends Screen implements MuiScreen {
         if (minecraft.level == null) {
             this.extractPanorama(guiGraphics, deltaTick);
             guiGraphics.nextStratum();
-            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
+            RenderService.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
         }
     }
 

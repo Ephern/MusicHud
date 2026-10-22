@@ -16,6 +16,7 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
 import indi.etern.musichud.client.ui.components.IdlePlaySourceWidget;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.UrlImageView;
@@ -24,7 +25,11 @@ import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.layouts.MusicVirtualizedListLayout;
 import indi.etern.musichud.client.utils.CountFormatter;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.ThemeColorStack;
+import indi.etern.musichud.client.utils.ui.ThemedColors;
+import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.utils.CollectionUpdateNotifier;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
@@ -40,8 +45,10 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class MusicCollectionDetailView extends LinearLayout {
+public class MusicCollectionDetailView extends LinearLayout implements RouterContainer.RouteAware {
     private static final MusicService musicService = MusicService.getInstance();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    private static final int COVER_SIZE = 1024;
     private static final String ICON_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/list_music.png";
     private static final String ICON_LIKE_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/heart_filled.png";
     private static final String ICON_RECOMMEND_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/radio.png";
@@ -59,6 +66,11 @@ public class MusicCollectionDetailView extends LinearLayout {
     private String currentCoverUrl = null;
     private long collectionId = -1;
     private boolean albumCollection = false;
+    private boolean routeActive;
+    private ThemeColorStack.Layer backgroundThemeLayer;
+    private ThemedColors themeColors;
+    private String themeColorsUrl;
+    private int themeColorsGeneration;
 
     public MusicCollectionDetailView(Context context, MusicCollection musicCollection) {
         super(context);
@@ -98,8 +110,8 @@ public class MusicCollectionDetailView extends LinearLayout {
         imageView = new UrlImageView(context);
         LayoutParams imageParams = new LayoutParams(imageSize, imageSize);
         topBar.addView(imageView, imageParams);
-        imageView.loadUrl(musicCollection.getImageThumbnailUrl(imageSize));
         imageView.setCornerRadius(dp(8));
+        loadCoverImage();
 
         LinearLayout infoView = new LinearLayout(context);
         infoView.setGravity(Gravity.TOP);
@@ -288,11 +300,34 @@ public class MusicCollectionDetailView extends LinearLayout {
     }
 
     @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        if (routeActive) {
+            syncBackgroundTheme();
+        }
+    }
+
+    @Override
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
         if (visibility == VISIBLE && changedView == this) {
             syncTracksView();
         }
+        if (visibility == VISIBLE && routeActive) {
+            syncBackgroundTheme();
+        }
+    }
+
+    @Override
+    public void onRoutePushed() {
+        routeActive = true;
+        syncBackgroundTheme();
+    }
+
+    @Override
+    public void onRoutePopped() {
+        routeActive = false;
+        popBackgroundTheme();
     }
 
     private void onCollectionUpdateNotified(boolean operateByRemoteSelf) {
@@ -306,10 +341,11 @@ public class MusicCollectionDetailView extends LinearLayout {
             if (throwable != null || !MusicCollections.isUsable(latest)) return;
             MuiModApi.postToUiThread(() -> {
                 if (!isAttachedToWindow()) return;
-                String newCoverUrl = latest.getImageThumbnailUrl(imageSize);
-                if (!Objects.equals(currentCoverUrl, newCoverUrl)) {
+                String newCoverUrl = latest.getImageThumbnailUrl(COVER_SIZE);
+                if (!newCoverUrl.isBlank() && !Objects.equals(currentCoverUrl, newCoverUrl)) {
                     currentCoverUrl = newCoverUrl;
-                    imageView.loadUrl(newCoverUrl);
+                    imageView.loadUrl(newCoverUrl, imageSize, imageSize);
+                    syncBackgroundTheme();
                 }
                 if (!operateByRemoteSelf) {
                     if (!isAttachedToWindow()) return;
@@ -327,11 +363,101 @@ public class MusicCollectionDetailView extends LinearLayout {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        popBackgroundTheme();
         unregisterTracksSync();
         if (updateNotifierUnregister != null) {
             updateNotifierUnregister.unregister();
             updateNotifierUnregister = null;
         }
+    }
+
+    private void loadCoverImage() {
+        String coverUrl = musicCollection.getImageThumbnailUrl(COVER_SIZE);
+        if (coverUrl.isBlank()) {
+            return;
+        }
+        currentCoverUrl = coverUrl;
+        imageView.loadUrl(coverUrl, imageSize, imageSize);
+    }
+
+    private void syncBackgroundTheme() {
+        if (!routeActive || !clientConfig.getEnableGuiFluidBackground()) {
+            popBackgroundTheme();
+            return;
+        }
+        String resolvedCoverUrl = currentCoverUrl;
+        if (resolvedCoverUrl == null || resolvedCoverUrl.isBlank()) {
+            resolvedCoverUrl = musicCollection.getImageThumbnailUrl(COVER_SIZE);
+        }
+        if (resolvedCoverUrl == null || resolvedCoverUrl.isBlank()) {
+            return;
+        }
+        final String coverUrl = resolvedCoverUrl;
+        if (themeColors != null && Objects.equals(themeColorsUrl, coverUrl)) {
+            pushBackgroundTheme(themeColors);
+            return;
+        }
+        if (Objects.equals(themeColorsUrl, coverUrl)) {
+            return;
+        }
+        themeColorsUrl = coverUrl;
+        themeColors = null;
+        int generation = ++themeColorsGeneration;
+        if (coverUrl.startsWith("data:image")) {
+            CompletableFuture.supplyAsync(() -> {
+                try (var imageTextureData = ImageUtils.loadBase64(coverUrl)) {
+                    return ColorExtractor.extractColors(imageTextureData.getTexture());
+                }
+            }, MusicHud.EXECUTOR).whenComplete((colors, throwable) ->
+                    handleThemeColors(generation, coverUrl, colors, throwable));
+        } else {
+            ImageUtils.downloadScaledAsync(coverUrl, COVER_SIZE, COVER_SIZE)
+                    .thenApplyAsync(image -> image == null
+                                    ? null
+                                    : ColorExtractor.extractColors(image.getTexture()),
+                            MusicHud.EXECUTOR)
+                    .whenComplete((colors, throwable) ->
+                            handleThemeColors(generation, coverUrl, colors, throwable));
+        }
+    }
+
+    private void handleThemeColors(int generation, String coverUrl,
+                                   ThemedColors colors, Throwable throwable) {
+        MuiModApi.postToUiThread(() -> {
+            if (generation != themeColorsGeneration || !Objects.equals(themeColorsUrl, coverUrl)) {
+                return;
+            }
+            if (throwable != null || colors == null) {
+                themeColorsUrl = null;
+                return;
+            }
+            themeColors = colors;
+            pushBackgroundTheme(colors);
+        });
+    }
+
+    private void pushBackgroundTheme(ThemedColors colors) {
+        if (!routeActive || !isAttachedToWindow() || colors == null) {
+            return;
+        }
+        RouterContainer router = RouterContainer.getInstance();
+        if (router == null || router.getEffectivePage() != this) {
+            return;
+        }
+        ThemeColorStack stack = HudPresentationService.getInstance().getGuiBackgroundColors();
+        if (backgroundThemeLayer == null) {
+            backgroundThemeLayer = stack.push(colors);
+        } else if (!stack.update(backgroundThemeLayer, colors)) {
+            backgroundThemeLayer = stack.push(colors);
+        }
+    }
+
+    private void popBackgroundTheme() {
+        if (backgroundThemeLayer == null) {
+            return;
+        }
+        HudPresentationService.getInstance().getGuiBackgroundColors().pop(backgroundThemeLayer);
+        backgroundThemeLayer = null;
     }
 
     private void updatePlaylistTrackCountView(Playlist playlist) {
@@ -378,8 +504,8 @@ public class MusicCollectionDetailView extends LinearLayout {
                     Collection<MusicDetail> musicDetails = result.musicDetails();
                     MusicCollection musicCollection1 = result.musicCollection();
                     this.musicCollection = musicCollection1;
-                    currentCoverUrl = musicCollection1.getImageThumbnailUrl(imageSize);
-                    this.imageView.loadUrl(currentCoverUrl);
+                    loadCoverImage();
+                    syncBackgroundTheme();
                     if (musicTrackCountView != null) {
                         if (musicCollection1 instanceof Album album) {
                             updateAlbumTrackCountView(album);
@@ -427,10 +553,11 @@ public class MusicCollectionDetailView extends LinearLayout {
         if (musicDetails instanceof ObservableSequencedSet<MusicDetail> tracks) {
             syncTracksList(tracks);
         }
-        String newCoverUrl = collection.getImageThumbnailUrl(imageSize);
-        if (!Objects.equals(currentCoverUrl, newCoverUrl)) {
+        String newCoverUrl = collection.getImageThumbnailUrl(COVER_SIZE);
+        if (!newCoverUrl.isBlank() && !Objects.equals(currentCoverUrl, newCoverUrl)) {
             currentCoverUrl = newCoverUrl;
-            imageView.loadUrl(newCoverUrl);
+            imageView.loadUrl(newCoverUrl, imageSize, imageSize);
+            syncBackgroundTheme();
         }
     }
 

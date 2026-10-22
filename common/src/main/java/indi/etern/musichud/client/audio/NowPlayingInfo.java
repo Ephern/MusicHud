@@ -9,7 +9,7 @@ import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.dto.LyricLine;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
@@ -132,6 +132,7 @@ public class NowPlayingInfo {
 
     private void initJmtc() {
         jmtc = JMTC.getInstance(new JMTCSettings("Minecraft-MusicHUD", "Minecraft-MusicHUD"));
+        if (jmtc == null) return;
         JMTCCallbacks jmtcCallbacks = new JMTCCallbacks();
         jmtcCallbacks.onPlay = () -> {
             MusicHud.EXECUTOR.execute(() -> {
@@ -171,13 +172,15 @@ public class NowPlayingInfo {
     }
 
     private void postJmtc(Runnable task) {
-        jmtcExecutor.execute(() -> {
-            try {
-                task.run();
-            } catch (Exception e) {
-                logger.warn("JMTC task failed", e);
-            }
-        });
+        if (jmtc != null) {
+            jmtcExecutor.execute(() -> {
+                try {
+                    task.run();
+                } catch (Exception e) {
+                    logger.warn("JMTC task failed", e);
+                }
+            });
+        }
     }
 
     /**
@@ -342,12 +345,12 @@ public class NowPlayingInfo {
                 Thread.sleep(500);
             } catch (InterruptedException ignored) {
             }
-            HudRendererManager.getInstance().switchMusic(musicDetail);
+            HudPresentationService.getInstance().switchMusic(musicDetail);
         });
         List.copyOf(musicSwitchListener).forEach(consumer -> consumer.accept(previous, musicDetail));
         // Reset HUD lyrics synchronously, before startAt() (triggered by play()) can dispatch the
         // first line. The delayed 500ms HUD update only refreshes title/artists/cover now.
-        HudRendererManager.getInstance().invalidateLyrics();
+        HudPresentationService.getInstance().invalidateLyrics();
         callLyricsUpdateListeners(null);
     }
 
