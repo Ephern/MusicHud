@@ -48,6 +48,25 @@ test {
     enabled = false
 }
 
+def backgroundRegressionTests = tasks.register('backgroundRegressionTest', Test) {
+    group = 'verification'
+    description = 'Runs deterministic background, artwork-publication and playing-PCM regression tests.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching 'indi.etern.musichud.client.ui.hud.presentation.CoverRequestGateTest'
+        includeTestsMatching 'indi.etern.musichud.client.audio.PlaybackSpectrumTest'
+        includeTestsMatching 'indi.etern.musichud.client.audio.PlaybackLedgerPcmWindowTest'
+        includeTestsMatching 'indi.etern.musichud.client.audio.PlaybackSpectrumMixerTest'
+        includeTestsMatching 'indi.etern.musichud.client.audio.SourcePcmClockTest'
+    }
+}
+
+tasks.named('check') {
+    dependsOn backgroundRegressionTests
+}
+
 shadowJar {
     enabled = false
 }

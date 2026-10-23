@@ -37,6 +37,8 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> enableMarqueeText;
     private final ModConfigSpec.ConfigValue<Boolean> showHudLayoutBoxes;
     private final ModConfigSpec.ConfigValue<Boolean> showThemeColor;
+    private final ModConfigSpec.ConfigValue<Boolean> forceGL32Path;
+    private final ModConfigSpec.ConfigValue<Boolean> forceRgba8Fallback;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -45,8 +47,10 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<String> scrobbleOption;
     private final ModConfigSpec.ConfigValue<String> multichannelMode;
     private final ModConfigSpec.ConfigValue<Boolean> enableGuiFluidBackground;
-    private final ModConfigSpec.ConfigValue<Double> guiBackgroundAlpha;
-    private final ModConfigSpec.ConfigValue<Double> guiBackgroundBrightness;
+    private final ModConfigSpec.ConfigValue<Double> fluidBackgroundAlpha;
+    private final ModConfigSpec.ConfigValue<Double> fluidBackgroundBrightness;
+    private final ModConfigSpec.ConfigValue<Double> solidBackgroundAlpha;
+    private final ModConfigSpec.ConfigValue<Double> solidBackgroundBrightness;
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundMixAlpha;
 
     private final ModConfigSpec.ConfigValue<String> hudVerticalPosition;
@@ -105,6 +109,14 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Show extracted theme color debug")
                 .translation(MusicHud.MOD_ID + ".config.debug.showThemeColor")
                 .define("showThemeColor", false);
+        forceGL32Path = builder
+                .comment("Force the OpenGL 3.2 compatible background texture path for debugging")
+                .translation(MusicHud.MOD_ID + ".config.debug.forceGL32Path")
+                .define("forceGL32Path", false);
+        forceRgba8Fallback = builder
+                .comment("Force RGBA8 background render targets for debugging")
+                .translation(MusicHud.MOD_ID + ".config.debug.forceRgba8Fallback")
+                .define("forceRgba8Fallback", false);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -125,14 +137,22 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Enable fluid background on the main GUI")
                 .translation(MusicHud.MOD_ID + ".config.common.enableGuiFluidBackground")
                 .define("enableGuiFluidBackground", true);
-        guiBackgroundAlpha = builder
-                .comment("Main GUI background overall opacity")
-                .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundAlpha")
+        fluidBackgroundAlpha = builder
+                .comment("Fluid GUI background opacity")
+                .translation(MusicHud.MOD_ID + ".config.common.fluidBackgroundAlpha")
                 .defineInRange("guiBackgroundAlpha", 0.75, 0, 1);
-        guiBackgroundBrightness = builder
-                .comment("Main GUI background brightness (fluid uses theme color brightness, flat overlay uses neutral gray)")
-                .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundBrightness")
+        fluidBackgroundBrightness = builder
+                .comment("Fluid GUI background brightness")
+                .translation(MusicHud.MOD_ID + ".config.common.fluidBackgroundBrightness")
                 .defineInRange("guiBackgroundBrightness", 0.1, 0, 1);
+        solidBackgroundAlpha = builder
+                .comment("Solid GUI background opacity")
+                .translation(MusicHud.MOD_ID + ".config.common.solidBackgroundAlpha")
+                .defineInRange("solidBackgroundAlpha", 0.75, 0, 1);
+        solidBackgroundBrightness = builder
+                .comment("Solid GUI background brightness")
+                .translation(MusicHud.MOD_ID + ".config.common.solidBackgroundBrightness")
+                .defineInRange("solidBackgroundBrightness", 0.1, 0, 1);
         hudBackgroundMixAlpha = builder
                 .comment("Hud Background Mix Alpha")
                 .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha")
@@ -610,33 +630,63 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public double getGuiBackgroundAlpha() {
-        return guiBackgroundAlpha.get();
+    public double getFluidBackgroundAlpha() {
+        return fluidBackgroundAlpha.get();
     }
 
     @Override
-    public double getDefaultGuiBackgroundAlpha() {
-        return guiBackgroundAlpha.getDefault();
+    public double getDefaultFluidBackgroundAlpha() {
+        return fluidBackgroundAlpha.getDefault();
     }
 
     @Override
-    public void setGuiBackgroundAlpha(double guiBackgroundAlpha) {
-        this.guiBackgroundAlpha.set(guiBackgroundAlpha);
+    public void setFluidBackgroundAlpha(double fluidBackgroundAlpha) {
+        this.fluidBackgroundAlpha.set(fluidBackgroundAlpha);
     }
 
     @Override
-    public double getGuiBackgroundBrightness() {
-        return guiBackgroundBrightness.get();
+    public double getFluidBackgroundBrightness() {
+        return fluidBackgroundBrightness.get();
     }
 
     @Override
-    public double getDefaultGuiBackgroundBrightness() {
-        return guiBackgroundBrightness.getDefault();
+    public double getDefaultFluidBackgroundBrightness() {
+        return fluidBackgroundBrightness.getDefault();
     }
 
     @Override
-    public void setGuiBackgroundBrightness(double guiBackgroundBrightness) {
-        this.guiBackgroundBrightness.set(guiBackgroundBrightness);
+    public void setFluidBackgroundBrightness(double fluidBackgroundBrightness) {
+        this.fluidBackgroundBrightness.set(fluidBackgroundBrightness);
+    }
+
+    @Override
+    public double getSolidBackgroundAlpha() {
+        return solidBackgroundAlpha.get();
+    }
+
+    @Override
+    public double getDefaultSolidBackgroundAlpha() {
+        return solidBackgroundAlpha.getDefault();
+    }
+
+    @Override
+    public void setSolidBackgroundAlpha(double solidBackgroundAlpha) {
+        this.solidBackgroundAlpha.set(solidBackgroundAlpha);
+    }
+
+    @Override
+    public double getSolidBackgroundBrightness() {
+        return solidBackgroundBrightness.get();
+    }
+
+    @Override
+    public double getDefaultSolidBackgroundBrightness() {
+        return solidBackgroundBrightness.getDefault();
+    }
+
+    @Override
+    public void setSolidBackgroundBrightness(double solidBackgroundBrightness) {
+        this.solidBackgroundBrightness.set(solidBackgroundBrightness);
     }
 
     @Override
@@ -763,5 +813,35 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setShowThemeColor(boolean showThemeColor) {
         this.showThemeColor.set(showThemeColor);
+    }
+
+    @Override
+    public boolean getForceGL32Path() {
+        return forceGL32Path.get();
+    }
+
+    @Override
+    public boolean getDefaultForceGL32Path() {
+        return forceGL32Path.getDefault();
+    }
+
+    @Override
+    public void setForceGL32Path(boolean force) {
+        forceGL32Path.set(force);
+    }
+
+    @Override
+    public boolean getForceRgba8Fallback() {
+        return forceRgba8Fallback.get();
+    }
+
+    @Override
+    public boolean getDefaultForceRgba8Fallback() {
+        return forceRgba8Fallback.getDefault();
+    }
+
+    @Override
+    public void setForceRgba8Fallback(boolean force) {
+        forceRgba8Fallback.set(force);
     }
 }

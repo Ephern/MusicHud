@@ -189,17 +189,29 @@ public interface ClientConfig {
 
     void setEnableGuiFluidBackground(boolean enableGuiFluidBackground);
 
-    double getGuiBackgroundAlpha();
+    double getFluidBackgroundAlpha();
 
-    double getDefaultGuiBackgroundAlpha();
+    double getDefaultFluidBackgroundAlpha();
 
-    void setGuiBackgroundAlpha(double guiBackgroundAlpha);
+    void setFluidBackgroundAlpha(double fluidBackgroundAlpha);
 
-    double getGuiBackgroundBrightness();
+    double getFluidBackgroundBrightness();
 
-    double getDefaultGuiBackgroundBrightness();
+    double getDefaultFluidBackgroundBrightness();
 
-    void setGuiBackgroundBrightness(double guiBackgroundBrightness);
+    void setFluidBackgroundBrightness(double fluidBackgroundBrightness);
+
+    double getSolidBackgroundAlpha();
+
+    double getDefaultSolidBackgroundAlpha();
+
+    void setSolidBackgroundAlpha(double solidBackgroundAlpha);
+
+    double getSolidBackgroundBrightness();
+
+    double getDefaultSolidBackgroundBrightness();
+
+    void setSolidBackgroundBrightness(double solidBackgroundBrightness);
 
     double getHudBackgroundMixAlpha();
 
@@ -224,6 +236,18 @@ public interface ClientConfig {
     boolean getDefaultShowThemeColor();
 
     void setShowThemeColor(boolean showThemeColor);
+
+    boolean getForceGL32Path();
+
+    boolean getDefaultForceGL32Path();
+
+    void setForceGL32Path(boolean force);
+
+    boolean getForceRgba8Fallback();
+
+    boolean getDefaultForceRgba8Fallback();
+
+    void setForceRgba8Fallback(boolean force);
 
     void save();
 

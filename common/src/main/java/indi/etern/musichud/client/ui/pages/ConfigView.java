@@ -74,6 +74,9 @@ public class ConfigView extends LinearLayout {
             LinearLayout view = new LinearLayout(context);
             view.setOrientation(LinearLayout.VERTICAL);
             view.setGravity(Gravity.CENTER_HORIZONTAL);
+            var baseTransition = new LayoutTransition();
+            baseTransition.enableTransitionType(LayoutTransition.CHANGING);
+            view.setLayoutTransition(baseTransition);
             scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
             view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(32)));
@@ -184,22 +187,13 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setEnableGuiFluidBackground)
                     .setDefaultValue(clientConfig.getDefaultEnableGuiFluidBackground())
                     .create(commonCategory);
-            new AdaptiveFloatOption(//FIXME slider width
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundAlpha"),
-                    clientConfig::getGuiBackgroundAlpha,
-                    clientConfig::setGuiBackgroundAlpha)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundAlpha())
-                    .create(commonCategory);
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundBrightness"),
-                    clientConfig::getGuiBackgroundBrightness,
-                    clientConfig::setGuiBackgroundBrightness)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundBrightness())
-                    .create(commonCategory);
+            addBackgroundAccordion(context, commonCategory,
+                    MusicHud.MOD_ID + ".config.common.solidBackground", true);
+            addBackgroundAccordion(context, commonCategory,
+                    MusicHud.MOD_ID + ".config.common.fluidBackground", false);
+            var transition1 = new LayoutTransition();
+            transition1.enableTransitionType(LayoutTransition.CHANGING);
+            commonCategory.setLayoutTransition(transition1);
 
             Button openHudConfigButton = new Button(context);
             openHudConfigButton.setText(I18n.get(MusicHud.MOD_ID + ".config.openHudConfig"));
@@ -648,6 +642,94 @@ public class ConfigView extends LinearLayout {
         return String.format("%.0f MiB", mib);
     }
 
+    private static void addBackgroundAccordion(Context context, LinearLayout parent,
+                                               String titleKey, boolean solid) {
+        final Button title = new ToggleButton(context, null, R.attr.borderlessButtonStyle);
+        title.setText(I18n.get(titleKey));
+        title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+        var icon = new StateListDrawable();
+        icon.addState(new int[]{R.attr.state_checked}, new BuiltinIconDrawable(
+                context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_UP
+        ));
+        icon.addState(StateSet.WILD_CARD, new BuiltinIconDrawable(
+                context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_DOWN
+        ));
+        icon.setTintList(title.getTextColors());
+        title.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon, null);
+        BackgroundAccordion accordion = new BackgroundAccordion(parent, solid);
+        title.setOnClickListener(accordion);
+        parent.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        accordion.attach();
+    }
+
+    private static final class BackgroundAccordion implements View.OnClickListener {
+        private final LinearLayout mParent;
+        private final boolean solid;
+        private LinearLayout mContent;
+
+        BackgroundAccordion(LinearLayout parent, boolean solid) {
+            this.mParent = parent;
+            this.solid = solid;
+        }
+
+        @Override
+        public void onClick(View v) {
+            if (mContent == null) {
+                attach();
+            }
+            mContent.setVisibility(mContent.getVisibility() == View.GONE
+                    ? View.VISIBLE
+                    : View.GONE);
+        }
+
+        private void attach() {
+            var context = mParent.getContext();
+            mContent = new LinearLayout(context);
+            mContent.setOrientation(LinearLayout.VERTICAL);
+
+            if (solid) {
+                new AdaptiveFloatOption(
+                        context,
+                        I18n.get(MusicHud.MOD_ID + ".config.common.solidBackgroundAlpha"),
+                        clientConfig::getSolidBackgroundAlpha,
+                        clientConfig::setSolidBackgroundAlpha)
+                        .setRange(0, 1, 100)
+                        .setDefaultValue(clientConfig.getDefaultSolidBackgroundAlpha())
+                        .create(mContent);
+                new AdaptiveFloatOption(
+                        context,
+                        I18n.get(MusicHud.MOD_ID + ".config.common.solidBackgroundBrightness"),
+                        clientConfig::getSolidBackgroundBrightness,
+                        clientConfig::setSolidBackgroundBrightness)
+                        .setRange(0, 1, 100)
+                        .setDefaultValue(clientConfig.getDefaultSolidBackgroundBrightness())
+                        .create(mContent);
+            } else {
+                new AdaptiveFloatOption(
+                        context,
+                        I18n.get(MusicHud.MOD_ID + ".config.common.fluidBackgroundAlpha"),
+                        clientConfig::getFluidBackgroundAlpha,
+                        clientConfig::setFluidBackgroundAlpha)
+                        .setRange(0, 1, 100)
+                        .setDefaultValue(clientConfig.getDefaultFluidBackgroundAlpha())
+                        .create(mContent);
+                new AdaptiveFloatOption(
+                        context,
+                        I18n.get(MusicHud.MOD_ID + ".config.common.fluidBackgroundBrightness"),
+                        clientConfig::getFluidBackgroundBrightness,
+                        clientConfig::setFluidBackgroundBrightness)
+                        .setRange(0, 1, 100)
+                        .setDefaultValue(clientConfig.getDefaultFluidBackgroundBrightness())
+                        .create(mContent);
+            }
+
+            var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params.setMargins(0, mContent.dp(6), 0, 0);
+            mContent.setVisibility(View.GONE);
+            mParent.addView(mContent, params);
+        }
+    }
+
     private static final class EnvVarAccordion implements View.OnClickListener {
         final ViewGroup mParent;
         LinearLayout mContent;
@@ -793,6 +875,20 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getShowThemeColor,
                     clientConfig::setShowThemeColor)
                     .setDefaultValue(clientConfig.getDefaultShowThemeColor())
+                    .create(mContent);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.forceGL32Path"),
+                    clientConfig::getForceGL32Path,
+                    clientConfig::setForceGL32Path)
+                    .setDefaultValue(clientConfig.getDefaultForceGL32Path())
+                    .create(mContent);
+
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.forceRgba8Fallback"),
+                    clientConfig::getForceRgba8Fallback,
+                    clientConfig::setForceRgba8Fallback)
+                    .setDefaultValue(clientConfig.getDefaultForceRgba8Fallback())
                     .create(mContent);
 
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);

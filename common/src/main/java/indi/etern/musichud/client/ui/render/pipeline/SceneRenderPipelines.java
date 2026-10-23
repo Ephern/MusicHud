@@ -17,6 +17,7 @@ public class SceneRenderPipelines {
                     .buildSnippet();
 
     public static final ScenePipeline BACKGROUND;
+    public static final ScenePipeline EXP_BACKGROUND;
 
     public static final ScenePipeline ROUNDED_ALBUM;
 
@@ -36,6 +37,12 @@ public class SceneRenderPipelines {
             .build();
 
     static {
+        EXP_BACKGROUND = wrap("exp_background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
+                .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/exp_background"))
+                .withVertexShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/background"))
+                .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/exp_background"))
+                .withUniform("MHPosition", UniformType.UNIFORM_BUFFER)
+                .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS).build());
         BACKGROUND = wrap("background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
                 .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/background"))
                 .withVertexShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/background"))
