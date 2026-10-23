@@ -3,6 +3,8 @@ package indi.etern.musichud.client.ui.render.gpu;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTextureView;
@@ -10,6 +12,8 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.client.ui.render.pipeline.VanillaScenePipeline;
+import net.minecraft.client.Minecraft;
+import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
@@ -121,6 +125,18 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         impl.close();
     }
 
+    @Override
+    public @Nullable MainColorSource mainColorSource() {
+        assertOpen();
+        var minecraft = Minecraft.getInstance();
+        var target = minecraft.getMainRenderTarget();
+        var view = target.getColorTextureView();
+        if (view == null) return null;
+        Window window = minecraft.getWindow();
+        int guiScale = window.getGuiScale();
+        return new MainColorSource(SceneTextureAdapters.wrap(view), target.width, target.height, guiScale);
+    }
+
     private Map<String, GpuTextureView> samplers(SceneDraw draw) {
         Map<String, GpuTextureView> result = new HashMap<>();
         for (SceneSamplerBinding binding : draw.samplers()) {
@@ -157,8 +173,22 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
 
     private RenderPipeline createPipeline(ScenePipelineKey key) {
         return switch (key) {
-            case EXP_BACKGROUND -> SceneNativePassRenderer.pipeline("exp_background_pass").build();
+            case SCENE_CAPTURE -> SceneNativePassRenderer.pipeline("scene_capture")
+                    .withSampler("Sampler0")
+                    .withUniform("MHCapture", UniformType.UNIFORM_BUFFER)
+                    .build();
+            case SCENE_BLUR_DOWNSAMPLE -> blurPipeline("scene_blur_downsample");
+            case SCENE_BLUR_GAUSSIAN -> blurPipeline("scene_blur_gaussian");
+            case SCENE_BLUR_UPSAMPLE -> blurPipeline("scene_blur_upsample");
+            case SCENE_BLUR_COPY -> blurPipeline("scene_blur_copy");
         };
+    }
+
+    private static RenderPipeline blurPipeline(String fragment) {
+        return SceneNativePassRenderer.pipeline(fragment)
+                .withSampler("Sampler0")
+                .withUniform("MHBlur", UniformType.UNIFORM_BUFFER)
+                .build();
     }
 
     private static RenderPipeline requirePipeline(ScenePipeline pipeline) {

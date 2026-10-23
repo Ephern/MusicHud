@@ -1,6 +1,8 @@
 package indi.etern.musichud.client.ui.render.gpu;
 
 import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
+import indi.etern.musichud.client.ui.render.pipeline.SceneTextureRef;
+import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 
@@ -28,6 +30,12 @@ public interface SceneGpuContext extends AutoCloseable {
 
     void release(SceneMesh mesh);
 
+    @Nullable
+    MainColorSource mainColorSource();
+
     @Override
     void close();
+
+    record MainColorSource(SceneTextureRef texture, int width, int height, int guiScale) {
+    }
 }

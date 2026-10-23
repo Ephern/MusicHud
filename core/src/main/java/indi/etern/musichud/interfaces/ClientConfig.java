@@ -249,6 +249,12 @@ public interface ClientConfig {
 
     void setForceRgba8Fallback(boolean force);
 
+    int getGuiBackgroundBlurRadius();
+
+    int getDefaultGuiBackgroundBlurRadius();
+
+    void setGuiBackgroundBlurRadius(int radius);
+
     void save();
 
     boolean isConfigured();

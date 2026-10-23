@@ -39,6 +39,7 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> showThemeColor;
     private final ModConfigSpec.ConfigValue<Boolean> forceGL32Path;
     private final ModConfigSpec.ConfigValue<Boolean> forceRgba8Fallback;
+    private final ModConfigSpec.ConfigValue<Integer> guiBackgroundBlurRadius;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -117,6 +118,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Force RGBA8 background render targets for debugging")
                 .translation(MusicHud.MOD_ID + ".config.debug.forceRgba8Fallback")
                 .define("forceRgba8Fallback", false);
+        guiBackgroundBlurRadius = builder
+                .comment("GUI and HUD exp background blur radius in physical pixels (0 disables blur)")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundBlurRadius")
+                .defineInRange("guiBackgroundBlurRadius", 32, 0, 512);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -843,5 +848,20 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setForceRgba8Fallback(boolean force) {
         forceRgba8Fallback.set(force);
+    }
+
+    @Override
+    public int getGuiBackgroundBlurRadius() {
+        return guiBackgroundBlurRadius.get();
+    }
+
+    @Override
+    public int getDefaultGuiBackgroundBlurRadius() {
+        return guiBackgroundBlurRadius.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundBlurRadius(int radius) {
+        guiBackgroundBlurRadius.set(Math.clamp(radius, 0, 512));
     }
 }

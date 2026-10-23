@@ -117,7 +117,7 @@ public final class HudScene implements RenderScene {
             }
             refreshThumbnailSize();
 
-            BACKGROUND_RENDERER.render(context);
+            BACKGROUND_RENDERER.render(context, clientConfig.getGuiBackgroundBlurRadius());
             IMAGE_RENDERER.render(context);
             PLAYER_HEAD_RENDERER.render(context);
             PLAYING_STATUS_RENDERER.render(context);

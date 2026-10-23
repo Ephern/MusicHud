@@ -1,5 +1,9 @@
 package indi.etern.musichud.client.ui.render.gpu;
 
 public enum ScenePipelineKey {
-    EXP_BACKGROUND
+    SCENE_CAPTURE,
+    SCENE_BLUR_DOWNSAMPLE,
+    SCENE_BLUR_GAUSSIAN,
+    SCENE_BLUR_UPSAMPLE,
+    SCENE_BLUR_COPY
 }

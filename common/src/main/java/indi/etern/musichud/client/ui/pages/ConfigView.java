@@ -891,6 +891,14 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(clientConfig.getDefaultForceRgba8Fallback())
                     .create(mContent);
 
+            new PreferencesFragment.IntegerOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundBlurRadius"),
+                    clientConfig::getGuiBackgroundBlurRadius,
+                    clientConfig::setGuiBackgroundBlurRadius)
+                    .setRange(0, 512)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundBlurRadius())
+                    .create(mContent);
+
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params.setMargins(0, mContent.dp(6), 0, 0);
             mParent.addView(mContent, params);

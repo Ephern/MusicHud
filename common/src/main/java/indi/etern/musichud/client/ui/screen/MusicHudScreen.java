@@ -25,7 +25,6 @@ package indi.etern.musichud.client.ui.screen;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.mc.*;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
 import indi.etern.musichud.client.ui.hud.renderer.BackgroundRenderer;
 import indi.etern.musichud.client.ui.render.HorizontalAlign;
@@ -34,8 +33,6 @@ import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
-import indi.etern.musichud.client.utils.ui.ThemedColors;
-import indi.etern.musichud.client.utils.ui.Transitionable;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import net.minecraft.client.Minecraft;
@@ -54,15 +51,6 @@ import java.util.Objects;
  */
 @SuppressWarnings("UnstableApiUsage")
 public class MusicHudScreen extends Screen implements MuiScreen {
-    static {
-        MuiModApi.addOnScreenChangeListener((oldScreen, newScreen) -> {
-            if (newScreen instanceof MusicHudScreen || newScreen instanceof HudConfigScreen) {
-                BlurHandler.INSTANCE.blur(null);
-                BlurHandler.INSTANCE.blur(newScreen);
-            }
-        });
-    }
-
     private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
     private static final Logger LOGGER = MusicHud.getLogger(MusicHudScreen.class);
     private static final BackgroundRenderer BACKGROUND_RENDERER = new BackgroundRenderer();
@@ -76,12 +64,6 @@ public class MusicHudScreen extends Screen implements MuiScreen {
             0, 0, 0, 0, 0, HorizontalAlign.CENTER, VerticalAlign.CENTER);
 
     private final static int FADE_IN_DURATION_MILLIS = 200;
-    private final Transitionable<BackgroundData> guiBackgroundTransition =
-            new Transitionable<>(BackgroundData.NONE, 500);
-    private float albumOpacity = 1;
-    private float albumOpacityFrom = 1;
-    private float albumOpacityTarget = 1;
-    private long albumOpacityStarted;
 
     MusicHudScreen(UIManager host, Fragment fragment,
                    @Nullable ScreenCallback callback, @Nullable Screen previous,
@@ -122,15 +104,28 @@ public class MusicHudScreen extends Screen implements MuiScreen {
             return;
         }
         if (minecraft != null && minecraft.level == null) {
-            super.renderBackground(gr, mouseX, mouseY, deltaTick);
-        } else {
-            BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
+            renderPanorama(gr, deltaTick);
         }
         float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
-        if (CLIENT_CONFIG.getEnableGuiFluidBackground()) {
-            renderFluidBackground(gr, progress);
-        } else {
-            renderSolidBackground(gr, progress);
+        renderBlurredBackground(gr, progress);
+    }
+
+    private void renderBlurredBackground(GuiGraphics gr, float progress) {
+        try {
+            backgroundStyle.setAlpha(progress);
+            backgroundStyle.setBounds(0, 0, this.width, this.height);
+            gr.nextStratum();
+            RenderService.getInstance().renderFrame(
+                    new VanillaSceneGraphics(gr),
+                    context -> {
+                        if (!BACKGROUND_RENDERER.renderExpBackground(context, backgroundStyle,
+                                CLIENT_CONFIG.getGuiBackgroundBlurRadius())) {
+                            renderSolidBackground(gr, progress);
+                        }
+                    }
+            );
+        } catch (Exception e) {
+            LOGGER.error("While rendering main GUI background", e);
         }
     }
 
@@ -140,85 +135,6 @@ public class MusicHudScreen extends Screen implements MuiScreen {
             return;
         }
         fillSolid(gr, alpha, (float) CLIENT_CONFIG.getSolidBackgroundBrightness());
-    }
-
-    private void renderFluidBackground(GuiGraphics gr, float progress) {
-        try {
-            HudPresentationService presentation = HudPresentationService.getInstance();
-            BackgroundData target = resolveBackgroundTarget(presentation);
-            guiBackgroundTransition.startTransition(target == null ? BackgroundData.NONE : target);
-            guiBackgroundTransition.updateTransition();
-            BackgroundData effectiveTarget = guiBackgroundTransition.isTransitioning()
-                    ? guiBackgroundTransition.getNext()
-                    : guiBackgroundTransition.getCurrent();
-            var effectiveImage = effectiveTarget == null ? null : effectiveTarget.image();
-            boolean idle = effectiveImage == null
-                    || (effectiveImage.current == null && effectiveImage.original == null);
-            if (idle) {
-                float solidAlpha = (float) CLIENT_CONFIG.getSolidBackgroundAlpha() * progress;
-                if (solidAlpha > 1e-4f) {
-                    renderIdleFluidFallback(gr, solidAlpha, (float) CLIENT_CONFIG.getSolidBackgroundBrightness());
-                } else {
-                    updateAlbumOpacity(0);
-                }
-                return;
-            }
-            float alpha = (float) CLIENT_CONFIG.getFluidBackgroundAlpha() * progress;
-            if (alpha <= 1e-4f) {
-                return;
-            }
-            float brightness = (float) CLIENT_CONFIG.getFluidBackgroundBrightness();
-            BackgroundData mixed = guiBackgroundTransition.getMixed();
-            if (mixed == null) {
-                return;
-            }
-            ThemedColors adjusted = ColorExtractor.adjustColors(mixed.color(), 1f, brightness, 1f);
-            BackgroundData backgroundData = BackgroundData.NONE.withThemeColors(adjusted);
-            float visibility = updateAlbumOpacity(1);
-            backgroundStyle.setAlpha(visibility * progress);
-            backgroundStyle.setBounds(0, 0, this.width, this.height);
-            SceneStyle themeStyle = new SceneStyle(0, 0, this.width, this.height, 0,
-                    HorizontalAlign.CENTER, VerticalAlign.CENTER);
-            themeStyle.setAlpha(alpha);
-            gr.nextStratum();
-            RenderService.getInstance().renderFrame(
-                    new VanillaSceneGraphics(gr),
-                    context -> {
-                        if (alpha > 1e-4f) {
-                            BACKGROUND_RENDERER.render(context, themeStyle, backgroundData);
-                        }
-                        BACKGROUND_RENDERER.renderExpBackground(context, backgroundStyle);
-                    }
-            );
-        } catch (Exception e) {
-            LOGGER.error("While rendering main GUI background", e);
-        }
-    }
-
-    private void renderIdleFluidFallback(GuiGraphics gr, float alpha, float brightness) {
-        updateAlbumOpacity(0);
-        fillSolid(gr, alpha, brightness);
-    }
-
-    private BackgroundData resolveBackgroundTarget(HudPresentationService presentation) {
-        BackgroundData override = presentation.getBackgroundOverrides().getTop();
-        if (override != null) {
-            return override;
-        }
-        Transitionable<BackgroundData> transition = presentation.getBackgroundTransition();
-        return transition.isTransitioning() ? transition.getNext() : transition.getCurrent();
-    }
-
-    private float updateAlbumOpacity(float desired) {
-        long now = System.nanoTime();
-        float progress = Math.clamp((now - albumOpacityStarted) / 500_000_000f, 0, 1);
-        albumOpacity = albumOpacityFrom + (albumOpacityTarget - albumOpacityFrom) * progress;
-        if (desired != albumOpacityTarget) {
-            albumOpacityFrom = albumOpacity;
-            albumOpacityTarget = desired;
-            albumOpacityStarted = now;
-        }
-        return albumOpacity;
     }
 
     private void fillSolid(GuiGraphics gr, float alpha, float brightness) {

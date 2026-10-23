@@ -119,6 +119,7 @@
   "music_hud.config.debug.showThemeColor": "顯示取色結果",
   "music_hud.config.debug.forceGL32Path": "強制使用 GL3.2 背景路徑",
   "music_hud.config.debug.forceRgba8Fallback": "強制使用 RGBA8 背景目標",
+  "music_hud.config.debug.guiBackgroundBlurRadius": "GUI/HUD 背景模糊半徑",
   "music_hud.config.common.enableLyricBlur": "模糊非高亮歌詞",
   "music_hud.config.common.soundVolume": "Music HUD 音量",
   "music_hud.config.common.soundVolumeInterval": "增減音量增量",
