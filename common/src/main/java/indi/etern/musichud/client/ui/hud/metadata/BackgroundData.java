@@ -24,6 +24,13 @@ public final class BackgroundData implements Mixable<BackgroundData>, SceneUnifo
     private float mixAlpha;
     public static final BackgroundData NONE = new BackgroundData(null, ColorExtractor.getDefaultColors());
 
+    public static BackgroundData solid(int rgb) {
+        int color = rgb & 0x00FFFFFF;
+        ThemedColors colors = new ThemedColors(
+                0x40000000 | color, 0x40000000 | color, 0x40000000 | color, 0x3F000000 | color);
+        return new BackgroundData(null, colors).withThemeColors(colors);
+    }
+
     public BackgroundData(
             BackgroundImages image
     ) {

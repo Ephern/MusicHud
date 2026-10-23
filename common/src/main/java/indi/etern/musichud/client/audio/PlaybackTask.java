@@ -141,6 +141,7 @@ public class PlaybackTask {
     private volatile boolean restartRequested = false;
     private volatile boolean downloadDone = false;
     private volatile OpenAlSource source;
+    private volatile PcmSink pcmSink;
     private volatile long fadeStartNanos = -1;
     private volatile long fadeDurationMs = 0;
     private volatile float lastSetGain = -1;
@@ -205,6 +206,17 @@ public class PlaybackTask {
                 Fade.of(StreamAudioPlayer.DEFAULT_FADE_IN_MS), Fade.of(StreamAudioPlayer.DEFAULT_FADE_OUT_MS));
     }
 
+    /** Attach a non-blocking observer of the PCM window currently playing, including rebuilt sources. */
+    public void setPcmSink(PcmSink sink) {
+        sourceLock.lock();
+        try {
+            pcmSink = sink;
+            if (source != null) source.setPcmSink(sink);
+        } finally {
+            sourceLock.unlock();
+        }
+    }
+
     public Fade fadeIn() {
         return fadeIn;
     }
@@ -224,6 +236,17 @@ public class PlaybackTask {
 
     public PlaybackState state() {
         return state;
+    }
+
+    public SourcePcmClock.Reading pcmClock() {
+        OpenAlSource current = source;
+        return current == null ? null : current.getPcmClock();
+    }
+
+    /** Last successfully applied OpenAL gain, including volume and fades. */
+    public float appliedGain() {
+        OpenAlSource current = source;
+        return current == null ? 0 : current.getAppliedGain();
     }
 
     public boolean isAudible() {
@@ -771,6 +794,7 @@ public class PlaybackTask {
                 return PlayResult.RESTARTED;
             }
             source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
+            source.setPcmSink(pcmSink);
         } finally {
             sourceLock.unlock();
         }

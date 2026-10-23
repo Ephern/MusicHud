@@ -18,16 +18,19 @@ import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundOverrideStack;
 import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
 import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
+import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
-import indi.etern.musichud.client.utils.ui.ThemeColorStack;
 import indi.etern.musichud.client.utils.ui.ThemedColors;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientMusicService;
@@ -59,10 +62,11 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
     Artist artist;
     private String currentAvatarUrl = null;
     private boolean routeActive;
-    private ThemeColorStack.Layer backgroundThemeLayer;
-    private ThemedColors themeColors;
+    private BackgroundOverrideStack.Layer backgroundThemeLayer;
+    private BackgroundData backgroundData;
     private String themeColorsUrl;
     private int themeColorsGeneration;
+    private ImageTextureData ownedBackgroundImage;
     private boolean artistDetailLoaded;
 
     public ArtistDetailView(Context context, Artist artist) {
@@ -369,71 +373,123 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
             return;
         }
         final String avatarUrl = resolvedAvatarUrl;
-        if (themeColors != null && Objects.equals(themeColorsUrl, avatarUrl)) {
-            pushBackgroundTheme(themeColors);
+        if (backgroundData != null && Objects.equals(themeColorsUrl, avatarUrl)) {
+            pushBackgroundTheme(backgroundData);
             return;
         }
         if (Objects.equals(themeColorsUrl, avatarUrl)) {
             return;
         }
         themeColorsUrl = avatarUrl;
-        themeColors = null;
+        backgroundData = null;
         int generation = ++themeColorsGeneration;
         if (avatarUrl.startsWith("data:image")) {
             CompletableFuture.supplyAsync(() -> {
-                try (var imageTextureData = ImageUtils.loadBase64(avatarUrl)) {
-                    return ColorExtractor.extractColors(imageTextureData.getTexture());
+                ImageTextureData image = ImageUtils.loadBase64(avatarUrl);
+                try {
+                    return new LoadedBackground(image, ColorExtractor.extractColors(image.getTexture()), true);
+                } catch (RuntimeException | Error failure) {
+                    image.close();
+                    throw failure;
                 }
-            }, MusicHud.EXECUTOR).whenComplete((colors, throwable) ->
-                    handleThemeColors(generation, avatarUrl, colors, throwable));
+            }, MusicHud.EXECUTOR).whenComplete((loaded, throwable) ->
+                    handleBackgroundData(generation, avatarUrl, loaded, throwable));
         } else {
             ImageUtils.downloadScaledAsync(avatarUrl, AVATAR_SIZE, AVATAR_SIZE)
                     .thenApplyAsync(image -> image == null
                                     ? null
-                                    : ColorExtractor.extractColors(image.getTexture()),
+                                    : new LoadedBackground(image, ColorExtractor.extractColors(image.getTexture()), false),
                             MusicHud.EXECUTOR)
-                    .whenComplete((colors, throwable) ->
-                            handleThemeColors(generation, avatarUrl, colors, throwable));
+                    .whenComplete((loaded, throwable) ->
+                            handleBackgroundData(generation, avatarUrl, loaded, throwable));
         }
     }
 
-    private void handleThemeColors(int generation, String avatarUrl,
-                                   ThemedColors colors, Throwable throwable) {
+    private void handleBackgroundData(int generation, String avatarUrl,
+                                      LoadedBackground loaded, Throwable throwable) {
         MuiModApi.postToUiThread(() -> {
             if (generation != themeColorsGeneration || !Objects.equals(themeColorsUrl, avatarUrl)) {
+                if (loaded != null && loaded.owned()) {
+                    releaseDelayed(loaded.image());
+                }
                 return;
             }
-            if (throwable != null || colors == null) {
+            if (throwable != null || loaded == null) {
+                if (loaded != null && loaded.owned()) {
+                    releaseDelayed(loaded.image());
+                }
                 themeColorsUrl = null;
                 return;
             }
-            themeColors = colors;
-            pushBackgroundTheme(colors);
+            BackgroundData data = new BackgroundData(new BackgroundImages(loaded.image(), 1f), loaded.colors())
+                    .withThemeColors(loaded.colors());
+            if (!pushBackgroundTheme(data)) {
+                if (loaded.owned()) {
+                    releaseDelayed(loaded.image());
+                }
+                themeColorsUrl = null;
+                return;
+            }
+            backgroundData = data;
+            if (loaded.owned()) {
+                ImageTextureData previous = ownedBackgroundImage;
+                ownedBackgroundImage = loaded.image();
+                releaseDelayed(previous);
+            } else if (ownedBackgroundImage != null) {
+                releaseDelayed(ownedBackgroundImage);
+                ownedBackgroundImage = null;
+            }
         });
     }
 
-    private void pushBackgroundTheme(ThemedColors colors) {
-        if (!routeActive || !isAttachedToWindow() || colors == null) {
+    private void releaseDelayed(ImageTextureData image) {
+        if (image == null) {
             return;
+        }
+        MusicHud.EXECUTOR.execute(() -> {
+            try {
+                Thread.sleep(800);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+            }
+            image.close();
+        });
+    }
+
+    private boolean pushBackgroundTheme(BackgroundData data) {
+        if (!routeActive || !isAttachedToWindow() || data == null) {
+            return false;
         }
         RouterContainer router = RouterContainer.getInstance();
         if (router == null || router.getEffectivePage() != this) {
-            return;
+            return false;
         }
-        ThemeColorStack stack = HudPresentationService.getInstance().getGuiBackgroundColors();
+        BackgroundOverrideStack stack = HudPresentationService.getInstance().getBackgroundOverrides();
         if (backgroundThemeLayer == null) {
-            backgroundThemeLayer = stack.push(colors);
-        } else if (!stack.update(backgroundThemeLayer, colors)) {
-            backgroundThemeLayer = stack.push(colors);
+            backgroundThemeLayer = stack.push(data);
+            return backgroundThemeLayer != null;
         }
+        if (stack.update(backgroundThemeLayer, data)) {
+            return true;
+        }
+        backgroundThemeLayer = stack.push(data);
+        return backgroundThemeLayer != null;
     }
 
     private void popBackgroundTheme() {
-        if (backgroundThemeLayer == null) {
-            return;
+        if (backgroundThemeLayer != null) {
+            HudPresentationService.getInstance().getBackgroundOverrides().pop(backgroundThemeLayer);
+            backgroundThemeLayer = null;
         }
-        HudPresentationService.getInstance().getGuiBackgroundColors().pop(backgroundThemeLayer);
-        backgroundThemeLayer = null;
+        if (ownedBackgroundImage != null) {
+            releaseDelayed(ownedBackgroundImage);
+            ownedBackgroundImage = null;
+            backgroundData = null;
+            themeColorsUrl = null;
+        }
+    }
+
+    private record LoadedBackground(ImageTextureData image, ThemedColors colors, boolean owned) {
     }
 
     boolean noMoreResult = false;

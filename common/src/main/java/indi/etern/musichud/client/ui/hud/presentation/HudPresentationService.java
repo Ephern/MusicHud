@@ -16,7 +16,6 @@ import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.Easing;
-import indi.etern.musichud.client.utils.ui.ThemeColorStack;
 import indi.etern.musichud.client.utils.ui.Transitionable;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -50,13 +49,14 @@ public final class HudPresentationService {
     private final Transitionable<BackgroundData> backgroundTransition =
             new Transitionable<>(BackgroundData.NONE, 500);
     @Getter
-    private final ThemeColorStack guiBackgroundColors = new ThemeColorStack(500);
+    private final BackgroundOverrideStack backgroundOverrides = new BackgroundOverrideStack();
     private final ConcurrentLinkedQueue<QueuedLyric> lyricQueue = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean lyricWorkerRunning = new AtomicBoolean();
     private final AtomicLong lyricGeneration = new AtomicLong();
     private final Object lyricLock = new Object();
+    private final CoverRequestGate coverRequests = new CoverRequestGate();
     private volatile LyricSink lyricSink;
-    private volatile int albumImageThumbnailSize = -1;
+    private volatile int albumImageThumbnailSize = 128;
     private volatile String idleMessage = I18n.get(MusicHud.MOD_ID + ".text.idle");
     private volatile String musicDurationString = "";
     private volatile float hudAlpha = 1f;
@@ -69,6 +69,8 @@ public final class HudPresentationService {
 
     private HudPresentationService() {
         model.setBackground(backgroundTransition);
+        // Playback notifies HUD layout after 500 ms; invalidate covers immediately at the switch.
+        nowPlayingInfo.getMusicSwitchListener().add((previous, current) -> coverRequests.begin());
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
             String text = lyricLine == null ? "" : lyricLine.getText();
             String translatedText = lyricLine == null ? "" : lyricLine.getTranslatedText();
@@ -146,6 +148,11 @@ public final class HudPresentationService {
     }
 
     public void switchMusic(MusicDetail musicDetail) {
+        MusicDetail actual = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+        boolean requestedIdle = musicDetail == null || musicDetail.equals(MusicDetail.NONE);
+        boolean actualIdle = actual == null || actual.equals(MusicDetail.NONE);
+        if (requestedIdle ? !actualIdle : !musicDetail.equals(actual)) return;
+        long coverToken = coverRequests.begin();
         try {
             boolean wasIdle = model.isIdle();
             boolean nowIdle = musicDetail == null || musicDetail.equals(MusicDetail.NONE);
@@ -164,7 +171,7 @@ public final class HudPresentationService {
                         .reduce((a, b) -> a + " / " + b)
                         .orElse("");
                 model.setArtistsAndAlbum(artists + " - " + musicDetail.getAlbum().getName());
-                loadAndSwitchAlbumImageWithRetry(musicDetail);
+                loadAndSwitchAlbumImageWithRetry(musicDetail, coverToken, albumImageThumbnailSize);
                 pendingSwitchToEmpty = false;
             }
         } catch (Exception e) {
@@ -173,6 +180,12 @@ public final class HudPresentationService {
     }
 
     public void reset() {
+        long coverToken = coverRequests.begin();
+        coverRequests.runIfCurrent(coverToken, () -> true, () -> {
+            model.setIdle(true);
+            musicDurationString = "";
+            backgroundTransition.startTransition(BackgroundData.NONE);
+        });
         idleMessage = I18n.get(MusicHud.MOD_ID + ".text.idle");
         boolean autoHide = clientConfig.getHideHudWhenNotPlaying();
         if (autoHide) {
@@ -180,13 +193,9 @@ public final class HudPresentationService {
         } else if (!idleMessage.equals(MusicHud.MOD_ID + ".text.idle")) {
             model.setTitle(idleMessage);
         }
-        model.setIdle(true);
         model.setArtistsAndAlbum("");
         model.setPlayTime("");
-        musicDurationString = "";
         invalidateLyrics();
-        backgroundTransition.startTransition(BackgroundData.NONE);
-        guiBackgroundColors.setBase(ColorExtractor.getDefaultColors());
         pendingSwitchToEmpty = false;
         hudFadeDurationMs = 0;
         hudAlpha = targetAlpha();
@@ -214,13 +223,18 @@ public final class HudPresentationService {
     }
 
     public void setThumbnailSize(int thumbnailSize) {
-        if (thumbnailSize <= 0 || albumImageThumbnailSize == thumbnailSize) {
-            return;
+        if (thumbnailSize <= 0) return;
+        thumbnailSize = Math.max(128, thumbnailSize);
+        MusicDetail current;
+        long token;
+        synchronized (coverRequests) {
+            if (albumImageThumbnailSize == thumbnailSize) return;
+            albumImageThumbnailSize = thumbnailSize;
+            token = coverRequests.begin();
+            current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
         }
-        albumImageThumbnailSize = thumbnailSize;
-        MusicDetail currentlyPlayingMusicDetail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-        if (currentlyPlayingMusicDetail != null && currentlyPlayingMusicDetail != MusicDetail.NONE) {
-            loadAndSwitchAlbumImageWithRetry(currentlyPlayingMusicDetail);
+        if (current != null && current != MusicDetail.NONE) {
+            loadAndSwitchAlbumImageWithRetry(current, token, thumbnailSize);
         }
     }
 
@@ -239,7 +253,6 @@ public final class HudPresentationService {
         }
 
         backgroundTransition.updateTransition();
-        guiBackgroundColors.update();
 
         Duration playedDuration = nowPlayingInfo.getPlayedDuration();
         Duration musicDuration = nowPlayingInfo.getMusicDuration();
@@ -338,45 +351,51 @@ public final class HudPresentationService {
         }
     }
 
-    private void loadAndSwitchAlbumImageWithRetry(MusicDetail musicDetail) {
-        CompletableFuture<Void> future = loadAlbumImage(musicDetail);
-        future.exceptionallyAsync(e -> {
-            backgroundTransition.startTransition(BackgroundData.NONE);
-            guiBackgroundColors.setBase(ColorExtractor.getDefaultColors());
-            try {
-                Thread.sleep(1000);
-            } catch (InterruptedException ignored) {
-            }
-            loadAndSwitchAlbumImageWithRetry(musicDetail);
-            return null;
-        }, MusicHud.EXECUTOR);
-        future.thenRun(() -> {
-            Duration musicDuration = nowPlayingInfo.getMusicDuration();
-            if (musicDuration == null) {
-                return;
-            }
-            DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1
-                    ? LONG_DATE_TIME_FORMATTER
-                    : SHORT_DATE_TIME_FORMATTER;
-            musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(musicDuration.toSeconds()));
+    private void loadAndSwitchAlbumImageWithRetry(MusicDetail musicDetail, long token, int thumbnailSize) {
+        coverRequests.runIfCurrent(token, () -> isCurrentCoverTrack(musicDetail), () -> {
+            CompletableFuture<Void> future = loadAlbumImage(musicDetail, token, thumbnailSize);
+            future.exceptionallyAsync(e -> {
+                boolean retry = coverRequests.runIfCurrent(token, () -> isCurrentCoverTrack(musicDetail), () -> {
+                    backgroundTransition.startTransition(BackgroundData.NONE);
+                });
+                if (!retry) return null;
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    return null;
+                }
+                // Admission and launch share the publication lock; replacement cannot slip between them.
+                loadAndSwitchAlbumImageWithRetry(musicDetail, token, thumbnailSize);
+                return null;
+            }, MusicHud.EXECUTOR);
         });
     }
 
-    private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail) {
-        if (albumImageThumbnailSize <= 0) {
-            return CompletableFuture.completedFuture(null);
-        }
+    private boolean isCurrentCoverTrack(MusicDetail musicDetail) {
+        return !model.isIdle() && musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail());
+    }
+
+    private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail, long token, int thumbnailSize) {
+        if (thumbnailSize <= 0) return CompletableFuture.completedFuture(null);
         Album album = musicDetail.getAlbum();
-        return ImageUtils.downloadScaledAsync(album.getPicUrl(), albumImageThumbnailSize, albumImageThumbnailSize)
+        return ImageUtils.downloadScaledAsync(album.getPicUrl(), thumbnailSize, thumbnailSize)
+                .thenCombine(ImageUtils.downloadAsync(album.getPicUrl()),
+                        (thumbnail, original) -> new BackgroundImages(thumbnail, 1f, original))
                 .thenAcceptBoth(
                         ImageUtils.downloadScaledAsync(album.getPicUrl(), DOWN_SCALE_TARGET_LENGTH, DOWN_SCALE_TARGET_LENGTH),
-                        (imageTextureData, downscaled) -> {
-                            if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())) {
-                                BackgroundImages backgroundImages = new BackgroundImages(imageTextureData, 1f);
-                                backgroundTransition.startTransition(
-                                        new BackgroundData(backgroundImages, ColorExtractor.extractColors(downscaled.getTexture())));
-                                guiBackgroundColors.setBase(ColorExtractor.extractColors(downscaled.getTexture()));
-                            }
+                        (backgroundImages, downscaled) -> {
+                            // Color extraction need not hold the publication lock.
+                            var colors = ColorExtractor.extractColors(downscaled.getTexture());
+                            coverRequests.runIfCurrent(token, () -> isCurrentCoverTrack(musicDetail), () -> {
+                                backgroundTransition.startTransition(new BackgroundData(backgroundImages, colors));
+                                Duration duration = nowPlayingInfo.getMusicDuration();
+                                if (duration != null) {
+                                    DateTimeFormatter formatter = duration.toHoursPart() >= 1
+                                            ? LONG_DATE_TIME_FORMATTER : SHORT_DATE_TIME_FORMATTER;
+                                    musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(duration.toSeconds()));
+                                }
+                            });
                         });
     }
 

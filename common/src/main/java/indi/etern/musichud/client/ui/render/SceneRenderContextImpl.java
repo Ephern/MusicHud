@@ -8,6 +8,7 @@ import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.gpu.SceneTextureAdapters;
 import indi.etern.musichud.client.ui.render.pipeline.*;
 import indi.etern.musichud.client.ui.render.text.GradientSpec;
 import indi.etern.musichud.client.ui.render.text.GradientTextRenderer;
@@ -154,8 +155,8 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     }
 
     private TextureSetup toVanillaTextureSetup(SceneTextureSetup setup, RenderLayer owner) {
-        GpuTextureView primary = setup.primary() == null ? null : ((GpuTextureViewRef) setup.primary()).view();
-        GpuTextureView secondary = setup.secondary() == null ? null : ((GpuTextureViewRef) setup.secondary()).view();
+        GpuTextureView primary = setup.primary() == null ? null : SceneTextureAdapters.view(setup.primary());
+        GpuTextureView secondary = setup.secondary() == null ? null : SceneTextureAdapters.view(setup.secondary());
         return new TextureSetup(primary, secondary, discriminatorView(owner));
     }
 
