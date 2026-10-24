@@ -23,9 +23,11 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.modals.ApiServerDownloadDialog;
 import indi.etern.musichud.client.ui.components.modals.Modal;
 import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
+import indi.etern.musichud.client.ui.screen.CoverWarpDebugFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -895,9 +897,112 @@ public class ConfigView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundBlurRadius"),
                     clientConfig::getGuiBackgroundBlurRadius,
                     clientConfig::setGuiBackgroundBlurRadius)
-                    .setRange(0, 512)
+                    .setRange(0, 1024)
                     .setDefaultValue(clientConfig.getDefaultGuiBackgroundBlurRadius())
                     .create(mContent);
+
+            new PreferencesFragment.IntegerOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundFluidBlurRadius"),
+                    clientConfig::getGuiBackgroundFluidBlurRadius,
+                    clientConfig::setGuiBackgroundFluidBlurRadius)
+                    .setRange(0, 1024)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidBlurRadius())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundSaturation"),
+                    clientConfig::getGuiBackgroundSaturation,
+                    clientConfig::setGuiBackgroundSaturation)
+                    .setRange(0, 2, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundSaturation())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOpacity"),
+                    clientConfig::getGuiBackgroundCoverOpacity,
+                    clientConfig::setGuiBackgroundCoverOpacity)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverOpacity())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverLayerOpacity"),
+                    clientConfig::getGuiBackgroundCoverLayerOpacity,
+                    clientConfig::setGuiBackgroundCoverLayerOpacity)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverLayerOpacity())
+                    .create(mContent);
+
+            new PreferencesFragment.IntegerOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverRotationSpeed"),
+                    clientConfig::getGuiBackgroundCoverRotationSpeed,
+                    clientConfig::setGuiBackgroundCoverRotationSpeed)
+                    .setRange(0, 360)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverRotationSpeed())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftX"),
+                    clientConfig::getGuiBackgroundCoverDriftX,
+                    clientConfig::setGuiBackgroundCoverDriftX)
+                    .setRange(0, 0.5, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverDriftX())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftY"),
+                    clientConfig::getGuiBackgroundCoverDriftY,
+                    clientConfig::setGuiBackgroundCoverDriftY)
+                    .setRange(0, 0.5, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverDriftY())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftSpeed"),
+                    clientConfig::getGuiBackgroundCoverDriftSpeed,
+                    clientConfig::setGuiBackgroundCoverDriftSpeed)
+                    .setRange(0, 4, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverDriftSpeed())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOrbitDriftX"),
+                    clientConfig::getGuiBackgroundCoverOrbitDriftX,
+                    clientConfig::setGuiBackgroundCoverOrbitDriftX)
+                    .setRange(0, 0.5, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverOrbitDriftX())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOrbitDriftY"),
+                    clientConfig::getGuiBackgroundCoverOrbitDriftY,
+                    clientConfig::setGuiBackgroundCoverOrbitDriftY)
+                    .setRange(0, 0.5, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverOrbitDriftY())
+                    .create(mContent);
+
+            Button coverWarpDebugButton = new Button(context);
+            coverWarpDebugButton.setText(I18n.get(MusicHud.MOD_ID + ".config.debug.coverWarp"));
+            coverWarpDebugButton.setTextColor(Theme.PRIMARY_COLOR);
+            coverWarpDebugButton.setTextSize(14);
+            coverWarpDebugButton.setOnClickListener(v -> {
+                Minecraft minecraft = Minecraft.getInstance();
+                minecraft.execute(() -> minecraft.setScreen(MusicHudScreen.createScreen(
+                        new CoverWarpDebugFragment(),
+                        null,
+                        minecraft.screen,
+                        I18n.get(MusicHud.MOD_ID + ".debug.coverWarp.title"))));
+            });
+            mContent.addView(coverWarpDebugButton,
+                    new LinearLayout.LayoutParams(MATCH_PARENT, mContent.dp(40)));
 
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params.setMargins(0, mContent.dp(6), 0, 0);

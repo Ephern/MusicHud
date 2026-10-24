@@ -40,6 +40,16 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> forceGL32Path;
     private final ModConfigSpec.ConfigValue<Boolean> forceRgba8Fallback;
     private final ModConfigSpec.ConfigValue<Integer> guiBackgroundBlurRadius;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverOpacity;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverLayerOpacity;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundSaturation;
+    private final ModConfigSpec.ConfigValue<Integer> guiBackgroundCoverRotationSpeed;
+    private final ModConfigSpec.ConfigValue<Integer> guiBackgroundFluidBlurRadius;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverDriftX;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverDriftY;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverDriftSpeed;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverOrbitDriftX;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverOrbitDriftY;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -121,7 +131,47 @@ public class ClientConfigDefinition implements ClientConfig {
         guiBackgroundBlurRadius = builder
                 .comment("GUI and HUD exp background blur radius in physical pixels (0 disables blur)")
                 .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundBlurRadius")
-                .defineInRange("guiBackgroundBlurRadius", 32, 0, 512);
+                .defineInRange("guiBackgroundBlurRadius", 32, 0, 1024);
+        guiBackgroundCoverOpacity = builder
+                .comment("Background cover overlay opacity (0 disables the cover overlay)")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOpacity")
+                .defineInRange("guiBackgroundCoverOpacity", 0.35, 0, 1);
+        guiBackgroundCoverLayerOpacity = builder
+                .comment("Opacity used when compositing the three cover layers")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverLayerOpacity")
+                .defineInRange("guiBackgroundCoverLayerOpacity", 0.35, 0, 1);
+        guiBackgroundSaturation = builder
+                .comment("Saturation applied to the exp background (1 = original)")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundSaturation")
+                .defineInRange("guiBackgroundSaturation", 1.0, 0, 2);
+        guiBackgroundCoverRotationSpeed = builder
+                .comment("Background cover clockwise rotation speed in degrees per second")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverRotationSpeed")
+                .defineInRange("guiBackgroundCoverRotationSpeed", 8, 0, 360);
+        guiBackgroundFluidBlurRadius = builder
+                .comment("Fluid cover background blur radius in physical pixels (0 disables fluid blur)")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundFluidBlurRadius")
+                .defineInRange("guiBackgroundFluidBlurRadius", 32, 0, 1024);
+        guiBackgroundCoverDriftX = builder
+                .comment("Background cover horizontal drift amplitude in normalized canvas units")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftX")
+                .defineInRange("guiBackgroundCoverDriftX", 0.25, 0, 0.5);
+        guiBackgroundCoverDriftY = builder
+                .comment("Background cover vertical drift amplitude in normalized canvas units")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftY")
+                .defineInRange("guiBackgroundCoverDriftY", 0.15, 0, 0.5);
+        guiBackgroundCoverDriftSpeed = builder
+                .comment("Background cover drift speed multiplier")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftSpeed")
+                .defineInRange("guiBackgroundCoverDriftSpeed", 1.0, 0, 4);
+        guiBackgroundCoverOrbitDriftX = builder
+                .comment("Background cover orbit center horizontal drift amplitude")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOrbitDriftX")
+                .defineInRange("guiBackgroundCoverOrbitDriftX", 0.1, 0, 0.5);
+        guiBackgroundCoverOrbitDriftY = builder
+                .comment("Background cover orbit center vertical drift amplitude")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOrbitDriftY")
+                .defineInRange("guiBackgroundCoverOrbitDriftY", 0.05, 0, 0.5);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -862,6 +912,156 @@ public class ClientConfigDefinition implements ClientConfig {
 
     @Override
     public void setGuiBackgroundBlurRadius(int radius) {
-        guiBackgroundBlurRadius.set(Math.clamp(radius, 0, 512));
+        guiBackgroundBlurRadius.set(Math.clamp(radius, 0, 1024));
+    }
+
+    @Override
+    public double getGuiBackgroundCoverOpacity() {
+        return guiBackgroundCoverOpacity.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundCoverOpacity() {
+        return guiBackgroundCoverOpacity.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundCoverOpacity(double opacity) {
+        guiBackgroundCoverOpacity.set(Math.clamp(opacity, 0, 1));
+    }
+
+    @Override
+    public double getGuiBackgroundCoverLayerOpacity() {
+        return guiBackgroundCoverLayerOpacity.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundCoverLayerOpacity() {
+        return guiBackgroundCoverLayerOpacity.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundCoverLayerOpacity(double opacity) {
+        guiBackgroundCoverLayerOpacity.set(Math.clamp(opacity, 0, 1));
+    }
+
+    @Override
+    public double getGuiBackgroundSaturation() {
+        return guiBackgroundSaturation.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundSaturation() {
+        return guiBackgroundSaturation.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundSaturation(double saturation) {
+        guiBackgroundSaturation.set(Math.clamp(saturation, 0, 2));
+    }
+
+    @Override
+    public int getGuiBackgroundFluidBlurRadius() {
+        return guiBackgroundFluidBlurRadius.get();
+    }
+
+    @Override
+    public int getDefaultGuiBackgroundFluidBlurRadius() {
+        return guiBackgroundFluidBlurRadius.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundFluidBlurRadius(int radius) {
+        guiBackgroundFluidBlurRadius.set(Math.clamp(radius, 0, 1024));
+    }
+
+    @Override
+    public int getGuiBackgroundCoverRotationSpeed() {
+        return guiBackgroundCoverRotationSpeed.get();
+    }
+
+    @Override
+    public int getDefaultGuiBackgroundCoverRotationSpeed() {
+        return guiBackgroundCoverRotationSpeed.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundCoverRotationSpeed(int degreesPerSecond) {
+        guiBackgroundCoverRotationSpeed.set(Math.clamp(degreesPerSecond, 0, 360));
+    }
+
+    @Override
+    public double getGuiBackgroundCoverDriftX() {
+        return guiBackgroundCoverDriftX.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundCoverDriftX() {
+        return guiBackgroundCoverDriftX.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundCoverDriftX(double amplitude) {
+        guiBackgroundCoverDriftX.set(Math.clamp(amplitude, 0, 0.5));
+    }
+
+    @Override
+    public double getGuiBackgroundCoverDriftY() {
+        return guiBackgroundCoverDriftY.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundCoverDriftY() {
+        return guiBackgroundCoverDriftY.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundCoverDriftY(double amplitude) {
+        guiBackgroundCoverDriftY.set(Math.clamp(amplitude, 0, 0.5));
+    }
+
+    @Override
+    public double getGuiBackgroundCoverDriftSpeed() {
+        return guiBackgroundCoverDriftSpeed.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundCoverDriftSpeed() {
+        return guiBackgroundCoverDriftSpeed.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundCoverDriftSpeed(double speed) {
+        guiBackgroundCoverDriftSpeed.set(Math.clamp(speed, 0, 4));
+    }
+
+    @Override
+    public double getGuiBackgroundCoverOrbitDriftX() {
+        return guiBackgroundCoverOrbitDriftX.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundCoverOrbitDriftX() {
+        return guiBackgroundCoverOrbitDriftX.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundCoverOrbitDriftX(double amplitude) {
+        guiBackgroundCoverOrbitDriftX.set(Math.clamp(amplitude, 0, 0.5));
+    }
+
+    @Override
+    public double getGuiBackgroundCoverOrbitDriftY() {
+        return guiBackgroundCoverOrbitDriftY.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundCoverOrbitDriftY() {
+        return guiBackgroundCoverOrbitDriftY.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundCoverOrbitDriftY(double amplitude) {
+        guiBackgroundCoverOrbitDriftY.set(Math.clamp(amplitude, 0, 0.5));
     }
 }

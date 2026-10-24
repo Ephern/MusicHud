@@ -53,7 +53,7 @@ import java.util.Objects;
 public class MusicHudScreen extends Screen implements MuiScreen {
     private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
     private static final Logger LOGGER = MusicHud.getLogger(MusicHudScreen.class);
-    private static final BackgroundRenderer BACKGROUND_RENDERER = new BackgroundRenderer();
+    private static final BackgroundRenderer BACKGROUND_RENDERER = new BackgroundRenderer(true);
     private final UIManager mHost;
     @Nullable
     private final Screen mPrevious;

@@ -164,7 +164,7 @@ public class SceneStyle implements SceneUniform, LayoutTarget {
 
     public void setAlpha(float alpha) {
         float clamped = Math.clamp(alpha, 0, 1);
-        this.dirty = this.alpha != clamped;
+        this.dirty |= this.alpha != clamped;
         this.alpha = clamped;
     }
 

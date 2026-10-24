@@ -181,6 +181,24 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
             case SCENE_BLUR_GAUSSIAN -> blurPipeline("scene_blur_gaussian");
             case SCENE_BLUR_UPSAMPLE -> blurPipeline("scene_blur_upsample");
             case SCENE_BLUR_COPY -> blurPipeline("scene_blur_copy");
+            case SCENE_COVER_WARP -> SceneNativePassRenderer.pipeline("scene_cover_warp")
+                    .withSampler("Sampler0")
+                    .withUniform("MHCoverWarp", UniformType.UNIFORM_BUFFER)
+                    .build();
+            case SCENE_COVER_LAYERS -> SceneNativePassRenderer.pipeline("scene_cover_layers")
+                    .withSampler("Sampler0")
+                    .withUniform("MHCover", UniformType.UNIFORM_BUFFER)
+                    .build();
+            case SCENE_COVER_OVERLAY -> SceneNativePassRenderer.pipeline("scene_cover_overlay")
+                    .withSampler("Sampler0")
+                    .withSampler("Sampler1")
+                    .withUniform("MHOverlay", UniformType.UNIFORM_BUFFER)
+                    .build();
+            case SCENE_COVER_BLEND -> SceneNativePassRenderer.pipeline("scene_cover_blend")
+                    .withSampler("Sampler0")
+                    .withSampler("Sampler1")
+                    .withUniform("MHCoverBlend", UniformType.UNIFORM_BUFFER)
+                    .build();
         };
     }
 

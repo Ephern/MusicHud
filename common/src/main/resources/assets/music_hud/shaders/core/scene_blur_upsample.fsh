@@ -12,5 +12,5 @@ out vec4 fragColor;
 
 void main() {
     vec2 uv = clamp(texCoord, u_Source.xy * 0.5, vec2(1.0) - u_Source.xy * 0.5);
-    fragColor = vec4(texture(Sampler0, uv).rgb, 1.0);
+    fragColor = texture(Sampler0, uv);
 }

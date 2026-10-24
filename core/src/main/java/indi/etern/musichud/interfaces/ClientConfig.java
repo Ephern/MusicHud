@@ -255,6 +255,66 @@ public interface ClientConfig {
 
     void setGuiBackgroundBlurRadius(int radius);
 
+    double getGuiBackgroundCoverOpacity();
+
+    double getDefaultGuiBackgroundCoverOpacity();
+
+    void setGuiBackgroundCoverOpacity(double opacity);
+
+    double getGuiBackgroundCoverLayerOpacity();
+
+    double getDefaultGuiBackgroundCoverLayerOpacity();
+
+    void setGuiBackgroundCoverLayerOpacity(double opacity);
+
+    double getGuiBackgroundSaturation();
+
+    double getDefaultGuiBackgroundSaturation();
+
+    void setGuiBackgroundSaturation(double saturation);
+
+    int getGuiBackgroundFluidBlurRadius();
+
+    int getDefaultGuiBackgroundFluidBlurRadius();
+
+    void setGuiBackgroundFluidBlurRadius(int radius);
+
+    int getGuiBackgroundCoverRotationSpeed();
+
+    int getDefaultGuiBackgroundCoverRotationSpeed();
+
+    void setGuiBackgroundCoverRotationSpeed(int degreesPerSecond);
+
+    double getGuiBackgroundCoverDriftX();
+
+    double getDefaultGuiBackgroundCoverDriftX();
+
+    void setGuiBackgroundCoverDriftX(double amplitude);
+
+    double getGuiBackgroundCoverDriftY();
+
+    double getDefaultGuiBackgroundCoverDriftY();
+
+    void setGuiBackgroundCoverDriftY(double amplitude);
+
+    double getGuiBackgroundCoverDriftSpeed();
+
+    double getDefaultGuiBackgroundCoverDriftSpeed();
+
+    void setGuiBackgroundCoverDriftSpeed(double speed);
+
+    double getGuiBackgroundCoverOrbitDriftX();
+
+    double getDefaultGuiBackgroundCoverOrbitDriftX();
+
+    void setGuiBackgroundCoverOrbitDriftX(double amplitude);
+
+    double getGuiBackgroundCoverOrbitDriftY();
+
+    double getDefaultGuiBackgroundCoverOrbitDriftY();
+
+    void setGuiBackgroundCoverOrbitDriftY(double amplitude);
+
     void save();
 
     boolean isConfigured();
