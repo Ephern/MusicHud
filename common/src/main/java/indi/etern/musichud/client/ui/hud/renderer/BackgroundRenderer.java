@@ -1,11 +1,14 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.audio.SpectrumSnapshot;
+import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
 import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
 import indi.etern.musichud.client.ui.render.CoverWarpSettings;
+import indi.etern.musichud.client.ui.render.AudioReactiveScale;
 import indi.etern.musichud.client.ui.render.RenderLayer;
 import indi.etern.musichud.client.ui.render.RenderService;
 import indi.etern.musichud.client.ui.render.SceneElementRenderState;
@@ -13,6 +16,7 @@ import indi.etern.musichud.client.ui.render.SceneRenderContext;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlur;
 import indi.etern.musichud.client.ui.render.gpu.SceneCapture;
+import indi.etern.musichud.client.ui.render.gpu.SceneCoverFluidScale;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverLayers;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverOverlay;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverTransition;
@@ -44,6 +48,7 @@ public class BackgroundRenderer implements RenderLayer {
     private final SceneBlur fluidBlur = new SceneBlur();
     private final SceneCoverTransition sceneCoverTransition = new SceneCoverTransition();
     private final SceneCoverWarp sceneCoverWarp = new SceneCoverWarp();
+    private final SceneCoverFluidScale sceneCoverFluidScale = new SceneCoverFluidScale();
     private final SceneCoverLayers sceneCoverLayers = new SceneCoverLayers();
     private final SceneCoverOverlay sceneCoverOverlay = new SceneCoverOverlay();
     private final boolean allowDebugPreview;
@@ -128,6 +133,7 @@ public class BackgroundRenderer implements RenderLayer {
         float masterOpacity = (float) (CLIENT_CONFIG.getGuiBackgroundCoverOpacity()
                 * coverFrame.opacityScale());
         int fluidBlurRadius = CLIENT_CONFIG.getGuiBackgroundFluidBlurRadius();
+        float audioScale = audioReactiveScale();
 
         CoverWarpSettings.PreviewMode previewMode = warpSettings.getPreviewMode();
         if (allowDebugPreview && previewMode != CoverWarpSettings.PreviewMode.OFF) {
@@ -135,7 +141,7 @@ public class BackgroundRenderer implements RenderLayer {
             SceneGpuTexture preview;
             if (previewMode == CoverWarpSettings.PreviewMode.LAYERS) {
                 preview = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
-                        time, layerOpacity, warpSnapshot, fluidBlurRadius);
+                        time, layerOpacity, warpSnapshot, fluidBlurRadius, audioScale);
             } else {
                 SceneGpuTexture sourceCover = cover;
                 if (warpSettings.isTiledPreviewBlur() && fluidBlurRadius > 0) {
@@ -144,6 +150,9 @@ public class BackgroundRenderer implements RenderLayer {
                 }
                 preview = sceneCoverWarp.apply(gpu, sourceCover, warpSnapshot,
                         coverFrame.animated());
+                if (preview != null) {
+                    preview = sceneCoverFluidScale.apply(gpu, preview, audioScale);
+                }
             }
             if (preview == null) return false;
             submitCoverPreview(context, style, preview);
@@ -157,7 +166,7 @@ public class BackgroundRenderer implements RenderLayer {
         if (fluidWanted && masterOpacity >= 1f - 1e-4f) {
             fluidAttempted = true;
             fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
-                    time, layerOpacity, warpSnapshot, fluidBlurRadius);
+                    time, layerOpacity, warpSnapshot, fluidBlurRadius, audioScale);
             if (fluid != null) {
                 submitExpBackground(context, style, fluid);
                 return true;
@@ -179,7 +188,7 @@ public class BackgroundRenderer implements RenderLayer {
         if (fluidWanted) {
             if (!fluidAttempted) {
                 fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
-                        time, layerOpacity, warpSnapshot, fluidBlurRadius);
+                        time, layerOpacity, warpSnapshot, fluidBlurRadius, audioScale);
             }
             if (fluid != null) {
                 SceneGpuTexture composite = sceneCoverOverlay.apply(
@@ -198,7 +207,7 @@ public class BackgroundRenderer implements RenderLayer {
                                        SceneCapture.Region region, int canvasWidth,
                                        int canvasHeight, float time, float layerOpacity,
                                        CoverWarpSettings.Snapshot snapshot,
-                                       int fluidBlurRadius) {
+                                       int fluidBlurRadius, float audioScale) {
         SceneCoverLayers.CoverUniform uniform = createCoverUniform(
                 region, time, cover, layerOpacity);
         SceneGpuTexture layers = sceneCoverLayers.apply(gpu, cover, uniform,
@@ -210,7 +219,8 @@ public class BackgroundRenderer implements RenderLayer {
                     Math.max(1, Math.max(canvasWidth, canvasHeight)));
         }
         SceneGpuTexture warped = sceneCoverWarp.apply(gpu, fluid, snapshot, true);
-        return warped != null ? warped : fluid;
+        SceneGpuTexture result = warped != null ? warped : fluid;
+        return sceneCoverFluidScale.apply(gpu, result, audioScale);
     }
 
     private static SceneGpuTexture blurTexture(SceneBlur blur, SceneGpuContext gpu,
@@ -224,6 +234,22 @@ public class BackgroundRenderer implements RenderLayer {
             return pending.target();
         }
         return source;
+    }
+
+    private static float audioReactiveScale() {
+        double amount = CLIENT_CONFIG.getGuiBackgroundAudioScaleAmount();
+        if (amount <= 1e-4) {
+            return 1f;
+        }
+        try {
+            SpectrumSnapshot spectrum = StreamAudioPlayer.getInstance().getSpectrum();
+            return AudioReactiveScale.compute(spectrum, amount,
+                    CLIENT_CONFIG.getGuiBackgroundAudioLowWeight(),
+                    CLIENT_CONFIG.getGuiBackgroundAudioMidWeight());
+        } catch (RuntimeException failure) {
+            LOGGER.debug("While reading the audio spectrum", failure);
+            return 1f;
+        }
     }
 
     private void submitCoverPreview(SceneRenderContext context, SceneStyle style,

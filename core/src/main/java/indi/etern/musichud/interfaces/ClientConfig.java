@@ -273,6 +273,24 @@ public interface ClientConfig {
 
     void setGuiBackgroundSaturation(double saturation);
 
+    double getGuiBackgroundAudioScaleAmount();
+
+    double getDefaultGuiBackgroundAudioScaleAmount();
+
+    void setGuiBackgroundAudioScaleAmount(double amount);
+
+    double getGuiBackgroundAudioLowWeight();
+
+    double getDefaultGuiBackgroundAudioLowWeight();
+
+    void setGuiBackgroundAudioLowWeight(double weight);
+
+    double getGuiBackgroundAudioMidWeight();
+
+    double getDefaultGuiBackgroundAudioMidWeight();
+
+    void setGuiBackgroundAudioMidWeight(double weight);
+
     int getGuiBackgroundFluidBlurRadius();
 
     int getDefaultGuiBackgroundFluidBlurRadius();

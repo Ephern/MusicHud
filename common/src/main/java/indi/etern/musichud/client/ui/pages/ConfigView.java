@@ -920,6 +920,33 @@ public class ConfigView extends LinearLayout {
 
             new AdaptiveFloatOption(
                     context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioScaleAmount"),
+                    clientConfig::getGuiBackgroundAudioScaleAmount,
+                    clientConfig::setGuiBackgroundAudioScaleAmount)
+                    .setRange(0, 0.5, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioScaleAmount())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioLowWeight"),
+                    clientConfig::getGuiBackgroundAudioLowWeight,
+                    clientConfig::setGuiBackgroundAudioLowWeight)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioLowWeight())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioMidWeight"),
+                    clientConfig::getGuiBackgroundAudioMidWeight,
+                    clientConfig::setGuiBackgroundAudioMidWeight)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioMidWeight())
+                    .create(mContent);
+
+            new AdaptiveFloatOption(
+                    context,
                     I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOpacity"),
                     clientConfig::getGuiBackgroundCoverOpacity,
                     clientConfig::setGuiBackgroundCoverOpacity)

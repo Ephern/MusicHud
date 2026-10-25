@@ -17,9 +17,12 @@ import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ScrollView;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.audio.SpectrumSnapshot;
+import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
 import indi.etern.musichud.client.ui.hud.CoverWarpOverlayView;
+import indi.etern.musichud.client.ui.render.AudioReactiveScale;
 import indi.etern.musichud.client.ui.render.CoverWarpSettings;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
@@ -27,6 +30,7 @@ import net.minecraft.client.resources.language.I18n;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -41,6 +45,31 @@ public class CoverWarpDebugFragment extends Fragment implements ScreenCallback {
     private FrameLayout.LayoutParams panelParams;
     private FrameLayout root;
     private boolean panelOnRight = true;
+    private TextView audioLevelsLabel;
+
+    private final Runnable audioLevelsTick = new Runnable() {
+        @Override
+        public void run() {
+            TextView label = audioLevelsLabel;
+            if (label == null) {
+                return;
+            }
+            try {
+                SpectrumSnapshot spectrum = StreamAudioPlayer.getInstance().getSpectrum();
+                ClientConfig config = ClientConfig.getInstance();
+                float scale = AudioReactiveScale.compute(spectrum,
+                        config.getGuiBackgroundAudioScaleAmount(),
+                        config.getGuiBackgroundAudioLowWeight(),
+                        config.getGuiBackgroundAudioMidWeight());
+                label.setText(String.format(Locale.ROOT,
+                        "L %.2f   M %.2f   H %.2f   x %.3f",
+                        spectrum.low(), spectrum.mid(), spectrum.high(), scale));
+            } catch (RuntimeException ignored) {
+                label.setText("-");
+            }
+            label.postDelayed(this, 100);
+        }
+    };
 
     @Override
     public boolean hasDefaultBackground() {
@@ -70,7 +99,7 @@ public class CoverWarpDebugFragment extends Fragment implements ScreenCallback {
         overlay = new CoverWarpOverlayView(context);
         root.addView(overlay, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-        panel = buildPanel(context, root);
+        panel = buildPanel(context);
         panelParams = new FrameLayout.LayoutParams(
                 root.dp(320), MATCH_PARENT);
         panelParams.gravity = Gravity.RIGHT;
@@ -78,16 +107,25 @@ public class CoverWarpDebugFragment extends Fragment implements ScreenCallback {
         panelParams.topMargin = root.dp(24);
         panelParams.bottomMargin = root.dp(24);
         root.addView(panel, panelParams);
+        if (audioLevelsLabel != null) {
+            audioLevelsLabel.postDelayed(audioLevelsTick, 100);
+        }
         return root;
     }
 
     @Override
     public void onDetach() {
+        TextView label = audioLevelsLabel;
+        audioLevelsLabel = null;
+        if (label != null) {
+            label.removeCallbacks(audioLevelsTick);
+        }
         settings.setPreviewMode(CoverWarpSettings.PreviewMode.OFF);
+        ClientConfig.getInstance().save();
         super.onDetach();
     }
 
-    private ScrollView buildPanel(Context context, FrameLayout root) {
+    private ScrollView buildPanel(Context context) {
         ScrollView scroll = new ScrollView(context);
         scroll.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
 
@@ -187,7 +225,48 @@ public class CoverWarpDebugFragment extends Fragment implements ScreenCallback {
                 .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidBlurRadius())
                 .create(category);
 
+        new AdaptiveFloatOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioScaleAmount"),
+                clientConfig::getGuiBackgroundAudioScaleAmount,
+                clientConfig::setGuiBackgroundAudioScaleAmount)
+                .setRange(0, 0.5, 100)
+                .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioScaleAmount())
+                .create(category);
+
+        new AdaptiveFloatOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioLowWeight"),
+                clientConfig::getGuiBackgroundAudioLowWeight,
+                clientConfig::setGuiBackgroundAudioLowWeight)
+                .setRange(0, 1, 100)
+                .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioLowWeight())
+                .create(category);
+
+        new AdaptiveFloatOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioMidWeight"),
+                clientConfig::getGuiBackgroundAudioMidWeight,
+                clientConfig::setGuiBackgroundAudioMidWeight)
+                .setRange(0, 1, 100)
+                .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioMidWeight())
+                .create(category);
+
         content.addView(category);
+
+        TextView audioTitle = new TextView(context);
+        audioTitle.setText(I18n.get(MusicHud.MOD_ID + ".debug.coverWarp.audioLevels"));
+        audioTitle.setTextSize(14);
+        audioTitle.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        LinearLayout.LayoutParams audioTitleParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        audioTitleParams.setMargins(0, content.dp(8), 0, 0);
+        content.addView(audioTitle, audioTitleParams);
+
+        audioLevelsLabel = new TextView(context);
+        audioLevelsLabel.setText("L -   M -   H -   x -");
+        audioLevelsLabel.setTextSize(12);
+        audioLevelsLabel.setTextColor(Theme.HUD_FADE_COLOR);
+        content.addView(audioLevelsLabel, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         Button reset = new Button(context);
         reset.setText(I18n.get(MusicHud.MOD_ID + ".debug.coverWarp.reset"));

@@ -43,6 +43,9 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverOpacity;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverLayerOpacity;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundSaturation;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundAudioScaleAmount;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundAudioLowWeight;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundAudioMidWeight;
     private final ModConfigSpec.ConfigValue<Integer> guiBackgroundCoverRotationSpeed;
     private final ModConfigSpec.ConfigValue<Integer> guiBackgroundFluidBlurRadius;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverDriftX;
@@ -144,6 +147,18 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Saturation applied to the exp background (1 = original)")
                 .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundSaturation")
                 .defineInRange("guiBackgroundSaturation", 1.0, 0, 2);
+        guiBackgroundAudioScaleAmount = builder
+                .comment("Audio-reactive fluid layer zoom amount (0 disables it)")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioScaleAmount")
+                .defineInRange("guiBackgroundAudioScaleAmount", 0.15, 0, 0.5);
+        guiBackgroundAudioLowWeight = builder
+                .comment("Low-band weight for the audio-reactive fluid zoom")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioLowWeight")
+                .defineInRange("guiBackgroundAudioLowWeight", 2.0 / 3.0, 0, 1);
+        guiBackgroundAudioMidWeight = builder
+                .comment("Mid-band weight for the audio-reactive fluid zoom")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioMidWeight")
+                .defineInRange("guiBackgroundAudioMidWeight", 1.0 / 3.0, 0, 1);
         guiBackgroundCoverRotationSpeed = builder
                 .comment("Background cover clockwise rotation speed in degrees per second")
                 .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverRotationSpeed")
@@ -958,6 +973,51 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setGuiBackgroundSaturation(double saturation) {
         guiBackgroundSaturation.set(Math.clamp(saturation, 0, 2));
+    }
+
+    @Override
+    public double getGuiBackgroundAudioScaleAmount() {
+        return guiBackgroundAudioScaleAmount.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundAudioScaleAmount() {
+        return guiBackgroundAudioScaleAmount.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundAudioScaleAmount(double amount) {
+        guiBackgroundAudioScaleAmount.set(Math.clamp(amount, 0, 0.5));
+    }
+
+    @Override
+    public double getGuiBackgroundAudioLowWeight() {
+        return guiBackgroundAudioLowWeight.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundAudioLowWeight() {
+        return guiBackgroundAudioLowWeight.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundAudioLowWeight(double weight) {
+        guiBackgroundAudioLowWeight.set(Math.clamp(weight, 0, 1));
+    }
+
+    @Override
+    public double getGuiBackgroundAudioMidWeight() {
+        return guiBackgroundAudioMidWeight.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundAudioMidWeight() {
+        return guiBackgroundAudioMidWeight.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundAudioMidWeight(double weight) {
+        guiBackgroundAudioMidWeight.set(Math.clamp(weight, 0, 1));
     }
 
     @Override

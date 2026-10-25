@@ -194,6 +194,10 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                     .withSampler("Sampler1")
                     .withUniform("MHOverlay", UniformType.UNIFORM_BUFFER)
                     .build();
+            case SCENE_COVER_FLUID_SCALE -> SceneNativePassRenderer.pipeline("scene_cover_fluid_scale")
+                    .withSampler("Sampler0")
+                    .withUniform("MHFluidScale", UniformType.UNIFORM_BUFFER)
+                    .build();
             case SCENE_COVER_BLEND -> SceneNativePassRenderer.pipeline("scene_cover_blend")
                     .withSampler("Sampler0")
                     .withSampler("Sampler1")
