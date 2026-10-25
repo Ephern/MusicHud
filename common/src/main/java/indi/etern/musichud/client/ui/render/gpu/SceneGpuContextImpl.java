@@ -185,6 +185,10 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                     .withSampler("Sampler0")
                     .withUniform("MHCoverWarp", UniformType.UNIFORM_BUFFER)
                     .build();
+            case SCENE_COVER_WARP_PROCEDURAL -> SceneNativePassRenderer.meshPipeline(
+                            "scene_cover_warp_procedural")
+                    .withSampler("Sampler0")
+                    .build();
             case SCENE_COVER_LAYERS -> SceneNativePassRenderer.pipeline("scene_cover_layers")
                     .withSampler("Sampler0")
                     .withUniform("MHCover", UniformType.UNIFORM_BUFFER)

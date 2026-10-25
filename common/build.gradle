@@ -63,8 +63,20 @@ def backgroundRegressionTests = tasks.register('backgroundRegressionTest', Test)
     }
 }
 
+def warpPresetTests = tasks.register('warpPresetTest', Test) {
+    group = 'verification'
+    description = 'Runs the clean-room procedural warp generator and forward-mesh tests.'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    useJUnitPlatform()
+    filter {
+        includeTestsMatching 'indi.etern.musichud.client.ui.render.warp.*Test'
+    }
+}
+
 tasks.named('check') {
     dependsOn backgroundRegressionTests
+    dependsOn warpPresetTests
 }
 
 shadowJar {

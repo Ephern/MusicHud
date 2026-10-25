@@ -119,6 +119,7 @@
   "music_hud.config.debug.showThemeColor": "Show extracted theme colors",
   "music_hud.config.debug.forceGL32Path": "Force GL3.2 background path",
   "music_hud.config.debug.forceRgba8Fallback": "Force RGBA8 background targets",
+  "music_hud.config.debug.useProceduralWarp": "Use procedural cover warp",
   "music_hud.config.debug.guiBackgroundBlurRadius": "GUI/HUD background blur radius",
   "music_hud.config.debug.guiBackgroundCoverOpacity": "GUI/HUD background cover opacity",
   "music_hud.config.debug.guiBackgroundCoverRotationSpeed": "GUI/HUD background cover rotation speed (deg/s)",

@@ -249,6 +249,12 @@ public interface ClientConfig {
 
     void setForceRgba8Fallback(boolean force);
 
+    boolean getUseProceduralWarp();
+
+    boolean getDefaultUseProceduralWarp();
+
+    void setUseProceduralWarp(boolean use);
+
     int getGuiBackgroundBlurRadius();
 
     int getDefaultGuiBackgroundBlurRadius();

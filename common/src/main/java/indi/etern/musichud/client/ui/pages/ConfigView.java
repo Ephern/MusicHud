@@ -893,6 +893,13 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(clientConfig.getDefaultForceRgba8Fallback())
                     .create(mContent);
 
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.useProceduralWarp"),
+                    clientConfig::getUseProceduralWarp,
+                    clientConfig::setUseProceduralWarp)
+                    .setDefaultValue(clientConfig.getDefaultUseProceduralWarp())
+                    .create(mContent);
+
             new PreferencesFragment.IntegerOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundBlurRadius"),
                     clientConfig::getGuiBackgroundBlurRadius,

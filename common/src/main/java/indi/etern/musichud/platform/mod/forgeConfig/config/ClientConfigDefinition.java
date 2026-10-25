@@ -39,6 +39,7 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> showThemeColor;
     private final ModConfigSpec.ConfigValue<Boolean> forceGL32Path;
     private final ModConfigSpec.ConfigValue<Boolean> forceRgba8Fallback;
+    private final ModConfigSpec.ConfigValue<Boolean> useProceduralWarp;
     private final ModConfigSpec.ConfigValue<Integer> guiBackgroundBlurRadius;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverOpacity;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundCoverLayerOpacity;
@@ -131,6 +132,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Force RGBA8 background render targets for debugging")
                 .translation(MusicHud.MOD_ID + ".config.debug.forceRgba8Fallback")
                 .define("forceRgba8Fallback", false);
+        useProceduralWarp = builder
+                .comment("Use the clean procedural forward warp for the cover background")
+                .translation(MusicHud.MOD_ID + ".config.debug.useProceduralWarp")
+                .define("useProceduralWarp", true);
         guiBackgroundBlurRadius = builder
                 .comment("GUI and HUD exp background blur radius in physical pixels (0 disables blur)")
                 .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundBlurRadius")
@@ -913,6 +918,21 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setForceRgba8Fallback(boolean force) {
         forceRgba8Fallback.set(force);
+    }
+
+    @Override
+    public boolean getUseProceduralWarp() {
+        return useProceduralWarp.get();
+    }
+
+    @Override
+    public boolean getDefaultUseProceduralWarp() {
+        return useProceduralWarp.getDefault();
+    }
+
+    @Override
+    public void setUseProceduralWarp(boolean use) {
+        useProceduralWarp.set(use);
     }
 
     @Override

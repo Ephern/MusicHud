@@ -29,6 +29,16 @@ final class SceneNativePassRenderer implements AutoCloseable {
                 .withDepthWrite(false).withCull(false).withoutBlend();
     }
 
+    public static RenderPipeline.Builder meshPipeline(String shader) {
+        return RenderPipeline.builder()
+                .withLocation(id("pipeline/" + shader))
+                .withVertexShader(id("core/" + shader))
+                .withFragmentShader(id("core/" + shader))
+                .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.TRIANGLES)
+                .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
+                .withDepthWrite(false).withCull(false).withoutBlend();
+    }
+
     private static ResourceLocation id(String path) {
         return ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, path);
     }

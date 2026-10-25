@@ -21,6 +21,7 @@ import indi.etern.musichud.client.ui.render.gpu.SceneCoverLayers;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverOverlay;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverTransition;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverWarp;
+import indi.etern.musichud.client.ui.render.gpu.SceneCoverWarpProcedural;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
@@ -48,10 +49,12 @@ public class BackgroundRenderer implements RenderLayer {
     private final SceneBlur fluidBlur = new SceneBlur();
     private final SceneCoverTransition sceneCoverTransition = new SceneCoverTransition();
     private final SceneCoverWarp sceneCoverWarp = new SceneCoverWarp();
+    private final SceneCoverWarpProcedural sceneCoverWarpProcedural = new SceneCoverWarpProcedural();
     private final SceneCoverFluidScale sceneCoverFluidScale = new SceneCoverFluidScale();
     private final SceneCoverLayers sceneCoverLayers = new SceneCoverLayers();
     private final SceneCoverOverlay sceneCoverOverlay = new SceneCoverOverlay();
     private final boolean allowDebugPreview;
+    private boolean lastUseProceduralWarp;
     private SceneRenderData currentData;
     private final DynamicStatusUniform dynamicStatusUniform = DynamicStatusUniform.getInstance();
 
@@ -218,7 +221,20 @@ public class BackgroundRenderer implements RenderLayer {
             fluid = blurTexture(fluidBlur, gpu, layers, fluidBlurRadius,
                     Math.max(1, Math.max(canvasWidth, canvasHeight)));
         }
-        SceneGpuTexture warped = sceneCoverWarp.apply(gpu, fluid, snapshot, true);
+        boolean useProceduralWarp = CLIENT_CONFIG.getUseProceduralWarp();
+        if (useProceduralWarp != lastUseProceduralWarp) {
+            sceneCoverWarpProcedural.reset();
+            lastUseProceduralWarp = useProceduralWarp;
+        }
+        SceneGpuTexture warped;
+        if (useProceduralWarp) {
+            warped = sceneCoverWarpProcedural.apply(gpu, fluid, time);
+            if (warped == fluid) {
+                warped = sceneCoverWarp.apply(gpu, fluid, snapshot, true);
+            }
+        } else {
+            warped = sceneCoverWarp.apply(gpu, fluid, snapshot, true);
+        }
         SceneGpuTexture result = warped != null ? warped : fluid;
         return sceneCoverFluidScale.apply(gpu, result, audioScale);
     }

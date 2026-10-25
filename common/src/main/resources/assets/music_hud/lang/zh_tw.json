@@ -119,6 +119,7 @@
   "music_hud.config.debug.showThemeColor": "顯示取色結果",
   "music_hud.config.debug.forceGL32Path": "強制使用 GL3.2 背景路徑",
   "music_hud.config.debug.forceRgba8Fallback": "強制使用 RGBA8 背景目標",
+  "music_hud.config.debug.useProceduralWarp": "使用程序化封面扭曲",
   "music_hud.config.debug.guiBackgroundBlurRadius": "GUI/HUD 背景模糊半徑",
   "music_hud.config.debug.guiBackgroundCoverOpacity": "GUI/HUD 背景封面不透明度",
   "music_hud.config.debug.guiBackgroundCoverRotationSpeed": "GUI/HUD 背景封面旋轉速度（度/秒）",
