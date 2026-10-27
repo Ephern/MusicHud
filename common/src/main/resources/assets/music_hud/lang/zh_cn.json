@@ -95,6 +95,8 @@
   "music_hud.config.common.hudBackgroundFluidBlurRadius": "HUD 流体层模糊半径下限",
   "music_hud.config.common.hudBackgroundBlurRadius": "HUD 背景采样模糊半径",
   "music_hud.config.common.guiBackgroundSamplingBlackOverlay": "GUI 背景采样纯黑叠加 (0~1)",
+  "music_hud.config.common.panelOpacity": "面板背景不透明度（侧边栏 / 配置分类面板）",
+  "music_hud.config.common.panelBrightness": "面板背景亮度 (0 = 纯黑, 1 = 中性灰)",
   "music_hud.config.common.hudBackgroundSamplingBlackOverlay": "HUD 背景采样纯黑叠加 (0~1)",
   "music_hud.config.common.mixWithVanillaSoundVolume": "混合 Music HUD 音量与原版 \"音乐\" 类型的音量",
   "music_hud.config.common.multichannelMode": "环绕音频处理",

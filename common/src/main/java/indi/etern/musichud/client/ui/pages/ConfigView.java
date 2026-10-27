@@ -30,6 +30,7 @@ import indi.etern.musichud.client.ui.screen.HudConfigFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
@@ -46,6 +47,7 @@ import org.lwjgl.glfw.GLFW;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
@@ -60,6 +62,7 @@ public class ConfigView extends LinearLayout {
     @Getter
     static volatile ConfigView instance;
     private final ConnectionManager connectionManager = ConnectionManager.getInstance();
+    private final List<LinearLayout> panelCategories = new ArrayList<>();
 
     public ConfigView(Context context) {
         super(context);
@@ -84,7 +87,7 @@ public class ConfigView extends LinearLayout {
 
             view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(32)));
 
-            var commonCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
+            var commonCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
             new PreferencesFragment.BooleanOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.enable"),
                     clientConfig::getEnable,
@@ -215,6 +218,24 @@ public class ConfigView extends LinearLayout {
                     .setRange(0, 1, 100)
                     .setDefaultValue(clientConfig.getDefaultGuiBackgroundSamplingBlackOverlay())
                     .create(commonCategory);
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.panelOpacity"),
+                    clientConfig::getPanelOpacity,
+                    clientConfig::setPanelOpacity)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultPanelOpacity())
+                    .setOnChanged(this::refreshPanelStyles)
+                    .create(commonCategory);
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.panelBrightness"),
+                    clientConfig::getPanelBrightness,
+                    clientConfig::setPanelBrightness)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultPanelBrightness())
+                    .setOnChanged(this::refreshPanelStyles)
+                    .create(commonCategory);
             var transition1 = new LayoutTransition();
             transition1.enableTransitionType(LayoutTransition.CHANGING);
             commonCategory.setLayoutTransition(transition1);
@@ -235,7 +256,7 @@ public class ConfigView extends LinearLayout {
             commonCategory.addView(openHudConfigButton, new LayoutParams(MATCH_PARENT, dp(40)));
             view.addView(commonCategory);
 
-            var multiplayerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.externalServer"));
+            var multiplayerCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.externalServer"));
             new PreferencesFragment.BooleanOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.externalServer.autoConnect"),
@@ -336,7 +357,7 @@ public class ConfigView extends LinearLayout {
             multiplayerCategory.addView(whiteList);
             view.addView(multiplayerCategory);
 
-            var integratedServerCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.integratedServer"));
+            var integratedServerCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.integratedServer"));
             view.addView(integratedServerCategory, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
             ApiServerManager apiServerManager = ApiServerManager.getInstance();
@@ -371,7 +392,7 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(serverConfig.getDefaultPusherVoteAdditionalRate())
                     .create(integratedServerCategory);
 
-            var apiCategory = PreferencesFragment.createCategoryList(view, I18n.get(MusicHud.MOD_ID + ".config.category.apiServer"));
+            var apiCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.apiServer"));
             LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params1.setMargins(0, dp(6), 0, dp(6));
             view.addView(apiCategory, params1);
@@ -567,7 +588,7 @@ public class ConfigView extends LinearLayout {
             apiLogLayout.addView(clearApiLogButton);
             apiCategory.addView(apiLogLayout);
 
-            var envVarCategory = PreferencesFragment.createCategoryList(view, null);
+            var envVarCategory = createPanelCategory(view, null);
             {
                 var transition = new LayoutTransition();
                 transition.enableTransitionType(LayoutTransition.CHANGING);
@@ -594,7 +615,7 @@ public class ConfigView extends LinearLayout {
             envVarParams.setMargins(0, dp(6), 0, dp(6));
             view.addView(envVarCategory, envVarParams);
 
-            var debugCategory = PreferencesFragment.createCategoryList(view, null);
+            var debugCategory = createPanelCategory(view, null);
             {
                 var transition = new LayoutTransition();
                 transition.enableTransitionType(LayoutTransition.CHANGING);
@@ -648,6 +669,27 @@ public class ConfigView extends LinearLayout {
             instance = null;
             throw e;
         }
+    }
+
+    private LinearLayout createPanelCategory(LinearLayout parent, String name) {
+        LinearLayout category = PreferencesFragment.createCategoryList(parent, name);
+        panelCategories.add(category);
+        applyPanelBackground(category);
+        return category;
+    }
+
+    private void refreshPanelStyles() {
+        for (LinearLayout category : panelCategories) {
+            applyPanelBackground(category);
+        }
+        MainFragment.refreshPanelStyle();
+    }
+
+    private static void applyPanelBackground(LinearLayout category) {
+        PanelStyle.factory(category,
+                        clientConfig.getPanelOpacity(), clientConfig.getPanelBrightness(),
+                        category.dp(12), null)
+                .applyBackgroundTo(category);
     }
 
     private static void updateApiLogLabel(TextView label) {

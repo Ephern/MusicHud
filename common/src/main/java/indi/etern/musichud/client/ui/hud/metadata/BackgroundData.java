@@ -24,7 +24,7 @@ public final class BackgroundData implements Mixable<BackgroundData> {
 
     @Override
     public BackgroundData mix(BackgroundData next, float transitionProgress) {
-        BackgroundImages nextImage = next != null && next.image != null ? next.image : image;
+        BackgroundImages nextImage = next != null ? next.image : image;
         return new BackgroundData(nextImage);
     }
 }

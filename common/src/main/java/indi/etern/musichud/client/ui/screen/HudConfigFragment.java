@@ -1,18 +1,13 @@
 package indi.etern.musichud.client.ui.screen;
 
-import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.RectF;
-import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.ScreenCallback;
 import icyllis.modernui.mc.ui.PreferencesFragment;
-import icyllis.modernui.resources.TypedValue;
-import icyllis.modernui.util.ColorStateList;
 import icyllis.modernui.util.DataSet;
-import icyllis.modernui.util.StateSet;
 import icyllis.modernui.view.*;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
@@ -28,6 +23,7 @@ import indi.etern.musichud.client.ui.hud.HudEditOverlayView;
 import indi.etern.musichud.client.ui.hud.scene.HudScene;
 import indi.etern.musichud.client.ui.render.HorizontalAlign;
 import indi.etern.musichud.client.ui.render.VerticalAlign;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
 import net.minecraft.client.Minecraft;
@@ -153,18 +149,8 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         panel.setMaxHeight(Math.max(0, windowHeight() - 2 * margin));
         panel.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
 
-        ShapeDrawable bg = new ShapeDrawable();
-        bg.setCornerRadius(panel.dp(12));
-        TypedValue value = new TypedValue();
-        var theme = context.getTheme();
-        if (theme.resolveAttribute(R.ns, R.attr.colorSurface, value, true)) {
-            bg.setColor(theme.getResources().loadColorStateList(value, null, theme));
-        } else {
-            bg.setColor(0xFF2D2D30);
-        }
-        bg.setStroke(panel.dp(1), new ColorStateList(
-                new int[][]{StateSet.WILD_CARD}, new int[]{0x20FFFFFF}));
-        panel.setBackground(bg);
+        PanelStyle.factory(panel, 1.0, clientConfig.getPanelBrightness(), panel.dp(12), null)
+                .applyBackgroundTo(panel);
 
         LinearLayout content = new LinearLayout(context);
         content.setOrientation(LinearLayout.VERTICAL);
@@ -181,11 +167,13 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
 
         var layoutCategory = PreferencesFragment.createCategoryList(content,
                 I18n.get(MusicHud.MOD_ID + ".config.category.layout"));
+        layoutCategory.setBackground(null);
         buildLayoutOptions(context, layoutCategory);
         content.addView(layoutCategory);
 
         var behaviorCategory = PreferencesFragment.createCategoryList(content,
                 I18n.get(MusicHud.MOD_ID + ".config.category.hudBehavior"));
+        behaviorCategory.setBackground(null);
         new PreferencesFragment.BooleanOption(context,
                 I18n.get(MusicHud.MOD_ID + ".config.common.enableHud"),
                 clientConfig::getEnableHud,
@@ -208,6 +196,7 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
 
         var appearanceCategory = PreferencesFragment.createCategoryList(content,
                 I18n.get(MusicHud.MOD_ID + ".config.category.hudAppearance"));
+        appearanceCategory.setBackground(null);
         new AdaptiveFloatOption(context,
                 I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundFluidOpacity"),
                 clientConfig::getHudBackgroundFluidOpacity,

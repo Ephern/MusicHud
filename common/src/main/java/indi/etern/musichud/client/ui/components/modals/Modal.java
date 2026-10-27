@@ -11,8 +11,6 @@ import icyllis.modernui.graphics.drawable.ColorDrawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.resources.TypedValue;
-import icyllis.modernui.util.ColorStateList;
-import icyllis.modernui.util.StateSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
@@ -21,6 +19,8 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.Easing;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 
 import java.util.function.BiConsumer;
@@ -38,6 +38,7 @@ public class Modal {
     private static final int SCREEN_DIM_COLOR = 0xA0000000;
     private static final int SHOW_DURATION = 200;
     private static final int DISMISS_DURATION = 150;
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     @Getter
     private final PopupWindow popupWindow;
@@ -85,7 +86,8 @@ public class Modal {
             }
         };
 
-        applyOutlinedCardBackground(context, card);
+        PanelStyle.factory(card, 1.0, clientConfig.getPanelBrightness(), card.dp(CORNER_RADIUS), null)
+                .applyBackgroundTo(card);
 
         int topPadding = card.dp(CONTENT_PADDING);
         int sidePadding = card.dp(CONTENT_PADDING);
@@ -174,36 +176,6 @@ public class Modal {
         popupWindow.setFocusable(true);
         popupWindow.setOutsideTouchable(false);
         popupWindow.setTouchModal(true);
-    }
-
-    private void applyOutlinedCardBackground(Context context, View layout) {
-        ShapeDrawable bg = new ShapeDrawable();
-        bg.setCornerRadius(layout.dp(CORNER_RADIUS));
-        TypedValue value = new TypedValue();
-        var theme = context.getTheme();
-        if (theme.resolveAttribute(R.ns, R.attr.colorSurface, value, true)) {
-            bg.setColor(theme.getResources().loadColorStateList(value, null, theme));
-        } else {
-            bg.setColor(0xFF2D2D30);
-        }
-
-        int[] strokeColors = new int[2];
-        if (theme.resolveAttribute(R.ns, R.attr.colorOutlineVariant, value, true)) {
-            strokeColors[0] = value.data;
-            theme.resolveAttribute(R.ns, R.attr.colorOutline, value, true);
-            strokeColors[1] = ColorStateList.modulateColor(value.data, 0.12f);
-        } else {
-            strokeColors[0] = 0x20FFFFFF;
-            strokeColors[1] = 0x08FFFFFF;
-        }
-        bg.setStroke(layout.dp(1), new ColorStateList(
-                new int[][]{
-                        StateSet.get(StateSet.VIEW_STATE_ENABLED),
-                        StateSet.WILD_CARD
-                },
-                strokeColors
-        ));
-        layout.setBackground(bg);
     }
 
     public void show() {

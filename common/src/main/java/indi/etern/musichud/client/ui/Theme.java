@@ -72,16 +72,6 @@ public class Theme {
             }
     );
 
-    public static final int SIDE_BAR_BACKGROUND = 0x32000000;
-    public static final ColorStateList SIDE_BAR_STATES = new ColorStateList(
-            new int[][]{
-                    StateSet.WILD_CARD
-            },
-            new int[]{
-                    Theme.SIDE_BAR_BACKGROUND
-            }
-    );
-
     public static final int TEXT_SIZE_SMALL = 10;
     public static final int TEXT_SIZE_NORMAL = 12;
     public static final int TEXT_SIZE_LARGE = 15;

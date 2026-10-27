@@ -42,6 +42,7 @@ public final class HudPresenter {
     private final ConcurrentLinkedQueue<QueuedLyric> lyricQueue = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean lyricWorkerRunning = new AtomicBoolean();
     private final AtomicLong lyricGeneration = new AtomicLong();
+    private final AtomicLong backgroundResetGeneration = new AtomicLong();
     private final Object lyricLock = new Object();
     private volatile LyricSink lyricSink;
     private volatile String idleMessage = I18n.get(MusicHud.MOD_ID + ".text.idle");
@@ -147,11 +148,13 @@ public final class HudPresenter {
             boolean autoHide = clientConfig.getHideHudWhenNotPlaying();
             if (nowIdle) {
                 if (autoHide && !wasIdle) {
+                    scheduleBackgroundResetAfterFade();
                     pendingSwitchToEmpty = true;
                 } else {
                     reset();
                 }
             } else {
+                backgroundResetGeneration.incrementAndGet();
                 model.setTitle(musicDetail.getName());
                 String artists = musicDetail.getArtists().stream()
                         .map(Artist::getName)
@@ -168,10 +171,10 @@ public final class HudPresenter {
     }
 
     public void reset() {
-        coverImageStore.invalidate();
+        backgroundResetGeneration.incrementAndGet();
+        resetBackgroundNow();
         model.setIdle(true);
         musicDurationString = "";
-        backgroundState.reset();
         idleMessage = I18n.get(MusicHud.MOD_ID + ".text.idle");
         boolean autoHide = clientConfig.getHideHudWhenNotPlaying();
         if (autoHide) {
@@ -187,6 +190,26 @@ public final class HudPresenter {
         hudAlpha = targetAlpha();
         hudFadeTo = hudAlpha;
         model.setHudAlpha(hudAlpha);
+    }
+
+    private void scheduleBackgroundResetAfterFade() {
+        long generation = backgroundResetGeneration.incrementAndGet();
+        MusicHud.EXECUTOR.execute(() -> {
+            try {
+                Thread.sleep(HUD_FADE_MS);
+            } catch (InterruptedException interrupted) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            if (backgroundResetGeneration.get() == generation) {
+                resetBackgroundNow();
+            }
+        });
+    }
+
+    private void resetBackgroundNow() {
+        coverImageStore.invalidate();
+        backgroundState.reset();
     }
 
     public void invalidateLyrics() {

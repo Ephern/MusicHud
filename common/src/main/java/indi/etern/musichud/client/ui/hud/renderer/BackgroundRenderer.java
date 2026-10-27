@@ -312,10 +312,10 @@ public class BackgroundRenderer implements RenderLayer {
             }
             Transitionable<BackgroundData> transition = backgroundState.getTransition();
             BackgroundData mixed = transition.getMixed();
-            if (!hasImage(mixed)) return null;
-            return new ResolvedCover(mixed.image(), frameResolver.usesOverrides()
+            long changedAt = frameResolver.usesOverrides()
                     ? backgroundState.getEffectiveBackgroundChangeTimeMillis()
-                    : backgroundState.getBaseEffectiveChangeTimeMillis());
+                    : backgroundState.getBaseEffectiveChangeTimeMillis();
+            return new ResolvedCover(hasImage(mixed) ? mixed.image() : null, changedAt);
         } catch (RuntimeException failure) {
             LOGGER.debug("While resolving the background cover image", failure);
             return null;

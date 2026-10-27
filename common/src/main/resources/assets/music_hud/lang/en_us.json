@@ -95,6 +95,8 @@
   "music_hud.config.common.hudBackgroundFluidBlurRadius": "HUD fluid layer blur radius lower bound",
   "music_hud.config.common.hudBackgroundBlurRadius": "HUD background sampling blur radius",
   "music_hud.config.common.guiBackgroundSamplingBlackOverlay": "GUI background sampling black overlay (0~1)",
+  "music_hud.config.common.panelOpacity": "Panel background opacity (sidebar / config categories)",
+  "music_hud.config.common.panelBrightness": "Panel background brightness (0 = black, 1 = neutral gray)",
   "music_hud.config.common.hudBackgroundSamplingBlackOverlay": "HUD background sampling black overlay (0~1)",
   "music_hud.config.common.mixWithVanillaSoundVolume": "Mix Music HUD sound volume with vanilla \"Music\" category volume",
   "music_hud.config.common.multichannelMode": "Surround audio handling",

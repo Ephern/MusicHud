@@ -96,17 +96,31 @@ public final class SceneCoverTransition {
         ImageTextureData source = sourceOf(images);
         if (source == null) {
             if (activeTexture != null) {
-                fadingTexture = activeTexture;
-                fadingSource = activeSource;
-                activeTexture = null;
-                activeSource = null;
-                previousTexture = null;
-                previousSource = null;
-                blending = false;
-                fading = true;
-                fadeFrom = 1f;
-                fadeTo = 0f;
-                transitionStartSeconds = timeSeconds;
+                float startSeconds = changedAtMillis / 1000f;
+                float t = progress(startSeconds, timeSeconds);
+                if (t >= 1f) {
+                    activeTexture = null;
+                    activeSource = null;
+                    fadingTexture = null;
+                    fadingSource = null;
+                    previousTexture = null;
+                    previousSource = null;
+                    blending = false;
+                    fading = false;
+                    transitionStartSeconds = startSeconds;
+                } else {
+                    fadingTexture = activeTexture;
+                    fadingSource = activeSource;
+                    activeTexture = null;
+                    activeSource = null;
+                    previousTexture = null;
+                    previousSource = null;
+                    blending = false;
+                    fading = true;
+                    fadeFrom = 1f;
+                    fadeTo = 0f;
+                    transitionStartSeconds = startSeconds;
+                }
             }
             return;
         }

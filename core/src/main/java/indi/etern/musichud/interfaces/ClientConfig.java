@@ -267,6 +267,18 @@ public interface ClientConfig {
 
     void setGuiBackgroundSaturation(double saturation);
 
+    double getPanelOpacity();
+
+    double getDefaultPanelOpacity();
+
+    void setPanelOpacity(double opacity);
+
+    double getPanelBrightness();
+
+    double getDefaultPanelBrightness();
+
+    void setPanelBrightness(double brightness);
+
     void save();
 
     boolean isConfigured();

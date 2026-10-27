@@ -34,6 +34,7 @@ import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -87,6 +88,7 @@ public class MainFragment extends Fragment {
     private int sideWidth = -1;
     private StaggeredLyricScrollView lyricsScrollView;
     private LinearLayout lyricsSidebar;
+    private LinearLayout sidePanel;
     private int lyricsPanelWidth = -1;
     private boolean lyricsPanelShown = false;
     private AnimatorSet lyricsAnimator = null;
@@ -193,6 +195,33 @@ public class MainFragment extends Fragment {
         if (instance != null && instance.visible) {
             instance.updateLyricsPanelVisibility();
         }
+    }
+
+    public static void refreshPanelStyle() {
+        MainFragment target = instance;
+        if (target == null) {
+            return;
+        }
+        try {
+            MuiModApi.postToUiThread(() -> {
+                if (target.visible && target.sidePanel != null) {
+                    target.applySidePanelBackground();
+                }
+            });
+        } catch (IllegalStateException ignored) {
+            // UI not ready or shutting down
+        }
+    }
+
+    private void applySidePanelBackground() {
+        if (sidePanel == null) {
+            return;
+        }
+        int dp12 = sidePanel.dp(12);
+        PanelStyle.factory(sidePanel,
+                        clientConfig.getPanelOpacity(), clientConfig.getPanelBrightness(),
+                        sidePanel.dp(16), new InsetBackgroundFactory.Padding(dp12, 0, dp12, dp12))
+                .applyBackgroundTo(sidePanel);
     }
 
     public static @NonNull MainFragment getInstance() {
@@ -439,13 +468,10 @@ public class MainFragment extends Fragment {
             {
                 var side = new LinearLayout(context);
                 side.setOrientation(LinearLayout.VERTICAL);
+                sidePanel = side;
+                applySidePanelBackground();
                 LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT);
                 params1.setMargins(dp12, dp12, dp12, dp12);
-                InsetBackgroundFactory.builder()
-                        .backgroundColor(Theme.SIDE_BAR_STATES)
-                        .padding(new InsetBackgroundFactory.Padding(dp12, 0, dp12, dp12))
-                        .cornerRadius(base.dp(16)).build()
-                        .applyBackgroundTo(side);
                 base.addView(side, params1);
 
                 //noinspection UnstableApiUsage
@@ -834,6 +860,7 @@ public class MainFragment extends Fragment {
         activeCard = null;
         stagedCard = null;
         cardWrapper = null;
+        sidePanel = null;
         displayedDetail = null;
         reset();
     }

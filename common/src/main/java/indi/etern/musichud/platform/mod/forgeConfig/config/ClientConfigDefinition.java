@@ -48,6 +48,8 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundSamplingBlackOverlay;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundOverallBrightness;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundSaturation;
+    private final ModConfigSpec.ConfigValue<Double> panelOpacity;
+    private final ModConfigSpec.ConfigValue<Double> panelBrightness;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -156,6 +158,14 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Temporary natural-saturation/vibrance debug value")
                 .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundSaturation")
                 .defineInRange("guiBackgroundSaturation", 1.3, 0, 2);
+        panelOpacity = builder
+                .comment("Panel background opacity; only affects the sidebar and ConfigView category panels")
+                .translation(MusicHud.MOD_ID + ".config.common.panelOpacity")
+                .defineInRange("panelOpacity", 0.2, 0, 1);
+        panelBrightness = builder
+                .comment("Panel background brightness (0 = black, 1 = neutral gray)")
+                .translation(MusicHud.MOD_ID + ".config.common.panelBrightness")
+                .defineInRange("panelBrightness", 0.25, 0, 1);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -903,5 +913,35 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setGuiBackgroundSaturation(double saturation) {
         guiBackgroundSaturation.set(Math.clamp(saturation, 0, 2));
+    }
+
+    @Override
+    public double getPanelOpacity() {
+        return panelOpacity.get();
+    }
+
+    @Override
+    public double getDefaultPanelOpacity() {
+        return panelOpacity.getDefault();
+    }
+
+    @Override
+    public void setPanelOpacity(double opacity) {
+        panelOpacity.set(Math.clamp(opacity, 0, 1));
+    }
+
+    @Override
+    public double getPanelBrightness() {
+        return panelBrightness.get();
+    }
+
+    @Override
+    public double getDefaultPanelBrightness() {
+        return panelBrightness.getDefault();
+    }
+
+    @Override
+    public void setPanelBrightness(double brightness) {
+        panelBrightness.set(Math.clamp(brightness, 0, 1));
     }
 }
