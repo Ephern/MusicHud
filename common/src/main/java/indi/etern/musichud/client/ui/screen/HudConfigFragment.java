@@ -21,6 +21,7 @@ import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
+import indi.etern.musichud.client.ui.components.options.AdaptiveIntegerOption;
 import indi.etern.musichud.client.ui.components.options.DynamicIntegerOption;
 import indi.etern.musichud.client.ui.components.options.SignedIntegerOption;
 import indi.etern.musichud.client.ui.hud.HudEditOverlayView;
@@ -213,6 +214,34 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
                 clientConfig::setHudBackgroundMixAlpha)
                 .setRange(0, 1)
                 .setDefaultValue(clientConfig.getDefaultHudBackgroundMixAlpha())
+                .create(appearanceCategory);
+        new AdaptiveFloatOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundFluidOpacity"),
+                clientConfig::getHudBackgroundFluidOpacity,
+                clientConfig::setHudBackgroundFluidOpacity)
+                .setRange(0, 1, 100)
+                .setDefaultValue(clientConfig.getDefaultHudBackgroundFluidOpacity())
+                .create(appearanceCategory);
+        new AdaptiveIntegerOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundFluidBlurRadius"),
+                clientConfig::getHudBackgroundFluidBlurRadius,
+                clientConfig::setHudBackgroundFluidBlurRadius)
+                .setRange(0, 1024)
+                .setDefaultValue(clientConfig.getDefaultHudBackgroundFluidBlurRadius())
+                .create(appearanceCategory);
+        new AdaptiveIntegerOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundBlurRadius"),
+                clientConfig::getHudBackgroundBlurRadius,
+                clientConfig::setHudBackgroundBlurRadius)
+                .setRange(0, 1024)
+                .setDefaultValue(clientConfig.getDefaultHudBackgroundBlurRadius())
+                .create(appearanceCategory);
+        new AdaptiveFloatOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundSamplingBlackOverlay"),
+                clientConfig::getHudBackgroundSamplingBlackOverlay,
+                clientConfig::setHudBackgroundSamplingBlackOverlay)
+                .setRange(0, 1, 100)
+                .setDefaultValue(clientConfig.getDefaultHudBackgroundSamplingBlackOverlay())
                 .create(appearanceCategory);
         content.addView(appearanceCategory);
 

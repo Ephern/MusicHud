@@ -189,18 +189,6 @@ public interface ClientConfig {
 
     void setEnableGuiFluidBackground(boolean enableGuiFluidBackground);
 
-    double getFluidBackgroundAlpha();
-
-    double getDefaultFluidBackgroundAlpha();
-
-    void setFluidBackgroundAlpha(double fluidBackgroundAlpha);
-
-    double getFluidBackgroundBrightness();
-
-    double getDefaultFluidBackgroundBrightness();
-
-    void setFluidBackgroundBrightness(double fluidBackgroundBrightness);
-
     double getSolidBackgroundAlpha();
 
     double getDefaultSolidBackgroundAlpha();
@@ -249,53 +237,17 @@ public interface ClientConfig {
 
     void setForceRgba8Fallback(boolean force);
 
-    boolean getUseProceduralWarp();
-
-    boolean getDefaultUseProceduralWarp();
-
-    void setUseProceduralWarp(boolean use);
-
     int getGuiBackgroundBlurRadius();
 
     int getDefaultGuiBackgroundBlurRadius();
 
     void setGuiBackgroundBlurRadius(int radius);
 
-    double getGuiBackgroundCoverOpacity();
+    int getHudBackgroundBlurRadius();
 
-    double getDefaultGuiBackgroundCoverOpacity();
+    int getDefaultHudBackgroundBlurRadius();
 
-    void setGuiBackgroundCoverOpacity(double opacity);
-
-    double getGuiBackgroundCoverLayerOpacity();
-
-    double getDefaultGuiBackgroundCoverLayerOpacity();
-
-    void setGuiBackgroundCoverLayerOpacity(double opacity);
-
-    double getGuiBackgroundSaturation();
-
-    double getDefaultGuiBackgroundSaturation();
-
-    void setGuiBackgroundSaturation(double saturation);
-
-    double getGuiBackgroundAudioScaleAmount();
-
-    double getDefaultGuiBackgroundAudioScaleAmount();
-
-    void setGuiBackgroundAudioScaleAmount(double amount);
-
-    double getGuiBackgroundAudioLowWeight();
-
-    double getDefaultGuiBackgroundAudioLowWeight();
-
-    void setGuiBackgroundAudioLowWeight(double weight);
-
-    double getGuiBackgroundAudioMidWeight();
-
-    double getDefaultGuiBackgroundAudioMidWeight();
-
-    void setGuiBackgroundAudioMidWeight(double weight);
+    void setHudBackgroundBlurRadius(int radius);
 
     int getGuiBackgroundFluidBlurRadius();
 
@@ -303,41 +255,35 @@ public interface ClientConfig {
 
     void setGuiBackgroundFluidBlurRadius(int radius);
 
-    int getGuiBackgroundCoverRotationSpeed();
+    int getHudBackgroundFluidBlurRadius();
 
-    int getDefaultGuiBackgroundCoverRotationSpeed();
+    int getDefaultHudBackgroundFluidBlurRadius();
 
-    void setGuiBackgroundCoverRotationSpeed(int degreesPerSecond);
+    void setHudBackgroundFluidBlurRadius(int radius);
 
-    double getGuiBackgroundCoverDriftX();
+    double getGuiBackgroundFluidOpacity();
 
-    double getDefaultGuiBackgroundCoverDriftX();
+    double getDefaultGuiBackgroundFluidOpacity();
 
-    void setGuiBackgroundCoverDriftX(double amplitude);
+    void setGuiBackgroundFluidOpacity(double opacity);
 
-    double getGuiBackgroundCoverDriftY();
+    double getHudBackgroundFluidOpacity();
 
-    double getDefaultGuiBackgroundCoverDriftY();
+    double getDefaultHudBackgroundFluidOpacity();
 
-    void setGuiBackgroundCoverDriftY(double amplitude);
+    void setHudBackgroundFluidOpacity(double opacity);
 
-    double getGuiBackgroundCoverDriftSpeed();
+    double getGuiBackgroundSamplingBlackOverlay();
 
-    double getDefaultGuiBackgroundCoverDriftSpeed();
+    double getDefaultGuiBackgroundSamplingBlackOverlay();
 
-    void setGuiBackgroundCoverDriftSpeed(double speed);
+    void setGuiBackgroundSamplingBlackOverlay(double overlay);
 
-    double getGuiBackgroundCoverOrbitDriftX();
+    double getHudBackgroundSamplingBlackOverlay();
 
-    double getDefaultGuiBackgroundCoverOrbitDriftX();
+    double getDefaultHudBackgroundSamplingBlackOverlay();
 
-    void setGuiBackgroundCoverOrbitDriftX(double amplitude);
-
-    double getGuiBackgroundCoverOrbitDriftY();
-
-    double getDefaultGuiBackgroundCoverOrbitDriftY();
-
-    void setGuiBackgroundCoverOrbitDriftY(double amplitude);
+    void setHudBackgroundSamplingBlackOverlay(double overlay);
 
     void save();
 

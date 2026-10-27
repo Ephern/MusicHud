@@ -21,7 +21,7 @@ import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundOverrideStack;
-import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
@@ -464,7 +464,7 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
         if (router == null || router.getEffectivePage() != this) {
             return false;
         }
-        BackgroundOverrideStack stack = HudPresentationService.getInstance().getBackgroundOverrides();
+        BackgroundOverrideStack stack = BackgroundState.getInstance().getOverrides();
         if (backgroundThemeLayer == null) {
             backgroundThemeLayer = stack.push(data);
             return backgroundThemeLayer != null;
@@ -478,7 +478,7 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
 
     private void popBackgroundTheme() {
         if (backgroundThemeLayer != null) {
-            HudPresentationService.getInstance().getBackgroundOverrides().pop(backgroundThemeLayer);
+            BackgroundState.getInstance().getOverrides().pop(backgroundThemeLayer);
             backgroundThemeLayer = null;
         }
         if (ownedBackgroundImage != null) {

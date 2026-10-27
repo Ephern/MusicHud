@@ -21,8 +21,10 @@ public final class SceneCoverOverlay {
     private SceneGpuTexture target;
 
     public @Nullable SceneGpuTexture apply(SceneGpuContext gpu, SceneGpuTexture scene,
-                                           SceneGpuTexture layers, float opacity) {
-        if (gpu == null || scene == null || layers == null
+                                           SceneGpuTexture layers, float opacity,
+                                           float backgroundBlackOverlay,
+                                           SceneUniform adjust) {
+        if (gpu == null || scene == null || layers == null || adjust == null
                 || scene.width() < 1 || scene.height() < 1) {
             return null;
         }
@@ -50,8 +52,10 @@ public final class SceneCoverOverlay {
                                     gpu.sampler(SceneSamplerState.linearClamp())),
                             new SceneSamplerBinding("Sampler1", layers,
                                     gpu.sampler(SceneSamplerState.linearClamp()))),
-                    List.of(new SceneUniformBinding(OverlayUniform.UBO_NAME,
-                            new OverlayUniform(opacity)))));
+                    List.of(
+                            new SceneUniformBinding(OverlayUniform.UBO_NAME,
+                                    new OverlayUniform(opacity, backgroundBlackOverlay)),
+                            new SceneUniformBinding(adjust.getUBOName(), adjust))));
             return target;
         } catch (RuntimeException failure) {
             LOGGER.debug("While overlaying the cover layers", failure);
@@ -70,7 +74,7 @@ public final class SceneCoverOverlay {
         height = 0;
     }
 
-    private record OverlayUniform(float opacity) implements SceneUniform {
+    private record OverlayUniform(float opacity, float backgroundBlackOverlay) implements SceneUniform {
         private static final String UBO_NAME = "MHOverlay";
         private static final int UBO_SIZE = Std140Sizes.calc().putVec4().get();
 
@@ -86,7 +90,7 @@ public final class SceneCoverOverlay {
 
         @Override
         public void write(Std140Writer writer) {
-            writer.putVec4(opacity, 0f, 0f, 0f);
+            writer.putVec4(opacity, backgroundBlackOverlay, 0f, 0f);
         }
 
         @Override

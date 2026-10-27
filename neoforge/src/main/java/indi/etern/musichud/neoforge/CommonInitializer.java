@@ -2,7 +2,7 @@ package indi.etern.musichud.neoforge;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.scene.HudScene;
-import indi.etern.musichud.client.ui.render.RenderService;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
 import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
@@ -52,7 +52,7 @@ public final class CommonInitializer {
 
     public static void onRenderGui(RenderGuiEvent.Pre event) {
         if (hudScene != null) {
-            RenderService.getInstance().renderFrame(new VanillaSceneGraphics(event.getGuiGraphics()), hudScene);
+            RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(event.getGuiGraphics()), hudScene);
         }
     }
 

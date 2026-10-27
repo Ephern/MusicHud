@@ -58,7 +58,7 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
         releaseMesh();
         releaseTarget(gpu);
         target = gpu.createRenderTarget("MusicHud procedural cover warp", width, height,
-                SceneTextureFormat.RGBA8, LINEAR_CLAMP);
+                SceneTextureFormat.RGBA16F, LINEAR_CLAMP);
         owner = gpu;
         this.width = width;
         this.height = height;

@@ -84,7 +84,8 @@ public final class BackgroundData implements Mixable<BackgroundData>, SceneUnifo
         ThemedColors colors = next != null
                 ? themedColors.mix(next.themedColors, transitionProgress)
                 : themedColors;
-        return new BackgroundData(image, colors, baseColor, mixAlpha, followHudConfig);
+        BackgroundImages nextImage = next != null && next.image != null ? next.image : image;
+        return new BackgroundData(nextImage, colors, baseColor, mixAlpha, followHudConfig);
     }
 
     public static final int UBO_SIZE = Std140Sizes.calc().putVec4().putVec4().putVec4().putVec4().align(16).get();

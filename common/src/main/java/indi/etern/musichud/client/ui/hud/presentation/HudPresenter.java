@@ -1,22 +1,16 @@
 package indi.etern.musichud.client.ui.hud.presentation;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.renderer.ScrollingLyricLineRenderer;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
-import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.Easing;
-import indi.etern.musichud.client.utils.ui.Transitionable;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
@@ -28,35 +22,28 @@ import org.jetbrains.annotations.Nullable;
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
-import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 
-public final class HudPresentationService {
+public final class HudPresenter {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final long LYRIC_DELAY_NANOS = 300_000_000L;
-    private static final int DOWN_SCALE_TARGET_LENGTH = (int) Math.sqrt(ColorExtractor.MAX_SAMPLES);
     private static final long HUD_FADE_MS = 300;
     private static final DateTimeFormatter LONG_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final DateTimeFormatter SHORT_DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern("mm:ss");
-    private static volatile HudPresentationService instance;
+    private static volatile HudPresenter instance;
 
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+    private final BackgroundState backgroundState = BackgroundState.getInstance();
+    private final CoverImageStore coverImageStore = CoverImageStore.getInstance();
     @Getter
     private final HudPresentationModel model = new HudPresentationModel();
-    @Getter
-    private final Transitionable<BackgroundData> backgroundTransition =
-            new Transitionable<>(BackgroundData.NONE, 500);
-    @Getter
-    private final BackgroundOverrideStack backgroundOverrides = new BackgroundOverrideStack();
     private final ConcurrentLinkedQueue<QueuedLyric> lyricQueue = new ConcurrentLinkedQueue<>();
     private final AtomicBoolean lyricWorkerRunning = new AtomicBoolean();
     private final AtomicLong lyricGeneration = new AtomicLong();
     private final Object lyricLock = new Object();
-    private final CoverRequestGate coverRequests = new CoverRequestGate();
     private volatile LyricSink lyricSink;
-    private volatile int albumImageThumbnailSize = 128;
     private volatile String idleMessage = I18n.get(MusicHud.MOD_ID + ".text.idle");
     private volatile String musicDurationString = "";
     private volatile float hudAlpha = 1f;
@@ -67,10 +54,10 @@ public final class HudPresentationService {
     private volatile boolean pendingSwitchToEmpty;
     private Logger logger;
 
-    private HudPresentationService() {
-        model.setBackground(backgroundTransition);
+    private HudPresenter() {
+        model.setBackground(backgroundState.getTransition());
         // Playback notifies HUD layout after 500 ms; invalidate covers immediately at the switch.
-        nowPlayingInfo.getMusicSwitchListener().add((previous, current) -> coverRequests.begin());
+        nowPlayingInfo.getMusicSwitchListener().add((previous, current) -> coverImageStore.beginRequest());
         nowPlayingInfo.getLyricLineUpdateListener().add((lyricLine) -> {
             String text = lyricLine == null ? "" : lyricLine.getText();
             String translatedText = lyricLine == null ? "" : lyricLine.getTranslatedText();
@@ -120,11 +107,11 @@ public final class HudPresentationService {
         reset();
     }
 
-    public static HudPresentationService getInstance() {
+    public static HudPresenter getInstance() {
         if (instance == null) {
-            synchronized (HudPresentationService.class) {
+            synchronized (HudPresenter.class) {
                 if (instance == null) {
-                    instance = new HudPresentationService();
+                    instance = new HudPresenter();
                 }
             }
         }
@@ -132,7 +119,7 @@ public final class HudPresentationService {
     }
 
     @Nullable
-    public static HudPresentationService getActiveInstance() {
+    public static HudPresenter getActiveInstance() {
         return instance;
     }
 
@@ -152,7 +139,7 @@ public final class HudPresentationService {
         boolean requestedIdle = musicDetail == null || musicDetail.equals(MusicDetail.NONE);
         boolean actualIdle = actual == null || actual.equals(MusicDetail.NONE);
         if (requestedIdle ? !actualIdle : !musicDetail.equals(actual)) return;
-        long coverToken = coverRequests.begin();
+        long coverToken = coverImageStore.beginRequest();
         try {
             boolean wasIdle = model.isIdle();
             boolean nowIdle = musicDetail == null || musicDetail.equals(MusicDetail.NONE);
@@ -171,7 +158,8 @@ public final class HudPresentationService {
                         .reduce((a, b) -> a + " / " + b)
                         .orElse("");
                 model.setArtistsAndAlbum(artists + " - " + musicDetail.getAlbum().getName());
-                loadAndSwitchAlbumImageWithRetry(musicDetail, coverToken, albumImageThumbnailSize);
+                coverImageStore.load(musicDetail, coverToken, this::isCurrentCoverTrack,
+                        this::updateMusicDuration);
                 pendingSwitchToEmpty = false;
             }
         } catch (Exception e) {
@@ -180,12 +168,10 @@ public final class HudPresentationService {
     }
 
     public void reset() {
-        long coverToken = coverRequests.begin();
-        coverRequests.runIfCurrent(coverToken, () -> true, () -> {
-            model.setIdle(true);
-            musicDurationString = "";
-            backgroundTransition.startTransition(BackgroundData.NONE);
-        });
+        coverImageStore.invalidate();
+        model.setIdle(true);
+        musicDurationString = "";
+        backgroundState.reset();
         idleMessage = I18n.get(MusicHud.MOD_ID + ".text.idle");
         boolean autoHide = clientConfig.getHideHudWhenNotPlaying();
         if (autoHide) {
@@ -214,34 +200,14 @@ public final class HudPresentationService {
         }
     }
 
-    public void preloadAlbumImage(Album album) {
-        int size = albumImageThumbnailSize;
-        if (size <= 0) {
-            return;
-        }
-        ImageUtils.downloadScaledAsync(album.getPicUrl(), size, size);
-    }
-
     public void setThumbnailSize(int thumbnailSize) {
-        if (thumbnailSize <= 0) return;
-        thumbnailSize = Math.max(128, thumbnailSize);
-        MusicDetail current;
-        long token;
-        synchronized (coverRequests) {
-            if (albumImageThumbnailSize == thumbnailSize) return;
-            albumImageThumbnailSize = thumbnailSize;
-            token = coverRequests.begin();
-            current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-        }
-        if (current != null && current != MusicDetail.NONE) {
-            loadAndSwitchAlbumImageWithRetry(current, token, thumbnailSize);
-        }
+        coverImageStore.setThumbnailSize(
+                thumbnailSize, this::isCurrentCoverTrack, this::updateMusicDuration);
     }
 
     public void updateFrame() {
         updateHudFade();
         model.setHudAlpha(hudAlpha);
-
         if (!clientConfig.getHideHudWhenNotPlaying()) {
             String title = model.getTitle();
             if (title == null || title.isBlank()) {
@@ -251,8 +217,6 @@ public final class HudPresentationService {
                 }
             }
         }
-
-        backgroundTransition.updateTransition();
 
         Duration playedDuration = nowPlayingInfo.getPlayedDuration();
         Duration musicDuration = nowPlayingInfo.getMusicDuration();
@@ -351,57 +315,22 @@ public final class HudPresentationService {
         }
     }
 
-    private void loadAndSwitchAlbumImageWithRetry(MusicDetail musicDetail, long token, int thumbnailSize) {
-        coverRequests.runIfCurrent(token, () -> isCurrentCoverTrack(musicDetail), () -> {
-            CompletableFuture<Void> future = loadAlbumImage(musicDetail, token, thumbnailSize);
-            future.exceptionallyAsync(e -> {
-                boolean retry = coverRequests.runIfCurrent(token, () -> isCurrentCoverTrack(musicDetail), () -> {
-                    backgroundTransition.startTransition(BackgroundData.NONE);
-                });
-                if (!retry) return null;
-                try {
-                    Thread.sleep(1000);
-                } catch (InterruptedException interrupted) {
-                    Thread.currentThread().interrupt();
-                    return null;
-                }
-                // Admission and launch share the publication lock; replacement cannot slip between them.
-                loadAndSwitchAlbumImageWithRetry(musicDetail, token, thumbnailSize);
-                return null;
-            }, MusicHud.EXECUTOR);
-        });
-    }
-
     private boolean isCurrentCoverTrack(MusicDetail musicDetail) {
         return !model.isIdle() && musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail());
     }
 
-    private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail, long token, int thumbnailSize) {
-        if (thumbnailSize <= 0) return CompletableFuture.completedFuture(null);
-        Album album = musicDetail.getAlbum();
-        return ImageUtils.downloadScaledAsync(album.getPicUrl(), thumbnailSize, thumbnailSize)
-                .thenCombine(ImageUtils.downloadAsync(album.getPicUrl()),
-                        (thumbnail, original) -> new BackgroundImages(thumbnail, 1f, original))
-                .thenAcceptBoth(
-                        ImageUtils.downloadScaledAsync(album.getPicUrl(), DOWN_SCALE_TARGET_LENGTH, DOWN_SCALE_TARGET_LENGTH),
-                        (backgroundImages, downscaled) -> {
-                            // Color extraction need not hold the publication lock.
-                            var colors = ColorExtractor.extractColors(downscaled.getTexture());
-                            coverRequests.runIfCurrent(token, () -> isCurrentCoverTrack(musicDetail), () -> {
-                                backgroundTransition.startTransition(new BackgroundData(backgroundImages, colors));
-                                Duration duration = nowPlayingInfo.getMusicDuration();
-                                if (duration != null) {
-                                    DateTimeFormatter formatter = duration.toHoursPart() >= 1
-                                            ? LONG_DATE_TIME_FORMATTER : SHORT_DATE_TIME_FORMATTER;
-                                    musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(duration.toSeconds()));
-                                }
-                            });
-                        });
+    private void updateMusicDuration(Duration duration) {
+        if (duration == null) {
+            return;
+        }
+        DateTimeFormatter formatter = duration.toHoursPart() >= 1
+                ? LONG_DATE_TIME_FORMATTER : SHORT_DATE_TIME_FORMATTER;
+        musicDurationString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(duration.toSeconds()));
     }
 
     private Logger logger() {
         if (logger == null) {
-            logger = MusicHud.getLogger(HudPresentationService.class);
+            logger = MusicHud.getLogger(HudPresenter.class);
         }
         return logger;
     }

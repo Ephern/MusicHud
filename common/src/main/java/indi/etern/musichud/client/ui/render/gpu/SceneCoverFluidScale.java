@@ -30,7 +30,7 @@ public final class SceneCoverFluidScale {
             try {
                 target = gpu.createRenderTarget("MusicHud fluid scale",
                         source.width(), source.height(),
-                        SceneTextureFormat.RGBA8, SceneSamplerState.linearClamp());
+                        SceneTextureFormat.RGBA16F, SceneSamplerState.linearClamp());
                 owner = gpu;
                 width = source.width();
                 height = source.height();

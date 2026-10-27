@@ -17,8 +17,7 @@ public class SceneRenderPipelines {
                     .buildSnippet();
 
     public static final ScenePipeline BACKGROUND;
-    public static final ScenePipeline EXP_BACKGROUND;
-    public static final ScenePipeline COVER_PREVIEW;
+    public static final ScenePipeline FLUID_BACKGROUND;
 
     public static final ScenePipeline ROUNDED_ALBUM;
 
@@ -38,18 +37,10 @@ public class SceneRenderPipelines {
             .build();
 
     static {
-        EXP_BACKGROUND = wrap("exp_background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
-                .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/exp_background"))
+        FLUID_BACKGROUND = wrap("fluid_background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
+                .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/fluid_background"))
                 .withVertexShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/background"))
-                .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/exp_background"))
-                .withUniform("MHPosition", UniformType.UNIFORM_BUFFER)
-                .withUniform("MHBackgroundAdjust", UniformType.UNIFORM_BUFFER)
-                .withSampler("Sampler0")
-                .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS).build());
-        COVER_PREVIEW = wrap("cover_preview", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
-                .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/cover_preview"))
-                .withVertexShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/background"))
-                .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/cover_preview"))
+                .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/fluid_background"))
                 .withUniform("MHPosition", UniformType.UNIFORM_BUFFER)
                 .withUniform("MHBackgroundAdjust", UniformType.UNIFORM_BUFFER)
                 .withSampler("Sampler0")

@@ -23,11 +23,10 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.modals.ApiServerDownloadDialog;
 import indi.etern.musichud.client.ui.components.modals.Modal;
 import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
-import indi.etern.musichud.client.ui.screen.CoverWarpDebugFragment;
+import indi.etern.musichud.client.ui.components.options.AdaptiveIntegerOption;
 import indi.etern.musichud.client.ui.screen.HudConfigFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
-import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -132,7 +131,7 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(clientConfig.getDefaultMixWithVanillaSoundVolume())
                     .setOnChanged(MainFragment::refreshCoverScale)
                     .create(commonCategory);
-            new PreferencesFragment.IntegerOption(
+            new AdaptiveIntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.soundVolume"),
                     clientConfig::getSoundVolume,
@@ -141,7 +140,7 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(clientConfig.getDefaultSoundVolume())
                     .setOnChanged(MainFragment::refreshCoverScale)
                     .create(commonCategory);
-            new PreferencesFragment.IntegerOption(
+            new AdaptiveIntegerOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.soundVolumeInterval"),
                     clientConfig::getSoundVolumeInterval,
@@ -189,10 +188,40 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setEnableGuiFluidBackground)
                     .setDefaultValue(clientConfig.getDefaultEnableGuiFluidBackground())
                     .create(commonCategory);
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundFluidOpacity"),
+                    clientConfig::getGuiBackgroundFluidOpacity,
+                    clientConfig::setGuiBackgroundFluidOpacity)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidOpacity())
+                    .create(commonCategory);
+            new AdaptiveIntegerOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundFluidBlurRadius"),
+                    clientConfig::getGuiBackgroundFluidBlurRadius,
+                    clientConfig::setGuiBackgroundFluidBlurRadius)
+                    .setRange(0, 1024)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidBlurRadius())
+                    .create(commonCategory);
+            new AdaptiveIntegerOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundBlurRadius"),
+                    clientConfig::getGuiBackgroundBlurRadius,
+                    clientConfig::setGuiBackgroundBlurRadius)
+                    .setRange(0, 1024)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundBlurRadius())
+                    .create(commonCategory);
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundSamplingBlackOverlay"),
+                    clientConfig::getGuiBackgroundSamplingBlackOverlay,
+                    clientConfig::setGuiBackgroundSamplingBlackOverlay)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundSamplingBlackOverlay())
+                    .create(commonCategory);
             addBackgroundAccordion(context, commonCategory,
-                    MusicHud.MOD_ID + ".config.common.solidBackground", true);
-            addBackgroundAccordion(context, commonCategory,
-                    MusicHud.MOD_ID + ".config.common.fluidBackground", false);
+                    MusicHud.MOD_ID + ".config.common.solidBackground");
             var transition1 = new LayoutTransition();
             transition1.enableTransitionType(LayoutTransition.CHANGING);
             commonCategory.setLayoutTransition(transition1);
@@ -340,7 +369,7 @@ public class ConfigView extends LinearLayout {
                     })
                     .create(integratedServerCategory);
 
-            new PreferencesFragment.FloatOption(
+            new AdaptiveFloatOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.integratedServer.pusherVoteAdditionalRate"),
                     serverConfig::getPusherVoteAdditionalRate,
@@ -645,7 +674,7 @@ public class ConfigView extends LinearLayout {
     }
 
     private static void addBackgroundAccordion(Context context, LinearLayout parent,
-                                               String titleKey, boolean solid) {
+                                               String titleKey) {
         final Button title = new ToggleButton(context, null, R.attr.borderlessButtonStyle);
         title.setText(I18n.get(titleKey));
         title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
@@ -658,7 +687,7 @@ public class ConfigView extends LinearLayout {
         ));
         icon.setTintList(title.getTextColors());
         title.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon, null);
-        BackgroundAccordion accordion = new BackgroundAccordion(parent, solid);
+        BackgroundAccordion accordion = new BackgroundAccordion(parent);
         title.setOnClickListener(accordion);
         parent.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         accordion.attach();
@@ -666,12 +695,10 @@ public class ConfigView extends LinearLayout {
 
     private static final class BackgroundAccordion implements View.OnClickListener {
         private final LinearLayout mParent;
-        private final boolean solid;
         private LinearLayout mContent;
 
-        BackgroundAccordion(LinearLayout parent, boolean solid) {
+        BackgroundAccordion(LinearLayout parent) {
             this.mParent = parent;
-            this.solid = solid;
         }
 
         @Override
@@ -689,41 +716,22 @@ public class ConfigView extends LinearLayout {
             mContent = new LinearLayout(context);
             mContent.setOrientation(LinearLayout.VERTICAL);
 
-            if (solid) {
-                new AdaptiveFloatOption(
-                        context,
-                        I18n.get(MusicHud.MOD_ID + ".config.common.solidBackgroundAlpha"),
-                        clientConfig::getSolidBackgroundAlpha,
-                        clientConfig::setSolidBackgroundAlpha)
-                        .setRange(0, 1, 100)
-                        .setDefaultValue(clientConfig.getDefaultSolidBackgroundAlpha())
-                        .create(mContent);
-                new AdaptiveFloatOption(
-                        context,
-                        I18n.get(MusicHud.MOD_ID + ".config.common.solidBackgroundBrightness"),
-                        clientConfig::getSolidBackgroundBrightness,
-                        clientConfig::setSolidBackgroundBrightness)
-                        .setRange(0, 1, 100)
-                        .setDefaultValue(clientConfig.getDefaultSolidBackgroundBrightness())
-                        .create(mContent);
-            } else {
-                new AdaptiveFloatOption(
-                        context,
-                        I18n.get(MusicHud.MOD_ID + ".config.common.fluidBackgroundAlpha"),
-                        clientConfig::getFluidBackgroundAlpha,
-                        clientConfig::setFluidBackgroundAlpha)
-                        .setRange(0, 1, 100)
-                        .setDefaultValue(clientConfig.getDefaultFluidBackgroundAlpha())
-                        .create(mContent);
-                new AdaptiveFloatOption(
-                        context,
-                        I18n.get(MusicHud.MOD_ID + ".config.common.fluidBackgroundBrightness"),
-                        clientConfig::getFluidBackgroundBrightness,
-                        clientConfig::setFluidBackgroundBrightness)
-                        .setRange(0, 1, 100)
-                        .setDefaultValue(clientConfig.getDefaultFluidBackgroundBrightness())
-                        .create(mContent);
-            }
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.solidBackgroundAlpha"),
+                    clientConfig::getSolidBackgroundAlpha,
+                    clientConfig::setSolidBackgroundAlpha)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultSolidBackgroundAlpha())
+                    .create(mContent);
+            new AdaptiveFloatOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.solidBackgroundBrightness"),
+                    clientConfig::getSolidBackgroundBrightness,
+                    clientConfig::setSolidBackgroundBrightness)
+                    .setRange(0, 1, 100)
+                    .setDefaultValue(clientConfig.getDefaultSolidBackgroundBrightness())
+                    .create(mContent);
 
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params.setMargins(0, mContent.dp(6), 0, 0);
@@ -815,7 +823,7 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(serverConfig.getDefaultFollowSourceOrder())
                     .create(mContent);
 
-            new PreferencesFragment.IntegerOption(context,
+            new AdaptiveIntegerOption(context,
                     I18n.get(MusicHud.MOD_ID + ".config.apiServer.port"),
                     serverConfig::getPort,
                     serverConfig::setPort)
@@ -892,151 +900,6 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setForceRgba8Fallback)
                     .setDefaultValue(clientConfig.getDefaultForceRgba8Fallback())
                     .create(mContent);
-
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.useProceduralWarp"),
-                    clientConfig::getUseProceduralWarp,
-                    clientConfig::setUseProceduralWarp)
-                    .setDefaultValue(clientConfig.getDefaultUseProceduralWarp())
-                    .create(mContent);
-
-            new PreferencesFragment.IntegerOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundBlurRadius"),
-                    clientConfig::getGuiBackgroundBlurRadius,
-                    clientConfig::setGuiBackgroundBlurRadius)
-                    .setRange(0, 1024)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundBlurRadius())
-                    .create(mContent);
-
-            new PreferencesFragment.IntegerOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundFluidBlurRadius"),
-                    clientConfig::getGuiBackgroundFluidBlurRadius,
-                    clientConfig::setGuiBackgroundFluidBlurRadius)
-                    .setRange(0, 1024)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidBlurRadius())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundSaturation"),
-                    clientConfig::getGuiBackgroundSaturation,
-                    clientConfig::setGuiBackgroundSaturation)
-                    .setRange(0, 2, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundSaturation())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioScaleAmount"),
-                    clientConfig::getGuiBackgroundAudioScaleAmount,
-                    clientConfig::setGuiBackgroundAudioScaleAmount)
-                    .setRange(0, 0.5, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioScaleAmount())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioLowWeight"),
-                    clientConfig::getGuiBackgroundAudioLowWeight,
-                    clientConfig::setGuiBackgroundAudioLowWeight)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioLowWeight())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundAudioMidWeight"),
-                    clientConfig::getGuiBackgroundAudioMidWeight,
-                    clientConfig::setGuiBackgroundAudioMidWeight)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundAudioMidWeight())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOpacity"),
-                    clientConfig::getGuiBackgroundCoverOpacity,
-                    clientConfig::setGuiBackgroundCoverOpacity)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverOpacity())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverLayerOpacity"),
-                    clientConfig::getGuiBackgroundCoverLayerOpacity,
-                    clientConfig::setGuiBackgroundCoverLayerOpacity)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverLayerOpacity())
-                    .create(mContent);
-
-            new PreferencesFragment.IntegerOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverRotationSpeed"),
-                    clientConfig::getGuiBackgroundCoverRotationSpeed,
-                    clientConfig::setGuiBackgroundCoverRotationSpeed)
-                    .setRange(0, 360)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverRotationSpeed())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftX"),
-                    clientConfig::getGuiBackgroundCoverDriftX,
-                    clientConfig::setGuiBackgroundCoverDriftX)
-                    .setRange(0, 0.5, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverDriftX())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftY"),
-                    clientConfig::getGuiBackgroundCoverDriftY,
-                    clientConfig::setGuiBackgroundCoverDriftY)
-                    .setRange(0, 0.5, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverDriftY())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverDriftSpeed"),
-                    clientConfig::getGuiBackgroundCoverDriftSpeed,
-                    clientConfig::setGuiBackgroundCoverDriftSpeed)
-                    .setRange(0, 4, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverDriftSpeed())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOrbitDriftX"),
-                    clientConfig::getGuiBackgroundCoverOrbitDriftX,
-                    clientConfig::setGuiBackgroundCoverOrbitDriftX)
-                    .setRange(0, 0.5, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverOrbitDriftX())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundCoverOrbitDriftY"),
-                    clientConfig::getGuiBackgroundCoverOrbitDriftY,
-                    clientConfig::setGuiBackgroundCoverOrbitDriftY)
-                    .setRange(0, 0.5, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundCoverOrbitDriftY())
-                    .create(mContent);
-
-            Button coverWarpDebugButton = new Button(context);
-            coverWarpDebugButton.setText(I18n.get(MusicHud.MOD_ID + ".config.debug.coverWarp"));
-            coverWarpDebugButton.setTextColor(Theme.PRIMARY_COLOR);
-            coverWarpDebugButton.setTextSize(14);
-            coverWarpDebugButton.setOnClickListener(v -> {
-                Minecraft minecraft = Minecraft.getInstance();
-                minecraft.execute(() -> minecraft.setScreen(MusicHudScreen.createScreen(
-                        new CoverWarpDebugFragment(),
-                        null,
-                        minecraft.screen,
-                        I18n.get(MusicHud.MOD_ID + ".debug.coverWarp.title"))));
-            });
-            mContent.addView(coverWarpDebugButton,
-                    new LinearLayout.LayoutParams(MATCH_PARENT, mContent.dp(40)));
 
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params.setMargins(0, mContent.dp(6), 0, 0);

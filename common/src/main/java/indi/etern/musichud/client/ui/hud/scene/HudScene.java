@@ -6,8 +6,9 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.layout.HudLayouts;
 import indi.etern.musichud.client.ui.hud.metadata.ProgressBarData;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.hud.presentation.HudPresentationModel;
-import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
 import indi.etern.musichud.client.ui.hud.renderer.*;
 import indi.etern.musichud.client.ui.hud.renderer.debug.HudLayoutDebugRenderer;
 import indi.etern.musichud.client.ui.hud.renderer.debug.ThemeColorDebugRenderer;
@@ -17,7 +18,6 @@ import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
 
@@ -25,8 +25,9 @@ public final class HudScene implements RenderScene {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static volatile HudScene instance;
 
-    private final HudPresentationService presentation = HudPresentationService.getInstance();
-    private final BackgroundRenderer BACKGROUND_RENDERER = new BackgroundRenderer();
+    private final HudPresenter presenter = HudPresenter.getInstance();
+    private final BackgroundRenderer BACKGROUND_RENDERER =
+            new BackgroundRenderer(BackgroundRenderer.Target.HUD);
     private final AlbumImageRenderer IMAGE_RENDERER = new AlbumImageRenderer();
     private final PlayerHeadRenderer PLAYER_HEAD_RENDERER = new PlayerHeadRenderer();
     private final PlayingStatusRenderer PLAYING_STATUS_RENDERER = new PlayingStatusRenderer();
@@ -36,7 +37,7 @@ public final class HudScene implements RenderScene {
     private final TextRenderer PLAY_TIME_RENDERER = new TextRenderer();
     private final ScrollingLyricLineRenderer LYRICS_LINE_RENDERER = new ScrollingLyricLineRenderer();
     private final ThemeColorDebugRenderer THEME_COLOR_DEBUG_RENDERER =
-            new ThemeColorDebugRenderer(presentation.getBackgroundTransition());
+            new ThemeColorDebugRenderer(BackgroundState.getInstance().getTransition());
     private final HudLayoutDebugRenderer HUD_LAYOUT_DEBUG_RENDERER = new HudLayoutDebugRenderer();
 
     @Getter
@@ -51,7 +52,7 @@ public final class HudScene implements RenderScene {
     private int appliedStatusRevision = -1;
 
     private HudScene() {
-        presentation.setLyricSink(new HudPresentationService.LyricSink() {
+        presenter.setLyricSink(new HudPresenter.LyricSink() {
             @Override
             public void submit(ScrollingLyricLineRenderer.Line line1, ScrollingLyricLineRenderer.Line line2) {
                 LYRICS_LINE_RENDERER.setLines(line1, line2, true);
@@ -77,15 +78,10 @@ public final class HudScene implements RenderScene {
         return instance;
     }
 
-    @Nullable
-    public static HudScene getActiveInstance() {
-        return instance;
-    }
-
     public void render(SceneRenderContext context) {
         try {
-            presentation.updateFrame();
-            HudPresentationModel model = presentation.getModel();
+            presenter.updateFrame();
+            HudPresentationModel model = presenter.getModel();
             if (model.getHudAlpha() <= 1e-4f) {
                 return;
             }
@@ -117,7 +113,7 @@ public final class HudScene implements RenderScene {
             }
             refreshThumbnailSize();
 
-            BACKGROUND_RENDERER.render(context, clientConfig.getGuiBackgroundBlurRadius());
+            BACKGROUND_RENDERER.render(context);
             IMAGE_RENDERER.render(context);
             PLAYER_HEAD_RENDERER.render(context);
             PLAYING_STATUS_RENDERER.render(context);
@@ -196,7 +192,7 @@ public final class HudScene implements RenderScene {
         }
         //noinspection ConstantValue
         if (window != null && imageDisplayData != null) {
-            presentation.setThumbnailSize((int) (imageDisplayData.getHudStyle().getWidth() * window.getGuiScale()));
+            presenter.setThumbnailSize((int) (imageDisplayData.getHudStyle().getWidth() * window.getGuiScale()));
         }
     }
 
@@ -215,7 +211,7 @@ public final class HudScene implements RenderScene {
     private void configureBaseRenderer(SceneStyle hudStyle) {
         if (hudBaseData == null) {
             hudBaseData = new SceneRenderData(hudStyle);
-            hudBaseData.setTransitionableBackground(presentation.getBackgroundTransition());
+            hudBaseData.setTransitionableBackground(BackgroundState.getInstance().getTransition());
         } else {
             hudBaseData.setHudStyle(hudStyle);
         }

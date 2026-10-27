@@ -6,7 +6,7 @@ import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.decoder.*;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
@@ -1169,7 +1169,7 @@ public class PlaybackTask {
     private void updateGain() {
         float targetGain = getTargetGain();
         if (lastVolume != targetGain && source != null) {
-            HudPresentationService presentationService = HudPresentationService.getActiveInstance();
+            HudPresenter presentationService = HudPresenter.getActiveInstance();
             if (presentationService != null) {
                 presentationService.updateStatus(null);
             }

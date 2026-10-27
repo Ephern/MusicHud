@@ -1,5 +1,6 @@
 #version 150
 
+// u_Canvas.x: canvas aspect ratio (width / height)
 layout(std140) uniform MHCover {
     vec4 u_Layer0Pos;
     vec4 u_Layer0Shape;
@@ -7,7 +8,6 @@ layout(std140) uniform MHCover {
     vec4 u_Layer1Shape;
     vec4 u_Layer2Pos;
     vec4 u_Layer2Shape;
-    // x: canvas aspect ratio (width / height)
     vec4 u_Canvas;
 };
 

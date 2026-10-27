@@ -4,23 +4,24 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.SpectrumSnapshot;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
-import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
-import indi.etern.musichud.client.ui.render.CoverWarpSettings;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.render.AudioReactiveScale;
+import indi.etern.musichud.client.ui.render.FluidBackgroundSettings;
 import indi.etern.musichud.client.ui.render.RenderLayer;
-import indi.etern.musichud.client.ui.render.RenderService;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
 import indi.etern.musichud.client.ui.render.SceneElementRenderState;
 import indi.etern.musichud.client.ui.render.SceneRenderContext;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlur;
+import indi.etern.musichud.client.ui.render.gpu.SceneBlurCrop;
 import indi.etern.musichud.client.ui.render.gpu.SceneCapture;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverFluidScale;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverLayers;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverOverlay;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverTransition;
-import indi.etern.musichud.client.ui.render.gpu.SceneCoverWarp;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverWarpProcedural;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
@@ -29,13 +30,18 @@ import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
-import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.ui.Transitionable;
 import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
 public class BackgroundRenderer implements RenderLayer {
+    public enum Target {
+        GUI,
+        HUD
+    }
+
+    private static final float EPSILON = 1e-4f;
     private static final BackgroundData HUD_IDLE_BACKGROUND = BackgroundData.solid(0x202020);
     private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
     private static final Logger LOGGER = MusicHud.getLogger(BackgroundRenderer.class);
@@ -44,26 +50,21 @@ public class BackgroundRenderer implements RenderLayer {
     private static final float DRIFT_FREQ_Y1 = (float) Math.sqrt(2.7);
     private static final float DRIFT_FREQ_Y2 = (float) Math.sqrt(4.93);
     private static final float ORBIT_DRIFT_FREQ_SCALE = (float) Math.sqrt(1.2);
+    private final Target target;
     private final SceneCapture sceneCapture = new SceneCapture();
     private final SceneBlur backgroundBlur = new SceneBlur();
+    private final SceneBlurCrop backgroundCrop = new SceneBlurCrop();
     private final SceneBlur fluidBlur = new SceneBlur();
     private final SceneCoverTransition sceneCoverTransition = new SceneCoverTransition();
-    private final SceneCoverWarp sceneCoverWarp = new SceneCoverWarp();
     private final SceneCoverWarpProcedural sceneCoverWarpProcedural = new SceneCoverWarpProcedural();
     private final SceneCoverFluidScale sceneCoverFluidScale = new SceneCoverFluidScale();
     private final SceneCoverLayers sceneCoverLayers = new SceneCoverLayers();
     private final SceneCoverOverlay sceneCoverOverlay = new SceneCoverOverlay();
-    private final boolean allowDebugPreview;
-    private boolean lastUseProceduralWarp;
     private SceneRenderData currentData;
     private final DynamicStatusUniform dynamicStatusUniform = DynamicStatusUniform.getInstance();
 
-    public BackgroundRenderer() {
-        this(false);
-    }
-
-    public BackgroundRenderer(boolean allowDebugPreview) {
-        this.allowDebugPreview = allowDebugPreview;
+    public BackgroundRenderer(Target target) {
+        this.target = target;
     }
 
     public void configure(SceneRenderData data) {
@@ -72,46 +73,24 @@ public class BackgroundRenderer implements RenderLayer {
 
     @Override
     public void render(SceneRenderContext context) {
-        render(context, false, 0);
-    }
-
-    public void render(SceneRenderContext context, int blurRadius) {
-        render(context, false, blurRadius);
-    }
-
-    public void render(SceneRenderContext context, boolean idle) {
-        render(context, idle, 0);
-    }
-
-    public void render(SceneRenderContext context, boolean idle, int blurRadius) {
         if (currentData == null) return;
 
         var transition = currentData.getTransitionableBackground();
         dynamicStatusUniform.setTransitionable(transition);
-        BackgroundData mixed = transition == null ? null : transition.getMixed();
-        var image = mixed == null ? null : mixed.image();
-        if (idle || image == null || (image.current == null && image.original == null)) {
-            render(context, currentData.getHudStyle(), HUD_IDLE_BACKGROUND);
-            return;
-        }
-        if (renderExpBackground(context, currentData.getHudStyle(), blurRadius)) {
+        if (renderFluidBackground(context, currentData.getHudStyle())) {
             context.nextStratum();
             return;
         }
         render(context, currentData.getHudStyle(), HUD_IDLE_BACKGROUND);
     }
 
-    public boolean renderExpBackground(SceneRenderContext context, SceneStyle style) {
-        return renderExpBackground(context, style, 0);
-    }
-
-    public boolean renderExpBackground(SceneRenderContext context, SceneStyle style, int blurRadius) {
+    public boolean renderFluidBackground(SceneRenderContext context, SceneStyle style) {
         if (style == null || style.getWidth() <= 0 || style.getHeight() <= 0
-                || style.getAlpha() <= 1e-4f) return false;
+                || style.getAlpha() <= EPSILON) return false;
 
         SceneGpuContext gpu;
         try {
-            gpu = RenderService.getInstance().gpu();
+            gpu = RenderRuntime.getInstance().gpu();
         } catch (RuntimeException failure) {
             LOGGER.debug("Scene capture is unavailable", failure);
             return false;
@@ -123,94 +102,87 @@ public class BackgroundRenderer implements RenderLayer {
 
         int canvasWidth = (int) Math.ceil(region.width());
         int canvasHeight = (int) Math.ceil(region.height());
-        int canvasLong = Math.max(1, Math.max(canvasWidth, canvasHeight));
-
-        ImageTextureData coverImage = resolveCoverImage();
         float time = MusicHud.getRunningMillis() / 1000f;
-        SceneCoverTransition.Frame coverFrame = sceneCoverTransition.update(
-                gpu, coverImage, coverTargetLongEdge(region), time);
-        CoverWarpSettings warpSettings = CoverWarpSettings.getInstance();
-        CoverWarpSettings.Snapshot warpSnapshot = warpSettings.snapshot();
-        SceneGpuTexture cover = coverFrame.cover();
-        float layerOpacity = (float) CLIENT_CONFIG.getGuiBackgroundCoverLayerOpacity();
-        float masterOpacity = (float) (CLIENT_CONFIG.getGuiBackgroundCoverOpacity()
-                * coverFrame.opacityScale());
-        int fluidBlurRadius = CLIENT_CONFIG.getGuiBackgroundFluidBlurRadius();
-        float audioScale = audioReactiveScale();
 
-        CoverWarpSettings.PreviewMode previewMode = warpSettings.getPreviewMode();
-        if (allowDebugPreview && previewMode != CoverWarpSettings.PreviewMode.OFF) {
-            if (cover == null) return false;
-            SceneGpuTexture preview;
-            if (previewMode == CoverWarpSettings.PreviewMode.LAYERS) {
-                preview = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
-                        time, layerOpacity, warpSnapshot, fluidBlurRadius, audioScale);
-            } else {
-                SceneGpuTexture sourceCover = cover;
-                if (warpSettings.isTiledPreviewBlur() && fluidBlurRadius > 0) {
-                    sourceCover = blurTexture(fluidBlur, gpu, cover,
-                            fluidBlurRadius, canvasLong);
-                }
-                preview = sceneCoverWarp.apply(gpu, sourceCover, warpSnapshot,
-                        coverFrame.animated());
-                if (preview != null) {
-                    preview = sceneCoverFluidScale.apply(gpu, preview, audioScale);
-                }
+        float fluidOpacityConfig = fluidOpacity();
+        SceneCoverTransition.Frame coverFrame;
+        SceneGpuTexture cover = null;
+        float masterOpacity = 0f;
+        if (fluidOpacityConfig > EPSILON) {
+            ResolvedCover resolvedCover = resolveCoverImages();
+            if (resolvedCover != null) {
+                coverFrame = sceneCoverTransition.update(
+                        gpu, resolvedCover.images(), resolvedCover.changedAtMillis(),
+                        coverTargetLongEdge(region), time);
+                cover = coverFrame.cover();
+                masterOpacity = fluidOpacityConfig * coverFrame.opacityScale();
             }
-            if (preview == null) return false;
-            submitCoverPreview(context, style, preview);
-            return true;
         }
 
-        boolean fluidWanted = cover != null && masterOpacity > 1e-4f && layerOpacity > 1e-4f;
-        SceneGpuTexture fluid = null;
+        float layerOpacity = FluidBackgroundSettings.COVER_LAYER_OPACITY;
+        int fluidBlurRadius = fluidBlurRadius(style, source);
+        boolean fluidWanted = cover != null && masterOpacity > EPSILON;
         boolean fluidAttempted = false;
 
-        if (fluidWanted && masterOpacity >= 1f - 1e-4f) {
+        if (fluidWanted && masterOpacity >= 1f - EPSILON) {
             fluidAttempted = true;
-            fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
-                    time, layerOpacity, warpSnapshot, fluidBlurRadius, audioScale);
+            SceneGpuTexture fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
+                    time, layerOpacity, fluidBlurRadius);
             if (fluid != null) {
-                submitExpBackground(context, style, fluid);
+                submitFluidBackground(context, style, fluid, true, 0f);
                 return true;
             }
         }
 
-        SceneGpuTexture captured = sceneCapture.capture(gpu, source, region);
+        CapturePlan capturePlan = capturePlan(region, source, backgroundBlurRadius());
+        if (capturePlan == null) return false;
+        SceneGpuTexture captured = sceneCapture.capture(gpu, source, capturePlan.captureRegion());
         if (captured == null) return false;
         SceneGpuTexture background = captured;
-        if (blurRadius > 0) {
+        int sceneBlurRadius = backgroundBlurRadius();
+        if (sceneBlurRadius > 0) {
             SceneBlur.PendingBlur blur = backgroundBlur.prepare(gpu,
-                    captured.width(), captured.height(), blurRadius / 3f);
+                    captured.width(), captured.height(), sceneBlurRadius / 3f);
             if (blur != null && blur.apply(gpu, captured)) {
                 background = blur.target();
             }
         }
+        if (capturePlan.needsCrop()) {
+            SceneGpuTexture cropped = backgroundCrop.apply(gpu, background,
+                    capturePlan.u0(), capturePlan.v0(), capturePlan.u1(), capturePlan.v1(),
+                    capturePlan.targetWidth(), capturePlan.targetHeight());
+            if (cropped == null) return false;
+            background = cropped;
+        }
 
         SceneGpuTexture output = background;
+        boolean backgroundOnly = true;
+        SceneUniform adjustUniform = backgroundAdjustUniform(false, 0f);
         if (fluidWanted) {
             if (!fluidAttempted) {
-                fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
-                        time, layerOpacity, warpSnapshot, fluidBlurRadius, audioScale);
-            }
-            if (fluid != null) {
-                SceneGpuTexture composite = sceneCoverOverlay.apply(
-                        gpu, background, fluid, masterOpacity);
-                if (composite != null) {
-                    output = composite;
+                SceneGpuTexture fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
+                        time, layerOpacity, fluidBlurRadius);
+                if (fluid != null) {
+                    SceneGpuTexture composite = sceneCoverOverlay.apply(
+                            gpu, background, fluid, masterOpacity,
+                            samplingBlackOverlay(), adjustUniform);
+                    if (composite != null) {
+                        output = composite;
+                        backgroundOnly = false;
+                    }
                 }
             }
         }
 
-        submitExpBackground(context, style, output);
+        submitFluidBackground(context, style, output, false,
+                backgroundOnly ? samplingBlackOverlay() : 0f);
         return true;
     }
 
     private SceneGpuTexture buildFluid(SceneGpuContext gpu, SceneGpuTexture cover,
                                        SceneCapture.Region region, int canvasWidth,
                                        int canvasHeight, float time, float layerOpacity,
-                                       CoverWarpSettings.Snapshot snapshot,
-                                       int fluidBlurRadius, float audioScale) {
+                                       int fluidBlurRadius) {
         SceneCoverLayers.CoverUniform uniform = createCoverUniform(
                 region, time, cover, layerOpacity);
         SceneGpuTexture layers = sceneCoverLayers.apply(gpu, cover, uniform,
@@ -221,22 +193,9 @@ public class BackgroundRenderer implements RenderLayer {
             fluid = blurTexture(fluidBlur, gpu, layers, fluidBlurRadius,
                     Math.max(1, Math.max(canvasWidth, canvasHeight)));
         }
-        boolean useProceduralWarp = CLIENT_CONFIG.getUseProceduralWarp();
-        if (useProceduralWarp != lastUseProceduralWarp) {
-            sceneCoverWarpProcedural.reset();
-            lastUseProceduralWarp = useProceduralWarp;
-        }
-        SceneGpuTexture warped;
-        if (useProceduralWarp) {
-            warped = sceneCoverWarpProcedural.apply(gpu, fluid, time);
-            if (warped == fluid) {
-                warped = sceneCoverWarp.apply(gpu, fluid, snapshot, true);
-            }
-        } else {
-            warped = sceneCoverWarp.apply(gpu, fluid, snapshot, true);
-        }
+        SceneGpuTexture warped = sceneCoverWarpProcedural.apply(gpu, fluid, time);
         SceneGpuTexture result = warped != null ? warped : fluid;
-        return sceneCoverFluidScale.apply(gpu, result, audioScale);
+        return sceneCoverFluidScale.apply(gpu, result, audioReactiveScale());
     }
 
     private static SceneGpuTexture blurTexture(SceneBlur blur, SceneGpuContext gpu,
@@ -252,68 +211,96 @@ public class BackgroundRenderer implements RenderLayer {
         return source;
     }
 
-    private static float audioReactiveScale() {
-        double amount = CLIENT_CONFIG.getGuiBackgroundAudioScaleAmount();
-        if (amount <= 1e-4) {
-            return 1f;
+    private int backgroundBlurRadius() {
+        return target == Target.GUI
+                ? CLIENT_CONFIG.getGuiBackgroundBlurRadius()
+                : CLIENT_CONFIG.getHudBackgroundBlurRadius();
+    }
+
+    private float fluidOpacity() {
+        return (float) (target == Target.GUI
+                ? CLIENT_CONFIG.getGuiBackgroundFluidOpacity()
+                : CLIENT_CONFIG.getHudBackgroundFluidOpacity());
+    }
+
+    private float samplingBlackOverlay() {
+        return (float) (target == Target.GUI
+                ? CLIENT_CONFIG.getGuiBackgroundSamplingBlackOverlay()
+                : CLIENT_CONFIG.getHudBackgroundSamplingBlackOverlay());
+    }
+
+    private int fluidBlurRadius(SceneStyle style, SceneGpuContext.MainColorSource source) {
+        int guiRadius = CLIENT_CONFIG.getGuiBackgroundFluidBlurRadius();
+        if (target == Target.GUI) {
+            return guiRadius;
         }
+        int lowerBound = Math.min(CLIENT_CONFIG.getHudBackgroundFluidBlurRadius(), guiRadius);
+        float referenceHeight = FluidBackgroundSettings.HUD_FLUID_RADIUS_REFERENCE_HEIGHT;
+        float guiHeight = Math.max(1f, source.height() / (float) Math.max(1, source.guiScale()));
+        float t = (style.getHeight() - referenceHeight) / Math.max(1f, guiHeight - referenceHeight);
+        t = Math.clamp(t, 0f, 1f);
+        float soft = softPlus(t, FluidBackgroundSettings.HUD_FLUID_RADIUS_SOFTNESS);
+        return Math.round(lowerBound + (guiRadius - lowerBound) * Math.clamp(soft, 0f, 1f));
+    }
+
+    private static float softPlus(float value, float softness) {
+        return (float) (Math.log1p(Math.exp(value * softness)) / softness);
+    }
+
+    private static float audioReactiveScale() {
         try {
             SpectrumSnapshot spectrum = StreamAudioPlayer.getInstance().getSpectrum();
-            return AudioReactiveScale.compute(spectrum, amount,
-                    CLIENT_CONFIG.getGuiBackgroundAudioLowWeight(),
-                    CLIENT_CONFIG.getGuiBackgroundAudioMidWeight());
+            return AudioReactiveScale.compute(spectrum, FluidBackgroundSettings.AUDIO_SCALE_AMOUNT,
+                    FluidBackgroundSettings.AUDIO_LOW_WEIGHT,
+                    FluidBackgroundSettings.AUDIO_MID_WEIGHT);
         } catch (RuntimeException failure) {
             LOGGER.debug("While reading the audio spectrum", failure);
             return 1f;
         }
     }
 
-    private void submitCoverPreview(SceneRenderContext context, SceneStyle style,
-                                    SceneGpuTexture texture) {
+    private void submitFluidBackground(SceneRenderContext context, SceneStyle style,
+                                       SceneGpuTexture texture, boolean applyColorAdjust,
+                                       float blackOverlay) {
         context.submit(this, new SceneElementRenderState(
-                SceneRenderPipelines.COVER_PREVIEW,
+                SceneRenderPipelines.FLUID_BACKGROUND,
                 SceneTextureSetup.single(texture),
                 context.currentPose(),
                 style,
                 style,
-                backgroundAdjustUniform()
+                backgroundAdjustUniform(applyColorAdjust, blackOverlay)
         ));
     }
 
-    private void submitExpBackground(SceneRenderContext context, SceneStyle style,
-                                     SceneGpuTexture texture) {
-        context.submit(this, new SceneElementRenderState(
-                SceneRenderPipelines.EXP_BACKGROUND,
-                SceneTextureSetup.single(texture),
-                context.currentPose(),
-                style,
-                style,
-                backgroundAdjustUniform()
-        ));
-    }
-
-    private static BackgroundAdjustUniform backgroundAdjustUniform() {
+    private static BackgroundAdjustUniform backgroundAdjustUniform(boolean applyColorAdjust,
+                                                                    float blackOverlay) {
         return new BackgroundAdjustUniform(
-                (float) CLIENT_CONFIG.getGuiBackgroundSaturation());
+                FluidBackgroundSettings.SATURATION,
+                FluidBackgroundSettings.HIGHLIGHT_DARKENING,
+                FluidBackgroundSettings.HIGHLIGHT_KNEE,
+                FluidBackgroundSettings.HIGHLIGHT_FULL,
+                FluidBackgroundSettings.OVERALL_BRIGHTNESS,
+                applyColorAdjust,
+                blackOverlay);
     }
 
     private static SceneCoverLayers.CoverUniform createCoverUniform(
             SceneCapture.Region region, float time, SceneGpuTexture cover,
             float layerOpacity) {
         float rotationSpeed = (float) Math.toRadians(
-                CLIENT_CONFIG.getGuiBackgroundCoverRotationSpeed());
-        float driftSpeed = (float) CLIENT_CONFIG.getGuiBackgroundCoverDriftSpeed();
-        float driftX = coverDriftX(CLIENT_CONFIG.getGuiBackgroundCoverDriftX(),
+                FluidBackgroundSettings.COVER_ROTATION_SPEED_DEGREES_PER_SECOND);
+        float driftSpeed = FluidBackgroundSettings.COVER_DRIFT_SPEED;
+        float driftX = coverDriftX(FluidBackgroundSettings.COVER_DRIFT_X,
                 time, rotationSpeed, driftSpeed, 1f);
-        float driftY = coverDriftY(CLIENT_CONFIG.getGuiBackgroundCoverDriftY(),
+        float driftY = coverDriftY(FluidBackgroundSettings.COVER_DRIFT_Y,
                 time, rotationSpeed, driftSpeed, 1f);
         float orbitAngle = rotationSpeed
                 * SceneCoverLayers.THIRD_LAYER_ORBIT_SPEED_RATIO * time;
         float orbitCenterX = coverDriftX(
-                CLIENT_CONFIG.getGuiBackgroundCoverOrbitDriftX(),
+                FluidBackgroundSettings.COVER_ORBIT_DRIFT_X,
                 time, rotationSpeed, driftSpeed, ORBIT_DRIFT_FREQ_SCALE);
         float orbitCenterY = coverDriftY(
-                CLIENT_CONFIG.getGuiBackgroundCoverOrbitDriftY(),
+                FluidBackgroundSettings.COVER_ORBIT_DRIFT_Y,
                 time, rotationSpeed, driftSpeed, ORBIT_DRIFT_FREQ_SCALE);
         float thirdCenterX = orbitCenterX + (float) Math.cos(orbitAngle)
                 * SceneCoverLayers.THIRD_LAYER_ORBIT_RADIUS;
@@ -337,31 +324,33 @@ public class BackgroundRenderer implements RenderLayer {
         return Math.clamp((int) Math.ceil(shortEdge * 0.5f), 64, 640);
     }
 
-    private static float coverDriftX(double amplitude, float time, float rotationSpeed,
+    private static float coverDriftX(float amplitude, float time, float rotationSpeed,
                                      float driftSpeed, float frequencyScale) {
         float t = time * rotationSpeed * driftSpeed * frequencyScale;
-        return (float) amplitude * (0.65f * (float) Math.sin(t * DRIFT_FREQ_X1 + 0.7f)
+        return amplitude * (0.65f * (float) Math.sin(t * DRIFT_FREQ_X1 + 0.7f)
                 + 0.35f * (float) Math.sin(t * DRIFT_FREQ_X2 + 2.1f));
     }
 
-    private static float coverDriftY(double amplitude, float time, float rotationSpeed,
+    private static float coverDriftY(float amplitude, float time, float rotationSpeed,
                                      float driftSpeed, float frequencyScale) {
         float t = time * rotationSpeed * driftSpeed * frequencyScale;
-        return (float) amplitude * (0.65f * (float) Math.sin(t * DRIFT_FREQ_Y1 + 1.9f)
+        return amplitude * (0.65f * (float) Math.sin(t * DRIFT_FREQ_Y1 + 1.9f)
                 + 0.35f * (float) Math.sin(t * DRIFT_FREQ_Y2 + 4.3f));
     }
 
-    private static @Nullable ImageTextureData resolveCoverImage() {
+    private static @Nullable ResolvedCover resolveCoverImages() {
         try {
-            BackgroundData override = HudPresentationService.getInstance()
-                    .getBackgroundOverrides().getTop();
+            BackgroundState backgroundState = BackgroundState.getInstance();
+            BackgroundData override = backgroundState.getOverrides().getTop();
             if (hasImage(override)) {
-                return override.image().current;
+                return new ResolvedCover(override.image(),
+                        backgroundState.getEffectiveBackgroundChangeTimeMillis());
             }
-            Transitionable<BackgroundData> transition = HudPresentationService.getInstance()
-                    .getBackgroundTransition();
-            BackgroundData mixed = transition == null ? null : transition.getMixed();
-            return hasImage(mixed) ? mixed.image().current : null;
+            Transitionable<BackgroundData> transition = backgroundState.getTransition();
+            BackgroundData mixed = transition.getMixed();
+            if (!hasImage(mixed)) return null;
+            return new ResolvedCover(mixed.image(),
+                    backgroundState.getEffectiveBackgroundChangeTimeMillis());
         } catch (RuntimeException failure) {
             LOGGER.debug("While resolving the background cover image", failure);
             return null;
@@ -369,7 +358,8 @@ public class BackgroundRenderer implements RenderLayer {
     }
 
     private static boolean hasImage(@Nullable BackgroundData data) {
-        return data != null && data.image() != null && data.image().current != null;
+        return data != null && data.image() != null
+                && (data.image().current != null || data.image().original != null);
     }
 
     private static @Nullable SceneCapture.Region captureRegion(SceneRenderContext context, SceneStyle style,
@@ -382,6 +372,42 @@ public class BackgroundRenderer implements RenderLayer {
         float left = (center.x() - style.getWidth() / 2f) * scale;
         float top = (center.y() - style.getHeight() / 2f) * scale;
         return new SceneCapture.Region(left, top, width, height);
+    }
+
+    private static @Nullable CapturePlan capturePlan(SceneCapture.Region hudRegion,
+                                                      SceneGpuContext.MainColorSource source,
+                                                      int blurRadius) {
+        if (hudRegion == null) return null;
+        float padding = blurRadius > 0 ? blurRadius + 2f : 0f;
+        float left = hudRegion.left();
+        float top = hudRegion.top();
+        float right = left + hudRegion.width();
+        float bottom = top + hudRegion.height();
+
+        float captureLeft = Math.max(0f, left - padding);
+        float captureTop = Math.max(0f, top - padding);
+        float captureRight = Math.min(source.width(), right + padding);
+        float captureBottom = Math.min(source.height(), bottom + padding);
+        if (captureRight - captureLeft < 1f || captureBottom - captureTop < 1f) {
+            return null;
+        }
+
+        SceneCapture.Region captureRegion = new SceneCapture.Region(
+                captureLeft, captureTop, captureRight - captureLeft, captureBottom - captureTop);
+        float captureWidth = captureRegion.width();
+        float captureHeight = captureRegion.height();
+        float u0 = (left - captureLeft) / captureWidth;
+        float v0 = (top - captureTop) / captureHeight;
+        float u1 = (right - captureLeft) / captureWidth;
+        float v1 = (bottom - captureTop) / captureHeight;
+        int targetWidth = Math.max(1, (int) Math.ceil(hudRegion.width()));
+        int targetHeight = Math.max(1, (int) Math.ceil(hudRegion.height()));
+        boolean needsCrop = Math.abs(captureWidth - hudRegion.width()) > 0.01f
+                || Math.abs(captureHeight - hudRegion.height()) > 0.01f
+                || Math.abs(captureLeft - left) > 0.01f
+                || Math.abs(captureTop - top) > 0.01f;
+        return new CapturePlan(captureRegion, u0, v0, u1, v1,
+                targetWidth, targetHeight, needsCrop);
     }
 
     public void render(SceneRenderContext context, SceneStyle style, BackgroundData backgroundData) {
@@ -401,9 +427,14 @@ public class BackgroundRenderer implements RenderLayer {
         context.nextStratum();
     }
 
-    private record BackgroundAdjustUniform(float saturation) implements SceneUniform {
+    private record BackgroundAdjustUniform(float saturation, float highlightDarkening,
+                                           float highlightKnee, float highlightFull,
+                                           float overallBrightness, boolean applyColorAdjust,
+                                           float blackOverlay)
+            implements SceneUniform {
         private static final String UBO_NAME = "MHBackgroundAdjust";
-        private static final int UBO_SIZE = Std140Sizes.calc().putVec4().get();
+        private static final int UBO_SIZE = Std140Sizes.calc()
+                .putVec4().putVec4().get();
 
         @Override
         public String getUBOName() {
@@ -417,12 +448,22 @@ public class BackgroundRenderer implements RenderLayer {
 
         @Override
         public void write(Std140Writer writer) {
-            writer.putVec4(saturation, 0f, 0f, 0f);
+            writer.putVec4(saturation, highlightDarkening, highlightKnee, highlightFull);
+            writer.putVec4(overallBrightness, applyColorAdjust ? 1f : 0f, blackOverlay, 0f);
         }
 
         @Override
         public boolean shouldUseBuffer(SceneUniform lastBuffered) {
             return false;
         }
+    }
+
+    private record ResolvedCover(BackgroundImages images, long changedAtMillis) {
+    }
+
+    private record CapturePlan(SceneCapture.Region captureRegion,
+                               float u0, float v0, float u1, float v1,
+                               int targetWidth, int targetHeight,
+                               boolean needsCrop) {
     }
 }

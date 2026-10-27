@@ -34,7 +34,7 @@ public final class SceneCoverBlend {
             try {
                 target = gpu.createRenderTarget("MusicHud cover blend",
                         current.width(), current.height(),
-                        SceneTextureFormat.RGBA8, SceneSamplerState.linearClamp());
+                        SceneTextureFormat.RGBA16F, SceneSamplerState.linearClamp());
                 owner = gpu;
                 width = current.width();
                 height = current.height();

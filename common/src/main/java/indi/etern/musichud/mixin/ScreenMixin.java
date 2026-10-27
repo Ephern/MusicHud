@@ -2,7 +2,7 @@
 package indi.etern.musichud.mixin;
 
 import indi.etern.musichud.client.ui.hud.scene.HudScene;
-import indi.etern.musichud.client.ui.render.RenderService;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
 import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.ReceivingLevelScreen;
@@ -21,7 +21,7 @@ public class ScreenMixin {
         //noinspection ConstantValue (incorrect warning)
         if (((Object) this instanceof ServerReconfigScreen) || ((Object) this instanceof ReceivingLevelScreen)) {
             guiGraphics.nextStratum();
-            RenderService.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
+            RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
         }
     }
 }

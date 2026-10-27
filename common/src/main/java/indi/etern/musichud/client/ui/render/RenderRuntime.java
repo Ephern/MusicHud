@@ -5,19 +5,19 @@ import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContextImpl;
 import indi.etern.musichud.interfaces.ICommonEventService;
 
-public final class RenderService {
-    private static volatile RenderService instance;
+public final class RenderRuntime {
+    private static volatile RenderRuntime instance;
     private final SceneRenderContextImpl context = new SceneRenderContextImpl();
     private SceneGpuContext gpu;
 
-    private RenderService() {
+    private RenderRuntime() {
     }
 
-    public static RenderService getInstance() {
+    public static RenderRuntime getInstance() {
         if (instance == null) {
-            synchronized (RenderService.class) {
+            synchronized (RenderRuntime.class) {
                 if (instance == null) {
-                    instance = new RenderService();
+                    instance = new RenderRuntime();
                 }
             }
         }

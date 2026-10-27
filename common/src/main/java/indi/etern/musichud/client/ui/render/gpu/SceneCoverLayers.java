@@ -59,7 +59,7 @@ public final class SceneCoverLayers {
                 || canvasWidth < 1 || canvasHeight < 1) {
             return null;
         }
-        int longEdge = Math.clamp((int) Math.ceil(Math.max(canvasWidth, canvasHeight)),
+        int longEdge = Math.clamp(Math.max(canvasWidth, canvasHeight),
                 1, MAX_LONG_EDGE);
         int width;
         int height;
@@ -74,7 +74,7 @@ public final class SceneCoverLayers {
             release(gpu);
             try {
                 target = gpu.createRenderTarget("MusicHud cover layers", width, height,
-                        SceneTextureFormat.RGBA8, SceneSamplerState.linearClamp());
+                        SceneTextureFormat.RGBA16F, SceneSamplerState.linearClamp());
                 owner = gpu;
                 this.width = width;
                 this.height = height;

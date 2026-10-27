@@ -1,7 +1,7 @@
 #version 150
 
+// u_Blend.x: crossfade factor (0 = previous, 1 = current)
 layout(std140) uniform MHCoverBlend {
-    // x: crossfade factor (0 = previous, 1 = current)
     vec4 u_Blend;
 };
 

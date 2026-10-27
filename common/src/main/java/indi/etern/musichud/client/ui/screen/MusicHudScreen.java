@@ -25,10 +25,10 @@ package indi.etern.musichud.client.ui.screen;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.mc.*;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.hud.renderer.BackgroundRenderer;
 import indi.etern.musichud.client.ui.render.HorizontalAlign;
-import indi.etern.musichud.client.ui.render.RenderService;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import indi.etern.musichud.client.ui.render.VerticalAlign;
@@ -53,7 +53,8 @@ import java.util.Objects;
 public class MusicHudScreen extends Screen implements MuiScreen {
     private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
     private static final Logger LOGGER = MusicHud.getLogger(MusicHudScreen.class);
-    private static final BackgroundRenderer BACKGROUND_RENDERER = new BackgroundRenderer(true);
+    private static final BackgroundRenderer BACKGROUND_RENDERER =
+            new BackgroundRenderer(BackgroundRenderer.Target.GUI);
     private final UIManager mHost;
     @Nullable
     private final Screen mPrevious;
@@ -115,11 +116,10 @@ public class MusicHudScreen extends Screen implements MuiScreen {
             backgroundStyle.setAlpha(progress);
             backgroundStyle.setBounds(0, 0, this.width, this.height);
             gr.nextStratum();
-            RenderService.getInstance().renderFrame(
+            RenderRuntime.getInstance().renderFrame(
                     new VanillaSceneGraphics(gr),
                     context -> {
-                        if (!BACKGROUND_RENDERER.renderExpBackground(context, backgroundStyle,
-                                CLIENT_CONFIG.getGuiBackgroundBlurRadius())) {
+                        if (!BACKGROUND_RENDERER.renderFluidBackground(context, backgroundStyle)) {
                             renderSolidBackground(gr, progress);
                         }
                     }
@@ -152,7 +152,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     public void removed() {
         super.removed();
         mHost.removed(this);
-        HudPresentationService.getInstance().getBackgroundOverrides().clear();
+        BackgroundState.getInstance().getOverrides().clear();
     }
 
     @Override

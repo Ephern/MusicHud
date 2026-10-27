@@ -13,6 +13,8 @@ public final class SceneBlur {
     private static final Logger LOGGER = MusicHud.getLogger(SceneBlur.class);
     private static final int MAX_LEVELS = 4;
 
+    private final SceneTextureFormat format;
+
     private SceneGpuContext owner;
     private int sourceWidth;
     private int sourceHeight;
@@ -20,6 +22,14 @@ public final class SceneBlur {
     private SceneGpuTexture[] downsamples = new SceneGpuTexture[1];
     private SceneGpuTexture scratch;
     private SceneGpuTexture result;
+
+    public SceneBlur() {
+        this(SceneTextureFormat.RGBA16F);
+    }
+
+    public SceneBlur(SceneTextureFormat format) {
+        this.format = format;
+    }
 
     public @Nullable PendingBlur prepare(SceneGpuContext gpu, int width, int height, float sigma) {
         if (gpu == null || width < 1 || height < 1 || !(sigma > 0f) || !Float.isFinite(sigma)) {
@@ -30,7 +40,7 @@ public final class SceneBlur {
         int levelHeight = height;
         float sigmaLow = sigma;
         while (level < MAX_LEVELS && sigmaLow > 4f
-                && levelWidth / 2 >= 8 && levelHeight / 2 >= 8) {
+                && levelWidth / 2 >= 16 && levelHeight / 2 >= 16) {
             level++;
             levelWidth /= 2;
             levelHeight /= 2;
@@ -70,9 +80,9 @@ public final class SceneBlur {
         }
     }
 
-    private static SceneGpuTexture target(SceneGpuContext gpu, int width, int height) {
+    private SceneGpuTexture target(SceneGpuContext gpu, int width, int height) {
         return gpu.createRenderTarget("MusicHud scene blur", width, height,
-                SceneTextureFormat.RGBA8, SceneSamplerState.linearClamp());
+                format, SceneSamplerState.linearClamp());
     }
 
     private void release() {

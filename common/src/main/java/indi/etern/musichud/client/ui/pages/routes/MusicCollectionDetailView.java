@@ -19,7 +19,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundOverrideStack;
-import indi.etern.musichud.client.ui.hud.presentation.HudPresentationService;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.components.IdlePlaySourceWidget;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.UrlImageView;
@@ -61,7 +61,6 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
     private final UrlImageView imageView;
     private final AtomicBoolean syncPending = new AtomicBoolean();
     private final int imageSize = dp(128);
-    private final TextView extraInfo;
     private TextView musicTrackCountView;
     private MusicCollection musicCollection;
     private Unregister tracksSyncUnregister = null;
@@ -202,9 +201,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
             var resources = getContext().getResources();
             Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
             refreshButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(resources, image1, dp(12), dp(16)), dp(3)));
-            refreshButton.setOnClickListener((v) -> {
-                refreshData(true);
-            });
+            refreshButton.setOnClickListener((v) -> refreshData(true));
             row1.addView(refreshButton, new LayoutParams(dp28, dp28));
         }
         {
@@ -241,7 +238,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         LayoutParams scrollParams = new LinearLayout.LayoutParams(MATCH_PARENT, 0, 1);
         infoView.addView(descriptionScrollView, scrollParams);
 
-        extraInfo = new TextView(context);
+        TextView extraInfo = new TextView(context);
         extraInfo.setTextSize(Theme.TEXT_SIZE_NORMAL);
         extraInfo.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         LayoutParams descriptionParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -488,7 +485,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         if (router == null || router.getEffectivePage() != this) {
             return false;
         }
-        BackgroundOverrideStack stack = HudPresentationService.getInstance().getBackgroundOverrides();
+        BackgroundOverrideStack stack = BackgroundState.getInstance().getOverrides();
         if (backgroundThemeLayer == null) {
             backgroundThemeLayer = stack.push(data);
             return backgroundThemeLayer != null;
@@ -502,7 +499,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
 
     private void popBackgroundTheme() {
         if (backgroundThemeLayer != null) {
-            HudPresentationService.getInstance().getBackgroundOverrides().pop(backgroundThemeLayer);
+            BackgroundState.getInstance().getOverrides().pop(backgroundThemeLayer);
             backgroundThemeLayer = null;
         }
         if (ownedBackgroundImage != null) {
