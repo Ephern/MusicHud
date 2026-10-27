@@ -6,6 +6,7 @@
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
     "GuiRendererHudMixin",
+    "ModernUiBitmapMixin",
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
