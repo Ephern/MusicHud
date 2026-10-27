@@ -7,7 +7,6 @@ import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ColorExtractor;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
@@ -20,7 +19,6 @@ import java.util.function.Predicate;
  * resulting {@link BackgroundData} to {@link BackgroundState}.
  */
 public final class CoverImageStore {
-    private static final int DOWN_SCALE_TARGET_LENGTH = (int) Math.sqrt(ColorExtractor.MAX_SAMPLES);
     private static volatile CoverImageStore instance;
 
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
@@ -115,20 +113,13 @@ public final class CoverImageStore {
         return ImageUtils.downloadScaledAsync(album.getPicUrl(), thumbnailSize, thumbnailSize)
                 .thenCombine(ImageUtils.downloadAsync(album.getPicUrl()),
                         (thumbnail, original) -> new BackgroundImages(thumbnail, 1f, original))
-                .thenAcceptBoth(
-                        ImageUtils.downloadScaledAsync(album.getPicUrl(), DOWN_SCALE_TARGET_LENGTH,
-                                DOWN_SCALE_TARGET_LENGTH),
-                        (backgroundImages, downscaled) -> {
-                            // Color extraction need not hold the publication lock.
-                            var colors = ColorExtractor.extractColors(downscaled.getTexture());
-                            coverRequests.runIfCurrent(token,
-                                    () -> currentTrack.test(musicDetail), () -> {
-                                        BackgroundState.getInstance().startTransition(
-                                                new BackgroundData(backgroundImages, colors));
-                                        if (onLoaded != null) {
-                                            onLoaded.accept(nowPlayingInfo.getMusicDuration());
-                                        }
-                                    });
-                        });
+                .thenAccept(backgroundImages -> coverRequests.runIfCurrent(token,
+                        () -> currentTrack.test(musicDetail), () -> {
+                            BackgroundState.getInstance().startTransition(
+                                    new BackgroundData(backgroundImages));
+                            if (onLoaded != null) {
+                                onLoaded.accept(nowPlayingInfo.getMusicDuration());
+                            }
+                        }));
     }
 }

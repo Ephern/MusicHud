@@ -36,7 +36,6 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> hideHudWhenNotPlaying;
     private final ModConfigSpec.ConfigValue<Boolean> enableMarqueeText;
     private final ModConfigSpec.ConfigValue<Boolean> showHudLayoutBoxes;
-    private final ModConfigSpec.ConfigValue<Boolean> showThemeColor;
     private final ModConfigSpec.ConfigValue<Boolean> forceGL32Path;
     private final ModConfigSpec.ConfigValue<Boolean> forceRgba8Fallback;
     private final ModConfigSpec.ConfigValue<Integer> guiBackgroundBlurRadius;
@@ -47,6 +46,8 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundFluidOpacity;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundSamplingBlackOverlay;
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundSamplingBlackOverlay;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundOverallBrightness;
+    private final ModConfigSpec.ConfigValue<Double> guiBackgroundSaturation;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -54,10 +55,6 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
     private final ModConfigSpec.ConfigValue<String> scrobbleOption;
     private final ModConfigSpec.ConfigValue<String> multichannelMode;
-    private final ModConfigSpec.ConfigValue<Boolean> enableGuiFluidBackground;
-    private final ModConfigSpec.ConfigValue<Double> solidBackgroundAlpha;
-    private final ModConfigSpec.ConfigValue<Double> solidBackgroundBrightness;
-    private final ModConfigSpec.ConfigValue<Double> hudBackgroundMixAlpha;
 
     private final ModConfigSpec.ConfigValue<String> hudVerticalPosition;
     private final ModConfigSpec.ConfigValue<String> hudHorizontalPosition;
@@ -111,10 +108,6 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Show HUD layout debug boxes")
                 .translation(MusicHud.MOD_ID + ".config.debug.showHudLayoutBoxes")
                 .define("showHudLayoutBoxes", false);
-        showThemeColor = builder
-                .comment("Show extracted theme color debug")
-                .translation(MusicHud.MOD_ID + ".config.debug.showThemeColor")
-                .define("showThemeColor", false);
         forceGL32Path = builder
                 .comment("Force the OpenGL 3.2 compatible background texture path for debugging")
                 .translation(MusicHud.MOD_ID + ".config.debug.forceGL32Path")
@@ -155,6 +148,14 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Black overlay applied only to the HUD background sampling path")
                 .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundSamplingBlackOverlay")
                 .defineInRange("hudBackgroundSamplingBlackOverlay", 0.7, 0, 1);
+        guiBackgroundOverallBrightness = builder
+                .comment("Temporary background brightness debug value")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundOverallBrightness")
+                .defineInRange("guiBackgroundOverallBrightness", 0.6, 0, 2);
+        guiBackgroundSaturation = builder
+                .comment("Temporary natural-saturation/vibrance debug value")
+                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundSaturation")
+                .defineInRange("guiBackgroundSaturation", 1.3, 0, 2);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -171,22 +172,6 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("How to handle audio with more than 2 channels (discrete multichannel via AL_EXT_MCFORMATS vs software downmix to stereo)")
                 .translation(MusicHud.MOD_ID + ".config.common.multichannelMode")
                 .define("multichannelMode", MultichannelMode.PREFER_DISCRETE.name());
-        enableGuiFluidBackground = builder
-                .comment("Enable fluid background on the main GUI")
-                .translation(MusicHud.MOD_ID + ".config.common.enableGuiFluidBackground")
-                .define("enableGuiFluidBackground", true);
-        solidBackgroundAlpha = builder
-                .comment("Solid GUI background opacity")
-                .translation(MusicHud.MOD_ID + ".config.common.solidBackgroundAlpha")
-                .defineInRange("solidBackgroundAlpha", 0.75, 0, 1);
-        solidBackgroundBrightness = builder
-                .comment("Solid GUI background brightness")
-                .translation(MusicHud.MOD_ID + ".config.common.solidBackgroundBrightness")
-                .defineInRange("solidBackgroundBrightness", 0.1, 0, 1);
-        hudBackgroundMixAlpha = builder
-                .comment("Hud Background Mix Alpha")
-                .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha")
-                .defineInRange("hudBackgroundMixAlpha", 0.65, 0, 1);
         mixWithVanillaSoundVolume = builder
                 .comment("Mix Sound Volume with Vanilla Music Sound Volume")
                 .translation(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume")
@@ -645,66 +630,6 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public boolean getEnableGuiFluidBackground() {
-        return enableGuiFluidBackground.get();
-    }
-
-    @Override
-    public boolean getDefaultEnableGuiFluidBackground() {
-        return enableGuiFluidBackground.getDefault();
-    }
-
-    @Override
-    public void setEnableGuiFluidBackground(boolean enableGuiFluidBackground) {
-        this.enableGuiFluidBackground.set(enableGuiFluidBackground);
-    }
-
-    @Override
-    public double getSolidBackgroundAlpha() {
-        return solidBackgroundAlpha.get();
-    }
-
-    @Override
-    public double getDefaultSolidBackgroundAlpha() {
-        return solidBackgroundAlpha.getDefault();
-    }
-
-    @Override
-    public void setSolidBackgroundAlpha(double solidBackgroundAlpha) {
-        this.solidBackgroundAlpha.set(solidBackgroundAlpha);
-    }
-
-    @Override
-    public double getSolidBackgroundBrightness() {
-        return solidBackgroundBrightness.get();
-    }
-
-    @Override
-    public double getDefaultSolidBackgroundBrightness() {
-        return solidBackgroundBrightness.getDefault();
-    }
-
-    @Override
-    public void setSolidBackgroundBrightness(double solidBackgroundBrightness) {
-        this.solidBackgroundBrightness.set(solidBackgroundBrightness);
-    }
-
-    @Override
-    public double getHudBackgroundMixAlpha() {
-        return hudBackgroundMixAlpha.get();
-    }
-
-    @Override
-    public double getDefaultHudBackgroundMixAlpha() {
-        return hudBackgroundMixAlpha.getDefault();
-    }
-
-    @Override
-    public void setHudBackgroundMixAlpha(double hudBackgroundMixAlpha) {
-        this.hudBackgroundMixAlpha.set(hudBackgroundMixAlpha);
-    }
-
-    @Override
     public boolean getMixWithVanillaSoundVolume() {
         return mixWithVanillaSoundVolume.get();
     }
@@ -798,21 +723,6 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setShowHudLayoutBoxes(boolean showHudLayoutBoxes) {
         this.showHudLayoutBoxes.set(showHudLayoutBoxes);
-    }
-
-    @Override
-    public boolean getShowThemeColor() {
-        return showThemeColor.get();
-    }
-
-    @Override
-    public boolean getDefaultShowThemeColor() {
-        return showThemeColor.getDefault();
-    }
-
-    @Override
-    public void setShowThemeColor(boolean showThemeColor) {
-        this.showThemeColor.set(showThemeColor);
     }
 
     @Override
@@ -963,5 +873,35 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setHudBackgroundSamplingBlackOverlay(double overlay) {
         hudBackgroundSamplingBlackOverlay.set(Math.clamp(overlay, 0, 1));
+    }
+
+    @Override
+    public double getGuiBackgroundOverallBrightness() {
+        return guiBackgroundOverallBrightness.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundOverallBrightness() {
+        return guiBackgroundOverallBrightness.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundOverallBrightness(double brightness) {
+        guiBackgroundOverallBrightness.set(Math.clamp(brightness, 0, 2));
+    }
+
+    @Override
+    public double getGuiBackgroundSaturation() {
+        return guiBackgroundSaturation.get();
+    }
+
+    @Override
+    public double getDefaultGuiBackgroundSaturation() {
+        return guiBackgroundSaturation.getDefault();
+    }
+
+    @Override
+    public void setGuiBackgroundSaturation(double saturation) {
+        guiBackgroundSaturation.set(Math.clamp(saturation, 0, 2));
     }
 }

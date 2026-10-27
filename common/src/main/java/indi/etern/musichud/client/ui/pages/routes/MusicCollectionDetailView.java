@@ -16,23 +16,20 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.user.Profile;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
-import indi.etern.musichud.client.ui.hud.presentation.BackgroundOverrideStack;
-import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.components.IdlePlaySourceWidget;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundOverrideStack;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.layouts.MusicVirtualizedListLayout;
 import indi.etern.musichud.client.utils.CountFormatter;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
-import indi.etern.musichud.client.utils.ui.ThemedColors;
-import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.utils.CollectionUpdateNotifier;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
@@ -50,7 +47,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicCollectionDetailView extends LinearLayout implements RouterContainer.RouteAware {
     private static final MusicService musicService = MusicService.getInstance();
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final int COVER_SIZE = 1024;
     private static final String ICON_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/list_music.png";
     private static final String ICON_LIKE_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/heart_filled.png";
@@ -71,8 +67,8 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
     private boolean routeActive;
     private BackgroundOverrideStack.Layer backgroundThemeLayer;
     private BackgroundData backgroundData;
-    private String themeColorsUrl;
-    private int themeColorsGeneration;
+    private String backgroundImageUrl;
+    private int backgroundImageGeneration;
     private ImageTextureData ownedBackgroundImage;
 
     public MusicCollectionDetailView(Context context, MusicCollection musicCollection) {
@@ -304,7 +300,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         if (routeActive) {
-            syncBackgroundTheme();
+            syncBackground();
         }
     }
 
@@ -315,20 +311,20 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
             syncTracksView();
         }
         if (visibility == VISIBLE && routeActive) {
-            syncBackgroundTheme();
+            syncBackground();
         }
     }
 
     @Override
     public void onRoutePushed() {
         routeActive = true;
-        syncBackgroundTheme();
+        syncBackground();
     }
 
     @Override
     public void onRoutePopped() {
         routeActive = false;
-        popBackgroundTheme();
+        popBackground();
     }
 
     private void onCollectionUpdateNotified(boolean operateByRemoteSelf) {
@@ -346,7 +342,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
                 if (!newCoverUrl.isBlank() && !Objects.equals(currentCoverUrl, newCoverUrl)) {
                     currentCoverUrl = newCoverUrl;
                     imageView.loadUrl(newCoverUrl, imageSize, imageSize);
-                    syncBackgroundTheme();
+                    syncBackground();
                 }
                 if (!operateByRemoteSelf) {
                     if (!isAttachedToWindow()) return;
@@ -364,7 +360,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        popBackgroundTheme();
+        popBackground();
         unregisterTracksSync();
         if (updateNotifierUnregister != null) {
             updateNotifierUnregister.unregister();
@@ -381,9 +377,9 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         imageView.loadUrl(coverUrl, imageSize, imageSize);
     }
 
-    private void syncBackgroundTheme() {
-        if (!routeActive || !clientConfig.getEnableGuiFluidBackground()) {
-            popBackgroundTheme();
+    private void syncBackground() {
+        if (!routeActive) {
+            popBackground();
             return;
         }
         String resolvedCoverUrl = currentCoverUrl;
@@ -394,21 +390,21 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
             return;
         }
         final String coverUrl = resolvedCoverUrl;
-        if (backgroundData != null && Objects.equals(themeColorsUrl, coverUrl)) {
-            pushBackgroundTheme(backgroundData);
+        if (backgroundData != null && Objects.equals(backgroundImageUrl, coverUrl)) {
+            pushBackground(backgroundData);
             return;
         }
-        if (Objects.equals(themeColorsUrl, coverUrl)) {
+        if (Objects.equals(backgroundImageUrl, coverUrl)) {
             return;
         }
-        themeColorsUrl = coverUrl;
+        backgroundImageUrl = coverUrl;
         backgroundData = null;
-        int generation = ++themeColorsGeneration;
+        int generation = ++backgroundImageGeneration;
         if (coverUrl.startsWith("data:image")) {
             CompletableFuture.supplyAsync(() -> {
                 ImageTextureData image = ImageUtils.loadBase64(coverUrl);
                 try {
-                    return new LoadedBackground(image, ColorExtractor.extractColors(image.getTexture()), true);
+                    return new LoadedBackground(image, true);
                 } catch (RuntimeException | Error failure) {
                     image.close();
                     throw failure;
@@ -419,7 +415,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
             ImageUtils.downloadScaledAsync(coverUrl, COVER_SIZE, COVER_SIZE)
                     .thenApplyAsync(image -> image == null
                                     ? null
-                                    : new LoadedBackground(image, ColorExtractor.extractColors(image.getTexture()), false),
+                                    : new LoadedBackground(image, false),
                             MusicHud.EXECUTOR)
                     .whenComplete((loaded, throwable) ->
                             handleBackgroundData(generation, coverUrl, loaded, throwable));
@@ -429,7 +425,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
     private void handleBackgroundData(int generation, String coverUrl,
                                       LoadedBackground loaded, Throwable throwable) {
         MuiModApi.postToUiThread(() -> {
-            if (generation != themeColorsGeneration || !Objects.equals(themeColorsUrl, coverUrl)) {
+            if (generation != backgroundImageGeneration || !Objects.equals(backgroundImageUrl, coverUrl)) {
                 if (loaded != null && loaded.owned()) {
                     releaseDelayed(loaded.image());
                 }
@@ -439,16 +435,15 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
                 if (loaded != null && loaded.owned()) {
                     releaseDelayed(loaded.image());
                 }
-                themeColorsUrl = null;
+                backgroundImageUrl = null;
                 return;
             }
-            BackgroundData data = new BackgroundData(new BackgroundImages(loaded.image(), 1f), loaded.colors())
-                    .withThemeColors(loaded.colors());
-            if (!pushBackgroundTheme(data)) {
+            BackgroundData data = new BackgroundData(new BackgroundImages(loaded.image(), 1f));
+            if (!pushBackground(data)) {
                 if (loaded.owned()) {
                     releaseDelayed(loaded.image());
                 }
-                themeColorsUrl = null;
+                backgroundImageUrl = null;
                 return;
             }
             backgroundData = data;
@@ -477,7 +472,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         });
     }
 
-    private boolean pushBackgroundTheme(BackgroundData data) {
+    private boolean pushBackground(BackgroundData data) {
         if (!routeActive || !isAttachedToWindow() || data == null) {
             return false;
         }
@@ -497,7 +492,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         return backgroundThemeLayer != null;
     }
 
-    private void popBackgroundTheme() {
+    private void popBackground() {
         if (backgroundThemeLayer != null) {
             BackgroundState.getInstance().getOverrides().pop(backgroundThemeLayer);
             backgroundThemeLayer = null;
@@ -506,11 +501,11 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
             releaseDelayed(ownedBackgroundImage);
             ownedBackgroundImage = null;
             backgroundData = null;
-            themeColorsUrl = null;
+            backgroundImageUrl = null;
         }
     }
 
-    private record LoadedBackground(ImageTextureData image, ThemedColors colors, boolean owned) {
+    private record LoadedBackground(ImageTextureData image, boolean owned) {
     }
 
     private void updatePlaylistTrackCountView(Playlist playlist) {
@@ -558,7 +553,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
                     MusicCollection musicCollection1 = result.musicCollection();
                     this.musicCollection = musicCollection1;
                     loadCoverImage();
-                    syncBackgroundTheme();
+                    syncBackground();
                     if (musicTrackCountView != null) {
                         if (musicCollection1 instanceof Album album) {
                             updateAlbumTrackCountView(album);
@@ -610,7 +605,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         if (!newCoverUrl.isBlank() && !Objects.equals(currentCoverUrl, newCoverUrl)) {
             currentCoverUrl = newCoverUrl;
             imageView.loadUrl(newCoverUrl, imageSize, imageSize);
-            syncBackgroundTheme();
+            syncBackground();
         }
     }
 

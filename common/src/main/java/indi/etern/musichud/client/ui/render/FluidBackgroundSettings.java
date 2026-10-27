@@ -9,11 +9,9 @@ package indi.etern.musichud.client.ui.render;
  */
 public final class FluidBackgroundSettings {
     public static final float COVER_LAYER_OPACITY = 1.0f;
-    public static final float SATURATION = 1.3f;
     public static final float HIGHLIGHT_DARKENING = 0.3f;
     public static final float HIGHLIGHT_KNEE = 0.0f;
     public static final float HIGHLIGHT_FULL = 0.75f;
-    public static final float OVERALL_BRIGHTNESS = 0.6f;
     public static final double AUDIO_SCALE_AMOUNT = 0.5;
     public static final double AUDIO_LOW_WEIGHT = 2.0 / 3.0;
     public static final double AUDIO_MID_WEIGHT = 0.33;

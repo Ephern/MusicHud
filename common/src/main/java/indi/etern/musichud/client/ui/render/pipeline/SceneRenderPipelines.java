@@ -16,7 +16,7 @@ public class SceneRenderPipelines {
                     .withBlend(BlendFunction.TRANSLUCENT)
                     .buildSnippet();
 
-    public static final ScenePipeline BACKGROUND;
+    public static final ScenePipeline SOLID_BACKGROUND;
     public static final ScenePipeline FLUID_BACKGROUND;
 
     public static final ScenePipeline ROUNDED_ALBUM;
@@ -45,13 +45,12 @@ public class SceneRenderPipelines {
                 .withUniform("MHBackgroundAdjust", UniformType.UNIFORM_BUFFER)
                 .withSampler("Sampler0")
                 .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS).build());
-        BACKGROUND = wrap("background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
-                .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/background"))
+        SOLID_BACKGROUND = wrap("solid_background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
+                .withLocation(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/solid_background"))
                 .withVertexShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/background"))
-                .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/background"))
+                .withFragmentShader(ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "core/solid_background"))
                 .withUniform("MHPosition", UniformType.UNIFORM_BUFFER)
-                .withUniform("MHNowPlayingThemeColor", UniformType.UNIFORM_BUFFER)
-                .withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER)
+                .withUniform("MHSolidColor", UniformType.UNIFORM_BUFFER)
                 .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
                 .build());
         ROUNDED_ALBUM = wrap("album_image", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)

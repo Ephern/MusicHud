@@ -209,13 +209,6 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         var appearanceCategory = PreferencesFragment.createCategoryList(content,
                 I18n.get(MusicHud.MOD_ID + ".config.category.hudAppearance"));
         new AdaptiveFloatOption(context,
-                I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundMixAlpha"),
-                clientConfig::getHudBackgroundMixAlpha,
-                clientConfig::setHudBackgroundMixAlpha)
-                .setRange(0, 1)
-                .setDefaultValue(clientConfig.getDefaultHudBackgroundMixAlpha())
-                .create(appearanceCategory);
-        new AdaptiveFloatOption(context,
                 I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundFluidOpacity"),
                 clientConfig::getHudBackgroundFluidOpacity,
                 clientConfig::setHudBackgroundFluidOpacity)

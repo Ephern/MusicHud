@@ -54,6 +54,7 @@ public class Theme {
                     Theme.GHOST_BUTTON_BACKGROUND_HOVERED,
                     Theme.GHOST_BUTTON_BACKGROUND
             }
+
     );
 
     public static final ColorStateList ITEM_RIPPLE_COLOR_STATES = new ColorStateList(
@@ -68,6 +69,16 @@ public class Theme {
                     0x0A000000,
                     0x00000000,
                     0x08000000,
+            }
+    );
+
+    public static final int SIDE_BAR_BACKGROUND = 0x32000000;
+    public static final ColorStateList SIDE_BAR_STATES = new ColorStateList(
+            new int[][]{
+                    StateSet.WILD_CARD
+            },
+            new int[]{
+                    Theme.SIDE_BAR_BACKGROUND
             }
     );
 

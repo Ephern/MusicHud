@@ -55,6 +55,14 @@ public final class BackgroundState {
         return Math.max(baseChange, overrideChange);
     }
 
+    public long getBaseEffectiveChangeTimeMillis() {
+        if (transition.isTransitioning()) {
+            return transition.getTransitionStartMillis();
+        }
+        BackgroundData current = transition.getCurrent();
+        return hasImage(current) ? current.image().changedAtMillis : 0L;
+    }
+
     private static boolean hasImage(BackgroundData data) {
         return data != null && data.image() != null
                 && (data.image().current != null || data.image().original != null);

@@ -18,21 +18,18 @@ import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
+import indi.etern.musichud.client.ui.components.MusicTrackItem;
+import indi.etern.musichud.client.ui.components.RouterContainer;
+import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
+import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundOverrideStack;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
-import indi.etern.musichud.client.ui.components.MusicTrackItem;
-import indi.etern.musichud.client.ui.components.RouterContainer;
-import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
-import indi.etern.musichud.client.ui.components.UrlImageView;
-import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
-import indi.etern.musichud.client.utils.ui.ThemedColors;
-import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import net.minecraft.client.resources.language.I18n;
 
@@ -52,7 +49,6 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
     private final TextView description;
     private final UrlImageView avatarImageView;
     private static final IClientMusicService musicService = MusicService.getInstance();
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final int AVATAR_SIZE = 1024;
     private final InsetBackgroundFactory itemBackgroundFactory = InsetBackgroundFactory.builder()
             .cornerRadius(dp(7))
@@ -64,8 +60,8 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
     private boolean routeActive;
     private BackgroundOverrideStack.Layer backgroundThemeLayer;
     private BackgroundData backgroundData;
-    private String themeColorsUrl;
-    private int themeColorsGeneration;
+    private String backgroundImageUrl;
+    private int backgroundImageGeneration;
     private ImageTextureData ownedBackgroundImage;
     private boolean artistDetailLoaded;
 
@@ -247,7 +243,7 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         if (routeActive) {
-            syncBackgroundTheme();
+            syncBackground();
         }
     }
 
@@ -255,26 +251,26 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
     protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
         super.onVisibilityChanged(changedView, visibility);
         if (visibility == VISIBLE && routeActive) {
-            syncBackgroundTheme();
+            syncBackground();
         }
     }
 
     @Override
     public void onRoutePushed() {
         routeActive = true;
-        syncBackgroundTheme();
+        syncBackground();
     }
 
     @Override
     public void onRoutePopped() {
         routeActive = false;
-        popBackgroundTheme();
+        popBackground();
     }
 
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
-        popBackgroundTheme();
+        popBackground();
     }
 
     private void loadData(boolean ignoreCache) {
@@ -325,7 +321,7 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
                     description.setText(artist1.getDescription());
                     artistDetailLoaded = true;
                     loadAvatarImage();
-                    syncBackgroundTheme();
+                    syncBackground();
                     musicList.removeAllViews();
                     for (MusicDetail musicDetail : artist1.getMusicDetails()) {
                         addItem(getContext(), musicDetail);
@@ -356,9 +352,9 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
         avatarImageView.loadUrl(avatarUrl, imageSize, imageSize);
     }
 
-    private void syncBackgroundTheme() {
-        if (!routeActive || !clientConfig.getEnableGuiFluidBackground()) {
-            popBackgroundTheme();
+    private void syncBackground() {
+        if (!routeActive) {
+            popBackground();
             return;
         }
         Artist current = artist;
@@ -373,21 +369,21 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
             return;
         }
         final String avatarUrl = resolvedAvatarUrl;
-        if (backgroundData != null && Objects.equals(themeColorsUrl, avatarUrl)) {
-            pushBackgroundTheme(backgroundData);
+        if (backgroundData != null && Objects.equals(backgroundImageUrl, avatarUrl)) {
+            pushBackground(backgroundData);
             return;
         }
-        if (Objects.equals(themeColorsUrl, avatarUrl)) {
+        if (Objects.equals(backgroundImageUrl, avatarUrl)) {
             return;
         }
-        themeColorsUrl = avatarUrl;
+        backgroundImageUrl = avatarUrl;
         backgroundData = null;
-        int generation = ++themeColorsGeneration;
+        int generation = ++backgroundImageGeneration;
         if (avatarUrl.startsWith("data:image")) {
             CompletableFuture.supplyAsync(() -> {
                 ImageTextureData image = ImageUtils.loadBase64(avatarUrl);
                 try {
-                    return new LoadedBackground(image, ColorExtractor.extractColors(image.getTexture()), true);
+                    return new LoadedBackground(image, true);
                 } catch (RuntimeException | Error failure) {
                     image.close();
                     throw failure;
@@ -398,7 +394,7 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
             ImageUtils.downloadScaledAsync(avatarUrl, AVATAR_SIZE, AVATAR_SIZE)
                     .thenApplyAsync(image -> image == null
                                     ? null
-                                    : new LoadedBackground(image, ColorExtractor.extractColors(image.getTexture()), false),
+                                    : new LoadedBackground(image, false),
                             MusicHud.EXECUTOR)
                     .whenComplete((loaded, throwable) ->
                             handleBackgroundData(generation, avatarUrl, loaded, throwable));
@@ -408,7 +404,7 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
     private void handleBackgroundData(int generation, String avatarUrl,
                                       LoadedBackground loaded, Throwable throwable) {
         MuiModApi.postToUiThread(() -> {
-            if (generation != themeColorsGeneration || !Objects.equals(themeColorsUrl, avatarUrl)) {
+            if (generation != backgroundImageGeneration || !Objects.equals(backgroundImageUrl, avatarUrl)) {
                 if (loaded != null && loaded.owned()) {
                     releaseDelayed(loaded.image());
                 }
@@ -418,16 +414,15 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
                 if (loaded != null && loaded.owned()) {
                     releaseDelayed(loaded.image());
                 }
-                themeColorsUrl = null;
+                backgroundImageUrl = null;
                 return;
             }
-            BackgroundData data = new BackgroundData(new BackgroundImages(loaded.image(), 1f), loaded.colors())
-                    .withThemeColors(loaded.colors());
-            if (!pushBackgroundTheme(data)) {
+            BackgroundData data = new BackgroundData(new BackgroundImages(loaded.image(), 1f));
+            if (!pushBackground(data)) {
                 if (loaded.owned()) {
                     releaseDelayed(loaded.image());
                 }
-                themeColorsUrl = null;
+                backgroundImageUrl = null;
                 return;
             }
             backgroundData = data;
@@ -456,7 +451,7 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
         });
     }
 
-    private boolean pushBackgroundTheme(BackgroundData data) {
+    private boolean pushBackground(BackgroundData data) {
         if (!routeActive || !isAttachedToWindow() || data == null) {
             return false;
         }
@@ -476,7 +471,7 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
         return backgroundThemeLayer != null;
     }
 
-    private void popBackgroundTheme() {
+    private void popBackground() {
         if (backgroundThemeLayer != null) {
             BackgroundState.getInstance().getOverrides().pop(backgroundThemeLayer);
             backgroundThemeLayer = null;
@@ -485,11 +480,11 @@ public class ArtistDetailView extends LinearLayout implements RouterContainer.Ro
             releaseDelayed(ownedBackgroundImage);
             ownedBackgroundImage = null;
             backgroundData = null;
-            themeColorsUrl = null;
+            backgroundImageUrl = null;
         }
     }
 
-    private record LoadedBackground(ImageTextureData image, ThemedColors colors, boolean owned) {
+    private record LoadedBackground(ImageTextureData image, boolean owned) {
     }
 
     boolean noMoreResult = false;

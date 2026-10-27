@@ -11,8 +11,8 @@ import indi.etern.musichud.client.ui.hud.presentation.HudPresentationModel;
 import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
 import indi.etern.musichud.client.ui.hud.renderer.*;
 import indi.etern.musichud.client.ui.hud.renderer.debug.HudLayoutDebugRenderer;
-import indi.etern.musichud.client.ui.hud.renderer.debug.ThemeColorDebugRenderer;
 import indi.etern.musichud.client.ui.render.*;
+import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
@@ -27,7 +27,7 @@ public final class HudScene implements RenderScene {
 
     private final HudPresenter presenter = HudPresenter.getInstance();
     private final BackgroundRenderer BACKGROUND_RENDERER =
-            new BackgroundRenderer(BackgroundRenderer.Target.HUD);
+            new BackgroundRenderer(BackgroundTarget.HUD);
     private final AlbumImageRenderer IMAGE_RENDERER = new AlbumImageRenderer();
     private final PlayerHeadRenderer PLAYER_HEAD_RENDERER = new PlayerHeadRenderer();
     private final PlayingStatusRenderer PLAYING_STATUS_RENDERER = new PlayingStatusRenderer();
@@ -36,8 +36,6 @@ public final class HudScene implements RenderScene {
     private final TextRenderer ARTISTS_AND_ALBUM_RENDERER = new TextRenderer();
     private final TextRenderer PLAY_TIME_RENDERER = new TextRenderer();
     private final ScrollingLyricLineRenderer LYRICS_LINE_RENDERER = new ScrollingLyricLineRenderer();
-    private final ThemeColorDebugRenderer THEME_COLOR_DEBUG_RENDERER =
-            new ThemeColorDebugRenderer(BackgroundState.getInstance().getTransition());
     private final HudLayoutDebugRenderer HUD_LAYOUT_DEBUG_RENDERER = new HudLayoutDebugRenderer();
 
     @Getter
@@ -79,6 +77,9 @@ public final class HudScene implements RenderScene {
     }
 
     public void render(SceneRenderContext context) {
+        if (MusicHudScreen.isHudOccluded()) {
+            return;
+        }
         try {
             presenter.updateFrame();
             HudPresentationModel model = presenter.getModel();
@@ -125,9 +126,6 @@ public final class HudScene implements RenderScene {
 
             if (clientConfig.getShowHudLayoutBoxes()) {
                 HUD_LAYOUT_DEBUG_RENDERER.render(context);
-            }
-            if (clientConfig.getShowThemeColor()) {
-                THEME_COLOR_DEBUG_RENDERER.render(context);
             }
         } catch (Exception e) {
             logger().error("While rendering HUD frame", e);

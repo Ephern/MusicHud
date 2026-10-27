@@ -423,7 +423,9 @@ public class MainFragment extends Fragment {
             visible = true;
             var context = requireContext();
             var base = new LinearLayout(context);
-            base.setPadding(base.dp(24), 0, base.dp(24), 0);
+            int dp24 = base.dp(24);
+            int dp12 = base.dp(12);
+            base.setPadding(0, 0, dp24, 0);
 
             var baseParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
             base.setLayoutParams(baseParams);
@@ -437,16 +439,25 @@ public class MainFragment extends Fragment {
             {
                 var side = new LinearLayout(context);
                 side.setOrientation(LinearLayout.VERTICAL);
-                base.addView(side, new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT));
+                LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT);
+                params1.setMargins(dp12, dp12, dp12, dp12);
+                InsetBackgroundFactory.builder()
+                        .backgroundColor(Theme.SIDE_BAR_STATES)
+                        .padding(new InsetBackgroundFactory.Padding(dp12, 0, dp12, dp12))
+                        .cornerRadius(base.dp(16)).build()
+                        .applyBackgroundTo(side);
+                base.addView(side, params1);
 
                 //noinspection UnstableApiUsage
                 var sideScrollView = new ClampingScrollView(context);
+                sideScrollView.setVerticalScrollBarEnabled(false);
+                sideScrollView.setHorizontalScrollBarEnabled(false);
                 side.addView(sideScrollView, new LinearLayout.LayoutParams(WRAP_CONTENT, 0, 1));
 
                 var sideContent = new LinearLayout(context);
                 sideContent.setOrientation(LinearLayout.VERTICAL);
 
-                sideContent.addView(new View(context), new LinearLayout.LayoutParams(MATCH_PARENT, sideContent.dp(24)));
+                sideContent.addView(new View(context), new LinearLayout.LayoutParams(MATCH_PARENT, dp12));
 
                 sideWidth = base.dp(240);
                 var params = new LinearLayout.LayoutParams(sideWidth, MATCH_PARENT);
@@ -464,9 +475,7 @@ public class MainFragment extends Fragment {
                 stagedCard.setAlpha(0f);
                 stagedCard.getAlbumImage().setScaleX(CARD_COVER_MIN_SCALE);
                 stagedCard.getAlbumImage().setScaleY(CARD_COVER_MIN_SCALE);
-                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-                cardParams.setMargins(0, 0, 0, sideContent.dp(24));
-                sideContent.addView(cardWrapper, cardParams);
+                sideContent.addView(cardWrapper, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 StreamAudioPlayer.Status status = streamAudioPlayer.getStatus();
@@ -525,7 +534,7 @@ public class MainFragment extends Fragment {
                 serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(36)));
                 refreshServerConnectStatus();
                 LinearLayout.LayoutParams params4 = new LinearLayout.LayoutParams(sideWidth, WRAP_CONTENT);
-                params4.setMargins(0, serverConnectPanel.dp(8), 0, serverConnectPanel.dp(16));
+                params4.setMargins(0, serverConnectPanel.dp(8), 0, 0);
                 side.addView(serverConnectPanel, params4);
 
                 LayoutTransition transition2 = new LayoutTransition();
@@ -629,11 +638,11 @@ public class MainFragment extends Fragment {
             });
 
             var params = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
-            params.setMargins(routerContainer.dp(64), 0, 0, 0);
+            params.setMargins(routerContainer.dp(40), 0, 0, 0);
             base.addView(routerContainer, params);
 
             LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(lyricsPanelWidth, MATCH_PARENT);
-            params1.setMargins(base.dp(24), 0, 0, 0);
+            params1.setMargins(dp24, 0, 0, 0);
             base.addView(lyricsSidebar, params1);
 
             if (defaultSelectedIndex != 0) {

@@ -27,13 +27,14 @@ import icyllis.modernui.mc.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.hud.renderer.BackgroundRenderer;
+import indi.etern.musichud.client.ui.hud.renderer.BackgroundTarget;
 import indi.etern.musichud.client.ui.render.HorizontalAlign;
 import indi.etern.musichud.client.ui.render.RenderRuntime;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import indi.etern.musichud.client.ui.render.VerticalAlign;
-import indi.etern.musichud.client.utils.ui.ColorExtractor;
 import indi.etern.musichud.interfaces.ClientConfig;
+import lombok.Getter;
 import lombok.NonNull;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
@@ -54,7 +55,9 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
     private static final Logger LOGGER = MusicHud.getLogger(MusicHudScreen.class);
     private static final BackgroundRenderer BACKGROUND_RENDERER =
-            new BackgroundRenderer(BackgroundRenderer.Target.GUI);
+            new BackgroundRenderer(BackgroundTarget.GUI);
+    @Getter
+    private static volatile boolean hudOccluded;
     private final UIManager mHost;
     @Nullable
     private final Screen mPrevious;
@@ -90,6 +93,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Override
     protected void init() {
         super.init();
+        hudOccluded = false;
         mHost.initScreen(this);
     }
 
@@ -102,12 +106,14 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
         if (callback != null && !callback.hasDefaultBackground()) {
+            hudOccluded = true;
             return;
         }
         if (minecraft != null && minecraft.level == null) {
             renderPanorama(gr, deltaTick);
         }
         float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
+        hudOccluded = progress >= 1f;
         renderBlurredBackground(gr, progress);
     }
 
@@ -130,17 +136,16 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     }
 
     private void renderSolidBackground(GuiGraphics gr, float progress) {
-        float alpha = (float) CLIENT_CONFIG.getSolidBackgroundAlpha() * progress;
+        float alpha = (float) CLIENT_CONFIG.getGuiBackgroundSamplingBlackOverlay() * progress;
         if (alpha <= 1e-4f) {
             return;
         }
-        fillSolid(gr, alpha, (float) CLIENT_CONFIG.getSolidBackgroundBrightness());
+        fillBlack(gr, alpha);
     }
 
-    private void fillSolid(GuiGraphics gr, float alpha, float brightness) {
-        int baseColor = ColorExtractor.brightnessToBaseColor(brightness);
+    private void fillBlack(GuiGraphics gr, float alpha) {
         int alphaByte = Math.clamp((int) (alpha * 255), 0, 255);
-        gr.fill(0, 0, this.width, this.height, (alphaByte << 24) | (baseColor & 0x00FFFFFF));
+        gr.fill(0, 0, this.width, this.height, (alphaByte << 24));
     }
 
     @Override
@@ -151,6 +156,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Override
     public void removed() {
         super.removed();
+        hudOccluded = false;
         mHost.removed(this);
         BackgroundState.getInstance().getOverrides().clear();
     }

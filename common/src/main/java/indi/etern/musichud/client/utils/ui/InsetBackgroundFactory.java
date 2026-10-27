@@ -26,14 +26,6 @@ public class InsetBackgroundFactory {
     long transitionDuration = 100;
     public record Padding(int left,int top,int right,int bottom) {}
 
-/*
-    public Drawable newBackgroundDrawable() {
-        ShapeDrawable background = newShapeDrawable();
-        RippleDrawable ripple = new RippleDrawable(Theme.ITEM_RIPPLE_COLOR_STATES, background, null);
-        return new InsetDrawable(ripple, inset);
-    }
-*/
-
     public void applyBackgroundTo(View view) {
         ShapeDrawable background = newShapeDrawable();
         RippleDrawable ripple = new RippleDrawable(Theme.ITEM_RIPPLE_COLOR_STATES, background, null);

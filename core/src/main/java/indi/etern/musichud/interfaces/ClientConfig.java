@@ -183,30 +183,6 @@ public interface ClientConfig {
 
     void setWhiteList(List<String> whiteList);
 
-    boolean getEnableGuiFluidBackground();
-
-    boolean getDefaultEnableGuiFluidBackground();
-
-    void setEnableGuiFluidBackground(boolean enableGuiFluidBackground);
-
-    double getSolidBackgroundAlpha();
-
-    double getDefaultSolidBackgroundAlpha();
-
-    void setSolidBackgroundAlpha(double solidBackgroundAlpha);
-
-    double getSolidBackgroundBrightness();
-
-    double getDefaultSolidBackgroundBrightness();
-
-    void setSolidBackgroundBrightness(double solidBackgroundBrightness);
-
-    double getHudBackgroundMixAlpha();
-
-    double getDefaultHudBackgroundMixAlpha();
-
-    void setHudBackgroundMixAlpha(double hudBackgroundMixAlpha);
-
     boolean getEnableMarqueeText();
 
     boolean getDefaultEnableMarqueeText();
@@ -218,12 +194,6 @@ public interface ClientConfig {
     boolean getDefaultShowHudLayoutBoxes();
 
     void setShowHudLayoutBoxes(boolean showHudLayoutBoxes);
-
-    boolean getShowThemeColor();
-
-    boolean getDefaultShowThemeColor();
-
-    void setShowThemeColor(boolean showThemeColor);
 
     boolean getForceGL32Path();
 
@@ -284,6 +254,18 @@ public interface ClientConfig {
     double getDefaultHudBackgroundSamplingBlackOverlay();
 
     void setHudBackgroundSamplingBlackOverlay(double overlay);
+
+    double getGuiBackgroundOverallBrightness();
+
+    double getDefaultGuiBackgroundOverallBrightness();
+
+    void setGuiBackgroundOverallBrightness(double brightness);
+
+    double getGuiBackgroundSaturation();
+
+    double getDefaultGuiBackgroundSaturation();
+
+    void setGuiBackgroundSaturation(double saturation);
 
     void save();
 
