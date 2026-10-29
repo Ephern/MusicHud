@@ -24,23 +24,6 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.function.Supplier;
 
-/**
- * Hooks {@link GuiRenderer} to support multiple HUD elements sharing one pipeline while each
- * carries its own uniform content.
- * <ul>
- *   <li>Merge breaking is driven by the per-element discriminator texture view that
- *       {@code SceneRenderContextImpl.toVanillaTextureSetup} places into {@code texure2} of
- *       each element's {@link TextureSetup}: elements of different profiles are
- *       record-unequal, so {@code GuiRenderer} never merges different uniform content into a
- *       single draw.</li>
- *   <li>Per-draw uniform upload: the set of {@link TextureSetup}s recorded by
- *       {@code recordMesh} is exactly aligned with the draw list, so each draw uploads only
- *       the uniforms of the element it belongs to (the GUI-pass equivalent of
- *       {@code RenderPass.drawMultipleIndexed}'s per-draw {@code uniformUploaderConsumer}).</li>
- *   <li>A default binding for every uploaded uniform name keeps {@code GuiRenderer}'s
- *       dev-mode validation satisfied.</li>
- * </ul>
- */
 @Mixin(GuiRenderer.class)
 public class GuiRendererSceneMixin {
     @Unique
@@ -49,11 +32,6 @@ public class GuiRendererSceneMixin {
     @Unique
     private final Deque<TextureSetup> music_hud$elementSetups = new ArrayDeque<>();
 
-    /**
-     * {@code recordMesh} is called once per mesh, in the exact order the corresponding draws
-     * will later be executed, so the recorded setups form an index-aligned mirror of the
-     * draw list.
-     */
     @Inject(method = "recordMesh", at = @At("HEAD"))
     private void music_hud$recordElementSetup(BufferBuilder bufferBuilder, RenderPipeline pipeline,
                                               TextureSetup textureSetup, ScreenRectangle scissor, CallbackInfo ci) {
@@ -73,11 +51,6 @@ public class GuiRendererSceneMixin {
         }
     }
 
-    /**
-     * Binds a default value for every uniform uploaded this frame, right after the vanilla
-     * default uniforms. Per-draw bindings injected in {@link #music_hud$bindElementUniforms}
-     * override the values that belong to the element being drawn.
-     */
     @Inject(method = "executeDrawRange",
             at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;bindDefaultUniforms" +
                     "(Lcom/mojang/blaze3d/systems/RenderPass;)V", shift = At.Shift.AFTER, remap = false),
@@ -93,11 +66,6 @@ public class GuiRendererSceneMixin {
         }
     }
 
-    /**
-     * Per-draw uniform upload: before each draw is issued, upload only the uniforms of the
-     * element that draw belongs to. This is the GUI-pass equivalent of
-     * {@code drawMultipleIndexed}'s per-draw {@code uniformUploaderConsumer}.
-     */
     @Inject(method = "executeDrawRange",
             at = @At(value = "INVOKE",
                     target = "Lnet/minecraft/client/gui/render/GuiRenderer;executeDraw(Lnet/minecraft/client/gui/render/GuiRenderer$Draw;Lcom/mojang/blaze3d/systems/RenderPass;Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/vertex/VertexFormat$IndexType;)V"))

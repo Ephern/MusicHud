@@ -21,17 +21,12 @@ public final class WarpPresetGenerator {
             throw new IllegalArgumentException("Invalid warp control grid size");
         }
         WarpPreset effective = preset;
-        if (preset.type() == WarpPresetType.NOISE || preset.type() == WarpPresetType.NOISE_FLOW) {
-            // Keep noise below the control-lattice Nyquist limit; otherwise the interpolation
-            // receives a field it cannot represent and local folds become unavoidable.
-            float maxScale = Math.max(.5f, (gridSize - 1) * .5f);
-            float scale = preset.value(WarpParameter.SCALE);
-            if (scale > maxScale) {
-                effective = preset.copy();
-                effective.setValue(WarpParameter.SCALE, maxScale);
-            }
+        float maxScale = Math.max(.5f, (gridSize - 1) * .5f);
+        float scale = preset.value(WarpParameter.SCALE);
+        if (scale > maxScale) {
+            effective = preset.copy();
+            effective.setValue(WarpParameter.SCALE, maxScale);
         }
-        WarpPresetField field = WarpPresetFields.of(effective.type());
         float[] offsets = new float[gridSize * gridSize * 2];
         float[] sample = new float[2];
         float asymmetry = Math.clamp(effective.value(WarpParameter.ASYMMETRY), -1, 1);
@@ -39,7 +34,7 @@ public final class WarpPresetGenerator {
             float v = y / (float) (gridSize - 1);
             for (int x = 0; x < gridSize; x++) {
                 float u = x / (float) (gridSize - 1);
-                field.sample(u, v, effective, sample);
+                NoiseFlowField.sample(u, v, effective, sample);
                 float xFactor = 1f + asymmetry * (u - .5f) * 2f;
                 float yFactor = 1f + asymmetry * (v - .5f);
                 int index = (y * gridSize + x) * 2;

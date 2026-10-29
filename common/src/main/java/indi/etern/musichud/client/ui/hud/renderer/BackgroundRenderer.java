@@ -4,13 +4,10 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.SpectrumSnapshot;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
 import indi.etern.musichud.client.ui.render.AudioReactiveScale;
-import indi.etern.musichud.client.ui.render.BackgroundDebugOptions;
-import indi.etern.musichud.client.ui.render.BackgroundToneMapping;
 import indi.etern.musichud.client.ui.render.FluidBackgroundSettings;
 import indi.etern.musichud.client.ui.render.RenderLayer;
 import indi.etern.musichud.client.ui.render.RenderRuntime;
@@ -23,8 +20,10 @@ import indi.etern.musichud.client.ui.render.gpu.SceneCapture;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverFluidScale;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverLayers;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverOverlay;
+import indi.etern.musichud.client.ui.render.gpu.SceneCoverSource;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverTransition;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverWarpProcedural;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.BlazeSceneCoverSources;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
@@ -108,7 +107,7 @@ public class BackgroundRenderer implements RenderLayer {
             ResolvedCover resolvedCover = resolveCoverImages();
             if (resolvedCover != null) {
                 coverFrame = sceneCoverTransition.update(
-                        gpu, resolvedCover.images(), resolvedCover.changedAtMillis(),
+                        gpu, resolvedCover.source(), resolvedCover.changedAtMillis(),
                         coverTargetLongEdge(region), time);
                 cover = coverFrame.cover();
                 masterOpacity = fluidOpacityConfig * coverFrame.opacityScale();
@@ -236,14 +235,13 @@ public class BackgroundRenderer implements RenderLayer {
     private static BackgroundAdjustUniform backgroundAdjustUniform(boolean applyColorAdjust,
                                                                     float blackOverlay) {
         return new BackgroundAdjustUniform(
-                (float) CLIENT_CONFIG.getGuiBackgroundSaturation(),
+                FluidBackgroundSettings.BACKGROUND_NATURAL_SATURATION,
                 FluidBackgroundSettings.HIGHLIGHT_DARKENING,
                 FluidBackgroundSettings.HIGHLIGHT_KNEE,
                 FluidBackgroundSettings.HIGHLIGHT_FULL,
-                (float) CLIENT_CONFIG.getGuiBackgroundOverallBrightness(),
+                FluidBackgroundSettings.BACKGROUND_OVERALL_BRIGHTNESS,
                 applyColorAdjust,
-                blackOverlay,
-                BackgroundDebugOptions.toneMapping == BackgroundToneMapping.GAMMA ? 1f : 0f);
+                blackOverlay);
     }
 
     private static SceneCoverLayers.CoverUniform createCoverUniform(
@@ -283,7 +281,9 @@ public class BackgroundRenderer implements RenderLayer {
 
     private static int coverTargetLongEdge(SceneCapture.Region region) {
         float shortEdge = Math.min(region.width(), region.height());
-        return Math.clamp((int) Math.ceil(shortEdge * 0.5f), 64, 640);
+        return Math.clamp((int) Math.ceil(shortEdge * FluidBackgroundSettings.COVER_TARGET_LONG_EDGE_SCALE),
+                FluidBackgroundSettings.COVER_TARGET_MIN_LONG_EDGE,
+                FluidBackgroundSettings.COVER_TARGET_MAX_LONG_EDGE);
     }
 
     private static float coverDriftX(float amplitude, float time, float rotationSpeed,
@@ -306,7 +306,7 @@ public class BackgroundRenderer implements RenderLayer {
             if (frameResolver.usesOverrides()) {
                 BackgroundData override = backgroundState.getOverrides().getTop();
                 if (hasImage(override)) {
-                    return new ResolvedCover(override.image(),
+                    return new ResolvedCover(BlazeSceneCoverSources.of(override.image()),
                             backgroundState.getEffectiveBackgroundChangeTimeMillis());
                 }
             }
@@ -315,7 +315,8 @@ public class BackgroundRenderer implements RenderLayer {
             long changedAt = frameResolver.usesOverrides()
                     ? backgroundState.getEffectiveBackgroundChangeTimeMillis()
                     : backgroundState.getBaseEffectiveChangeTimeMillis();
-            return new ResolvedCover(hasImage(mixed) ? mixed.image() : null, changedAt);
+            return new ResolvedCover(hasImage(mixed)
+                    ? BlazeSceneCoverSources.of(mixed.image()) : null, changedAt);
         } catch (RuntimeException failure) {
             LOGGER.debug("While resolving the background cover image", failure);
             return null;
@@ -419,7 +420,7 @@ public class BackgroundRenderer implements RenderLayer {
     private record BackgroundAdjustUniform(float saturation, float highlightDarkening,
                                            float highlightKnee, float highlightFull,
                                            float overallBrightness, boolean applyColorAdjust,
-                                           float blackOverlay, float gammaToneMapping)
+                                           float blackOverlay)
             implements SceneUniform {
         private static final String UBO_NAME = "MHBackgroundAdjust";
         private static final int UBO_SIZE = Std140Sizes.calc()
@@ -439,7 +440,7 @@ public class BackgroundRenderer implements RenderLayer {
         public void write(Std140Writer writer) {
             writer.putVec4(saturation, highlightDarkening, highlightKnee, highlightFull);
             writer.putVec4(overallBrightness, applyColorAdjust ? 1f : 0f,
-                    blackOverlay, gammaToneMapping);
+                    blackOverlay, 0f);
         }
 
         @Override
@@ -448,7 +449,7 @@ public class BackgroundRenderer implements RenderLayer {
         }
     }
 
-    private record ResolvedCover(BackgroundImages images, long changedAtMillis) {
+    private record ResolvedCover(SceneCoverSource source, long changedAtMillis) {
     }
 
     private record CapturePlan(SceneCapture.Region captureRegion,

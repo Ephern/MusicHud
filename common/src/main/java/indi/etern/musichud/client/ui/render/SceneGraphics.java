@@ -3,10 +3,6 @@ package indi.etern.musichud.client.ui.render;
 import net.minecraft.client.gui.Font;
 import org.joml.Matrix3x2fStack;
 
-/**
- * Version-neutral facade over the platform GUI graphics context
- * ({@code GuiGraphics} on 1.21.x, {@code GuiGraphicsExtractor} on 26.x).
- */
 public interface SceneGraphics {
     Matrix3x2fStack pose();
 

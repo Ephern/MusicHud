@@ -10,10 +10,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-/**
- * Adapter: turns a neutral {@link SceneElementRenderState}
- * into a {@link GuiElementRenderState} consumable by {@code GuiRenderer}.
- */
 public class SceneGuiElementRenderState implements GuiElementRenderState {
     private final RenderPipeline pipeline;
     private final TextureSetup textureSetup;

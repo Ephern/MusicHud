@@ -8,10 +8,6 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 
-/**
- * Applies the audio-reactive zoom to the final fluid layer, after blur and warp.
- * The pass is skipped entirely when the scale is effectively 1.
- */
 public final class SceneCoverFluidScale {
     private static final Logger LOGGER = MusicHud.getLogger(SceneCoverFluidScale.class);
 
@@ -30,7 +26,7 @@ public final class SceneCoverFluidScale {
             try {
                 target = gpu.createRenderTarget("MusicHud fluid scale",
                         source.width(), source.height(),
-                        SceneTextureFormat.RGBA16F, SceneSamplerState.linearClamp());
+                        SceneTextureFormat.RGBA16F);
                 owner = gpu;
                 width = source.width();
                 height = source.height();
@@ -42,7 +38,7 @@ public final class SceneCoverFluidScale {
         }
         try {
             gpu.draw(new SceneDraw(target,
-                    gpu.pipeline(ScenePipelineKey.SCENE_COVER_FLUID_SCALE, target.format()),
+                    gpu.pipeline(ScenePipelineKey.SCENE_COVER_FLUID_SCALE, target.actualFormat()),
                     List.of(new SceneSamplerBinding("Sampler0", source,
                             gpu.sampler(SceneSamplerState.linearClamp()))),
                     List.of(new SceneUniformBinding(ScaleUniform.UBO_NAME,

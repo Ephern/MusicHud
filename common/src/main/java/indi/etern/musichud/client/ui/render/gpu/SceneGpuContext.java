@@ -8,10 +8,11 @@ import java.nio.ByteBuffer;
 
 public interface SceneGpuContext extends AutoCloseable {
     SceneGpuTexture createRenderTarget(String label, int width, int height,
-                                       SceneTextureFormat format, SceneSamplerState sampler);
+                                       SceneTextureFormat format);
 
     SceneSampler sampler(SceneSamplerState state);
 
+    /** {@code targetFormat} must be {@link SceneGpuTexture#actualFormat()}. */
     ScenePipeline pipeline(ScenePipelineKey key, SceneTextureFormat targetFormat);
 
     SceneMesh createMesh(String label, int vertexBytes, short[] indices);
@@ -23,8 +24,6 @@ public interface SceneGpuContext extends AutoCloseable {
     void drawIndexed(SceneIndexedDraw draw);
 
     void clear(SceneGpuTexture target, int argb);
-
-    byte[] readPixels(SceneGpuTexture target);
 
     void release(SceneGpuTexture texture);
 

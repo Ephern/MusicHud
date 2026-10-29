@@ -1,11 +1,5 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-/**
- * Immutable decision produced by {@link BackgroundFrameResolver}.
- * <p>
- * {@code FLUID_ONLY} skips scene capture, {@code SAMPLING_ONLY} skips the fluid layer, and
- * {@code MIXED} runs both pipelines before compositing.
- */
 public record BackgroundFramePlan(Path path, int sceneBlurRadius, int fluidBlurRadius,
                                   float masterOpacity, float samplingBlackOverlay) {
     public enum Path {

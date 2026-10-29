@@ -9,16 +9,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-/**
- * A {@link GuiElementRenderState} that renders one {@link GradientTextRun} with a horizontal
- * gradient. Submitted through {@code GuiRenderState.submitGlyphToCurrentLayer}, exactly like
- * the text engines submit their own glyph runs, so it participates in the same batching and
- * scissor handling of {@code GuiRenderer}.
- * <p>
- * The texture setup is resolved lazily when the GUI renderer starts sorting elements; that is
- * after the engines have baked their glyphs for this frame, so the font atlas view cannot go
- * stale before the draw.
- */
+/** Resolves the font atlas view lazily when the GUI renderer sorts elements. */
 public final class GradientTextRenderState implements GuiElementRenderState {
     private final Matrix3x2f pose;
     private final GradientTextRun run;

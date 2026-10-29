@@ -8,7 +8,8 @@ import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.render.gpu.SceneTextureAdapters;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneTextureAdapters;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.VanillaScenePipeline;
 import indi.etern.musichud.client.ui.render.pipeline.*;
 import indi.etern.musichud.client.ui.render.text.GradientSpec;
 import indi.etern.musichud.client.ui.render.text.GradientTextRenderer;
@@ -25,22 +26,6 @@ import org.joml.Matrix3x2f;
 import java.nio.ByteBuffer;
 import java.util.*;
 
-/**
- * <p>
- * Multiple elements may share one {@link ScenePipeline} while carrying
- * different per-element uniform content. Every submitted element is kept as its own
- * {@link TextureSetup} identity and gets its own set of UBO slices. Uniform storage is
- * keyed by UBO name alone, so shared uniforms (e.g. {@code MHDynamicStatus}) are uploaded
- * only once per frame and deduplicated across elements by
- * {@link DynamicUniformStorage#writeUniform}, while distinct content for the same name
- * lives in separate blocks of the same buffer. During the GUI pass each draw binds only the
- * slices of the element it belongs to (per-draw uniform upload, equivalent to
- * {@code RenderPass.drawMultipleIndexed}'s {@code uniformUploaderConsumer}).
- * <p>
- * On-demand upload is preserved: if a logical element's uniform data did not change since
- * the last frame ({@link SceneUniform#shouldUseBuffer}) and its previously uploaded slice is
- * still backed by a live buffer, the slice is reused and nothing is re-written.
- */
 public class SceneRenderContextImpl implements SceneRenderContext {
     private static final RenderStateUtil UNIFORM_WRITER = new RenderStateUtil();
     @Getter
@@ -55,11 +40,6 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     private final Map<TextureSetup, Map<String, GpuBufferSlice>> elementSlices = new IdentityHashMap<>();
     private final Map<String, GpuBufferSlice> defaultSlices = new HashMap<>();
 
-    /**
-     * Mirror of the GUI scissor stack in GUI coordinates, kept in sync with
-     * {@code pushScissor}/{@code popScissor}. Gradient text elements carry the top rectangle as
-     * their {@code scissorArea} so {@code GuiRenderer} clips them exactly like engine text.
-     */
     private final Deque<ScreenRectangle> scissorStack = new ArrayDeque<>();
 
     private SceneGraphics graphics;
@@ -95,6 +75,7 @@ public class SceneRenderContextImpl implements SceneRenderContext {
                 storage.endFrame();
             }
         }
+        RenderRuntime.getInstance().processPendingGpuRecreate();
     }
 
     @Override
@@ -129,12 +110,7 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         elements.add(new ElementRecord(owner, state.pipeline(), textureSetup, state.uniforms()));
     }
 
-    /**
-     * Distinct 1x1 texture view per render layer. It is placed in {@code texure2} of the
-     * element's {@link TextureSetup} so that elements of different profiles are
-     * record-unequal and {@code GuiRenderer} never merges them into one draw. No mod
-     * pipeline declares {@code Sampler2}, so binding this view is a no-op.
-     */
+    /** Breaks GUI batching between render layers. */
     private final Map<RenderLayer, GpuTextureView> discriminatorViews =
             new IdentityHashMap<>();
     private int discriminatorSerial;
@@ -190,12 +166,6 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         }
     }
 
-    /**
-     * Binds a default slice for every uniform name uploaded this frame. This guarantees the
-     * dev-mode validation of {@code GuiRenderer} always finds a value for every declared
-     * uniform; per-draw binding ({@link #bindElementUniforms}) then overrides the values
-     * that actually belong to the element being drawn.
-     */
     public void bindAllUniforms(RenderPass pass) {
         if (pass == null) return;
         for (Map.Entry<String, GpuBufferSlice> entry : defaultSlices.entrySet()) {
@@ -203,11 +173,6 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         }
     }
 
-    /**
-     * Per-draw uniform upload, following the same contract as
-     * {@code RenderPass.UniformUploader}. The uploader is invoked once per uniform of the
-     * element that the given {@link TextureSetup} identity belongs to.
-     */
     @FunctionalInterface
     public interface UniformUploader {
         void upload(String uboName, GpuBufferSlice slice);
@@ -275,12 +240,9 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     @Override
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
         if (dropShadow) {
-            // shadows keep the engine path; the flat geometry path does not draw them
             graphics.drawString(font, text, x, y, color, dropShadow);
             return;
         }
-        // Plain text shares the gradient geometry path, so it gets the same layout-local
-        // snapping and bilinear sampling instead of the engine's per-glyph screen snapping.
         drawGradientString(font, text, x, y, GradientSpec.flat(color), 1f);
     }
 

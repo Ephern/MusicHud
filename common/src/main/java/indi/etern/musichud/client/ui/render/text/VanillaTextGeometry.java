@@ -41,7 +41,6 @@ public final class VanillaTextGeometry {
 
             @Override
             public void acceptEffect(@NotNull BakedGlyph glyph, BakedGlyph.@NotNull Effect effect) {
-                // underline/strikethrough are intentionally not supported
             }
         });
         if (instances.isEmpty()) {

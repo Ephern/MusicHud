@@ -6,7 +6,7 @@ layout(std140) uniform MHPosition {
 };
 
 // u_Adjust: (natural saturation, highlightDarkening, highlightKnee, highlightFull)
-// u_Adjust2: (overallBrightness, applyColorAdjust, backgroundBlackOverlay, gammaToneMapping)
+// u_Adjust2: (overallBrightness, applyColorAdjust, backgroundBlackOverlay, unused)
 layout(std140) uniform MHBackgroundAdjust {
     vec4 u_Adjust;
     vec4 u_Adjust2;
@@ -57,12 +57,9 @@ vec3 applyNaturalSaturation(vec3 rgb, float saturation) {
 }
 
 // Brightness is applied as a single scale factor so it stays independent from saturation.
-// GAMMA applies the curve to the maximum channel instead of each channel separately.
-vec3 applyBrightness(vec3 rgb, float brightness, float gammaMode) {
+// The gamma curve is applied to the maximum channel instead of each channel separately.
+vec3 applyBrightness(vec3 rgb, float brightness) {
     float b = max(brightness, 0.0);
-    if (gammaMode < 0.5) {
-        return rgb * b;
-    }
     if (b <= 1e-4) {
         return vec3(0.0);
     }
@@ -89,7 +86,7 @@ void main() {
     if (u_Adjust2.y > 0.5) {
         rgb = applyNaturalSaturation(rgb, u_Adjust.x);
         rgb = applyHighlightDarkening(rgb, u_Adjust.y, u_Adjust.z, u_Adjust.w);
-        rgb = clamp(applyBrightness(rgb, u_Adjust2.x, u_Adjust2.w), 0.0, 1.0);
+        rgb = clamp(applyBrightness(rgb, u_Adjust2.x), 0.0, 1.0);
     }
     rgb *= 1.0 - clamp(u_Adjust2.z, 0.0, 1.0);
     rgb += (ign(gl_FragCoord.xy) - 0.5) * (2.0 / 255.0);

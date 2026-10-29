@@ -219,18 +219,6 @@ public interface ClientConfig {
 
     void setHudBackgroundBlurRadius(int radius);
 
-    int getGuiBackgroundFluidBlurRadius();
-
-    int getDefaultGuiBackgroundFluidBlurRadius();
-
-    void setGuiBackgroundFluidBlurRadius(int radius);
-
-    int getHudBackgroundFluidBlurRadius();
-
-    int getDefaultHudBackgroundFluidBlurRadius();
-
-    void setHudBackgroundFluidBlurRadius(int radius);
-
     double getGuiBackgroundFluidOpacity();
 
     double getDefaultGuiBackgroundFluidOpacity();
@@ -254,18 +242,6 @@ public interface ClientConfig {
     double getDefaultHudBackgroundSamplingBlackOverlay();
 
     void setHudBackgroundSamplingBlackOverlay(double overlay);
-
-    double getGuiBackgroundOverallBrightness();
-
-    double getDefaultGuiBackgroundOverallBrightness();
-
-    void setGuiBackgroundOverallBrightness(double brightness);
-
-    double getGuiBackgroundSaturation();
-
-    double getDefaultGuiBackgroundSaturation();
-
-    void setGuiBackgroundSaturation(double saturation);
 
     double getPanelOpacity();
 

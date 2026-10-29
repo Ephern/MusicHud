@@ -6,6 +6,7 @@ import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.VanillaScenePipeline;
 import net.minecraft.resources.ResourceLocation;
 
 public class SceneRenderPipelines {

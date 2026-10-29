@@ -7,23 +7,13 @@ import java.util.EnumMap;
 import java.util.Map;
 import java.util.Objects;
 
-/** Mutable macro preset state shared by the generator and the debug controls. */
 public final class WarpPreset {
-    private final WarpPresetType type;
     private final EnumMap<WarpParameter, Float> values = new EnumMap<>(WarpParameter.class);
     @Setter
     private int seed;
     @Getter
     @Setter
     private boolean stream = true;
-
-    public WarpPreset(WarpPresetType type) {
-        this.type = Objects.requireNonNull(type, "type");
-    }
-
-    public WarpPresetType type() {
-        return type;
-    }
 
     public int seed() {
         return seed;
@@ -42,7 +32,7 @@ public final class WarpPreset {
     }
 
     public WarpPreset copy() {
-        WarpPreset copy = new WarpPreset(type);
+        WarpPreset copy = new WarpPreset();
         copy.values.putAll(values);
         copy.seed = seed;
         copy.stream = stream;

@@ -1,65 +1,46 @@
 package indi.etern.musichud.client.ui.render.gpu;
 
-import com.mojang.blaze3d.platform.NativeImage;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.render.pipeline.GpuTextureViewRef;
 import indi.etern.musichud.client.ui.render.pipeline.SceneTextureRef;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
-import indi.etern.musichud.client.utils.image.ImageTextureData;
-import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
-/**
- * Resolves a cover source into a canonical square texture.
- * <p>
- * The source is center-cropped to a square, then downsampled through a cached 9-tap
- * chain until it reaches the requested canonical size. Both the active and previous
- * cover therefore share exactly the same dimensions during crossfades.
- */
 public final class SceneCover {
     private static final Logger LOGGER = MusicHud.getLogger(SceneCover.class);
 
     private SceneGpuContext owner;
-    private DynamicTexture source;
+    private SceneCoverSource source;
     private int targetSize;
     private SceneGpuTexture target;
     private SceneGpuTexture[] intermediates = new SceneGpuTexture[0];
 
-    public @Nullable SceneGpuTexture prepare(SceneGpuContext gpu, ImageTextureData image,
+    public @Nullable SceneGpuTexture prepare(SceneGpuContext gpu, SceneCoverSource image,
                                              int targetLongEdge) {
         if (gpu == null || image == null || targetLongEdge < 1) return null;
 
-        DynamicTexture texture;
-        int sourceWidth;
-        int sourceHeight;
-        try {
-            texture = image.getTexture();
-            NativeImage pixels = texture.getPixels();
-            if (pixels == null) return null;
-            sourceWidth = pixels.getWidth();
-            sourceHeight = pixels.getHeight();
-        } catch (RuntimeException failure) {
-            LOGGER.debug("While reading the background cover image", failure);
-            return null;
-        }
+        int sourceWidth = image.width();
+        int sourceHeight = image.height();
         if (sourceWidth < 1 || sourceHeight < 1) return null;
 
-        if (target != null && owner == gpu && source == texture && targetSize == targetLongEdge) {
+        if (target != null && owner == gpu && Objects.equals(source, image)
+                && targetSize == targetLongEdge) {
             return target;
         }
 
         release(gpu);
         owner = gpu;
-        source = texture;
+        source = image;
         targetSize = targetLongEdge;
         try {
-            SceneTextureRef sourceRef = new GpuTextureViewRef(texture.getTextureView());
+            SceneTextureRef sourceRef = image.texture();
+            if (sourceRef == null) return null;
             int cropSize = Math.min(sourceWidth, sourceHeight);
             Rect sourceRect = centerSquare(sourceWidth, sourceHeight);
             if (cropSize <= targetLongEdge) {
@@ -126,14 +107,14 @@ public final class SceneCover {
 
     private static SceneGpuTexture createTarget(SceneGpuContext gpu, int size) {
         return gpu.createRenderTarget("MusicHud canonical cover", size, size,
-                SceneTextureFormat.RGBA16F, SceneSamplerState.linearClamp());
+                SceneTextureFormat.RGBA16F);
     }
 
     private static void resolvePass(SceneGpuContext gpu, SceneTextureRef source,
                                     int sourceWidth, int sourceHeight, Rect rect,
                                     SceneGpuTexture target, boolean downsample) {
         gpu.draw(new SceneDraw(target,
-                gpu.pipeline(ScenePipelineKey.SCENE_COVER_RESOLVE, target.format()),
+                gpu.pipeline(ScenePipelineKey.SCENE_COVER_RESOLVE, target.actualFormat()),
                 List.of(new SceneSamplerBinding("Sampler0", source,
                         gpu.sampler(SceneSamplerState.linearClamp()))),
                 List.of(new SceneUniformBinding(ResolveUniform.UBO_NAME,

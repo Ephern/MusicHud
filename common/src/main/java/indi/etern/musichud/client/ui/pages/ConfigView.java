@@ -24,8 +24,6 @@ import indi.etern.musichud.client.ui.components.modals.ApiServerDownloadDialog;
 import indi.etern.musichud.client.ui.components.modals.Modal;
 import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
 import indi.etern.musichud.client.ui.components.options.AdaptiveIntegerOption;
-import indi.etern.musichud.client.ui.render.BackgroundDebugOptions;
-import indi.etern.musichud.client.ui.render.BackgroundToneMapping;
 import indi.etern.musichud.client.ui.screen.HudConfigFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
@@ -193,14 +191,6 @@ public class ConfigView extends LinearLayout {
                     clientConfig::setGuiBackgroundFluidOpacity)
                     .setRange(0, 1, 100)
                     .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidOpacity())
-                    .create(commonCategory);
-            new AdaptiveIntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundFluidBlurRadius"),
-                    clientConfig::getGuiBackgroundFluidBlurRadius,
-                    clientConfig::setGuiBackgroundFluidBlurRadius)
-                    .setRange(0, 1024)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidBlurRadius())
                     .create(commonCategory);
             new AdaptiveIntegerOption(
                     context,
@@ -868,35 +858,6 @@ public class ConfigView extends LinearLayout {
                     clientConfig::getForceRgba8Fallback,
                     clientConfig::setForceRgba8Fallback)
                     .setDefaultValue(clientConfig.getDefaultForceRgba8Fallback())
-                    .create(mContent);
-
-            BackgroundToneMapping[] toneMappings = BackgroundToneMapping.values();
-            List<BackgroundToneMapping> toneMappingList = Arrays.asList(toneMappings);
-            new PreferencesFragment.DropDownOption<>(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.backgroundToneMapping"),
-                    toneMappings,
-                    toneMappingList::indexOf,
-                    () -> BackgroundDebugOptions.toneMapping,
-                    mapping -> BackgroundDebugOptions.toneMapping = mapping)
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundOverallBrightness"),
-                    clientConfig::getGuiBackgroundOverallBrightness,
-                    clientConfig::setGuiBackgroundOverallBrightness)
-                    .setRange(0, 2, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundOverallBrightness())
-                    .create(mContent);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.debug.guiBackgroundSaturation"),
-                    clientConfig::getGuiBackgroundSaturation,
-                    clientConfig::setGuiBackgroundSaturation)
-                    .setRange(0, 2, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundSaturation())
                     .create(mContent);
 
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);

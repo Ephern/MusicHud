@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.render.gpu;
+package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -9,9 +9,11 @@ import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import indi.etern.musichud.client.ui.render.gpu.*;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlHalfFloatAllocator;
 import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
-import indi.etern.musichud.client.ui.render.pipeline.VanillaScenePipeline;
+import indi.etern.musichud.interfaces.ClientConfig;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.system.MemoryUtil;
@@ -26,6 +28,10 @@ import java.util.OptionalInt;
 
 public final class SceneGpuContextImpl implements SceneGpuContext {
     private final SceneNativePassRenderer renderer = new SceneNativePassRenderer();
+    private final SceneTextureAllocator blazeAllocator;
+    private final SceneTextureAllocator halfFloatAllocator;
+    private final int maxTextureSize;
+    private final boolean rgba16fTargets;
     private final Map<PipelineKey, ScenePipeline> pipelines = new HashMap<>();
     private final Map<UniformKey, GpuBuffer> uniformBuffers = new HashMap<>();
     private final List<SceneGpuTextureImpl> textures = new ArrayList<>();
@@ -34,13 +40,34 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
 
     public SceneGpuContextImpl() {
         RenderSystem.assertOnRenderThread();
+        var device = RenderSystem.getDevice();
+        this.blazeAllocator = new BlazeTextureAllocator(device);
+        this.halfFloatAllocator = new GlHalfFloatAllocator(device);
+        this.maxTextureSize = device.getMaxTextureSize();
+        this.rgba16fTargets = halfFloatAllocator.supportsHalfFloat();
     }
 
     @Override
     public SceneGpuTexture createRenderTarget(String label, int width, int height,
-                                              SceneTextureFormat format, SceneSamplerState sampler) {
+                                              SceneTextureFormat format) {
         assertOpen();
-        var texture = new SceneGpuTextureImpl(label, width, height, format, sampler);
+        if (width < 1 || height < 1 || width > maxTextureSize || height > maxTextureSize) {
+            throw new IllegalArgumentException(
+                    "Invalid scene target size: " + width + "x" + height);
+        }
+        boolean halfFloat = format == SceneTextureFormat.RGBA16F
+                && rgba16fTargets
+                && !ClientConfig.getInstance().getForceRgba8Fallback();
+        boolean nativePath = halfFloat || ClientConfig.getInstance().getForceGL32Path();
+        SceneTextureAllocator.SceneAllocatedTexture allocated;
+        try {
+            allocated = (nativePath ? halfFloatAllocator : blazeAllocator)
+                    .allocate(label, width, height, halfFloat);
+        } catch (RuntimeException | LinkageError failure) {
+            if (!nativePath) throw failure;
+            allocated = blazeAllocator.allocate(label, width, height, false);
+        }
+        var texture = new SceneGpuTextureImpl(format, allocated, maxTextureSize);
         textures.add(texture);
         return texture;
     }
@@ -78,7 +105,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         var target = requireTexture(draw.target());
         var samplers = samplers(draw);
         var uniforms = uniforms(draw);
-        renderer.draw(requirePipeline(draw.pipeline()), target.target(), samplers, uniforms);
+        renderer.draw(requirePipeline(draw.pipeline()), target.view(), samplers, uniforms);
     }
 
     @Override
@@ -102,20 +129,14 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     @Override
     public void clear(SceneGpuTexture target, int argb) {
         assertOpen();
-        requireTexture(target).target().clear(argb);
-    }
-
-    @Override
-    public byte[] readPixels(SceneGpuTexture target) {
-        assertOpen();
-        return requireTexture(target).target().readRgba8();
+        requireTexture(target).clear(argb);
     }
 
     @Override
     public void release(SceneGpuTexture texture) {
         if (!(texture instanceof SceneGpuTextureImpl impl)) return;
         textures.remove(impl);
-        impl.target().close();
+        impl.close();
     }
 
     @Override
@@ -247,7 +268,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         RenderSystem.assertOnRenderThread();
         if (closed) return;
         closed = true;
-        for (SceneGpuTextureImpl texture : new ArrayList<>(textures)) texture.target().close();
+        for (SceneGpuTextureImpl texture : new ArrayList<>(textures)) texture.close();
         textures.clear();
         for (SceneGpuMeshImpl mesh : new ArrayList<>(meshes)) mesh.close();
         meshes.clear();

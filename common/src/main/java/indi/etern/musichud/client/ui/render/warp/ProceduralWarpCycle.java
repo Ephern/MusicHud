@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.render.warp;
 
-/** Maps the existing monotonic background clock to a raised-cosine warp cycle. */
 public final class ProceduralWarpCycle {
     public static final float PERIOD_SECONDS = 10f;
 

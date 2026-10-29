@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.render.warp;
 
-/** Trigonometric warp envelope over one background warp cycle. */
 public final class ProceduralWarpTiming {
     private static final float TWO_PI = (float) (Math.PI * 2.0);
 

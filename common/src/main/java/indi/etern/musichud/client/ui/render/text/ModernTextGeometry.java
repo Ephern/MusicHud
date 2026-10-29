@@ -26,30 +26,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.WeakHashMap;
 
-/**
- * Geometry source for the Modern UI text engine, using only its public API. Layout comes from
- * {@link TextLayoutEngine#lookupVanillaLayout}, glyph baking and atlas lookup are deferred to
- * draw time (after the engine finished baking this frame's glyphs, so atlas rebuilds cannot
- * invalidate the UVs we captured), and each glyph quad is re-emitted with per-vertex gradient
- * colors, mirroring {@code TextRunRenderState.buildPass}.
- * <p>
- * Mode selection, device font size and pixel snapping mirror the engine's own GUI text path
- * ({@code MixinGuiTextRenderState.onPrepareText} and {@code TextLayout.prepareTextWithDensity}):
- * uniformly scaled text bakes glyphs at {@code resLevel * scale}. Unlike the engine's own
- * renderer, snapping is performed in layout space (the animated text origin is excluded) so
- * scrolling text keeps rigid glyph spacing, and direct-mask runs are drawn through
- * {@link SceneRenderPipelines#GRADIENT_TEXT}, whose fragment shader performs manual bilinear
- * filtering for smooth sub-pixel motion.
- */
+/** Modern UI text geometry source. */
 public final class ModernTextGeometry {
     private static final Random OBFUSCATED_RANDOM = new Random();
 
-    /**
-     * Baked glyph arrays keyed by layout and font size, mirroring {@code TextLayout.getGlyphs}
-     * and {@code TextLayout.getGlyphsUniformScale} caches. Layouts are created fresh for every
-     * cached text and evicted by the engine's LRU cache, so weak keys follow the same lifetime
-     * as the engine's own baked glyph caches. Only accessed on the render thread.
-     */
+    /** Baked glyph arrays keyed by layout and font size; render thread only. */
     private static final Map<TextLayout, Map<Integer, GLBakedGlyph[]>> GLYPH_CACHE = new WeakHashMap<>();
 
     private ModernTextGeometry() {
@@ -72,7 +53,6 @@ public final class ModernTextGeometry {
             density = TextLayoutEngine.adjustPixelDensityForSDF(createdResLevel);
         } else if (preferredMode == TextRenderType.MODE_UNIFORM_SCALE) {
             if (setup.uniformScale() <= 0.001f) {
-                // drop if flipped or too small
                 return List.of();
             }
             density = createdResLevel * setup.uniformScale();
@@ -84,11 +64,6 @@ public final class ModernTextGeometry {
         int fontSize = TextLayoutProcessor.computeFontSize(density);
         boolean directMask = preferredMode == TextRenderType.MODE_NORMAL;
 
-        // Bake every glyph now, while this element is merely being submitted: a newly baked
-        // glyph can grow or rebuild the font atlas, and that rebuild must never happen while
-        // the GUI renderer is already recording this element's vertices, otherwise the UVs
-        // written in that pass would no longer match the atlas texture bound for the draw
-        // (visible as corrupted, diagonally clipped or entirely missing glyphs).
         bakedGlyphs(layout, fontSize);
 
         int[] flags = layout.getGlyphFlags();
@@ -109,12 +84,6 @@ public final class ModernTextGeometry {
         return states;
     }
 
-    /**
-     * Mirrors {@code MixinGuiTextRenderState.onPrepareText}: decides the render mode for the
-     * given pose, extracts the pose translation into the text origin (so that per-vertex
-     * snapping can align quads to the device pixel grid) and computes the residual uniform
-     * scale used to bake glyphs at the device font size.
-     */
     private static DrawSetup resolveDraw(Matrix3x2f pose, float x, float y, int createdResLevel) {
         Matrix3x2f ctm = new Matrix3x2f(pose);
         int mode;
@@ -138,10 +107,8 @@ public final class ModernTextGeometry {
         float uniformScale = 1f;
         if (ModernTextRenderer.sComputeDeviceFontSize
                 && (pureTranslation || mode == TextRenderType.MODE_UNIFORM_SCALE)) {
-            // extract the translation vector for snapping to pixel grid
             x += ctm.m20 / ctm.m00;
             y += ctm.m21 / ctm.m11;
-            // the pose translation is moved into the text origin
             ctm.m20 = 0f;
             ctm.m21 = 0f;
             uniformScale = ctm.m00;
@@ -151,7 +118,6 @@ public final class ModernTextGeometry {
                 float upperLimit = Math.max(1f,
                         (float) TextLayoutEngine.sMinPixelDensityForSDF / createdResLevel);
                 if (uniformScale <= upperLimit) {
-                    // uniform scale smaller and not too large
                     mode = TextRenderType.MODE_UNIFORM_SCALE;
                 } else {
                     mode = ModernTextRenderer.sAllowSDFTextIn2D
@@ -191,16 +157,11 @@ public final class ModernTextGeometry {
             return new RunKey(TextRenderType.getPipelineForGui(TextRenderType.MODE_NORMAL, false),
                     TextureKind.EMOJI, null, true);
         }
-        // direct-mask runs use our manual-bilinear pipeline; every other mode keeps the engine's
         return new RunKey(directMask ? SceneRenderPipelines.GRADIENT_TEXT
                         : TextRenderType.getPipelineForGui(preferredMode, false),
                 TextureKind.FONT, null, false);
     }
 
-    /**
-     * Bakes (once per layout and font size) every glyph of the layout, exactly like
-     * {@code TextLayout.prepareGlyphs}: obfuscated code points bake to their fast char set.
-     */
     private static GLBakedGlyph[] bakedGlyphs(TextLayout layout, int fontSize) {
         return GLYPH_CACHE
                 .computeIfAbsent(layout, k -> new HashMap<>())
@@ -308,9 +269,6 @@ public final class ModernTextGeometry {
                     w = glyph.width * invDensity;
                     h = glyph.height * invDensity;
                 }
-                // Snapping happens in layout space: the animated text origin must not take
-                // part in it, otherwise every glyph snaps on its own schedule and the glyph
-                // spacing pulses while the text scrolls (the marquee jitter this class fixes).
                 if (directMask) {
                     localX = Math.round(localX * density) * invDensity;
                     localY = Math.round(localY * density) * invDensity;
@@ -337,8 +295,6 @@ public final class ModernTextGeometry {
                 float v1 = glyph.v1;
                 float u2 = glyph.u2;
                 float v2 = glyph.v2;
-                // One texel of bleed (position + UV) so the manual bilinear taps never clip
-                // at the quad edge; the atlas reserves a border around every glyph.
                 if (directMask && !bitmapReplacement) {
                     float du = (u2 - u1) / (float) glyph.width;
                     float dv = (v2 - v1) / (float) glyph.height;

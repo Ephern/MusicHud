@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.render.warp;
 
-/** Signed-area metrics used by the strict fold guard and the debug heatmap. */
 public final class WarpMeshMetrics {
     public record Metrics(float minDet, float minDetRatio, float foldedFraction,
                           float maxCompression, float maxDetRatio, float maxOffset) {

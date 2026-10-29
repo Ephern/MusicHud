@@ -6,9 +6,6 @@ import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.ResourceLocation;
 import org.joml.Matrix3x2fStack;
 
-/**
- * Adapter: exposes a {@link GuiGraphics} behind the neutral {@link SceneGraphics}.
- */
 public class VanillaSceneGraphics implements SceneGraphics {
     private final GuiGraphics graphics;
 

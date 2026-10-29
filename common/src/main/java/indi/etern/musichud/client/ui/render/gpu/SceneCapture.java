@@ -10,12 +10,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/**
- * Reusable crop-and-resample capture of the main color target into an owned offscreen target.
- * <p>
- * The source crop is stored top-down in the target: target row {@code v = 0} contains the top
- * of the crop, matching the GUI texture UV convention used by the final display shader.
- */
 public final class SceneCapture {
     private static final Logger LOGGER = MusicHud.getLogger(SceneCapture.class);
 
@@ -70,7 +64,7 @@ public final class SceneCapture {
         }
         try {
             target = gpu.createRenderTarget("MusicHud scene capture", width, height,
-                    SceneTextureFormat.RGBA8, SceneSamplerState.linearClamp());
+                    SceneTextureFormat.RGBA8);
             owner = gpu;
             targetWidth = width;
             targetHeight = height;
@@ -107,7 +101,7 @@ public final class SceneCapture {
         public boolean fill() {
             if (filled) return true;
             try {
-                gpu.draw(new SceneDraw(target, gpu.pipeline(ScenePipelineKey.SCENE_CAPTURE, target.format()),
+                gpu.draw(new SceneDraw(target, gpu.pipeline(ScenePipelineKey.SCENE_CAPTURE, target.actualFormat()),
                         List.of(new SceneSamplerBinding("Sampler0", source,
                                 gpu.sampler(SceneSamplerState.linearClamp()))),
                         List.of(new SceneUniformBinding(CaptureUniform.UBO_NAME, uniform))));

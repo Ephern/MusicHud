@@ -6,11 +6,6 @@ import org.joml.Vector4fc;
 
 import java.nio.ByteBuffer;
 
-/**
- * A dependency-free {@link Std140Writer} that replicates the exact byte layout of
- * Minecraft's {@code Std140Builder}, so the same metadata beans work on every
- * supported version regardless of where the platform-specific std140 builder lives.
- */
 public class ByteBufferStd140Writer implements Std140Writer {
     private final ByteBuffer buffer;
     private final int start;

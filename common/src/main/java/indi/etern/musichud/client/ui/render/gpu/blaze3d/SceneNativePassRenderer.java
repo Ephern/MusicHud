@@ -1,4 +1,4 @@
-package indi.etern.musichud.client.ui.render.gpu;
+package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
@@ -15,7 +15,7 @@ import net.minecraft.resources.ResourceLocation;
 import java.util.Map;
 import java.util.OptionalInt;
 
-/** Immediate Minecraft GPU passes; does not own any input textures or returned views. */
+/** Does not own input textures or returned views. */
 final class SceneNativePassRenderer implements AutoCloseable {
     private GpuBuffer fullscreenVertices;
 
@@ -43,17 +43,15 @@ final class SceneNativePassRenderer implements AutoCloseable {
         return ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, path);
     }
 
-    public void draw(RenderPipeline pipeline, SceneNativeTarget output,
+    public void draw(RenderPipeline pipeline, GpuTextureView destination,
                      Map<String, GpuTextureView> textures, Map<String, GpuBufferSlice> uniforms) {
         RenderSystem.assertOnRenderThread();
-        GpuTextureView destination = output.view();
         for (GpuTextureView source : textures.values()) {
             if (source == destination || source.texture() == destination.texture()) {
                 throw new IllegalArgumentException("Scene pass cannot sample its own attachment");
             }
         }
-        // Minecraft's separate-attrib VAO cache requires a live buffer even for EMPTY formats.
-        // The shader synthesizes its triangle with gl_VertexID and reads no vertex attributes.
+        // EMPTY-format pipelines still need a live vertex buffer for the VAO cache.
         if (fullscreenVertices == null) {
             fullscreenVertices = RenderSystem.getDevice().createBuffer(() -> "MusicHud fullscreen",
                     GpuBuffer.USAGE_VERTEX, 16);
@@ -68,7 +66,6 @@ final class SceneNativePassRenderer implements AutoCloseable {
         }
     }
 
-    /** Release on resource reload/shutdown, after all queued GUI draws have consumed outputs. */
     @Override public void close() {
         RenderSystem.assertOnRenderThread();
         if (fullscreenVertices != null) {

@@ -50,11 +50,6 @@ public class RenderStateUtil {
         getGuiRenderState(gr).submitGuiElement(renderState);
     }
 
-    /**
-     * Submits an element to the glyph layer, like the text engines do for their own runs.
-     * Unlike {@code submitGuiElement}, this neither requires non-null bounds nor moves the
-     * current navigation node, and it keeps adjacent glyph runs batching together.
-     */
     public void submitGlyphRenderState(
             GuiGraphics gr,
             GuiElementRenderState renderState

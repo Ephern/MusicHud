@@ -4,22 +4,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.jetbrains.annotations.NotNull;
 import org.joml.Matrix4f;
 
-/**
- * A pass-through {@link VertexConsumer} that replaces the color of every vertex emitted by a
- * text renderable with a gradient color sampled at the vertex's local x position.
- * <p>
- * Vanilla glyph renderables write their quads as
- * {@code addVertex(matrix, localX, localY, localZ).setColor(argb).setUv(...).setLight(...)}.
- * The local x is captured before the matrix transform, so the gradient parameter stays
- * independent of whatever pose (translation, scale) the HUD has applied. Every other vertex
- * attribute is forwarded unchanged, which keeps glyph shapes, UVs, bold/italic passes and
- * depth offsets exactly as the text engine produced them.
- * <p>
- * All chained methods return this wrapper (not the delegate) so that a later {@code setColor}
- * in the same chain is still intercepted. If a color is set without a preceding
- * {@code addVertex(Matrix4f, ...)} the original color is passed through, so renderables using
- * a different write path are never corrupted.
- */
+/** Replaces text vertex colors with a gradient sampled from local x. */
 final class GradientVertexConsumer implements VertexConsumer {
     private final VertexConsumer delegate;
     private final float originX;
@@ -39,10 +24,6 @@ final class GradientVertexConsumer implements VertexConsumer {
         this.alpha = alpha;
     }
 
-    /**
-     * Captures the vertex's local x and forwards the call with the same matrix, so the delegate
-     * performs the transform exactly like it would without this wrapper.
-     */
     @Override
     public @NotNull VertexConsumer addVertex(@NotNull Matrix4f matrix, float x, float y, float z) {
         this.localX = x;
@@ -51,10 +32,6 @@ final class GradientVertexConsumer implements VertexConsumer {
         return this;
     }
 
-    /**
-     * A direct (already transformed) vertex add cannot be mapped back to text space, so colors
-     * pass through untouched for such quads.
-     */
     @Override
     public @NotNull VertexConsumer addVertex(float x, float y, float z) {
         this.hasLocalX = false;
@@ -106,10 +83,6 @@ final class GradientVertexConsumer implements VertexConsumer {
         return this;
     }
 
-    /**
-     * {@link GradientSpec#sample} clamps both t and the global alpha, so glyph overhang outside
-     * the text width and faded-out states resolve to the nearest endpoint color.
-     */
     private int sampleColor() {
         return this.gradient.sample((this.localX - this.originX) / this.totalAdvance, this.alpha);
     }

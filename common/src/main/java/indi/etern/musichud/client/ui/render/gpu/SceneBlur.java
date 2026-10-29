@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.render.gpu;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.FluidBackgroundSettings;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
@@ -11,7 +12,7 @@ import java.util.List;
 
 public final class SceneBlur {
     private static final Logger LOGGER = MusicHud.getLogger(SceneBlur.class);
-    private static final int MAX_LEVELS = 4;
+    private static final int MAX_LEVELS = FluidBackgroundSettings.BLUR_MAX_LEVELS;
 
     private final SceneTextureFormat format;
 
@@ -82,7 +83,7 @@ public final class SceneBlur {
 
     private SceneGpuTexture target(SceneGpuContext gpu, int width, int height) {
         return gpu.createRenderTarget("MusicHud scene blur", width, height,
-                format, SceneSamplerState.linearClamp());
+                format);
     }
 
     private void release() {
@@ -176,7 +177,7 @@ public final class SceneBlur {
         private boolean pass(SceneGpuContext gpu, ScenePipelineKey key,
                              SceneGpuTexture source, SceneGpuTexture target, SceneUniform uniform) {
             try {
-                gpu.draw(new SceneDraw(target, gpu.pipeline(key, target.format()),
+                gpu.draw(new SceneDraw(target, gpu.pipeline(key, target.actualFormat()),
                         List.of(new SceneSamplerBinding("Sampler0", source,
                                 gpu.sampler(SceneSamplerState.linearClamp()))),
                         List.of(new SceneUniformBinding(BlurUniform.UBO_NAME, uniform))));

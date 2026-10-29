@@ -40,14 +40,10 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> forceRgba8Fallback;
     private final ModConfigSpec.ConfigValue<Integer> guiBackgroundBlurRadius;
     private final ModConfigSpec.ConfigValue<Integer> hudBackgroundBlurRadius;
-    private final ModConfigSpec.ConfigValue<Integer> guiBackgroundFluidBlurRadius;
-    private final ModConfigSpec.ConfigValue<Integer> hudBackgroundFluidBlurRadius;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundFluidOpacity;
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundFluidOpacity;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundSamplingBlackOverlay;
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundSamplingBlackOverlay;
-    private final ModConfigSpec.ConfigValue<Double> guiBackgroundOverallBrightness;
-    private final ModConfigSpec.ConfigValue<Double> guiBackgroundSaturation;
     private final ModConfigSpec.ConfigValue<Double> panelOpacity;
     private final ModConfigSpec.ConfigValue<Double> panelBrightness;
     private final ModConfigSpec.ConfigValue<Boolean> enableSidebarBackground;
@@ -127,14 +123,6 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("HUD background sampling blur radius in physical pixels (0 disables blur)")
                 .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundBlurRadius")
                 .defineInRange("hudBackgroundSamplingBlurRadius", 64, 0, 1024);
-        guiBackgroundFluidBlurRadius = builder
-                .comment("GUI fluid layer blur radius in physical pixels (0 disables fluid blur)")
-                .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundFluidBlurRadius")
-                .defineInRange("guiFluidBackgroundBlurRadius", 480, 0, 1024);
-        hudBackgroundFluidBlurRadius = builder
-                .comment("HUD fluid layer blur radius lower bound in physical pixels")
-                .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundFluidBlurRadius")
-                .defineInRange("hudFluidBackgroundBlurRadius", 96, 0, 1024);
         guiBackgroundFluidOpacity = builder
                 .comment("GUI fluid layer final composite opacity (0 disables the fluid layer)")
                 .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundFluidOpacity")
@@ -151,14 +139,6 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Black overlay applied only to the HUD background sampling path")
                 .translation(MusicHud.MOD_ID + ".config.common.hudBackgroundSamplingBlackOverlay")
                 .defineInRange("hudBackgroundSamplingBlackOverlay", 0.7, 0, 1);
-        guiBackgroundOverallBrightness = builder
-                .comment("Temporary background brightness debug value")
-                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundOverallBrightness")
-                .defineInRange("guiBackgroundOverallBrightness", 0.6, 0, 2);
-        guiBackgroundSaturation = builder
-                .comment("Temporary natural-saturation/vibrance debug value")
-                .translation(MusicHud.MOD_ID + ".config.debug.guiBackgroundSaturation")
-                .defineInRange("guiBackgroundSaturation", 1.3, 0, 2);
         panelOpacity = builder
                 .comment("Panel background opacity; only affects the sidebar and ConfigView category panels")
                 .translation(MusicHud.MOD_ID + ".config.common.panelOpacity")
@@ -801,36 +781,6 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public int getGuiBackgroundFluidBlurRadius() {
-        return guiBackgroundFluidBlurRadius.get();
-    }
-
-    @Override
-    public int getDefaultGuiBackgroundFluidBlurRadius() {
-        return guiBackgroundFluidBlurRadius.getDefault();
-    }
-
-    @Override
-    public void setGuiBackgroundFluidBlurRadius(int radius) {
-        guiBackgroundFluidBlurRadius.set(Math.clamp(radius, 0, 1024));
-    }
-
-    @Override
-    public int getHudBackgroundFluidBlurRadius() {
-        return hudBackgroundFluidBlurRadius.get();
-    }
-
-    @Override
-    public int getDefaultHudBackgroundFluidBlurRadius() {
-        return hudBackgroundFluidBlurRadius.getDefault();
-    }
-
-    @Override
-    public void setHudBackgroundFluidBlurRadius(int radius) {
-        hudBackgroundFluidBlurRadius.set(Math.clamp(radius, 0, 1024));
-    }
-
-    @Override
     public double getGuiBackgroundFluidOpacity() {
         return guiBackgroundFluidOpacity.get();
     }
@@ -888,36 +838,6 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setHudBackgroundSamplingBlackOverlay(double overlay) {
         hudBackgroundSamplingBlackOverlay.set(Math.clamp(overlay, 0, 1));
-    }
-
-    @Override
-    public double getGuiBackgroundOverallBrightness() {
-        return guiBackgroundOverallBrightness.get();
-    }
-
-    @Override
-    public double getDefaultGuiBackgroundOverallBrightness() {
-        return guiBackgroundOverallBrightness.getDefault();
-    }
-
-    @Override
-    public void setGuiBackgroundOverallBrightness(double brightness) {
-        guiBackgroundOverallBrightness.set(Math.clamp(brightness, 0, 2));
-    }
-
-    @Override
-    public double getGuiBackgroundSaturation() {
-        return guiBackgroundSaturation.get();
-    }
-
-    @Override
-    public double getDefaultGuiBackgroundSaturation() {
-        return guiBackgroundSaturation.getDefault();
-    }
-
-    @Override
-    public void setGuiBackgroundSaturation(double saturation) {
-        guiBackgroundSaturation.set(Math.clamp(saturation, 0, 2));
     }
 
     @Override

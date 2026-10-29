@@ -31,10 +31,6 @@ class WarpPresetFitterTest {
 
     @Test
     void stretchRemainsStrictlySafe() {
-        WarpPreset noise = WarpPresetLibrary.defaultPreset(WarpPresetType.NOISE);
-        noise.setValue(WarpParameter.STRETCH, 1);
-        assertStrictlySafe(noise, 1.08f);
-
         WarpPreset flow = defaultNoiseFlow();
         flow.setValue(WarpParameter.STRETCH, 1);
         flow.setValue(WarpParameter.DETAIL, .6f);
@@ -64,7 +60,7 @@ class WarpPresetFitterTest {
     }
 
     private static WarpPreset defaultNoiseFlow() {
-        return WarpPresetLibrary.defaultPreset(WarpPresetType.NOISE_FLOW);
+        return ProceduralWarpTargets.defaultPreset();
     }
 
     private static void assertStrictlySafe(WarpPreset preset, float zoom) {

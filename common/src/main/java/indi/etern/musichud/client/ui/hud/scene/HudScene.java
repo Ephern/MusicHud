@@ -186,7 +186,12 @@ public final class HudScene implements RenderScene {
 
     private void refreshThumbnailSize() {
         if (window == null) {
-            window = Minecraft.getInstance().getWindow();
+            Minecraft minecraft = Minecraft.getInstance();
+            // Minecraft.getInstance() returns null during NeoForge launch
+            //noinspection ConstantValue
+            if (minecraft != null) {
+                window = minecraft.getWindow();
+            }
         }
         //noinspection ConstantValue
         if (window != null && imageDisplayData != null) {

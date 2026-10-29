@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -55,6 +56,26 @@ public final class MusicHud {
         LOGGER.debug("Initialized in environment: {}", currentEnvironment);
         RegistrationManager.performCommonAutoRegistration();
         initAtMillis = System.currentTimeMillis();
+    }
+
+    /**
+     * Opens a resource that is shipped on the mod class path.
+     * <p>
+     * {@link Class#getResourceAsStream(String)} on a class that lives in a <em>named module</em> only
+     * searches the content of that very module (see {@code Module#getResourceAsStream}). In a NeoForge
+     * dev launch every mod (and the {@code core} library) is its own module, so loading an asset that
+     * lives in another mod would silently return {@code null}. Asking the class loader instead keeps
+     * the class-path-wide lookup that Fabric dev and the shaded production jar have.
+     *
+     * @param path resource path, with or without a leading {@code /}
+     * @return the stream, or {@code null} if no loaded mod provides that resource
+     */
+    public static InputStream getResourceAsStream(String path) {
+        String name = path.startsWith("/") ? path.substring(1) : path;
+        ClassLoader classLoader = MusicHud.class.getClassLoader();
+        return classLoader != null
+                ? classLoader.getResourceAsStream(name)
+                : ClassLoader.getSystemResourceAsStream(name);
     }
 
     public static long getRunningMillis() {

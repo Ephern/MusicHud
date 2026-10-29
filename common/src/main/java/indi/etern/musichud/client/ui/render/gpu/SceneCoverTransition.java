@@ -1,32 +1,21 @@
 package indi.etern.musichud.client.ui.render.gpu;
 
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
-import indi.etern.musichud.client.utils.image.ImageTextureData;
+import indi.etern.musichud.client.ui.render.FluidBackgroundSettings;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
 
-/**
- * Owns the active and previous canonical cover textures and crossfades between them.
- * <p>
- * Image-to-image switches use {@link SceneCoverBlend}; none-to-image and image-to-none
- * switches fade the existing cover through the overlay opacity instead.
- * <p>
- * Transition progress is derived from the absolute image availability timestamp so a
- * renderer that was not drawing while the music changed does not restart the fade when
- * it becomes visible again.
- */
 public final class SceneCoverTransition {
-    private static final float TRANSITION_SECONDS = 0.5f;
+    private static final float TRANSITION_SECONDS = FluidBackgroundSettings.COVER_TRANSITION_SECONDS;
 
     private final SceneCover[] covers = {new SceneCover(), new SceneCover()};
     private final SceneCoverBlend blend = new SceneCoverBlend();
 
     private SceneGpuContext owner;
     private int activeSlot;
-    private ImageTextureData activeSource;
-    private ImageTextureData previousSource;
-    private ImageTextureData fadingSource;
+    private SceneCoverSource activeSource;
+    private SceneCoverSource previousSource;
+    private SceneCoverSource fadingSource;
     private SceneGpuTexture activeTexture;
     private SceneGpuTexture previousTexture;
     private SceneGpuTexture fadingTexture;
@@ -40,7 +29,7 @@ public final class SceneCoverTransition {
     public record Frame(@Nullable SceneGpuTexture cover, float opacityScale, boolean animated) {
     }
 
-    public Frame update(SceneGpuContext gpu, @Nullable BackgroundImages images,
+    public Frame update(SceneGpuContext gpu, @Nullable SceneCoverSource source,
                         long changedAtMillis, int targetLongEdge, float timeSeconds) {
         if (gpu == null) {
             return new Frame(null, 0f, false);
@@ -53,9 +42,8 @@ public final class SceneCoverTransition {
             this.targetLongEdge = targetLongEdge;
             reResolve(gpu);
         }
-        ImageTextureData nextSource = sourceOf(images);
-        if (!Objects.equals(nextSource, activeSource)) {
-            transitionTo(gpu, images, changedAtMillis, timeSeconds);
+        if (!Objects.equals(source, activeSource)) {
+            transitionTo(gpu, source, changedAtMillis, timeSeconds);
         }
 
         float opacityScale = 1f;
@@ -91,9 +79,8 @@ public final class SceneCoverTransition {
         return new Frame(cover, opacityScale, animated);
     }
 
-    private void transitionTo(SceneGpuContext gpu, @Nullable BackgroundImages images,
+    private void transitionTo(SceneGpuContext gpu, @Nullable SceneCoverSource source,
                               long changedAtMillis, float timeSeconds) {
-        ImageTextureData source = sourceOf(images);
         if (source == null) {
             if (activeTexture != null) {
                 float startSeconds = changedAtMillis / 1000f;
@@ -128,7 +115,6 @@ public final class SceneCoverTransition {
         int nextSlot = 1 - activeSlot;
         SceneGpuTexture prepared = covers[nextSlot].prepare(gpu, source, targetLongEdge);
         if (prepared == null) {
-            // Keep the current cover; remember the failed source so it is not retried every frame.
             activeSource = source;
             return;
         }
@@ -203,11 +189,6 @@ public final class SceneCoverTransition {
 
     private static float smooth(float t) {
         return t * t * (3f - 2f * t);
-    }
-
-    private static @Nullable ImageTextureData sourceOf(@Nullable BackgroundImages images) {
-        if (images == null) return null;
-        return images.original != null ? images.original : images.current;
     }
 
     private void resetState() {

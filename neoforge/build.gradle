@@ -114,6 +114,18 @@ remapJar {
 }
 
 loom {
+    // NeoForge's dev launch isolates mod class loading in a module layer that only contains
+    // MOD_CLASSES groups and mod files, so `:core` must be part of the `main` mod group instead of
+    // being a plain classpath/forgeRuntimeLibrary entry. Bundling it into the mod group keeps it in
+    // the GAME layer next to `common`/`neoforge` classes, which `Environment.Platform.load` reflects into.
+    mods {
+        main {
+            sourceSet(project.sourceSets.main)
+            // Use the compiled classes directory (instead of the core jar) so IDEA/Gradle builds are
+            // picked up without having to rebuild `:core:jar` before every debug session.
+            modFiles.from(project(':core').sourceSets.main.output)
+        }
+    }
     runs {
         client {
             setRunDirectory file("run/client")

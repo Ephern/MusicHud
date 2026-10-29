@@ -9,9 +9,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/**
- * Combines the captured game scene with the premultiplied cover layer target.
- */
 public final class SceneCoverOverlay {
     private static final Logger LOGGER = MusicHud.getLogger(SceneCoverOverlay.class);
 
@@ -34,7 +31,7 @@ public final class SceneCoverOverlay {
             try {
                 target = gpu.createRenderTarget("MusicHud cover overlay",
                         scene.width(), scene.height(),
-                        SceneTextureFormat.RGBA8, SceneSamplerState.linearClamp());
+                        SceneTextureFormat.RGBA8);
                 owner = gpu;
                 width = scene.width();
                 height = scene.height();
@@ -46,7 +43,7 @@ public final class SceneCoverOverlay {
         }
         try {
             gpu.draw(new SceneDraw(target,
-                    gpu.pipeline(ScenePipelineKey.SCENE_COVER_OVERLAY, target.format()),
+                    gpu.pipeline(ScenePipelineKey.SCENE_COVER_OVERLAY, target.actualFormat()),
                     List.of(
                             new SceneSamplerBinding("Sampler0", scene,
                                     gpu.sampler(SceneSamplerState.linearClamp())),

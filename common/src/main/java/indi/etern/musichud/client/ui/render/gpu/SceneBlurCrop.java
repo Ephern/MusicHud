@@ -9,10 +9,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/**
- * Crops the inner HUD rectangle out of a padded, blurred scene capture so downstream
- * passes can keep using full [0,1] UVs. Off-screen parts clamp to the captured edge.
- */
 public final class SceneBlurCrop {
     private static final Logger LOGGER = MusicHud.getLogger(SceneBlurCrop.class);
 
@@ -35,7 +31,7 @@ public final class SceneBlurCrop {
             release(gpu);
             try {
                 target = gpu.createRenderTarget("MusicHud blur crop", width, height,
-                        SceneTextureFormat.RGBA16F, SceneSamplerState.linearClamp());
+                        SceneTextureFormat.RGBA16F);
                 owner = gpu;
                 this.width = width;
                 this.height = height;
@@ -47,7 +43,7 @@ public final class SceneBlurCrop {
         }
         try {
             gpu.draw(new SceneDraw(target,
-                    gpu.pipeline(ScenePipelineKey.SCENE_BLUR_CROP, target.format()),
+                    gpu.pipeline(ScenePipelineKey.SCENE_BLUR_CROP, target.actualFormat()),
                     List.of(new SceneSamplerBinding("Sampler0", source,
                             gpu.sampler(SceneSamplerState.linearClamp()))),
                     List.of(new SceneUniformBinding(CropUniform.UBO_NAME,

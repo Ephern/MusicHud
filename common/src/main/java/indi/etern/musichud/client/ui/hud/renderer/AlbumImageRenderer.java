@@ -9,7 +9,7 @@ import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
 import indi.etern.musichud.client.ui.render.SceneStyle;
-import indi.etern.musichud.client.ui.render.pipeline.GpuTextureViewRef;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.BlazeTextureRefs;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
 import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
@@ -55,11 +55,11 @@ public class AlbumImageRenderer implements RenderLayer {
         }
         if (transitionTexture != null) {
             return SceneTextureSetup.doubleTexture(
-                    new GpuTextureViewRef(currentTexture.getTextureView()),
-                    new GpuTextureViewRef(transitionTexture.getTextureView())
+                    BlazeTextureRefs.of(currentTexture),
+                    BlazeTextureRefs.of(transitionTexture)
             );
         }
-        return SceneTextureSetup.single(new GpuTextureViewRef(currentTexture.getTextureView()));
+        return SceneTextureSetup.single(BlazeTextureRefs.of(currentTexture));
     }
 
     private DynamicTexture getIconTexture() {

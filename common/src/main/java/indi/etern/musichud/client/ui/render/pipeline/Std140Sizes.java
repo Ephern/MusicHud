@@ -1,9 +1,5 @@
 package indi.etern.musichud.client.ui.render.pipeline;
 
-/**
- * Dependency-free std140 size calculator replicating the exact semantics of Minecraft's
- * {@code Std140SizeCalculator}, so metadata beans stay version-neutral.
- */
 public class Std140Sizes {
     private int size;
 

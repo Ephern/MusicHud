@@ -29,22 +29,20 @@ class WarpMeshEvaluatorTest {
     }
 
     @Test
-    void bothInterpolationsStayFiniteForDefaultPresets() {
-        for (WarpPresetType type : WarpPresetType.values()) {
-            WarpPreset preset = WarpPresetLibrary.defaultPreset(type);
-            for (int grid = 3; grid <= 9; grid++) {
-                float[] offsets = WarpPresetGenerator.generateOffsets(preset, grid);
-                for (WarpMeshInterpolation interpolation : WarpMeshInterpolation.values()) {
-                    WarpMesh mesh = WarpMeshEvaluator.evaluate(offsets, grid,
-                            interpolation, WarpMesh.DEFAULT_RESOLUTION);
-                    assertEquals(WarpMesh.DEFAULT_RESOLUTION, mesh.columns());
-                    assertEquals(offsets.length, mesh.controlPoints().length);
-                    for (int i = 0; i < mesh.positions().length; i++) {
-                        assertTrue(Float.isFinite(mesh.positions()[i]));
-                    }
-                    for (short index : mesh.indices()) {
-                        assertTrue(index >= 0 && index < mesh.columns() * mesh.rows());
-                    }
+    void bothInterpolationsStayFiniteForDefaultPreset() {
+        WarpPreset preset = ProceduralWarpTargets.defaultPreset();
+        for (int grid = 3; grid <= 9; grid++) {
+            float[] offsets = WarpPresetGenerator.generateOffsets(preset, grid);
+            for (WarpMeshInterpolation interpolation : WarpMeshInterpolation.values()) {
+                WarpMesh mesh = WarpMeshEvaluator.evaluate(offsets, grid,
+                        interpolation, WarpMesh.DEFAULT_RESOLUTION);
+                assertEquals(WarpMesh.DEFAULT_RESOLUTION, mesh.columns());
+                assertEquals(offsets.length, mesh.controlPoints().length);
+                for (int i = 0; i < mesh.positions().length; i++) {
+                    assertTrue(Float.isFinite(mesh.positions()[i]));
+                }
+                for (short index : mesh.indices()) {
+                    assertTrue(index >= 0 && index < mesh.columns() * mesh.rows());
                 }
             }
         }

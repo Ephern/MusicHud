@@ -9,12 +9,6 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/**
- * Crossfades two downsampled cover textures into a reusable offscreen target.
- * <p>
- * This pass only runs while a cover transition is active; stable frames reuse the
- * current cover directly and pay no extra sampling cost.
- */
 public final class SceneCoverBlend {
     private static final Logger LOGGER = MusicHud.getLogger(SceneCoverBlend.class);
 
@@ -34,7 +28,7 @@ public final class SceneCoverBlend {
             try {
                 target = gpu.createRenderTarget("MusicHud cover blend",
                         current.width(), current.height(),
-                        SceneTextureFormat.RGBA16F, SceneSamplerState.linearClamp());
+                        SceneTextureFormat.RGBA16F);
                 owner = gpu;
                 width = current.width();
                 height = current.height();
@@ -46,7 +40,7 @@ public final class SceneCoverBlend {
         }
         try {
             gpu.draw(new SceneDraw(target,
-                    gpu.pipeline(ScenePipelineKey.SCENE_COVER_BLEND, target.format()),
+                    gpu.pipeline(ScenePipelineKey.SCENE_COVER_BLEND, target.actualFormat()),
                     List.of(
                             new SceneSamplerBinding("Sampler0", previous,
                                     gpu.sampler(SceneSamplerState.linearClamp())),

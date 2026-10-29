@@ -1,7 +1,8 @@
-package indi.etern.musichud.client.ui.render.gpu;
+package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.systems.RenderSystem;
+import indi.etern.musichud.client.ui.render.gpu.SceneMesh;
 import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;

@@ -16,10 +16,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.concurrent.ThreadLocalRandom;
 
-/**
- * Forward procedural cover warp. Targets are generated once per raised-cosine cycle and
- * consumed from a clean control lattice; no Apple/native mesh data is involved.
- */
 public final class SceneCoverWarpProcedural implements AutoCloseable {
     private static final Logger LOGGER = MusicHud.getLogger(SceneCoverWarpProcedural.class);
     private static final SceneSamplerState LINEAR_CLAMP = SceneSamplerState.linearClamp();
@@ -58,7 +54,7 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
         releaseMesh();
         releaseTarget(gpu);
         target = gpu.createRenderTarget("MusicHud procedural cover warp", width, height,
-                SceneTextureFormat.RGBA16F, LINEAR_CLAMP);
+                SceneTextureFormat.RGBA16F);
         owner = gpu;
         this.width = width;
         this.height = height;
@@ -125,7 +121,7 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
         vertexData.flip();
         gpu.updateMesh(mesh, vertexData);
         ScenePipeline pipeline = gpu.pipeline(ScenePipelineKey.SCENE_COVER_WARP_PROCEDURAL,
-                target.format());
+                target.actualFormat());
         gpu.clear(target, 0xff000000);
         gpu.drawIndexed(new SceneIndexedDraw(new SceneDraw(target, pipeline,
                 List.of(new SceneSamplerBinding("Sampler0", cover,

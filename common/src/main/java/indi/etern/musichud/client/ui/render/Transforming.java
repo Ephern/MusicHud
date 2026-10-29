@@ -4,9 +4,6 @@ import org.joml.Matrix3x2fStack;
 
 import java.util.function.Consumer;
 
-/**
- * Version-neutral 2D transform helper backed by a JOML {@link Matrix3x2fStack}.
- */
 public class Transforming {
     private final Matrix3x2fStack pose;
 

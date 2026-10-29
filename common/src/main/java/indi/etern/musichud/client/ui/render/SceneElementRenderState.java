@@ -9,12 +9,6 @@ import net.minecraft.client.gui.navigation.ScreenRectangle;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
-/**
- * Version-neutral description of a single HUD element.
- * <p>
- * The owning {@link RenderLayer} is supplied when the element is submitted, so elements
- * sharing the same pipeline stay separated by renderer identity.
- */
 public record SceneElementRenderState(
         @NonNull ScenePipeline pipeline,
         @NonNull SceneTextureSetup textureSetup,

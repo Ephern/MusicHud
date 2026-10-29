@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.render.gpu;
 
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
+import org.jetbrains.annotations.NotNull;
 
 import java.nio.ByteBuffer;
 import java.util.Objects;
@@ -35,7 +36,7 @@ public final class SceneRawUniform implements SceneUniform {
     }
 
     @Override
-    public void write(ByteBuffer byteBuffer) {
+    public void write(@NotNull ByteBuffer byteBuffer) {
         writer.accept(byteBuffer);
     }
 

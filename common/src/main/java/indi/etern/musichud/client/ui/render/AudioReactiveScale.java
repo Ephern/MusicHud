@@ -2,9 +2,6 @@ package indi.etern.musichud.client.ui.render;
 
 import indi.etern.musichud.client.audio.SpectrumSnapshot;
 
-/**
- * Maps the low/mid spectrum bands to a fluid-layer zoom factor.
- */
 public final class AudioReactiveScale {
     private AudioReactiveScale() {
     }

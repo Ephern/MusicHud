@@ -208,13 +208,6 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
                 .setDefaultValue(clientConfig.getDefaultHudBackgroundFluidOpacity())
                 .create(appearanceCategory);
         new AdaptiveIntegerOption(context,
-                I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundFluidBlurRadius"),
-                clientConfig::getHudBackgroundFluidBlurRadius,
-                clientConfig::setHudBackgroundFluidBlurRadius)
-                .setRange(0, 1024)
-                .setDefaultValue(clientConfig.getDefaultHudBackgroundFluidBlurRadius())
-                .create(appearanceCategory);
-        new AdaptiveIntegerOption(context,
                 I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundBlurRadius"),
                 clientConfig::getHudBackgroundBlurRadius,
                 clientConfig::setHudBackgroundBlurRadius)

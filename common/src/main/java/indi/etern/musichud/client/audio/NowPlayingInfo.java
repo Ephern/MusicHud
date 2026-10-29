@@ -272,7 +272,7 @@ public class NowPlayingInfo {
                     if (!Files.exists(iconPath)) {
                         Files.createFile(iconPath);
                         iconPath.toFile().deleteOnExit();
-                        try (InputStream iconStream = getClass().getResourceAsStream("/assets/music_hud/icon.png")) {
+                        try (InputStream iconStream = MusicHud.getResourceAsStream("/assets/music_hud/icon.png")) {
                             if (iconStream != null) {
                                 Files.copy(iconStream, iconPath, StandardCopyOption.REPLACE_EXISTING);
                             }
