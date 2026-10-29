@@ -15,7 +15,6 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
 import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
 import indi.etern.musichud.client.ui.lyric.LineBlurResources;
 import indi.etern.musichud.client.utils.ui.RhythmAnimator;
@@ -134,7 +133,7 @@ public class LyricLineView extends LinearLayout {
             }
         } catch (Exception e) {
             if (logger == null) {
-                logger = MusicHud.getLogger(HudRendererManager.class);
+                logger = MusicHud.getLogger(LyricLineView.class);
             }
             logger.error("While configure LyricLineView", e);
         }
@@ -344,7 +343,7 @@ public class LyricLineView extends LinearLayout {
             blurDisabled = true;
             blurResources.release();
             if (logger == null) {
-                logger = MusicHud.getLogger(HudRendererManager.class);
+                logger = MusicHud.getLogger(LyricLineView.class);
             }
             logger.error("Disabling lyric blur after an error", t);
             super.dispatchDraw(canvas);

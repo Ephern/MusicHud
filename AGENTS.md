@@ -54,6 +54,13 @@ The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradl
 - **Mixin**: Config `music_hud.mixins.json`. 6 classes: `SoundEngineMixin`, `GuiRendererHudMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin` + `MusicHudMixinPlugin`.
 - **Config**: Forge Config API Port (Fabric, shared with NeoForge) / native NeoForge `ModConfig` / Paper `config.yml`.
 
+## Render Backend Boundary
+
+- `common/.../client/ui/render/gpu/` is the version-neutral scene layer. It must not import `com.mojang.blaze3d.*`, `com.mojang.renderpearl.*`, `org.lwjgl.*`, `net.neoforged.*`, or `net.minecraft.*`.
+- `gpu/blaze3d/` is the 1.21.6-1.21.8 blaze3d command adapter. `gpu/blaze3d/gl/` is the only place allowed to use raw OpenGL and NeoForge `ValidationGpuDevice` reflection.
+- Effects use `SceneGpuContext` plus `SceneTextureFormat`/`SceneSamplerState`/`SceneUniform`; they must not cast to backend types or probe GL directly.
+- `SceneGpuContext` has no generic readback API. Add readback only with a backend capability and a real implementation; the native RGBA16F shim advertises RGBA8 metadata and must never be used for CPU transfer.
+
 ## Frameworks & Dependencies
 
 - **ModernUI** (icyllis.modernui) — GUI framework, NOT vanilla MC widgets. Resolved from Gradle caches / Loom remap cache (may have flat JARs in `libs/` in some branches). See `ModernUI Library JARs` below for exact sources-JAR paths.

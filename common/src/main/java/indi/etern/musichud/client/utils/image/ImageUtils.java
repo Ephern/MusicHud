@@ -509,7 +509,7 @@ public class ImageUtils {
 
     public static @Nullable Image getImageFromResource(String resourceName) {
         return cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
-            try (InputStream iconResourceStream = MusicHud.class.getResourceAsStream(s)) {
+            try (InputStream iconResourceStream = MusicHud.getResourceAsStream(s)) {
                 if (iconResourceStream != null) {
                     return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
                 } else {

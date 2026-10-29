@@ -3,6 +3,7 @@ package indi.etern.musichud.client.audio;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Traceable;
+import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import org.apache.logging.log4j.Logger;
 
@@ -34,6 +35,12 @@ public class StreamAudioPlayer {
     private final AtomicReference<Status> status = new AtomicReference<>(Status.IDLE);
     @Getter
     private final Set<Consumer<Status>> statusChangeListener = new CopyOnWriteArraySet<>();
+    private final PlaybackSpectrum spectrum = new PlaybackSpectrum(MusicHud.EXECUTOR);
+    private final PlaybackSpectrumMixer spectrumMixer = new PlaybackSpectrumMixer();
+    private final java.util.IdentityHashMap<PlaybackTask, Long> spectrumSubmissions = new java.util.IdentityHashMap<>();
+    private long nextSpectrumSubmission;
+    private long spectrumToken;
+    private boolean spectrumMuted;
     private PlaybackTask currentTask;
     private PlaybackTask pendingTask;
     /** Next track buffered ahead of time; not audible until it becomes current/pending. */
@@ -53,6 +60,54 @@ public class StreamAudioPlayer {
 
     public Status getStatus() {
         return status.get();
+    }
+
+    /** Read-only session-bound spectrum of the actual current/pending PCM mix. */
+    public synchronized SpectrumSnapshot getSpectrum() {
+        boolean muted = ClientConfig.getInstance().getMuted();
+        updateSpectrumPause(muted);
+        return spectrum.snapshot(muted);
+    }
+
+    private void updateSpectrumPause(boolean muted) {
+        if (spectrumMuted != muted) {
+            spectrumMuted = muted;
+            // Discard old wallclock capture windows, while preserving the native FFT history/envelope.
+            spectrumMixer.clear();
+        }
+        spectrum.setPaused(muted);
+    }
+
+    public record SpectrumMixDiagnostics(long blocks, long missingSamples,
+                                         long contentStartNanos, long contentEndNanos, long assemblyNanos,
+                                         long minimumEndLeadNanos, long maximumEndLeadNanos,
+                                         SourcePcmClock.Reading currentClock, SourcePcmClock.Reading pendingClock) { }
+
+    public synchronized SpectrumMixDiagnostics getSpectrumMixDiagnostics() {
+        return new SpectrumMixDiagnostics(spectrumMixer.mixedBlocks(), spectrumMixer.missingSamples(),
+                spectrumMixer.contentStartNanos(), spectrumMixer.contentEndNanos(), spectrumMixer.assemblyNanos(),
+                spectrumMixer.minimumEndLeadNanos(), spectrumMixer.maximumEndLeadNanos(),
+                currentTask == null ? null : currentTask.pcmClock(), pendingTask == null ? null : pendingTask.pcmClock());
+    }
+
+    private synchronized void onPcm(PlaybackTask task, long submission, PcmChunk chunk) {
+        Long registered = spectrumSubmissions.get(task);
+        if (registered == null || registered != submission || !task.isAudible()) return;
+        boolean muted = ClientConfig.getInstance().getMuted();
+        updateSpectrumPause(muted);
+        if (muted) return;
+        retainAudibleSpectrumSources();
+        spectrum.setActive(spectrumToken, true);
+        spectrumMixer.accept(submission, chunk, mixed -> spectrum.accept(spectrumToken, mixed));
+    }
+
+    private void retainAudibleSpectrumSources() {
+        java.util.Set<Long> active = new java.util.HashSet<>();
+        for (PlaybackTask task : new PlaybackTask[] {currentTask, pendingTask}) {
+            Long submission = spectrumSubmissions.get(task);
+            if (task != null && task.isAudible() && submission != null) active.add(submission);
+        }
+        spectrumMixer.retain(active);
     }
 
     private void setStatus(Status status) {
@@ -79,6 +134,10 @@ public class StreamAudioPlayer {
      * is superseded before it started).
      */
     public synchronized CompletableFuture<ZonedDateTime> play(PlaybackTask task) {
+        if (spectrumSubmissions.isEmpty()) spectrumToken = spectrum.beginSession();
+        long submission = ++nextSpectrumSubmission;
+        spectrumSubmissions.put(task, submission);
+        task.setPcmSink(chunk -> onPcm(task, submission, chunk));
         PlaybackTask stale = preloadedTask;
         if (stale != null && stale != task) {
             preloadedTask = null;
@@ -194,6 +253,9 @@ public class StreamAudioPlayer {
     }
 
     public synchronized CompletableFuture<Void> stop() {
+        spectrum.stop();
+        spectrumMixer.clear();
+        spectrumSubmissions.clear();
         if (preloadedTask != null) {
             preloadedTask.cancel();
             preloadedTask = null;
@@ -218,6 +280,10 @@ public class StreamAudioPlayer {
     }
 
     private synchronized void onTaskStateChanged(PlaybackTask task, PlaybackState state) {
+        retainAudibleSpectrumSources();
+        if ((currentTask == null || !currentTask.isAudible()) && (pendingTask == null || !pendingTask.isAudible())) {
+            spectrum.setActive(spectrumToken, false);
+        }
         if (task != currentTask) return;
         // A pending successor will take over in onTaskFinished; never flash IDLE
         // in between (the old task's FINISHED must not mask the already-known next).
@@ -234,6 +300,12 @@ public class StreamAudioPlayer {
 
     private void onTaskFinished(PlaybackTask finished) {
         synchronized (this) {
+            spectrumSubmissions.remove(finished);
+            retainAudibleSpectrumSources();
+            if (spectrumSubmissions.isEmpty()) {
+                spectrumMixer.clear();
+                spectrum.stop();
+            }
             if (currentTask != finished) return;
             currentTask = null;
             PlaybackTask next = pendingTask;

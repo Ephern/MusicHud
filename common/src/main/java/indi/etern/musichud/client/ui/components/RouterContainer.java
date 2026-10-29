@@ -352,6 +352,24 @@ public class RouterContainer extends FrameLayout {
         default void onTransitionStart(@Nullable String fromKey, @NonNull String toKey, @NonNull TransitionType type) {}
     }
 
+    public interface RouteAware {
+        default void onRoutePushed() {}
+
+        default void onRoutePopped() {}
+    }
+
+    private static void notifyRoutePushed(@Nullable View view) {
+        if (view instanceof RouteAware aware) {
+            aware.onRoutePushed();
+        }
+    }
+
+    private static void notifyRoutePopped(@Nullable View view) {
+        if (view instanceof RouteAware aware) {
+            aware.onRoutePopped();
+        }
+    }
+
     public RouterContainer(Context context) {
         super(context);
         RouterContainer thisInstance = this;
@@ -394,6 +412,7 @@ public class RouterContainer extends FrameLayout {
             String popKey = routeStack.pop();
             View view = dynamicViews.get(popKey);
             if (view != null) {
+                notifyRoutePopped(view);
                 removeView(view);
             }
         }
@@ -442,6 +461,7 @@ public class RouterContainer extends FrameLayout {
         dynamicViews.put(dynamicKey, view);
 
         isTransitioning = true;
+        transitionTargetKey = dynamicKey;
 
         View currentPage = getCurrentViewFromStack();
 
@@ -450,6 +470,7 @@ public class RouterContainer extends FrameLayout {
         }
 
         routeStack.push(dynamicKey);
+        notifyRoutePushed(view);
 
         AnimationStyle effectiveStyle = animationStyle != null ? animationStyle : AnimationStyle.SCALE_FADE_PUSH;
 
@@ -483,6 +504,9 @@ public class RouterContainer extends FrameLayout {
             isTransitioning = false;
             return;
         }
+
+        transitionTargetKey = parentKey;
+        notifyRoutePopped(currentPage);
 
         if (pageChangeListener != null) {
             pageChangeListener.onPageChangeStart(currentKey, parentKey);
@@ -670,6 +694,7 @@ public class RouterContainer extends FrameLayout {
         isTransitioning = false;
         transitionTargetKey = null;
         currentPageKey = toKey;
+        notifyRoutePushed(toPage);
         if (pageChangeListener != null) {
             pageChangeListener.onPageChangeEnd(toKey);
         }
@@ -727,6 +752,12 @@ public class RouterContainer extends FrameLayout {
         return page;
     }
 
+    @Nullable
+    public View getEffectivePage() {
+        String key = getEffectivePageKey();
+        return key != null ? getViewByKey(key) : null;
+    }
+
     public void setAnimationStyle(@NonNull AnimationStyle style) {
         animationStyle = style;
     }
@@ -746,9 +777,11 @@ public class RouterContainer extends FrameLayout {
 
     public void clearAllPageCache() {
         for (View page : pageCache.values()) {
+            notifyRoutePopped(page);
             removeView(page);
         }
         for (View page : dynamicViews.values()) {
+            notifyRoutePopped(page);
             removeView(page);
         }
         pageCache.clear();

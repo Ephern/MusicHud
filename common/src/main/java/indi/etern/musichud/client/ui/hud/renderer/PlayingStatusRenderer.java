@@ -1,15 +1,19 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import indi.etern.musichud.client.ui.render.*;
+import indi.etern.musichud.client.ui.render.pipeline.*;
+import indi.etern.musichud.client.ui.render.text.*;
+
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
-import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
+import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.util.Mth;
 
-public class PlayingStatusRenderer implements HudRenderer {
+public class PlayingStatusRenderer implements RenderLayer {
     // From Lucide Icons
     public static final String LOADING_ICON_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/loader_circle.png";
     public static final String RETRYING_ICON_LOCATION = MusicHud.MOD_ID + ":textures/gui/icons/rotate_cw.png";
@@ -22,12 +26,12 @@ public class PlayingStatusRenderer implements HudRenderer {
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     StreamAudioPlayer.Status status;
     @Getter
-    private HudStyle hudStyle;
+    private SceneStyle hudStyle;
     @Setter
     private boolean visibility = true;
     private String currentResourceLocation;
 
-    public void configure(HudStyle hudStyle) {
+    public void configure(SceneStyle hudStyle) {
         this.hudStyle = hudStyle;
     }
 
@@ -52,8 +56,11 @@ public class PlayingStatusRenderer implements HudRenderer {
     }
 
     @Override
-    public void render(HudRenderContext hudRenderContext) {
+    public void render(SceneRenderContext hudRenderContext) {
         String currentResourceLocation1 = currentResourceLocation;
+        if (hudStyle != null && (hudStyle.getWidth() <= 0 || hudStyle.getHeight() <= 0)) {
+            return;
+        }
         if (currentResourceLocation1 != null && visibility) {
             float rotationRadians;
             if (currentResourceLocation1.equals(RETRYING_ICON_LOCATION) || currentResourceLocation1.equals(LOADING_ICON_LOCATION)) {
@@ -62,7 +69,7 @@ public class PlayingStatusRenderer implements HudRenderer {
                 rotationRadians = 0;
             }
 
-            HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(hudRenderContext);
+            SceneStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(hudRenderContext);
             int screenX = (int) absolutePosition.x();
             int screenY = (int) absolutePosition.y();
             int width = (int) hudStyle.getWidth();

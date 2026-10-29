@@ -21,7 +21,8 @@ import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.states.*;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.hud.presentation.CoverImageStore;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -111,9 +112,9 @@ public class MusicService implements IClientMusicService {
                 inst.musicQueue.clear();
             }
         }
-        HudRendererManager hudRendererManager = HudRendererManager.getActiveInstance();
-        if (switchToNone && hudRendererManager != null) {
-            hudRendererManager.reset();
+        HudPresenter presenter = HudPresenter.getActiveInstance();
+        if (switchToNone && presenter != null) {
+            presenter.reset();
         }
     }
 
@@ -348,11 +349,11 @@ public class MusicService implements IClientMusicService {
                 MusicDetail peek = head.musicDetail().value();
                 Album album = peek.getAlbum();
                 ImageUtils.downloadScaledAsync(album.getPicUrl(), 240, 240);
-                HudRendererManager.getInstance().preloadAlbumImage(peek.getAlbum());
+                CoverImageStore.getInstance().preload(peek.getAlbum());
             } else if (nextIdleMusicDetail != null && !nextIdleMusicDetail.value().equals(MusicDetail.NONE)) {
                 Album album = nextIdleMusicDetail.value().getAlbum();
                 ImageUtils.downloadScaledAsync(album.getPicUrl(), 240, 240);
-                HudRendererManager.getInstance().preloadAlbumImage(nextIdleMusicDetail.value().getAlbum());
+                CoverImageStore.getInstance().preload(nextIdleMusicDetail.value().getAlbum());
             }
             if (!message.isEmpty()) {
                 MuiModApi.postToUiThread(() -> {
@@ -398,7 +399,7 @@ public class MusicService implements IClientMusicService {
         MusicDetail nextDetail = next.value();
         if (!nextDetail.equals(MusicDetail.NONE)) {
             ImageUtils.downloadScaledAsync(nextDetail.getAlbum().getPicUrl(), 240, 240);
-            HudRendererManager.getInstance().preloadAlbumImage(nextDetail.getAlbum());
+            CoverImageStore.getInstance().preload(nextDetail.getAlbum());
         }
         NowPlayingInfo.getInstance().updateNextToPlayIdle(next);
     }

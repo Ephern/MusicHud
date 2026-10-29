@@ -26,8 +26,9 @@ import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.mc.MuiScreen;
 import icyllis.modernui.mc.ScreenCallback;
 import icyllis.modernui.mc.UIManager;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
+import indi.etern.musichud.client.ui.hud.scene.HudScene;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import lombok.Getter;
 import lombok.NonNull;
 import net.minecraft.client.Minecraft;
@@ -89,12 +90,14 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     public void renderBackground(@NonNull GuiGraphics guiGraphics, int mouseX, int mouseY, float deltaTick) {
         if (minecraft != null && minecraft.level == null) {
             this.renderPanorama(guiGraphics, deltaTick);
-            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
+            RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
         }
     }
 
     @Override
     public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
+        // See MusicHudScreen#render: 1.21.1 does not call Screen#renderBackground on its own.
+        renderBackground(gr, mouseX, mouseY, deltaTick);
         mHost.render(gr, mouseX, mouseY, deltaTick);
     }
 

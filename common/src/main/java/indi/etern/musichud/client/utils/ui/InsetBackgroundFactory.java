@@ -23,16 +23,12 @@ public class InsetBackgroundFactory {
     @Builder.Default
     ColorStateList backgroundColor = Theme.GHOST_CHECK_BUTTON_STATES;
     @Builder.Default
+    int strokeWidth = 0;
+    @Builder.Default
+    int strokeColor = 0;
+    @Builder.Default
     long transitionDuration = 100;
     public record Padding(int left,int top,int right,int bottom) {}
-
-/*
-    public Drawable newBackgroundDrawable() {
-        ShapeDrawable background = newShapeDrawable();
-        RippleDrawable ripple = new RippleDrawable(Theme.ITEM_RIPPLE_COLOR_STATES, background, null);
-        return new InsetDrawable(ripple, inset);
-    }
-*/
 
     public void applyBackgroundTo(View view) {
         ShapeDrawable background = newShapeDrawable();
@@ -48,6 +44,9 @@ public class InsetBackgroundFactory {
         }
         background.setCornerRadius(cornerRadius);
         background.setColor(backgroundColor);
+        if (strokeWidth > 0) {
+            background.setStroke(strokeWidth, strokeColor);
+        }
         return background;
     }
 

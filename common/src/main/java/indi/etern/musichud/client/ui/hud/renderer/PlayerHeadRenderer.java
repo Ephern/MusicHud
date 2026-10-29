@@ -1,6 +1,10 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
-import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
+import indi.etern.musichud.client.ui.render.*;
+import indi.etern.musichud.client.ui.render.pipeline.*;
+import indi.etern.musichud.client.ui.render.text.*;
+
+import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.utils.ui.Easing;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
@@ -12,12 +16,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.function.Supplier;
 
-public class PlayerHeadRenderer implements HudRenderer {
+public class PlayerHeadRenderer implements RenderLayer {
     private static final int SKIN_TEXTURE_SIZE = 64;
     private static final int TRANSITION_DURATION = 400;
     private static final float ALPHA_EPSILON = 0.003f;
     @Getter
-    private HudStyle hudStyle;
+    private SceneStyle hudStyle;
     @Getter
     private volatile Supplier<String> playerSkinSupplier;
 
@@ -43,7 +47,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         }
     }
 
-    public static void renderHead(HudGraphics graphics, String skinPath,
+    public static void renderHead(SceneGraphics graphics, String skinPath,
                                   float x, float y, int w, int h, float alpha) {
         if (alpha <= ALPHA_EPSILON) {
             return;
@@ -75,12 +79,12 @@ public class PlayerHeadRenderer implements HudRenderer {
         return !layers.isEmpty();
     }
 
-    public void configure(HudStyle hudStyle) {
+    public void configure(SceneStyle hudStyle) {
         this.hudStyle = hudStyle;
     }
 
     @Override
-    public void render(HudRenderContext context) {
+    public void render(SceneRenderContext context) {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null) return;
 
@@ -110,7 +114,7 @@ public class PlayerHeadRenderer implements HudRenderer {
         }
         if (layers.isEmpty()) return;
 
-        HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
+        SceneStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
         int w = (int) hudStyle.getWidth();
         int h = (int) hudStyle.getHeight();
         float styleAlpha = hudStyle.calcAbsoluteAlpha();

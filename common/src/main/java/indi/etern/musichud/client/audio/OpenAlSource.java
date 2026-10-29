@@ -360,10 +360,22 @@ public final class OpenAlSource implements AutoCloseable {
     public void updatePlaybackPosition() {
         checkSourceValid();
         ledger.playbackBytes = Math.max(0, ledger.fedBytes.get() - ledger.queuedBytes.get());
+        long sampleOffset = -1;
+        long captureNanos = 0;
         try {
             clearStaleALError();
-            long offset = AL10.alGetSourcei(source, AL11.AL_SAMPLE_OFFSET);
-            checkQueryALError("alGetSourcei-SampleOffset");
+            PlaybackLedger.LedgerEntry pcmHead = ledger.peekFirst();
+            long offset;
+            if (pcmSink != null && pcmHead != null && pcmHead.sampleRate() > 0) {
+                SourcePcmClock.Reading reading = SourcePcmClock.query(source, pcmHead.sampleRate());
+                lastPcmClock = reading;
+                offset = reading.sampleOffset();
+                captureNanos = reading.capturedNanos();
+            } else {
+                offset = AL10.alGetSourcei(source, AL11.AL_SAMPLE_OFFSET);
+                checkQueryALError("alGetSourcei-SampleOffset");
+            }
+            sampleOffset = offset;
             if (offset >= 0 && offset >= lastSampleOffset) {
                 PlaybackLedger.LedgerEntry head = ledger.peekFirst();
                 int bytesPerFrame = head != null && head.sampleCount() > 0 ? head.bytes() / head.sampleCount() : 4;
@@ -374,15 +386,18 @@ public final class OpenAlSource implements AutoCloseable {
             }
         } catch (Exception ignored) {
         }
-        deliverPcm();
+        deliverPcm(sampleOffset, captureNanos);
     }
 
-    private void deliverPcm() {
+    private void deliverPcm(long sampleOffset, long captureNanos) {
         PcmSink sink = pcmSink;
-        if (sink == null) return;
+        if (sink == null || sampleOffset < 0 || !isPlaying()) return;
         PlaybackLedger.LedgerEntry head = ledger.peekFirst();
-        if (head == null) return;
-        sink.onPcm(new PcmChunk(head.pcm().slice(), head.format(), head.sampleRate()));
+        if (head == null || head.sampleCount() <= 0) return;
+        ByteBuffer window = ledger.pcmWindow(sampleOffset, PlaybackSpectrumMixer.CAPTURE_FRAMES);
+        int frameBytes = head.bytes() / head.sampleCount();
+        long firstFrame = Math.max(0, ledger.fedBytes.get() - ledger.queuedBytes.get()) / frameBytes + sampleOffset;
+        if (window.hasRemaining()) sink.onPcm(new PcmChunk(window, head.format(), head.sampleRate(), firstFrame, appliedGain, captureNanos));
     }
 
     public void flush() {
@@ -418,12 +433,22 @@ public final class OpenAlSource implements AutoCloseable {
         checkALError("alSourceStop");
     }
 
+    private volatile SourcePcmClock.Reading lastPcmClock;
+
+    public SourcePcmClock.Reading getPcmClock() { return lastPcmClock; }
+
+    private volatile float appliedGain = 1;
+
+    public float getAppliedGain() { return appliedGain; }
+
     public void setGain(float gain) {
         checkSourceValid();
         AL10.alSourcef(source, AL10.AL_GAIN, gain);
         int error = AL10.alGetError();
         if (error != AL10.AL_NO_ERROR) {
             LOGGER.warn("Failed to set source gain to {}: {} (source: {})", gain, getALErrorString(error), source);
+        } else {
+            appliedGain = gain;
         }
     }
 

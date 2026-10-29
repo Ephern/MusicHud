@@ -1,13 +1,17 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import indi.etern.musichud.client.ui.render.*;
+import indi.etern.musichud.client.ui.render.pipeline.*;
+import indi.etern.musichud.client.ui.render.text.*;
+
 import icyllis.modernui.mc.FontResourceManager;
 import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
-import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
-import indi.etern.musichud.client.ui.hud.renderer.text.GradientSpec;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.text.GradientSpec;
 import indi.etern.musichud.client.ui.lyric.LyricHighlightCalculator;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringValue;
@@ -24,7 +28,7 @@ import java.util.List;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 
-public class ScrollingLyricLineRenderer implements HudRenderer {
+public class ScrollingLyricLineRenderer implements RenderLayer {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static final int LYRICS_ANIMATION_DURATION = 300;
@@ -36,6 +40,10 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     // Gradient highlight smoothing band half width, in unscaled font pixels; it scales with the
     // text and stays within a few pixels of the classic hard scissor sweep.
     private static final float GRADIENT_SMOOTH_PX = 4f;
+    // Horizontal edge mask for overflowing lines: ramp width in units of the line height, and the
+    // cut amount (gui px) over which an edge mask fades in so it never pops on.
+    private static final float EDGE_FADE_WIDTH = 0.9f;
+    private static final float EDGE_FADE_RAMP_PX = 6f;
     private final List<LinePair> pairs = new ArrayList<>();
     private final ConcurrentLinkedQueue<PendingLines> pendingLines = new ConcurrentLinkedQueue<>();
     ModernStringSplitter modernStringSplitter;
@@ -44,7 +52,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
     @Setter
     private float line2Height;
     @Setter
-    private HudStyle hudStyle;
+    private SceneStyle hudStyle;
     private int cachedContainerWidth;
     @Setter
     private int lineSpacing = 0;
@@ -260,13 +268,13 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         }
     }
 
-    public void render(HudRenderContext context) {
+    public void render(SceneRenderContext context) {
         if (hudStyle == null) {
             return;
         }
 
         // 计算实际布局绝对坐标和尺寸
-        HudStyle.AbsolutePosition absPos = hudStyle.calcAbsolutePosition(context);
+        SceneStyle.AbsolutePosition absPos = hudStyle.calcAbsolutePosition(context);
         // 布局缓存（每次渲染时更新）
         int cachedContainerX = (int) absPos.x();
         int cachedContainerY = (int) absPos.y();
@@ -279,7 +287,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
 
         int totalHeight = (int) (line1Height + line2Height);
         int startY = cachedContainerY + (cachedContainerHeight - totalHeight) / 2; // 垂直居中
-        HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
+        SceneStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
 
         float x = absolutePosition.x();
         float y = absolutePosition.y();
@@ -340,7 +348,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         return from + (offset - floor) * (to - from);
     }
 
-    private void renderLine(HudRenderContext context, LineState line, int color, int baseX, int baseY, float lineHeight, float yOffset) {
+    private void renderLine(SceneRenderContext context, LineState line, int color, int baseX, int baseY, float lineHeight, float yOffset) {
         if (line.line == null) return;
         String text = line.line.text;
         if (text.isEmpty()) return;
@@ -353,13 +361,36 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         float drawX = baseX + scrollOffset;
         float drawY = baseY + yOffset;
         int drawColor = applyStyleAlpha(color);
+        TextEdgeFade fade = edgeFade(line, lineHeight, scale, drawX, baseX);
 
         context.transform()
                 .translate(drawX, drawY)
                 .scale(scale)
                 .end(transforming ->
-                        context.drawString(Minecraft.getInstance().font, text, 0, 0, drawColor, false)
+                        context.drawGradientString(Minecraft.getInstance().font, text, 0, 0,
+                                GradientSpec.flat(drawColor), 1f, fade)
                 );
+    }
+
+    /**
+     * Horizontal edge mask for one line: an edge is masked only while the run actually crosses that
+     * box edge, and the ramp width follows the cut amount, so a line that just starts to overflow
+     * dissolves in smoothly instead of flipping a hard mask on.
+     */
+    private TextEdgeFade edgeFade(LineState line, float lineHeight, float scale, float drawGuiX, float boxLeft) {
+        float overhang = -line.maxScrollOffset;
+        if (overhang <= 0.5f || scale <= 0f) {
+            return TextEdgeFade.NONE;
+        }
+        float boxWidth = hudStyle.getWidth();
+        float cutLeft = Math.max(0f, boxLeft - drawGuiX);
+        float cutRight = Math.max(0f, overhang - cutLeft);
+        float baseBand = Math.min(lineHeight * EDGE_FADE_WIDTH, boxWidth * 0.4f);
+        return TextEdgeFade.between(boxLeft, boxLeft + boxWidth,
+                Math.min(baseBand, cutLeft), Math.min(baseBand, cutRight),
+                TextEdgeFade.smoothstep(cutLeft / EDGE_FADE_RAMP_PX),
+                TextEdgeFade.smoothstep(cutRight / EDGE_FADE_RAMP_PX),
+                drawGuiX, scale);
     }
 
     /**
@@ -371,7 +402,7 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
      * completely off both ends: at sweep 0 the whole line is pending and at sweep 1 the whole
      * line is sung, both reached continuously instead of snapping at the ends.
      */
-    private void renderLineHighlight(HudRenderContext context, LineState line, int sungColor, int pendingColor,
+    private void renderLineHighlight(SceneRenderContext context, LineState line, int sungColor, int pendingColor,
                                      int baseX, int baseY, float lineHeight, float yOffset) {
         if (line.line == null) return;
         String text = line.line.text;
@@ -399,12 +430,13 @@ public class ScrollingLyricLineRenderer implements HudRenderer {
         // slide fully off either end (sweep 0 -> all pending, sweep 1 -> all sung) without a jump
         float center = sweep * (1f + 2f * band) - band;
         GradientSpec spec = GradientSpec.window(sung, pending, center, band);
+        TextEdgeFade fade = edgeFade(line, lineHeight, scale, drawX, baseX);
 
         context.transform()
                 .translate(drawX, drawY)
                 .scale(scale)
                 .end(transforming ->
-                        context.drawGradientString(Minecraft.getInstance().font, text, 0, 0, spec, 1f)
+                        context.drawGradientString(Minecraft.getInstance().font, text, 0, 0, spec, 1f, fade)
                 );
     }
 

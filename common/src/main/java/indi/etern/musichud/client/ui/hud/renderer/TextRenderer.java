@@ -1,10 +1,14 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import indi.etern.musichud.client.ui.render.*;
+import indi.etern.musichud.client.ui.render.pipeline.*;
+import indi.etern.musichud.client.ui.render.text.*;
+
 import icyllis.modernui.mc.text.ModernStringSplitter;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
-import indi.etern.musichud.client.ui.hud.renderer.text.GradientSpec;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.text.GradientSpec;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
@@ -13,25 +17,35 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Style;
 
+import java.util.Objects;
+
 @Getter
 @Setter
-public class TextRenderer implements HudRenderer {
+public class TextRenderer implements RenderLayer {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    /** Left edge mask fade-in window before the marquee starts moving. */
+    private static final float MARQUEE_FADE_IN_MS = 200f;
     private int vanillaLineHeight = -1;
     private ModernStringSplitter modernStringSplitter = null;
     private TextStyle currentTextData;
-    private HudStyle hudStyle;
+    private SceneStyle hudStyle;
     private int baseColor;
     private Position position;
     private int marqueeIntervalMillis = 5000;
     private Easing marqueeStartAndEndUpSpeedEasing = Easing.EASE_IN_OUT_SINE;
     private float marqueeSpaceWeight = 0.4f;
+    /** Edge mask width, in units of the text height. */
+    private float marqueeEdgeFadeWidth = 0.9f;
     private TextStyle nextTextData;
     private float transitionProgress = 1.0f;
     private boolean isTransitioning = false;
     private float transitionSpeed = 4.0f;
     private long lastUpdateTime = System.currentTimeMillis();
     private float marqueeDuration = 10000;
+    private String measuredCurrentText;
+    private String measuredNextText;
+    private float measuredHeight = -1;
+    private float measuredDisplayWidth;
     /**
      * Optional horizontal gradient; when set the text is drawn with per-vertex gradient colors
      * instead of a single color. {@code null} keeps the legacy flat path.
@@ -46,7 +60,7 @@ public class TextRenderer implements HudRenderer {
         }
     }
 
-    public void configure(HudStyle hudStyle, int baseColor, Position position) {
+    public void configure(SceneStyle hudStyle, int baseColor, Position position) {
         this.hudStyle = hudStyle;
         this.baseColor = baseColor;
         this.position = position;
@@ -118,7 +132,7 @@ public class TextRenderer implements HudRenderer {
         }
     }
 
-    public void render(HudRenderContext context) {
+    public void render(SceneRenderContext context) {
         // 更新过渡进度
         updateTransition();
 
@@ -132,7 +146,7 @@ public class TextRenderer implements HudRenderer {
 
         float scale = hudStyle.getHeight() / vanillaLineHeight;
 
-        HudStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
+        SceneStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
 
         if (!isTransitioning || nextTextData == null) {
             renderText(context, currentTextData, absolutePosition, scale, 1.0f);
@@ -149,7 +163,7 @@ public class TextRenderer implements HudRenderer {
         }
     }
 
-    private void renderText(HudRenderContext context, TextStyle textData, HudStyle.AbsolutePosition absolutePosition,
+    private void renderText(SceneRenderContext context, TextStyle textData, SceneStyle.AbsolutePosition absolutePosition,
                             float scale, float alpha) {
         String text = textData.text;
         if (text == null || text.isEmpty()) return;
@@ -158,47 +172,87 @@ public class TextRenderer implements HudRenderer {
         float absoluteAlpha = alpha * hudStyle.calcAbsoluteAlpha();
         int color = getColorWithAlpha(textData.baseColor, absoluteAlpha);
 
-        // 计算位置
+        float boxLeft = absolutePosition.x();
+        float boxWidth = hudStyle.getWidth();
+        float boxRight = boxLeft + boxWidth;
+        float y = absolutePosition.y();
         float measuredWidth = measureWidth(text);
         float textRenderWidth = scale * measuredWidth;
-        float layoutWidth = hudStyle.getWidth();
-        float x = position.computeX(absolutePosition.x(), text, Math.min(textRenderWidth, layoutWidth));
-        float y = absolutePosition.y();
-        boolean overflow = textRenderWidth > layoutWidth;
+        boolean overflow = textRenderWidth > boxWidth;
 
-        float x1 = x;
+        float x = boxLeft;
         float marqueeWidth = 0;
         float marqueeOffset = 0;
+        float fadeBandLeft = 0;
+        float fadeBandRight = 0;
+        float fadeStrengthLeft = 0;
+        float fadeStrengthRight = 0;
         boolean enableMarqueeText = clientConfig.getEnableMarqueeText();
         if (enableMarqueeText && position == Position.LEFT) {
-            marqueeWidth = textRenderWidth + layoutWidth * marqueeSpaceWeight;
-            long elapsedTime = System.currentTimeMillis() - lastUpdateTime;
-            float marqueeElapsedTime = Math.max(0, elapsedTime % (marqueeDuration + marqueeIntervalMillis) - marqueeIntervalMillis);
-            float marqueeProgress = marqueeStartAndEndUpSpeedEasing.getInterpolation(marqueeElapsedTime / marqueeDuration);
+            marqueeWidth = textRenderWidth + boxWidth * marqueeSpaceWeight;
+            // keep the phase in long arithmetic: as a float, the elapsed milliseconds lose
+            // precision once the HUD has been running for a while (16 ms steps past 2^24)
+            long cycleMs = (long) (marqueeDuration + marqueeIntervalMillis);
+            float marqueePhase = cycleMs > 0
+                    ? (float) ((System.currentTimeMillis() - lastUpdateTime) % cycleMs) : 0f;
+            float marqueeElapsedTime = Math.max(0f, marqueePhase - marqueeIntervalMillis);
+            float marqueeProgress = marqueeDuration > 0
+                    ? marqueeStartAndEndUpSpeedEasing.getInterpolation(marqueeElapsedTime / marqueeDuration)
+                    : 0f;
             marqueeOffset = overflow ? marqueeProgress * marqueeWidth : 0;
-            x1 -= marqueeOffset;
+            x -= marqueeOffset;
+            if (overflow) {
+                float baseBand = Math.min(hudStyle.getHeight() * marqueeEdgeFadeWidth, boxWidth * 0.4f);
+                // the right edge always cuts the run, so it always dissolves; clamping the band to
+                // the overhang keeps text that is still fully visible from being dimmed
+                fadeBandRight = Math.min(baseBand, textRenderWidth - boxWidth);
+                fadeStrengthRight = 1f;
+                // the left edge only cuts the leading run, i.e. exactly while it still crosses the
+                // box: fade in during the last MARQUEE_FADE_IN_MS of the pause, then drop the mask
+                // the instant the run has fully left. At that moment the band holds no text, so
+                // the mask vanishing is invisible, and it stays gone while the pause brings the
+                // wrapped copy back to its initial position.
+                fadeBandLeft = baseBand;
+                if (marqueeOffset <= textRenderWidth + 0.5f) {
+                    float fadeInStart = Math.max(0f, marqueeIntervalMillis - MARQUEE_FADE_IN_MS);
+                    fadeStrengthLeft = TextEdgeFade.smoothstep(
+                            (marqueePhase - fadeInStart) / MARQUEE_FADE_IN_MS);
+                }
+            }
         } else {
-            float maxWidth = hudStyle.getWidth() / scale;
-            text = trimToWidth(text, maxWidth);
-            if (text.isEmpty()) return;
+            String trimmed = trimToWidth(text, boxWidth / scale);
+            if (trimmed.isEmpty()) return;
+            text = trimmed;
+            float trimmedWidth = measureWidth(text) * scale;
+            x = switch (position) {
+                case LEFT -> boxLeft;
+                case CENTER -> boxLeft + (boxWidth - trimmedWidth) / 2f;
+                case RIGHT -> boxRight - trimmedWidth;
+            };
+            x = Math.max(boxLeft, x);
+            overflow = false;
         }
-        context.pushScissor((int) x, (int) y, (int) (x + layoutWidth), (int) (y + hudStyle.getHeight() + 1));
+        context.pushScissor((int) boxLeft, (int) y, (int) boxRight, (int) (y + hudStyle.getHeight() + 1));
         Transforming transform = context.transform();
         String finalText = text;
-        transform.translate(x1, y)
+        TextEdgeFade fade = TextEdgeFade.between(boxLeft, boxRight, fadeBandLeft, fadeBandRight,
+                fadeStrengthLeft, fadeStrengthRight, x, scale);
+        transform.translate(x, y)
                 .subTransform(transforming -> {
                     transforming.scale(scale)
                             .then(transforming1 -> {
-                                drawTextRun(context, finalText, color, absoluteAlpha);
+                                drawTextRun(context, finalText, color, absoluteAlpha, fade);
                             });
                 });
-        if (overflow && enableMarqueeText) {
-            if (marqueeWidth - marqueeOffset < layoutWidth) {
+        if (overflow) {
+            if (marqueeWidth - marqueeOffset < boxWidth) {
+                TextEdgeFade wrapFade = TextEdgeFade.between(boxLeft, boxRight, fadeBandLeft, fadeBandRight,
+                        fadeStrengthLeft, fadeStrengthRight, x + marqueeWidth, scale);
                 transform.translate(marqueeWidth, 0)
                         .subTransform(transforming -> {
                             transforming.scale(scale)
                                     .then(transforming1 -> {
-                                        drawTextRun(context, finalText, color, absoluteAlpha);
+                                        drawTextRun(context, finalText, color, absoluteAlpha, wrapFade);
                                     });
                         });
             }
@@ -207,12 +261,13 @@ public class TextRenderer implements HudRenderer {
         context.popScissor();
     }
 
-    private void drawTextRun(HudRenderContext context, String text, int color, float alpha) {
+    private void drawTextRun(SceneRenderContext context, String text, int color, float alpha, TextEdgeFade fade) {
         Font font = Minecraft.getInstance().font;
         if (gradient != null) {
-            context.drawGradientString(font, text, 0, 0, gradient, alpha);
+            context.drawGradientString(font, text, 0, 0, gradient, alpha, fade);
         } else {
-            context.drawString(font, text, 0, 0, color, false);
+            // color already carries the transition alpha, so the per-glyph alpha stays neutral
+            context.drawGradientString(font, text, 0, 0, GradientSpec.flat(color), 1f, fade);
         }
     }
 
@@ -223,11 +278,38 @@ public class TextRenderer implements HudRenderer {
     }
 
     public float calcDisplayWidth() {
-        if (currentTextData == null || currentTextData.text == null || currentTextData.text.isEmpty()) {
+        if (hudStyle == null) {
             return 0f;
-        } else {
-            return Math.min(hudStyle.getWidth(), measureWidth(currentTextData.text) * (hudStyle.getHeight() / vanillaLineHeight));
         }
+        return Math.min(hudStyle.getWidth(), measureDisplayWidth(hudStyle.getHeight()));
+    }
+
+    public float measureDisplayWidth(float height) {
+        String current = currentTextData == null ? null : currentTextData.text;
+        String next = isTransitioning && nextTextData != null ? nextTextData.text : null;
+        if ((current == null || current.isEmpty()) && (next == null || next.isEmpty())) {
+            return 0f;
+        }
+        if (Objects.equals(current, measuredCurrentText)
+                && Objects.equals(next, measuredNextText)
+                && height == measuredHeight) {
+            return measuredDisplayWidth;
+        }
+        if (vanillaLineHeight < 0) {
+            vanillaLineHeight = Minecraft.getInstance().font.lineHeight;
+        }
+        float width = 0;
+        if (current != null && !current.isEmpty()) {
+            width = measureWidth(current);
+        }
+        if (next != null && !next.isEmpty()) {
+            width = Math.max(width, measureWidth(next));
+        }
+        measuredCurrentText = current;
+        measuredNextText = next;
+        measuredHeight = height;
+        measuredDisplayWidth = width * (height / vanillaLineHeight);
+        return measuredDisplayWidth;
     }
 
     private ModernStringSplitter tryGetSplitter() {
@@ -291,24 +373,9 @@ public class TextRenderer implements HudRenderer {
     }
 
     public enum Position {
-        LEFT {
-            @Override
-            float computeX(float startX, String text, float scaledMeasuredWidth) {
-                return startX;
-            }
-        }, CENTER {
-            @Override
-            float computeX(float startX, String text, float scaledMeasuredWidth) {
-                return startX - 0.5f * scaledMeasuredWidth;
-            }
-        }, RIGHT {
-            @Override
-            float computeX(float startX, String text, float scaledMeasuredWidth) {
-                return startX - scaledMeasuredWidth;
-            }
-        };
-
-        abstract float computeX(float startX, String text, float scaledMeasuredWidth);
+        LEFT,
+        CENTER,
+        RIGHT
     }
 
     public static class TextStyle {

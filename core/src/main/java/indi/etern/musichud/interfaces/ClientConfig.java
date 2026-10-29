@@ -183,23 +183,83 @@ public interface ClientConfig {
 
     void setWhiteList(List<String> whiteList);
 
-    double getMainScreenAdditionalBackgroundDarken();
-
-    double getDefaultMainScreenAdditionalBackgroundDarken();
-
-    void setMainScreenAdditionalBackgroundDarken(double additionalBackgroundDarken);
-
-    double getHudBackgroundMixAlpha();
-
-    double getDefaultHudBackgroundMixAlpha();
-
-    void setHudBackgroundMixAlpha(double hudBackgroundMixAlpha);
-
     boolean getEnableMarqueeText();
 
     boolean getDefaultEnableMarqueeText();
 
     void setEnableMarqueeText(boolean aBoolean);
+
+    boolean getShowHudLayoutBoxes();
+
+    boolean getDefaultShowHudLayoutBoxes();
+
+    void setShowHudLayoutBoxes(boolean showHudLayoutBoxes);
+
+    boolean getForceGL32Path();
+
+    boolean getDefaultForceGL32Path();
+
+    void setForceGL32Path(boolean force);
+
+    boolean getForceRgba8Fallback();
+
+    boolean getDefaultForceRgba8Fallback();
+
+    void setForceRgba8Fallback(boolean force);
+
+    int getGuiBackgroundBlurRadius();
+
+    int getDefaultGuiBackgroundBlurRadius();
+
+    void setGuiBackgroundBlurRadius(int radius);
+
+    int getHudBackgroundBlurRadius();
+
+    int getDefaultHudBackgroundBlurRadius();
+
+    void setHudBackgroundBlurRadius(int radius);
+
+    double getGuiBackgroundFluidOpacity();
+
+    double getDefaultGuiBackgroundFluidOpacity();
+
+    void setGuiBackgroundFluidOpacity(double opacity);
+
+    double getHudBackgroundFluidOpacity();
+
+    double getDefaultHudBackgroundFluidOpacity();
+
+    void setHudBackgroundFluidOpacity(double opacity);
+
+    double getGuiBackgroundSamplingBlackOverlay();
+
+    double getDefaultGuiBackgroundSamplingBlackOverlay();
+
+    void setGuiBackgroundSamplingBlackOverlay(double overlay);
+
+    double getHudBackgroundSamplingBlackOverlay();
+
+    double getDefaultHudBackgroundSamplingBlackOverlay();
+
+    void setHudBackgroundSamplingBlackOverlay(double overlay);
+
+    double getPanelOpacity();
+
+    double getDefaultPanelOpacity();
+
+    void setPanelOpacity(double opacity);
+
+    double getPanelBrightness();
+
+    double getDefaultPanelBrightness();
+
+    void setPanelBrightness(double brightness);
+
+    boolean getEnableSidebarBackground();
+
+    boolean getDefaultEnableSidebarBackground();
+
+    void setEnableSidebarBackground(boolean enable);
 
     void save();
 
