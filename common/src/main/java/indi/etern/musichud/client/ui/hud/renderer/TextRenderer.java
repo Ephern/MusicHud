@@ -23,6 +23,8 @@ import java.util.Objects;
 @Setter
 public class TextRenderer implements RenderLayer {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    /** Left edge mask fade-in window before the marquee starts moving. */
+    private static final float MARQUEE_FADE_IN_MS = 200f;
     private int vanillaLineHeight = -1;
     private ModernStringSplitter modernStringSplitter = null;
     private TextStyle currentTextData;
@@ -32,6 +34,8 @@ public class TextRenderer implements RenderLayer {
     private int marqueeIntervalMillis = 5000;
     private Easing marqueeStartAndEndUpSpeedEasing = Easing.EASE_IN_OUT_SINE;
     private float marqueeSpaceWeight = 0.4f;
+    /** Edge mask width, in units of the text height. */
+    private float marqueeEdgeFadeWidth = 0.9f;
     private TextStyle nextTextData;
     private float transitionProgress = 1.0f;
     private boolean isTransitioning = false;
@@ -179,14 +183,42 @@ public class TextRenderer implements RenderLayer {
         float x = boxLeft;
         float marqueeWidth = 0;
         float marqueeOffset = 0;
+        float fadeBandLeft = 0;
+        float fadeBandRight = 0;
+        float fadeStrengthLeft = 0;
+        float fadeStrengthRight = 0;
         boolean enableMarqueeText = clientConfig.getEnableMarqueeText();
         if (enableMarqueeText && position == Position.LEFT) {
             marqueeWidth = textRenderWidth + boxWidth * marqueeSpaceWeight;
-            long elapsedTime = System.currentTimeMillis() - lastUpdateTime;
-            float marqueeElapsedTime = Math.max(0, elapsedTime % (marqueeDuration + marqueeIntervalMillis) - marqueeIntervalMillis);
-            float marqueeProgress = marqueeStartAndEndUpSpeedEasing.getInterpolation(marqueeElapsedTime / marqueeDuration);
+            // keep the phase in long arithmetic: as a float, the elapsed milliseconds lose
+            // precision once the HUD has been running for a while (16 ms steps past 2^24)
+            long cycleMs = (long) (marqueeDuration + marqueeIntervalMillis);
+            float marqueePhase = cycleMs > 0
+                    ? (float) ((System.currentTimeMillis() - lastUpdateTime) % cycleMs) : 0f;
+            float marqueeElapsedTime = Math.max(0f, marqueePhase - marqueeIntervalMillis);
+            float marqueeProgress = marqueeDuration > 0
+                    ? marqueeStartAndEndUpSpeedEasing.getInterpolation(marqueeElapsedTime / marqueeDuration)
+                    : 0f;
             marqueeOffset = overflow ? marqueeProgress * marqueeWidth : 0;
             x -= marqueeOffset;
+            if (overflow) {
+                float baseBand = Math.min(hudStyle.getHeight() * marqueeEdgeFadeWidth, boxWidth * 0.4f);
+                // the right edge always cuts the run, so it always dissolves; clamping the band to
+                // the overhang keeps text that is still fully visible from being dimmed
+                fadeBandRight = Math.min(baseBand, textRenderWidth - boxWidth);
+                fadeStrengthRight = 1f;
+                // the left edge only cuts the leading run, i.e. exactly while it still crosses the
+                // box: fade in during the last MARQUEE_FADE_IN_MS of the pause, then drop the mask
+                // the instant the run has fully left. At that moment the band holds no text, so
+                // the mask vanishing is invisible, and it stays gone while the pause brings the
+                // wrapped copy back to its initial position.
+                fadeBandLeft = baseBand;
+                if (marqueeOffset <= textRenderWidth + 0.5f) {
+                    float fadeInStart = Math.max(0f, marqueeIntervalMillis - MARQUEE_FADE_IN_MS);
+                    fadeStrengthLeft = TextEdgeFade.smoothstep(
+                            (marqueePhase - fadeInStart) / MARQUEE_FADE_IN_MS);
+                }
+            }
         } else {
             String trimmed = trimToWidth(text, boxWidth / scale);
             if (trimmed.isEmpty()) return;
@@ -203,20 +235,24 @@ public class TextRenderer implements RenderLayer {
         context.pushScissor((int) boxLeft, (int) y, (int) boxRight, (int) (y + hudStyle.getHeight() + 1));
         Transforming transform = context.transform();
         String finalText = text;
+        TextEdgeFade fade = TextEdgeFade.between(boxLeft, boxRight, fadeBandLeft, fadeBandRight,
+                fadeStrengthLeft, fadeStrengthRight, x, scale);
         transform.translate(x, y)
                 .subTransform(transforming -> {
                     transforming.scale(scale)
                             .then(transforming1 -> {
-                                drawTextRun(context, finalText, color, absoluteAlpha);
+                                drawTextRun(context, finalText, color, absoluteAlpha, fade);
                             });
                 });
         if (overflow) {
             if (marqueeWidth - marqueeOffset < boxWidth) {
+                TextEdgeFade wrapFade = TextEdgeFade.between(boxLeft, boxRight, fadeBandLeft, fadeBandRight,
+                        fadeStrengthLeft, fadeStrengthRight, x + marqueeWidth, scale);
                 transform.translate(marqueeWidth, 0)
                         .subTransform(transforming -> {
                             transforming.scale(scale)
                                     .then(transforming1 -> {
-                                        drawTextRun(context, finalText, color, absoluteAlpha);
+                                        drawTextRun(context, finalText, color, absoluteAlpha, wrapFade);
                                     });
                         });
             }
@@ -225,12 +261,13 @@ public class TextRenderer implements RenderLayer {
         context.popScissor();
     }
 
-    private void drawTextRun(SceneRenderContext context, String text, int color, float alpha) {
+    private void drawTextRun(SceneRenderContext context, String text, int color, float alpha, TextEdgeFade fade) {
         Font font = Minecraft.getInstance().font;
         if (gradient != null) {
-            context.drawGradientString(font, text, 0, 0, gradient, alpha);
+            context.drawGradientString(font, text, 0, 0, gradient, alpha, fade);
         } else {
-            context.drawString(font, text, 0, 0, color, false);
+            // color already carries the transition alpha, so the per-glyph alpha stays neutral
+            context.drawGradientString(font, text, 0, 0, GradientSpec.flat(color), 1f, fade);
         }
     }
 

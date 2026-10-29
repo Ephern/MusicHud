@@ -40,6 +40,10 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
     // Gradient highlight smoothing band half width, in unscaled font pixels; it scales with the
     // text and stays within a few pixels of the classic hard scissor sweep.
     private static final float GRADIENT_SMOOTH_PX = 4f;
+    // Horizontal edge mask for overflowing lines: ramp width in units of the line height, and the
+    // cut amount (gui px) over which an edge mask fades in so it never pops on.
+    private static final float EDGE_FADE_WIDTH = 0.9f;
+    private static final float EDGE_FADE_RAMP_PX = 6f;
     private final List<LinePair> pairs = new ArrayList<>();
     private final ConcurrentLinkedQueue<PendingLines> pendingLines = new ConcurrentLinkedQueue<>();
     ModernStringSplitter modernStringSplitter;
@@ -357,13 +361,36 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
         float drawX = baseX + scrollOffset;
         float drawY = baseY + yOffset;
         int drawColor = applyStyleAlpha(color);
+        TextEdgeFade fade = edgeFade(line, lineHeight, scale, drawX, baseX);
 
         context.transform()
                 .translate(drawX, drawY)
                 .scale(scale)
                 .end(transforming ->
-                        context.drawString(Minecraft.getInstance().font, text, 0, 0, drawColor, false)
+                        context.drawGradientString(Minecraft.getInstance().font, text, 0, 0,
+                                GradientSpec.flat(drawColor), 1f, fade)
                 );
+    }
+
+    /**
+     * Horizontal edge mask for one line: an edge is masked only while the run actually crosses that
+     * box edge, and the ramp width follows the cut amount, so a line that just starts to overflow
+     * dissolves in smoothly instead of flipping a hard mask on.
+     */
+    private TextEdgeFade edgeFade(LineState line, float lineHeight, float scale, float drawGuiX, float boxLeft) {
+        float overhang = -line.maxScrollOffset;
+        if (overhang <= 0.5f || scale <= 0f) {
+            return TextEdgeFade.NONE;
+        }
+        float boxWidth = hudStyle.getWidth();
+        float cutLeft = Math.max(0f, boxLeft - drawGuiX);
+        float cutRight = Math.max(0f, overhang - cutLeft);
+        float baseBand = Math.min(lineHeight * EDGE_FADE_WIDTH, boxWidth * 0.4f);
+        return TextEdgeFade.between(boxLeft, boxLeft + boxWidth,
+                Math.min(baseBand, cutLeft), Math.min(baseBand, cutRight),
+                TextEdgeFade.smoothstep(cutLeft / EDGE_FADE_RAMP_PX),
+                TextEdgeFade.smoothstep(cutRight / EDGE_FADE_RAMP_PX),
+                drawGuiX, scale);
     }
 
     /**
@@ -403,12 +430,13 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
         // slide fully off either end (sweep 0 -> all pending, sweep 1 -> all sung) without a jump
         float center = sweep * (1f + 2f * band) - band;
         GradientSpec spec = GradientSpec.window(sung, pending, center, band);
+        TextEdgeFade fade = edgeFade(line, lineHeight, scale, drawX, baseX);
 
         context.transform()
                 .translate(drawX, drawY)
                 .scale(scale)
                 .end(transforming ->
-                        context.drawGradientString(Minecraft.getInstance().font, text, 0, 0, spec, 1f)
+                        context.drawGradientString(Minecraft.getInstance().font, text, 0, 0, spec, 1f, fade)
                 );
     }
 

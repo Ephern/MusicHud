@@ -14,6 +14,7 @@ import indi.etern.musichud.client.ui.render.pipeline.*;
 import indi.etern.musichud.client.ui.render.text.GradientSpec;
 import indi.etern.musichud.client.ui.render.text.GradientTextRenderer;
 import indi.etern.musichud.client.ui.render.text.GradientTextRenderState;
+import indi.etern.musichud.client.ui.render.text.TextEdgeFade;
 import lombok.Getter;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -243,17 +244,22 @@ public class SceneRenderContextImpl implements SceneRenderContext {
             graphics.drawString(font, text, x, y, color, dropShadow);
             return;
         }
-        drawGradientString(font, text, x, y, GradientSpec.flat(color), 1f);
+        drawGradientString(font, text, x, y, GradientSpec.flat(color), 1f, TextEdgeFade.NONE);
     }
 
     @Override
-    public void drawGradientString(Font font, String text, int x, int y, GradientSpec gradient, float alpha) {
+    public void drawGradientString(Font font, String text, int x, int y, GradientSpec gradient, float alpha,
+                                   TextEdgeFade fade) {
         if (font == null || text == null || text.isEmpty() || gradient == null || alpha <= 0f) {
             return;
         }
+        if (fade == null) {
+            fade = TextEdgeFade.NONE;
+        }
         List<GradientTextRenderState> states = null;
         try {
-            states = GradientTextRenderer.build(font, text, x, y, gradient, alpha, currentScissor(), currentPose());
+            states = GradientTextRenderer.build(font, text, x, y, gradient, alpha, fade,
+                    currentScissor(), currentPose());
         } catch (Throwable t) {
             MusicHud.getLogger(SceneRenderContextImpl.class).debug("Gradient text geometry failed", t);
         }

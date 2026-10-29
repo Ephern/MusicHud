@@ -12,5 +12,6 @@ public interface GradientTextRun {
     GpuTextureView texture();
 
     /** {@code pose} maps text-local coordinates to GUI space. */
-    void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha);
+    void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha,
+                       TextEdgeFade fade);
 }

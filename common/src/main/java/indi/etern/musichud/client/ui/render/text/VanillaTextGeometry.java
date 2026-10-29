@@ -26,6 +26,7 @@ public final class VanillaTextGeometry {
 
     public static List<GradientTextRenderState> build(Font font, String text, int x, int y,
                                                       GradientSpec gradient, float alpha,
+                                                      TextEdgeFade fade,
                                                       @Nullable ScreenRectangle scissor, Matrix3x2f pose) {
         FormattedCharSequence sequence = Language.getInstance().getVisualOrder(FormattedText.of(text));
         Font.PreparedText prepared = font.prepareText(sequence, x, y, 0xFFFFFFFF, false, 0);
@@ -54,7 +55,7 @@ public final class VanillaTextGeometry {
             if (i == instances.size() || !sameBatch(instances.get(start), instances.get(i))) {
                 List<BakedGlyph.GlyphInstance> runInstances = instances.subList(start, i);
                 GradientTextRun run = new VanillaTextRun(runInstances, x, totalAdvance);
-                states.add(new GradientTextRenderState(pose, run, gradient, alpha, scissor));
+                states.add(new GradientTextRenderState(pose, run, gradient, alpha, fade, scissor));
                 start = i;
             }
         }
@@ -93,9 +94,10 @@ public final class VanillaTextGeometry {
         }
 
         @Override
-        public void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha) {
+        public void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha,
+                                  TextEdgeFade fade) {
             Matrix4f matrix = new Matrix4f().mul(pose).translate(0f, 0f, z);
-            VertexConsumer wrapper = new GradientVertexConsumer(consumer, originX, totalAdvance, gradient, alpha);
+            VertexConsumer wrapper = new GradientVertexConsumer(consumer, originX, totalAdvance, gradient, alpha, fade);
             for (BakedGlyph.GlyphInstance instance : instances) {
                 BakedGlyph glyph = instance.glyph();
                 if (glyph.textureView() == null) continue;

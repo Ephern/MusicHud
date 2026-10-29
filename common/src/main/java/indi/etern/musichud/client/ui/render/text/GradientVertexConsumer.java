@@ -11,17 +11,19 @@ final class GradientVertexConsumer implements VertexConsumer {
     private final float totalAdvance;
     private final GradientSpec gradient;
     private final float alpha;
+    private final TextEdgeFade fade;
 
     private float localX;
     private boolean hasLocalX;
 
     GradientVertexConsumer(VertexConsumer delegate, float originX, float totalAdvance,
-                           GradientSpec gradient, float alpha) {
+                           GradientSpec gradient, float alpha, TextEdgeFade fade) {
         this.delegate = delegate;
         this.originX = originX;
         this.totalAdvance = totalAdvance;
         this.gradient = gradient;
         this.alpha = alpha;
+        this.fade = fade;
     }
 
     @Override
@@ -84,6 +86,7 @@ final class GradientVertexConsumer implements VertexConsumer {
     }
 
     private int sampleColor() {
-        return this.gradient.sample((this.localX - this.originX) / this.totalAdvance, this.alpha);
+        float edgeAlpha = this.alpha * this.fade.factorAt(this.localX);
+        return this.gradient.sample((this.localX - this.originX) / this.totalAdvance, edgeAlpha);
     }
 }

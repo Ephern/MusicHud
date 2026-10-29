@@ -38,6 +38,7 @@ public final class ModernTextGeometry {
 
     public static List<GradientTextRenderState> build(Font font, String text, int x, int y,
                                                       GradientSpec gradient, float alpha,
+                                                      TextEdgeFade fade,
                                                       @Nullable ScreenRectangle scissor, Matrix3x2f pose) {
         TextLayout layout = TextLayoutEngine.getInstance().lookupVanillaLayout(text);
         float totalAdvance = Math.max(1f, layout.getTotalAdvance());
@@ -76,7 +77,7 @@ public final class ModernTextGeometry {
                 GradientTextRun run = new ModernTextRun(layout, start, i, fontSize, density, invDensity,
                         directMask, currentKey.pipeline, currentKey.kind, currentKey.bitmapFont,
                         currentKey.isColorEmoji, setup.originX(), setup.originY(), totalAdvance);
-                states.add(new GradientTextRenderState(setup.pose(), run, gradient, alpha, scissor));
+                states.add(new GradientTextRenderState(setup.pose(), run, gradient, alpha, fade, scissor));
                 start = i;
             }
             currentKey = key;
@@ -232,7 +233,8 @@ public final class ModernTextGeometry {
         }
 
         @Override
-        public void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha) {
+        public void writeVertices(VertexConsumer consumer, float z, Matrix3x2f pose, GradientSpec gradient, float alpha,
+                                  TextEdgeFade fade) {
             GLBakedGlyph[] bakedGlyphs = bakedGlyphs(layout, fontSize);
             float[] positions = layout.getPositions();
             int[] flags = layout.getGlyphFlags();
@@ -273,15 +275,17 @@ public final class ModernTextGeometry {
                     localX = Math.round(localX * density) * invDensity;
                     localY = Math.round(localY * density) * invDensity;
                 }
+                // the edge mask is per-vertex, so the GPU keeps interpolating it inside the quad
+                float leftAlpha = alpha * fade.factorAt(localX);
+                float rightAlpha = alpha * fade.factorAt(localX + w);
                 int colorLeft;
                 int colorRight;
                 if (isColorEmoji) {
-                    int a = Math.clamp((int) (alpha * 255f), 0, 255);
-                    colorLeft = (a << 24) | 0xFFFFFF;
-                    colorRight = colorLeft;
+                    colorLeft = (Math.clamp((int) (leftAlpha * 255f), 0, 255) << 24) | 0xFFFFFF;
+                    colorRight = (Math.clamp((int) (rightAlpha * 255f), 0, 255) << 24) | 0xFFFFFF;
                 } else {
-                    colorLeft = gradient.sample(localX / totalAdvance, alpha);
-                    colorRight = gradient.sample((localX + w) / totalAdvance, alpha);
+                    colorLeft = gradient.sample(localX / totalAdvance, leftAlpha);
+                    colorRight = gradient.sample((localX + w) / totalAdvance, rightAlpha);
                 }
                 float upSkew = 0f;
                 float downSkew = 0f;

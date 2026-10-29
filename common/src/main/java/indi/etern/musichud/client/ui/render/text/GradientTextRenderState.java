@@ -15,23 +15,25 @@ public final class GradientTextRenderState implements GuiElementRenderState {
     private final GradientTextRun run;
     private final GradientSpec gradient;
     private final float alpha;
+    private final TextEdgeFade fade;
     @Nullable
     private final ScreenRectangle scissorArea;
     @Nullable
     private TextureSetup textureSetup;
 
     public GradientTextRenderState(Matrix3x2f pose, GradientTextRun run, GradientSpec gradient,
-                                   float alpha, @Nullable ScreenRectangle scissorArea) {
+                                   float alpha, TextEdgeFade fade, @Nullable ScreenRectangle scissorArea) {
         this.pose = pose;
         this.run = run;
         this.gradient = gradient;
         this.alpha = alpha;
+        this.fade = fade == null ? TextEdgeFade.NONE : fade;
         this.scissorArea = scissorArea;
     }
 
     @Override
     public void buildVertices(@NotNull VertexConsumer consumer, float z) {
-        run.writeVertices(consumer, z, pose, gradient, alpha);
+        run.writeVertices(consumer, z, pose, gradient, alpha, fade);
     }
 
     @Override
