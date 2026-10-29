@@ -218,10 +218,13 @@ public class MainFragment extends Fragment {
             return;
         }
         int dp12 = sidePanel.dp(12);
-        PanelStyle.factory(sidePanel,
+        var padding = new InsetBackgroundFactory.Padding(dp12, 0, dp12, dp12);
+        InsetBackgroundFactory factory = clientConfig.getEnableSidebarBackground()
+                ? PanelStyle.factory(sidePanel,
                         clientConfig.getPanelOpacity(), clientConfig.getPanelBrightness(),
-                        sidePanel.dp(16), new InsetBackgroundFactory.Padding(dp12, 0, dp12, dp12))
-                .applyBackgroundTo(sidePanel);
+                        sidePanel.dp(16), padding)
+                : PanelStyle.transparentFactory(sidePanel.dp(16), padding);
+        factory.applyBackgroundTo(sidePanel);
     }
 
     public static @NonNull MainFragment getInstance() {

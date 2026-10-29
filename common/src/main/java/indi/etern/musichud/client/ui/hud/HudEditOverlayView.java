@@ -1,22 +1,35 @@
 package indi.etern.musichud.client.ui.hud;
 
 import icyllis.modernui.R;
+import icyllis.modernui.annotation.NonNull;
+import icyllis.modernui.animation.Animator;
+import icyllis.modernui.animation.AnimatorListener;
+import icyllis.modernui.animation.AnimatorSet;
+import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.Paint;
 import icyllis.modernui.graphics.RectF;
+import icyllis.modernui.util.FloatProperty;
+import icyllis.modernui.util.IntProperty;
 import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.scene.HudScene;
 import indi.etern.musichud.client.ui.render.HorizontalAlign;
+import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.HudRootPlacement;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.VerticalAlign;
+import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import org.jetbrains.annotations.NotNull;
+
+import java.util.EnumMap;
+import java.util.Map;
 
 public class HudEditOverlayView extends View {
     private static final int OFFSET_LIMIT = 1920;
@@ -28,15 +41,52 @@ public class HudEditOverlayView extends View {
     private static final int EDGE_MARKER_LENGTH_DP = 24;
     private static final int EDGE_MARKER_THICKNESS_DP = 3;
     private static final int BORDER_THICKNESS_DP = 1;
+    private static final float HANDLE_HOVER_SCALE = 1.25f;
+    private static final float HANDLE_PRESSED_SCALE = 0.8f;
+    private static final int HANDLE_ANIM_DURATION = 200;
+    private static final SpringInterpolator HANDLE_SCALE_INTERPOLATOR =
+            new SpringInterpolator(HANDLE_ANIM_DURATION / 1000f, 0.9f, 0f, HANDLE_ANIM_DURATION / 1000f);
 
     private static final int[] PRESSED_STATE = {R.attr.state_pressed};
     private static final int[] HOVERED_STATE = {R.attr.state_hovered};
     private static final int[] EMPTY_STATE = {};
 
+    private static final Handle[] VISIBLE_HANDLES = {
+            Handle.TOP_LEFT, Handle.TOP_RIGHT, Handle.BOTTOM_LEFT, Handle.BOTTOM_RIGHT,
+            Handle.TOP, Handle.BOTTOM, Handle.LEFT, Handle.RIGHT
+    };
+
+    private static final IntProperty<HandleVisual> COLOR_PROPERTY =
+            new IntProperty<>("handleColor") {
+                @Override
+                public void setValue(HandleVisual target, int value) {
+                    target.color = value;
+                }
+
+                @Override
+                public Integer get(HandleVisual target) {
+                    return target.color;
+                }
+            };
+
+    private static final FloatProperty<HandleVisual> SCALE_PROPERTY =
+            new FloatProperty<>("handleScale") {
+                @Override
+                public void setValue(HandleVisual target, float value) {
+                    target.scale = value;
+                }
+
+                @Override
+                public Float get(HandleVisual target) {
+                    return target.scale;
+                }
+            };
+
     private final ClientConfig clientConfig = ClientConfig.getInstance();
     private final HudScene hudScene = HudScene.getInstance();
     private final Paint borderPaint = new Paint();
     private final Paint handlePaint = new Paint();
+    private final Map<Handle, HandleVisual> handleVisuals = new EnumMap<>(Handle.class);
 
     private Handle hoveredHandle = Handle.NONE;
     private Handle activeHandle = Handle.NONE;
@@ -50,6 +100,12 @@ public class HudEditOverlayView extends View {
         super(context);
         setClickable(true);
         setFocusable(false);
+        int defaultColor = Color.toArgb(Theme.HUD_HANDLE_STATES.getDefaultColor());
+        for (Handle handle : VISIBLE_HANDLES) {
+            HandleVisual visual = new HandleVisual();
+            visual.color = defaultColor;
+            handleVisuals.put(handle, visual);
+        }
     }
 
     public void refresh() {
@@ -94,6 +150,7 @@ public class HudEditOverlayView extends View {
                 dragStartPointerY = ev.getY();
                 dragStartRect = new RectF(currentGuiRect());
                 activeHandle = hitTest(ev.getX(), ev.getY());
+                refreshHandleVisuals();
                 invalidate();
                 return true;
             }
@@ -112,6 +169,7 @@ public class HudEditOverlayView extends View {
                     activeHandle = Handle.NONE;
                     dragStartRect = null;
                     clientConfig.save();
+                    refreshHandleVisuals();
                     invalidate();
                 }
                 return true;
@@ -129,12 +187,14 @@ public class HudEditOverlayView extends View {
                 Handle h = activeHandle != Handle.NONE ? activeHandle : hitTest(ev.getX(), ev.getY());
                 if (h != hoveredHandle) {
                     hoveredHandle = h;
+                    refreshHandleVisuals();
                     invalidate();
                 }
             }
             case MotionEvent.ACTION_HOVER_EXIT -> {
                 if (hoveredHandle != Handle.NONE) {
                     hoveredHandle = Handle.NONE;
+                    refreshHandleVisuals();
                     invalidate();
                 }
             }
@@ -291,25 +351,81 @@ public class HudEditOverlayView extends View {
         drawHandleMarker(canvas, Handle.RIGHT, r.right, (r.top + r.bottom) / 2);
     }
 
+    private void refreshHandleVisuals() {
+        for (Handle handle : VISIBLE_HANDLES) {
+            updateHandleVisual(handle);
+        }
+    }
+
+    private void updateHandleVisual(Handle handle) {
+        HandleVisual visual = handleVisuals.get(handle);
+        if (visual == null) {
+            return;
+        }
+        int[] state = handleState(handle);
+        if (visual.state == state) {
+            return;
+        }
+        visual.state = state;
+
+        int targetColor = Color.toArgb(Theme.HUD_HANDLE_STATES.getColorForState(
+                state, Theme.HUD_HANDLE_STATES.getDefaultColor()));
+        float targetScale = state == PRESSED_STATE
+                ? HANDLE_PRESSED_SCALE
+                : state == HOVERED_STATE ? HANDLE_HOVER_SCALE : 1f;
+
+        if (visual.animator != null) {
+            visual.animator.cancel();
+            visual.animator = null;
+        }
+
+        ObjectAnimator colorAnimator = ObjectAnimator.ofArgb(visual, COLOR_PROPERTY,
+                visual.color, targetColor);
+        colorAnimator.setDuration(HANDLE_ANIM_DURATION);
+        colorAnimator.setInterpolator(Easing.EASE_OUT_QUAD);
+        colorAnimator.addUpdateListener(animation -> invalidate());
+
+        ObjectAnimator scaleAnimator = ObjectAnimator.ofFloat(visual, SCALE_PROPERTY,
+                visual.scale, targetScale);
+        scaleAnimator.setDuration(HANDLE_ANIM_DURATION);
+        scaleAnimator.setInterpolator(HANDLE_SCALE_INTERPOLATOR);
+
+        AnimatorSet animatorSet = new AnimatorSet();
+        animatorSet.playTogether(colorAnimator, scaleAnimator);
+        visual.animator = animatorSet;
+        animatorSet.addListener(new AnimatorListener() {
+            @Override
+            public void onAnimationEnd(@NonNull Animator animation) {
+                if (visual.animator == animatorSet) {
+                    visual.animator = null;
+                }
+            }
+        });
+        animatorSet.start();
+    }
+
     private void drawHandleMarker(Canvas canvas, Handle handle, float cx, float cy) {
-        long color = Theme.HUD_HANDLE_STATES.getColorForState(handleState(handle),
-                Theme.HUD_HANDLE_STATES.getDefaultColor());
-        handlePaint.setColor(color);
+        HandleVisual visual = handleVisuals.get(handle);
+        if (visual == null) {
+            return;
+        }
+        handlePaint.setColor(visual.color);
+        float scale = visual.scale;
         switch (handle) {
             case TOP_LEFT, TOP_RIGHT, BOTTOM_LEFT, BOTTOM_RIGHT -> {
-                float half = dp(HANDLE_VISUAL_DP) / 2f;
+                float half = dp(HANDLE_VISUAL_DP) * scale / 2f;
                 handlePaint.setStyle(Paint.Style.FILL);
                 canvas.drawRoundRect(cx - half, cy - half, cx + half, cy + half, half, handlePaint);
             }
             case TOP, BOTTOM -> {
-                float length = dp(EDGE_MARKER_LENGTH_DP);
+                float length = dp(EDGE_MARKER_LENGTH_DP) * scale;
                 handlePaint.setStyle(Paint.Style.STROKE);
                 handlePaint.setStrokeWidth(dp(EDGE_MARKER_THICKNESS_DP));
                 handlePaint.setStrokeCap(Paint.Cap.ROUND);
                 canvas.drawLine(cx - length / 2, cy, cx + length / 2, cy, handlePaint);
             }
             case LEFT, RIGHT -> {
-                float length = dp(EDGE_MARKER_LENGTH_DP);
+                float length = dp(EDGE_MARKER_LENGTH_DP) * scale;
                 handlePaint.setStyle(Paint.Style.STROKE);
                 handlePaint.setStrokeWidth(dp(EDGE_MARKER_THICKNESS_DP));
                 handlePaint.setStrokeCap(Paint.Cap.ROUND);
@@ -328,6 +444,13 @@ public class HudEditOverlayView extends View {
             return HOVERED_STATE;
         }
         return EMPTY_STATE;
+    }
+
+    private static final class HandleVisual {
+        int color;
+        float scale = 1f;
+        int[] state = EMPTY_STATE;
+        AnimatorSet animator;
     }
 
     private enum Handle {

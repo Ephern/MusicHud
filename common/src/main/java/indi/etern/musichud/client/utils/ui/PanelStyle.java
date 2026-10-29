@@ -32,4 +32,13 @@ public final class PanelStyle {
                 .padding(padding)
                 .build();
     }
+
+    public static InsetBackgroundFactory transparentFactory(int cornerRadiusPx,
+                                                            InsetBackgroundFactory.Padding padding) {
+        return InsetBackgroundFactory.builder()
+                .backgroundColor(ColorStateList.valueOf(0x00000000))
+                .cornerRadius(cornerRadiusPx)
+                .padding(padding)
+                .build();
+    }
 }

@@ -218,6 +218,14 @@ public class ConfigView extends LinearLayout {
                     .setRange(0, 1, 100)
                     .setDefaultValue(clientConfig.getDefaultGuiBackgroundSamplingBlackOverlay())
                     .create(commonCategory);
+            new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.common.enableSidebarBackground"),
+                    clientConfig::getEnableSidebarBackground,
+                    clientConfig::setEnableSidebarBackground)
+                    .setDefaultValue(clientConfig.getDefaultEnableSidebarBackground())
+                    .setOnChanged(MainFragment::refreshPanelStyle)
+                    .create(commonCategory);
             new AdaptiveFloatOption(
                     context,
                     I18n.get(MusicHud.MOD_ID + ".config.common.panelOpacity"),

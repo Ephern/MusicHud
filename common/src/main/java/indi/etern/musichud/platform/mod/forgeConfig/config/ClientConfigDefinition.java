@@ -50,6 +50,7 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundSaturation;
     private final ModConfigSpec.ConfigValue<Double> panelOpacity;
     private final ModConfigSpec.ConfigValue<Double> panelBrightness;
+    private final ModConfigSpec.ConfigValue<Boolean> enableSidebarBackground;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -166,6 +167,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Panel background brightness (0 = black, 1 = neutral gray)")
                 .translation(MusicHud.MOD_ID + ".config.common.panelBrightness")
                 .defineInRange("panelBrightness", 0.25, 0, 1);
+        enableSidebarBackground = builder
+                .comment("Show background on the main GUI sidebar")
+                .translation(MusicHud.MOD_ID + ".config.common.enableSidebarBackground")
+                .define("enableSidebarBackground", true);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -943,5 +948,20 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setPanelBrightness(double brightness) {
         panelBrightness.set(Math.clamp(brightness, 0, 1));
+    }
+
+    @Override
+    public boolean getEnableSidebarBackground() {
+        return enableSidebarBackground.get();
+    }
+
+    @Override
+    public boolean getDefaultEnableSidebarBackground() {
+        return enableSidebarBackground.getDefault();
+    }
+
+    @Override
+    public void setEnableSidebarBackground(boolean enable) {
+        enableSidebarBackground.set(enable);
     }
 }

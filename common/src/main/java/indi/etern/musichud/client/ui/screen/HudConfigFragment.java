@@ -167,12 +167,14 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
 
         var layoutCategory = PreferencesFragment.createCategoryList(content,
                 I18n.get(MusicHud.MOD_ID + ".config.category.layout"));
+        layoutCategory.setPadding(0, 0, 0, 0);
         layoutCategory.setBackground(null);
         buildLayoutOptions(context, layoutCategory);
         content.addView(layoutCategory);
 
         var behaviorCategory = PreferencesFragment.createCategoryList(content,
                 I18n.get(MusicHud.MOD_ID + ".config.category.hudBehavior"));
+        behaviorCategory.setPadding(0, 0, 0, 0);
         behaviorCategory.setBackground(null);
         new PreferencesFragment.BooleanOption(context,
                 I18n.get(MusicHud.MOD_ID + ".config.common.enableHud"),
@@ -196,6 +198,7 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
 
         var appearanceCategory = PreferencesFragment.createCategoryList(content,
                 I18n.get(MusicHud.MOD_ID + ".config.category.hudAppearance"));
+        appearanceCategory.setPadding(0, 0, 0, 0);
         appearanceCategory.setBackground(null);
         new AdaptiveFloatOption(context,
                 I18n.get(MusicHud.MOD_ID + ".config.common.hudBackgroundFluidOpacity"),
