@@ -38,15 +38,10 @@ import static org.lwjgl.opengl.GL11.GL_DEPTH_TEST;
 import static org.lwjgl.opengl.GL11.GL_ONE;
 import static org.lwjgl.opengl.GL11.GL_ONE_MINUS_SRC_ALPHA;
 import static org.lwjgl.opengl.GL11.GL_SRC_ALPHA;
-import static org.lwjgl.opengl.GL11.GL_TEXTURE_2D;
-import static org.lwjgl.opengl.GL11.glBindTexture;
-import static org.lwjgl.opengl.GL11.glDisable;
-import static org.lwjgl.opengl.GL11.glEnable;
 import static org.lwjgl.opengl.GL11.glGetIntegerv;
 import static org.lwjgl.opengl.GL11.glIsEnabled;
 import static org.lwjgl.opengl.GL13.GL_ACTIVE_TEXTURE;
 import static org.lwjgl.opengl.GL13.GL_TEXTURE0;
-import static org.lwjgl.opengl.GL13.glActiveTexture;
 import static org.lwjgl.opengl.GL14.*;
 import static org.lwjgl.opengl.GL20.*;
 import static org.lwjgl.opengl.GL20.glUniformMatrix4fv;
@@ -322,6 +317,9 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         if (font == null || text == null || text.isEmpty() || gradient == null || alpha <= 0f) {
             return;
         }
+        if (fade == null) {
+            fade = TextEdgeFade.NONE;
+        }
         if (!(graphics instanceof VanillaSceneGraphics vanillaGraphics)) {
             graphics.drawString(font, text, x, y, gradient.sample(0.5f, alpha), false);
             return;
@@ -333,7 +331,7 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         float[] prevColor = RenderSystem.getShaderColor().clone();
         RenderSystem.setShaderColor(1f, 1f, 1f, 1f);
         try {
-            GradientTextRenderer.draw(font, text, x, y, gradient, alpha, pose,
+            GradientTextRenderer.draw(font, text, x, y, gradient, alpha, fade, pose,
                     bufferSource, LightTexture.FULL_BRIGHT);
         } catch (Throwable t) {
             MusicHud.getLogger(SceneRenderContextImpl.class).debug("Gradient text rendering failed", t);

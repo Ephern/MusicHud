@@ -41,27 +41,31 @@ public final class GradientTextRenderer {
      * @param x,y        text origin in the current (already posed) coordinate space
      * @param gradient   gradient normalized over the whole drawn string ({@code [0, 1]})
      * @param alpha      global opacity multiplier folded into the sampled colors
+     * @param fade       horizontal edge mask applied per glyph vertex ({@link TextEdgeFade#NONE} for none)
      * @param pose       the current GUI pose matrix (as passed to {@link Font#drawInBatch})
      * @param packedLight packed lightmap coordinate (usually {@code LightTexture.FULL_BRIGHT})
      */
     public static void draw(Font font, String text, float x, float y, GradientSpec gradient, float alpha,
-                            Matrix4f pose, MultiBufferSource.BufferSource bufferSource, int packedLight) {
+                            TextEdgeFade fade, Matrix4f pose, MultiBufferSource.BufferSource bufferSource,
+                            int packedLight) {
         if (font == null || text == null || text.isEmpty() || gradient == null || alpha <= 0f) {
             return;
         }
-        if (LegacyTextGeometry.draw(text, x, y, gradient, alpha, pose, bufferSource, packedLight)) {
+        TextEdgeFade edgeFade = fade == null ? TextEdgeFade.NONE : fade;
+        if (LegacyTextGeometry.draw(text, x, y, gradient, alpha, edgeFade, pose, bufferSource, packedLight)) {
             return;
         }
-        drawDelegated(font, text, x, y, gradient, alpha, pose, bufferSource, packedLight);
+        drawDelegated(font, text, x, y, gradient, alpha, edgeFade, pose, bufferSource, packedLight);
     }
 
     private static void drawDelegated(Font font, String text, float x, float y, GradientSpec gradient, float alpha,
-                                      Matrix4f pose, MultiBufferSource.BufferSource bufferSource, int packedLight) {
+                                      TextEdgeFade fade, Matrix4f pose,
+                                      MultiBufferSource.BufferSource bufferSource, int packedLight) {
         // Local glyph coordinates are in unscaled font units, so normalizing by the unscaled
         // advance makes the gradient independent of any pose scale applied by the caller.
         float totalAdvance = Math.max(1f, font.width(text));
         GradientMultiBufferSource source =
-                new GradientMultiBufferSource(bufferSource, gradient, alpha, totalAdvance);
+                new GradientMultiBufferSource(bufferSource, gradient, alpha, fade, totalAdvance);
         font.drawInBatch(text, x, y, 0xFFFFFFFF, false, pose, source, Font.DisplayMode.NORMAL,
                 /*colorBackground*/ 0, packedLight);
         // Flush the gradient now, while the caller keeps ColorModulator neutral. If left buffered, a
@@ -77,6 +81,7 @@ public final class GradientTextRenderer {
         private final MultiBufferSource delegate;
         private final GradientSpec gradient;
         private final float alpha;
+        private final TextEdgeFade fade;
         private final float totalAdvance;
         private final Set<RenderType> renderTypes = new LinkedHashSet<>();
         /**
@@ -88,10 +93,12 @@ public final class GradientTextRenderer {
         boolean originResolved;
         float originX;
 
-        GradientMultiBufferSource(MultiBufferSource delegate, GradientSpec gradient, float alpha, float totalAdvance) {
+        GradientMultiBufferSource(MultiBufferSource delegate, GradientSpec gradient, float alpha,
+                                  TextEdgeFade fade, float totalAdvance) {
             this.delegate = delegate;
             this.gradient = gradient;
             this.alpha = alpha;
+            this.fade = fade;
             this.totalAdvance = totalAdvance;
         }
 
@@ -163,7 +170,10 @@ public final class GradientTextRenderer {
         }
 
         private void applyGradientColor() {
-            int color = source.gradient.sample((localX - source.originX) / source.totalAdvance, source.alpha);
+            // localX already lives in the space TextEdgeFade was built for, so the mask can be
+            // sampled with the raw vertex X (origin-relative like the gradient below).
+            float edgeAlpha = source.alpha * source.fade.factorAt(localX);
+            int color = source.gradient.sample((localX - source.originX) / source.totalAdvance, edgeAlpha);
             delegate.setColor((color >> 16) & 0xFF, (color >> 8) & 0xFF, color & 0xFF, (color >>> 24) & 0xFF);
         }
 

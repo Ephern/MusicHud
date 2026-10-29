@@ -81,7 +81,8 @@ public final class LegacyTextGeometry {
      *         been fully handled, possibly drawn as nothing (empty text, dropped scale).
      */
     public static boolean draw(String text, float x, float y, GradientSpec gradient, float alpha,
-                               Matrix4f pose, MultiBufferSource.BufferSource source, int packedLight) {
+                               TextEdgeFade fade, Matrix4f pose, MultiBufferSource.BufferSource source,
+                               int packedLight) {
         TextLayout layout;
         DrawSetup setup;
         GLBakedGlyph[] glyphs;
@@ -105,7 +106,8 @@ public final class LegacyTextGeometry {
             // so the caller can safely use the delegation fallback.
             return false;
         }
-        emit(layout, setup, glyphs, gradient, alpha, source, packedLight);
+        emit(layout, setup, glyphs, gradient, alpha,
+                fade == null ? TextEdgeFade.NONE : fade, source, packedLight);
         return true;
     }
 
@@ -233,7 +235,7 @@ public final class LegacyTextGeometry {
     }
 
     private static void emit(TextLayout layout, DrawSetup setup, GLBakedGlyph[] baked,
-                             GradientSpec gradient, float alpha,
+                             GradientSpec gradient, float alpha, TextEdgeFade fade,
                              MultiBufferSource.BufferSource source, int packedLight) {
         float[] positions = layout.getPositions();
         int[] flags = layout.getGlyphFlags();
@@ -297,15 +299,19 @@ public final class LegacyTextGeometry {
                 localX = Math.round(localX * density) * invDensity;
                 localY = Math.round(localY * density) * invDensity;
             }
+            // The edge mask is per-vertex alpha, so the GPU keeps interpolating it inside the
+            // glyph quad instead of stepping once per glyph. Local X is layout-local, which is
+            // exactly the space TextEdgeFade was built in (its local 0 is the draw origin).
+            float leftAlpha = alpha * fade.factorAt(localX);
+            float rightAlpha = alpha * fade.factorAt(localX + w);
             int colorLeft;
             int colorRight;
             if (isColorEmoji) {
-                int a = Math.clamp((int) (alpha * 255f), 0, 255);
-                colorLeft = (a << 24) | 0xFFFFFF;
-                colorRight = colorLeft;
+                colorLeft = (Math.clamp((int) (leftAlpha * 255f), 0, 255) << 24) | 0xFFFFFF;
+                colorRight = (Math.clamp((int) (rightAlpha * 255f), 0, 255) << 24) | 0xFFFFFF;
             } else {
-                colorLeft = gradient.sample(localX / totalAdvance, alpha);
-                colorRight = gradient.sample((localX + w) / totalAdvance, alpha);
+                colorLeft = gradient.sample(localX / totalAdvance, leftAlpha);
+                colorRight = gradient.sample((localX + w) / totalAdvance, rightAlpha);
             }
             float upSkew = 0f;
             float downSkew = 0f;
