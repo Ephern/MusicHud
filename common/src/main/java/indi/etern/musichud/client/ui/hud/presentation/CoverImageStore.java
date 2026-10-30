@@ -60,7 +60,11 @@ public final class CoverImageStore {
                                  Predicate<MusicDetail> currentTrack,
                                  Consumer<Duration> onLoaded) {
         if (thumbnailSize <= 0) return;
-        thumbnailSize = Math.max(128, thumbnailSize);
+        // Bucket the layout-driven size: the artwork is sampled by the GPU at the exact display
+        // size, so reloading for every pixel of a HUD resize would only restart the crossfade and
+        // re-upload a texture that looks identical. Power-of-two buckets keep the reloads to a
+        // handful while a resize is dragged.
+        thumbnailSize = quantizeThumbnailSize(thumbnailSize);
         MusicDetail current;
         long token;
         synchronized (coverRequests) {
@@ -72,6 +76,13 @@ public final class CoverImageStore {
         if (current != null && current != MusicDetail.NONE) {
             loadAndSwitchAlbumImageWithRetry(current, token, thumbnailSize, currentTrack, onLoaded);
         }
+    }
+
+    /** Rounds up to a power of two within [128, 1024]. */
+    static int quantizeThumbnailSize(int size) {
+        int clamped = Math.clamp(size, 128, 1024);
+        int bucket = Integer.highestOneBit(clamped);
+        return bucket == clamped ? clamped : Math.min(1024, bucket << 1);
     }
 
     public void load(MusicDetail musicDetail, long token,

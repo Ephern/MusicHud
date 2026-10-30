@@ -3,9 +3,11 @@ package indi.etern.musichud.client.ui.render;
 import com.mojang.blaze3d.systems.RenderSystem;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.presentation.TrackArtworkStore;
+import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneGpuContextImpl;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneWindowEnvironment;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ICommonEventService;
 import org.apache.logging.log4j.Logger;
@@ -225,7 +227,8 @@ public final class RenderRuntime {
                 RenderStats.Snapshot.averageMicros(stats.uniformNanos(), stats.uniformCalls()), stats.uniformCalls(),
                 RenderStats.Snapshot.maxMicros(stats.uniformMaxNanos()),
                 RenderStats.phaseSpikes(2_000_000L) + RenderStats.windowAllocations()
-                        + SceneWindowEnvironment.describe());
+                        + SceneWindowEnvironment.describe() + ImageUtils.describeCache()
+                        + UrlImageView.describeImageCache());
         RenderStats.resetTimings();
         SceneWindowEnvironment.beginWindow();
     }
