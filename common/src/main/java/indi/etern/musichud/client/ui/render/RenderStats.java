@@ -42,6 +42,31 @@ public final class RenderStats {
     // Fluid/capture blur split: target (re)allocation vs the mip passes themselves.
     private static long blurAllocMaxNanos;
     private static long blurPassMaxNanos;
+    private static long captureMaxNanos;
+    private static long sceneBlurMaxNanos;
+    // Phase averages over the reporting window. A max alone cannot say whether a pass is expensive
+    // every frame or only when a target is rebuilt, which is exactly the question when sizing the
+    // background chain for an integrated GPU.
+    private static long transitionNanos;
+    private static int transitionCalls;
+    private static long audioNanos;
+    private static int audioCalls;
+    private static long layersNanos;
+    private static int layersCalls;
+    private static long blurNanos;
+    private static int blurCalls;
+    private static long warpNanos;
+    private static int warpCalls;
+    private static long submitNanos;
+    private static int submitCalls;
+    private static long blurAllocNanos;
+    private static int blurAllocCalls;
+    private static long blurPassNanos;
+    private static int blurPassCalls;
+    private static long captureNanos;
+    private static int captureCalls;
+    private static long sceneBlurNanos;
+    private static int sceneBlurCalls;
     // Allocations inside the current reporting window, so a spike can be matched to a realloc.
     private static int windowTargetsCreated;
     private static int windowTargetsReleased;
@@ -142,6 +167,28 @@ public final class RenderStats {
         submitMaxNanos = 0;
         blurAllocMaxNanos = 0;
         blurPassMaxNanos = 0;
+        captureMaxNanos = 0;
+        sceneBlurMaxNanos = 0;
+        transitionNanos = 0;
+        transitionCalls = 0;
+        audioNanos = 0;
+        audioCalls = 0;
+        layersNanos = 0;
+        layersCalls = 0;
+        blurNanos = 0;
+        blurCalls = 0;
+        warpNanos = 0;
+        warpCalls = 0;
+        submitNanos = 0;
+        submitCalls = 0;
+        blurAllocNanos = 0;
+        blurAllocCalls = 0;
+        blurPassNanos = 0;
+        blurPassCalls = 0;
+        captureNanos = 0;
+        captureCalls = 0;
+        sceneBlurNanos = 0;
+        sceneBlurCalls = 0;
         windowTargetsCreated = 0;
         windowTargetsReleased = 0;
         windowTargetBytes = 0;
@@ -152,32 +199,80 @@ public final class RenderStats {
 
     /** Cover resolve + transition update. */
     public static void phaseTransitionNanos(long nanos) {
+        transitionNanos += nanos;
+        transitionCalls++;
         if (nanos > transitionMaxNanos) transitionMaxNanos = nanos;
     }
 
     /** Audio spectrum read + reactive scale computation. */
     public static void phaseAudioNanos(long nanos) {
+        audioNanos += nanos;
+        audioCalls++;
         if (nanos > audioMaxNanos) audioMaxNanos = nanos;
     }
 
     /** Cover layer composition. */
     public static void phaseLayersNanos(long nanos) {
+        layersNanos += nanos;
+        layersCalls++;
         if (nanos > layersMaxNanos) layersMaxNanos = nanos;
     }
 
     /** Blur pyramid for the fluid canvas. */
     public static void phaseBlurNanos(long nanos) {
+        blurNanos += nanos;
+        blurCalls++;
         if (nanos > blurMaxNanos) blurMaxNanos = nanos;
     }
 
     /** Blur target (re)allocation, i.e. the size/level cache miss. */
     public static void phaseBlurAllocNanos(long nanos) {
+        blurAllocNanos += nanos;
+        blurAllocCalls++;
         if (nanos > blurAllocMaxNanos) blurAllocMaxNanos = nanos;
     }
 
     /** The blur mip passes themselves, with the targets already allocated. */
     public static void phaseBlurPassNanos(long nanos) {
+        blurPassNanos += nanos;
+        blurPassCalls++;
         if (nanos > blurPassMaxNanos) blurPassMaxNanos = nanos;
+    }
+
+    /** Copying the scene colour region into the capture target (sampling path only). */
+    public static void phaseCaptureNanos(long nanos) {
+        captureNanos += nanos;
+        captureCalls++;
+        if (nanos > captureMaxNanos) captureMaxNanos = nanos;
+    }
+
+    /** Blur of the captured scene (sampling path only), allocation and passes together. */
+    public static void phaseSceneBlurNanos(long nanos) {
+        sceneBlurNanos += nanos;
+        sceneBlurCalls++;
+        if (nanos > sceneBlurMaxNanos) sceneBlurMaxNanos = nanos;
+    }
+
+    /** Compact "phase=avgus/calls" suffix; the companion of {@link #phaseSpikes(long)}. */
+    public static String phaseSummary() {
+        StringBuilder builder = new StringBuilder(" | phases:");
+        appendAverage(builder, "transition", transitionNanos, transitionCalls);
+        appendAverage(builder, "capture", captureNanos, captureCalls);
+        appendAverage(builder, "sceneBlur", sceneBlurNanos, sceneBlurCalls);
+        appendAverage(builder, "layers", layersNanos, layersCalls);
+        appendAverage(builder, "blurAlloc", blurAllocNanos, blurAllocCalls);
+        appendAverage(builder, "blurPass", blurPassNanos, blurPassCalls);
+        appendAverage(builder, "warp", warpNanos, warpCalls);
+        appendAverage(builder, "submit", submitNanos, submitCalls);
+        appendAverage(builder, "audio", audioNanos, audioCalls);
+        return builder.length() == " | phases:".length() ? "" : builder.toString();
+    }
+
+    private static void appendAverage(StringBuilder builder, String name, long nanos, int calls) {
+        if (calls <= 0) {
+            return;
+        }
+        builder.append(' ').append(name).append('=').append(nanos / (1000L * calls)).append("us/").append(calls);
     }
 
     /** Text layout + glyph submission time inside the running scene frame. */
@@ -230,11 +325,15 @@ public final class RenderStats {
 
     /** Procedural warp pass (including the per-cycle mesh rebuild). */
     public static void phaseWarpNanos(long nanos) {
+        warpNanos += nanos;
+        warpCalls++;
         if (nanos > warpMaxNanos) warpMaxNanos = nanos;
     }
 
     /** Submitting the display element into the GUI batch. */
     public static void phaseSubmitNanos(long nanos) {
+        submitNanos += nanos;
+        submitCalls++;
         if (nanos > submitMaxNanos) submitMaxNanos = nanos;
     }
 

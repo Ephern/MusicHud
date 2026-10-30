@@ -193,25 +193,22 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         CapturePlan capturePlan = capturePlan(region, source, plan.sceneBlurRadius());
         if (capturePlan == null) return false;
         int downscale = capturePlan.downscale();
+        long captureStart = System.nanoTime();
         SceneGpuTexture captured = sceneCapture.capture(gpu, source,
                 capturePlan.captureRegion(), downscale);
+        RenderStats.phaseCaptureNanos(System.nanoTime() - captureStart);
         if (captured == null) return false;
         SceneGpuTexture background = captured;
         int sceneBlurRadius = plan.sceneBlurRadius();
         if (sceneBlurRadius > 0) {
+            long sceneBlurStart = System.nanoTime();
             // Sigma is expressed in the (possibly downscaled) capture's pixel space.
-            long blurAllocStart = System.nanoTime();
             SceneBlur.PendingBlur blur = backgroundBlur.prepare(gpu,
                     captured.width(), captured.height(), sceneBlurRadius / (3f * downscale));
-            RenderStats.phaseBlurAllocNanos(System.nanoTime() - blurAllocStart);
-            if (blur != null) {
-                long blurPassStart = System.nanoTime();
-                boolean applied = blur.apply(gpu, captured);
-                RenderStats.phaseBlurPassNanos(System.nanoTime() - blurPassStart);
-                if (applied) {
-                    background = blur.target();
-                }
+            if (blur != null && blur.apply(gpu, captured)) {
+                background = blur.target();
             }
+            RenderStats.phaseSceneBlurNanos(System.nanoTime() - sceneBlurStart);
         }
         if (capturePlan.needsCrop()) {
             SceneGpuTexture cropped = backgroundCrop.apply(gpu, background,
@@ -478,11 +475,21 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
     /**
      * The captured backdrop is blurred with {@code blurRadius} screen pixels, so grabbing it at
      * full resolution is pure oversampling: the capture, the blur pyramid sized from it and the
-     * crop target are all taken at 1/downscale. Bounded to {1, 2, 4} to keep the box filter cheap.
+     * crop target are all taken at 1/downscale.
+     * <p>
+     * The old fixed tiers (4 for anything above 64 px) left the GUI, whose radius is 512 px,
+     * capturing at 640x352 and running a four-level RGBA16F pyramid: the blur removes everything
+     * finer than ~128 physical pixels, so all of that detail was written only to be averaged out.
+     * Deriving the factor from the radius keeps sigma at three capture pixels or more (the smallest
+     * kernel that still looks like a blur) and drops every stage's fill rate by the same factor.
      */
     private static int captureDownscale(int blurRadius) {
-        if (blurRadius >= 64) return 4;
-        if (blurRadius >= 24) return 2;
+        // sigma in capture pixels = blurRadius / (3 * downscale) >= 3  =>  downscale <= radius / 9.
+        int affordable = Math.max(1, blurRadius / 9);
+        if (affordable >= 16) return 16;
+        if (affordable >= 8) return 8;
+        if (affordable >= 4) return 4;
+        if (affordable >= 2) return 2;
         return 1;
     }
 

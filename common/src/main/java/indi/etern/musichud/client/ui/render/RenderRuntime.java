@@ -10,6 +10,7 @@ import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneWindowEnvironment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ICommonEventService;
+import net.minecraft.client.Minecraft;
 import org.apache.logging.log4j.Logger;
 
 import java.util.Locale;
@@ -205,6 +206,20 @@ public final class RenderRuntime {
         return scenePipelinesPrecompiled || precompileAbandoned;
     }
 
+    /**
+     * The frame rate the game itself reports. Every timing in this line is wall time measured around
+     * command submission, so it inflates whenever the GPU falls behind: without the frame rate next
+     * to it, a queueing stall is indistinguishable from a regression.
+     */
+    private static String frameRate() {
+        Minecraft minecraft = Minecraft.getInstance();
+        if (minecraft == null) {
+            return "fps=?";
+        }
+        return String.format(Locale.ROOT, "fps=%d frame=%.2fms",
+                minecraft.getFps(), minecraft.getFrameTimeNs() / 1_000_000.0);
+    }
+
     private void logRenderStatsIfEnabled() {
         if (!logRenderStats) {
             return;
@@ -215,8 +230,9 @@ public final class RenderRuntime {
         }
         lastStatsLogMillis = now;
         RenderStats.Snapshot stats = RenderStats.snapshot();
-        LOGGER.info("[RenderStats] passes={} targets(+{} -{}) live={} liveMiB={} uniformBytes={} meshBytes={}"
+        LOGGER.info("[RenderStats] {} | passes={} targets(+{} -{}) live={} liveMiB={} uniformBytes={} meshBytes={}"
                         + " | scene={}us/{} max={}us offscreen={}us/{} max={}us uniforms={}us/{} max={}us{}",
+                frameRate(),
                 stats.passes(), stats.targetsCreated(), stats.targetsReleased(), stats.liveTargets(),
                 String.format(Locale.ROOT, "%.1f", stats.liveTargetBytes() / 1048576.0),
                 stats.uniformBytes(), stats.meshBytes(),
@@ -227,6 +243,7 @@ public final class RenderRuntime {
                 RenderStats.Snapshot.averageMicros(stats.uniformNanos(), stats.uniformCalls()), stats.uniformCalls(),
                 RenderStats.Snapshot.maxMicros(stats.uniformMaxNanos()),
                 RenderStats.phaseSpikes(2_000_000L) + RenderStats.windowAllocations()
+                        + RenderStats.phaseSummary()
                         + SceneWindowEnvironment.describe() + ImageUtils.describeCache()
                         + UrlImageView.describeImageCache());
         RenderStats.resetTimings();
