@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.hud.presentation;
 
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.utils.ui.Transitionable;
 import lombok.Getter;
 
@@ -39,6 +40,19 @@ public final class BackgroundState {
 
     public void reset() {
         transition.startTransition(BackgroundData.NONE);
+    }
+
+    /** @return true while either crossfade slot still samples one of {@code artwork}'s textures. */
+    public boolean holdsArtwork(TrackArtwork artwork) {
+        if (artwork == null) return false;
+        return references(transition.getCurrent(), artwork)
+                || references(transition.getNext(), artwork);
+    }
+
+    private static boolean references(BackgroundData data, TrackArtwork artwork) {
+        BackgroundImages images = data == null ? null : data.image();
+        return images != null
+                && (artwork.holds(images.current) || artwork.holds(images.original));
     }
 
     public long getEffectiveBackgroundChangeTimeMillis() {

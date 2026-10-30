@@ -29,6 +29,30 @@ public final class SceneCoverTransition {
     public record Frame(@Nullable SceneGpuTexture cover, float opacityScale, boolean animated) {
     }
 
+    /** Releases every cover/blend target; the state is reset so the next frame re-resolves. */
+    public void release() {
+        covers[0].release();
+        covers[1].release();
+        blend.release();
+        resetState();
+        owner = null;
+    }
+
+    /**
+     * @return true while any crossfade slot still samples {@code identity}, i.e. while the artwork
+     * that owns it may not be released yet.
+     */
+    public boolean holds(Object identity) {
+        return identity != null
+                && (samples(activeSource, identity)
+                || samples(previousSource, identity)
+                || samples(fadingSource, identity));
+    }
+
+    private static boolean samples(@Nullable SceneCoverSource source, Object identity) {
+        return source != null && Objects.equals(source.identity(), identity);
+    }
+
     public Frame update(SceneGpuContext gpu, @Nullable SceneCoverSource source,
                         long changedAtMillis, int targetLongEdge, float timeSeconds) {
         if (gpu == null) {

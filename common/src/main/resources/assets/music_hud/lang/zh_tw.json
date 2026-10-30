@@ -120,6 +120,7 @@
   "music_hud.config.debug.showHudLayoutBoxes": "顯示 HUD 佈局框",
   "music_hud.config.debug.forceGL32Path": "強制使用 GL3.2 背景路徑",
   "music_hud.config.debug.forceRgba8Fallback": "強制使用 RGBA8 背景目標",
+  "music_hud.config.debug.logRenderStats": "輸出場景渲染統計日誌",
 
   "music_hud.config.common.enableLyricBlur": "模糊非高亮歌詞",
   "music_hud.config.common.soundVolume": "Music HUD 音量",

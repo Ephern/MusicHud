@@ -85,7 +85,7 @@ public final class IdlePlaySource {
      * R3 sampling: delegates track selection to this source's play mode, then
      * completes extra info / pusher info and wraps the track with its source meta.
      */
-    public @Nullable Traceable<MusicDetail> sampleRandomTrack() {
+    public @Nullable Traceable<MusicDetail> sampleRandomTrack() throws InterruptedException {
         MusicDetail sampledTrack = playMode.selectTrack(this);
         if (sampledTrack == null) {
             return null;
@@ -96,8 +96,12 @@ public final class IdlePlaySource {
             long id = sampledTrack.getId();
             try {
                 detailByIds = musicApiService.getMusicDetailByIds(List.of(id), null);
-            } catch (Throwable e) {
-                throw new MusicResourceLoadingException(e, id, false);
+            } catch (Exception e) {
+                if (e instanceof InterruptedException interruptedException) {
+                    throw interruptedException;
+                } else {
+                    throw new MusicResourceLoadingException(e, id, false);
+                }
             }
             if (detailByIds.size() == 1) {
                 MusicDetail musicDetail = detailByIds.getFirst();

@@ -67,6 +67,11 @@ final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
         return actualFormat;
     }
 
+    /** Approximate VRAM footprint of this target, used by the debug render statistics. */
+    long byteSize() {
+        return (long) width() * height() * (actualFormat == SceneTextureFormat.RGBA16F ? 8L : 4L);
+    }
+
     @Override
     public void close() {
         RenderSystem.assertOnRenderThread();

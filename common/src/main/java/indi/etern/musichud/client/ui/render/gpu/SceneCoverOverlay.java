@@ -20,7 +20,7 @@ public final class SceneCoverOverlay {
     public @Nullable SceneGpuTexture apply(SceneGpuContext gpu, SceneGpuTexture scene,
                                            SceneGpuTexture layers, float opacity,
                                            float backgroundBlackOverlay,
-                                           SceneUniform adjust) {
+                                           SceneUniform adjust, float fluidScale) {
         if (gpu == null || scene == null || layers == null || adjust == null
                 || scene.width() < 1 || scene.height() < 1) {
             return null;
@@ -45,19 +45,25 @@ public final class SceneCoverOverlay {
             gpu.draw(new SceneDraw(target,
                     gpu.pipeline(ScenePipelineKey.SCENE_COVER_OVERLAY, target.actualFormat()),
                     List.of(
-                            new SceneSamplerBinding("Sampler0", scene,
-                                    gpu.sampler(SceneSamplerState.linearClamp())),
-                            new SceneSamplerBinding("Sampler1", layers,
-                                    gpu.sampler(SceneSamplerState.linearClamp()))),
+                            new SceneSamplerBinding("Sampler0", scene),
+                            new SceneSamplerBinding("Sampler1", layers)),
                     List.of(
                             new SceneUniformBinding(OverlayUniform.UBO_NAME,
-                                    new OverlayUniform(opacity, backgroundBlackOverlay)),
+                                    new OverlayUniform(opacity, backgroundBlackOverlay, fluidScale)),
                             new SceneUniformBinding(adjust.getUBOName(), adjust))));
             return target;
         } catch (RuntimeException failure) {
             LOGGER.debug("While overlaying the cover layers", failure);
             release(gpu);
             return null;
+        }
+    }
+
+    /** Releases the overlay target; it is re-created lazily on the next composite. */
+    public void release() {
+        SceneGpuContext current = owner;
+        if (current != null) {
+            release(current);
         }
     }
 
@@ -71,7 +77,8 @@ public final class SceneCoverOverlay {
         height = 0;
     }
 
-    private record OverlayUniform(float opacity, float backgroundBlackOverlay) implements SceneUniform {
+    private record OverlayUniform(float opacity, float backgroundBlackOverlay,
+                                  float fluidScale) implements SceneUniform {
         private static final String UBO_NAME = "MHOverlay";
         private static final int UBO_SIZE = Std140Sizes.calc().putVec4().get();
 
@@ -87,7 +94,7 @@ public final class SceneCoverOverlay {
 
         @Override
         public void write(Std140Writer writer) {
-            writer.putVec4(opacity, backgroundBlackOverlay, 0f, 0f);
+            writer.putVec4(opacity, backgroundBlackOverlay, fluidScale, 0f);
         }
 
         @Override

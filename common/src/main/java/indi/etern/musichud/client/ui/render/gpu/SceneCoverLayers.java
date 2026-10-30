@@ -68,17 +68,25 @@ public final class SceneCoverLayers {
             }
         }
         try {
-            gpu.clear(target, 0);
+            // The layer shader writes every pixel with alpha = 1; a pre-clear would only add a
+            // full-target write per frame.
             gpu.draw(new SceneDraw(target,
                     gpu.pipeline(ScenePipelineKey.SCENE_COVER_LAYERS, target.actualFormat()),
-                    List.of(new SceneSamplerBinding("Sampler0", cover,
-                            gpu.sampler(SceneSamplerState.linearClamp()))),
+                    List.of(new SceneSamplerBinding("Sampler0", cover)),
                     List.of(new SceneUniformBinding(CoverUniform.UBO_NAME, uniform))));
             return target;
         } catch (RuntimeException failure) {
             LOGGER.debug("While composing the cover layers", failure);
             release(gpu);
             return null;
+        }
+    }
+
+    /** Releases the layer target; it is re-created lazily on the next composition. */
+    public void release() {
+        SceneGpuContext current = owner;
+        if (current != null) {
+            release(current);
         }
     }
 

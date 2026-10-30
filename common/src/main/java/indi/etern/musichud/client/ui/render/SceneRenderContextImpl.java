@@ -62,7 +62,13 @@ public class SceneRenderContextImpl implements SceneRenderContext {
 
     @Override
     public void endFrame() {
+        RenderStats.endTextFrame();
+        long startNanos = System.nanoTime();
         prepareUniforms();
+        RenderStats.addUniformNanos(System.nanoTime() - startNanos);
+        // The offscreen passes recorded during scene.render() uploaded their uniforms into ring
+        // buffers; advance them now so the next frame never overwrites an in-flight slice.
+        RenderRuntime.getInstance().endSceneFrame();
     }
 
     @Override
@@ -241,7 +247,12 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     @Override
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
         if (dropShadow) {
-            graphics.drawString(font, text, x, y, color, dropShadow);
+            long textStartNanos = System.nanoTime();
+            try {
+                graphics.drawString(font, text, x, y, color, dropShadow);
+            } finally {
+                RenderStats.addTextNanos(System.nanoTime() - textStartNanos);
+            }
             return;
         }
         drawGradientString(font, text, x, y, GradientSpec.flat(color), 1f, TextEdgeFade.NONE);
@@ -256,19 +267,26 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         if (fade == null) {
             fade = TextEdgeFade.NONE;
         }
-        List<GradientTextRenderState> states = null;
+        // Text is the only per-frame work outside the background chain that can take milliseconds
+        // (layout + glyph geometry), so it gets its own bucket in the phase report.
+        long textStartNanos = System.nanoTime();
         try {
-            states = GradientTextRenderer.build(font, text, x, y, gradient, alpha, fade,
-                    currentScissor(), currentPose());
-        } catch (Throwable t) {
-            MusicHud.getLogger(SceneRenderContextImpl.class).debug("Gradient text geometry failed", t);
-        }
-        if (states == null || states.isEmpty()) {
-            graphics.drawString(font, text, x, y, gradient.sample(0.5f, alpha), false);
-            return;
-        }
-        for (GradientTextRenderState state : states) {
-            UNIFORM_WRITER.submitGlyphRenderState(((VanillaSceneGraphics) graphics).vanilla(), state);
+            List<GradientTextRenderState> states = null;
+            try {
+                states = GradientTextRenderer.build(font, text, x, y, gradient, alpha, fade,
+                        currentScissor(), currentPose());
+            } catch (Throwable t) {
+                MusicHud.getLogger(SceneRenderContextImpl.class).debug("Gradient text geometry failed", t);
+            }
+            if (states == null || states.isEmpty()) {
+                graphics.drawString(font, text, x, y, gradient.sample(0.5f, alpha), false);
+                return;
+            }
+            for (GradientTextRenderState state : states) {
+                UNIFORM_WRITER.submitGlyphRenderState(((VanillaSceneGraphics) graphics).vanilla(), state);
+            }
+        } finally {
+            RenderStats.addTextNanos(System.nanoTime() - textStartNanos);
         }
     }
 

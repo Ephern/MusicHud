@@ -207,6 +207,12 @@ public interface ClientConfig {
 
     void setForceRgba8Fallback(boolean force);
 
+    boolean getDebugLogRenderStats();
+
+    boolean getDefaultDebugLogRenderStats();
+
+    void setDebugLogRenderStats(boolean logRenderStats);
+
     int getGuiBackgroundBlurRadius();
 
     int getDefaultGuiBackgroundBlurRadius();

@@ -7,17 +7,19 @@ import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
+import indi.etern.musichud.client.ui.hud.presentation.TrackArtwork;
+import indi.etern.musichud.client.ui.hud.presentation.TrackArtworkStore;
 import indi.etern.musichud.client.ui.render.AudioReactiveScale;
 import indi.etern.musichud.client.ui.render.FluidBackgroundSettings;
 import indi.etern.musichud.client.ui.render.RenderLayer;
 import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.RenderStats;
 import indi.etern.musichud.client.ui.render.SceneElementRenderState;
 import indi.etern.musichud.client.ui.render.SceneRenderContext;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlur;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurCrop;
 import indi.etern.musichud.client.ui.render.gpu.SceneCapture;
-import indi.etern.musichud.client.ui.render.gpu.SceneCoverFluidScale;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverLayers;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverOverlay;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverSource;
@@ -36,7 +38,7 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
-public class BackgroundRenderer implements RenderLayer {
+public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder {
     private static final float EPSILON = 1e-4f;
     private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
     private static final Logger LOGGER = MusicHud.getLogger(BackgroundRenderer.class);
@@ -52,11 +54,12 @@ public class BackgroundRenderer implements RenderLayer {
     private final SceneBlur fluidBlur = new SceneBlur();
     private final SceneCoverTransition sceneCoverTransition = new SceneCoverTransition();
     private final SceneCoverWarpProcedural sceneCoverWarpProcedural = new SceneCoverWarpProcedural();
-    private final SceneCoverFluidScale sceneCoverFluidScale = new SceneCoverFluidScale();
     private final SceneCoverLayers sceneCoverLayers = new SceneCoverLayers();
     private final SceneCoverOverlay sceneCoverOverlay = new SceneCoverOverlay();
     private SceneRenderData currentData;
     private final DynamicStatusUniform dynamicStatusUniform = DynamicStatusUniform.getInstance();
+    /** Consecutive frames in which this renderer produced no background. */
+    private int skippedFrames;
 
     public BackgroundRenderer(BackgroundTarget target) {
         this.frameResolver = new BackgroundFrameResolver(target);
@@ -64,6 +67,36 @@ public class BackgroundRenderer implements RenderLayer {
 
     public void configure(SceneRenderData data) {
         this.currentData = data;
+    }
+
+    /**
+     * Releases every offscreen target of this background. Everything is re-created lazily on the
+     * next rendered frame, so this only trades a one-frame rebuild for the idle memory footprint.
+     */
+    public void release() {
+        sceneCapture.release();
+        backgroundBlur.release();
+        backgroundCrop.release();
+        fluidBlur.release();
+        sceneCoverTransition.release();
+        sceneCoverWarpProcedural.reset();
+        sceneCoverLayers.release();
+        sceneCoverOverlay.release();
+    }
+
+    /**
+     * Drops only the cover crossfade state. A renderer that stops rendering (closed screen, hidden
+     * HUD) must not keep the current artwork alive, and its stale cover sources would otherwise be
+     * sampled again after a long pause.
+     */
+    public void releaseCoverState() {
+        sceneCoverTransition.release();
+        skippedFrames = 0;
+    }
+
+    @Override
+    public boolean holdsCover(TrackArtwork artwork) {
+        return artwork != null && sceneCoverTransition.holds(artwork.background());
     }
 
     @Override
@@ -79,7 +112,29 @@ public class BackgroundRenderer implements RenderLayer {
         renderSolidFallback(context, currentData.getHudStyle());
     }
 
+    /**
+     * Builds the whole offscreen background chain. Timed here rather than in {@link #render} so the
+     * GUI background, which the screen drives directly, shows up in the stats too.
+     */
     public boolean renderFluidBackground(SceneRenderContext context, SceneStyle style) {
+        long startNanos = System.nanoTime();
+        try {
+            TrackArtworkStore.getInstance().addHolder(this);
+            boolean rendered = buildFluidBackground(context, style);
+            if (rendered) {
+                skippedFrames = 0;
+            } else if (++skippedFrames >= 2) {
+                // Two frames without a background mean this renderer is idle (hidden HUD, closed
+                // screen); holding a cover source would block the artwork release indefinitely.
+                sceneCoverTransition.release();
+            }
+            return rendered;
+        } finally {
+            RenderStats.addOffscreenNanos(System.nanoTime() - startNanos);
+        }
+    }
+
+    private boolean buildFluidBackground(SceneRenderContext context, SceneStyle style) {
         if (style == null || style.getWidth() <= 0 || style.getHeight() <= 0
                 || style.getAlpha() <= EPSILON) return false;
 
@@ -104,6 +159,7 @@ public class BackgroundRenderer implements RenderLayer {
         SceneGpuTexture cover = null;
         float masterOpacity = 0f;
         if (fluidOpacityConfig > EPSILON) {
+            long transitionStart = System.nanoTime();
             ResolvedCover resolvedCover = resolveCoverImages();
             if (resolvedCover != null) {
                 coverFrame = sceneCoverTransition.update(
@@ -112,6 +168,7 @@ public class BackgroundRenderer implements RenderLayer {
                 cover = coverFrame.cover();
                 masterOpacity = fluidOpacityConfig * coverFrame.opacityScale();
             }
+            RenderStats.phaseTransitionNanos(System.nanoTime() - transitionStart);
         }
 
         float layerOpacity = FluidBackgroundSettings.COVER_LAYER_OPACITY;
@@ -125,43 +182,61 @@ public class BackgroundRenderer implements RenderLayer {
             SceneGpuTexture fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
                     time, layerOpacity, plan.fluidBlurRadius());
             if (fluid != null) {
-                submitFluidBackground(context, style, fluid, true, 0f);
+                float scale = audioReactiveScaleTimed();
+                long submitStart = System.nanoTime();
+                submitFluidBackground(context, style, fluid, true, 0f, scale);
+                RenderStats.phaseSubmitNanos(System.nanoTime() - submitStart);
                 return true;
             }
         }
 
         CapturePlan capturePlan = capturePlan(region, source, plan.sceneBlurRadius());
         if (capturePlan == null) return false;
-        SceneGpuTexture captured = sceneCapture.capture(gpu, source, capturePlan.captureRegion());
+        int downscale = capturePlan.downscale();
+        SceneGpuTexture captured = sceneCapture.capture(gpu, source,
+                capturePlan.captureRegion(), downscale);
         if (captured == null) return false;
         SceneGpuTexture background = captured;
         int sceneBlurRadius = plan.sceneBlurRadius();
         if (sceneBlurRadius > 0) {
+            // Sigma is expressed in the (possibly downscaled) capture's pixel space.
+            long blurAllocStart = System.nanoTime();
             SceneBlur.PendingBlur blur = backgroundBlur.prepare(gpu,
-                    captured.width(), captured.height(), sceneBlurRadius / 3f);
-            if (blur != null && blur.apply(gpu, captured)) {
-                background = blur.target();
+                    captured.width(), captured.height(), sceneBlurRadius / (3f * downscale));
+            RenderStats.phaseBlurAllocNanos(System.nanoTime() - blurAllocStart);
+            if (blur != null) {
+                long blurPassStart = System.nanoTime();
+                boolean applied = blur.apply(gpu, captured);
+                RenderStats.phaseBlurPassNanos(System.nanoTime() - blurPassStart);
+                if (applied) {
+                    background = blur.target();
+                }
             }
         }
         if (capturePlan.needsCrop()) {
             SceneGpuTexture cropped = backgroundCrop.apply(gpu, background,
                     capturePlan.u0(), capturePlan.v0(), capturePlan.u1(), capturePlan.v1(),
-                    capturePlan.targetWidth(), capturePlan.targetHeight());
+                    downscaled(capturePlan.targetWidth(), downscale),
+                    downscaled(capturePlan.targetHeight(), downscale));
             if (cropped == null) return false;
             background = cropped;
         }
 
         SceneGpuTexture output = background;
         boolean backgroundOnly = true;
-        SceneUniform adjustUniform = backgroundAdjustUniform(false, 0f);
+        // scaleOrGamma = 0 keeps the overlay shader on its linear tone-mapping mode; the fluid zoom
+        // is applied to Sampler1 by the overlay shader through MHOverlay.z instead.
+        SceneUniform adjustUniform = backgroundAdjustUniform(false, 0f, 0f);
         if (fluidWanted) {
             if (!fluidAttempted) {
                 SceneGpuTexture fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
                         time, layerOpacity, plan.fluidBlurRadius());
                 if (fluid != null) {
+                    float scale = audioReactiveScaleTimed();
                     SceneGpuTexture composite = sceneCoverOverlay.apply(
                             gpu, background, fluid, plan.masterOpacity(),
-                            plan.samplingBlackOverlay(), adjustUniform);
+                            plan.samplingBlackOverlay(), adjustUniform,
+                            scale);
                     if (composite != null) {
                         output = composite;
                         backgroundOnly = false;
@@ -170,28 +245,47 @@ public class BackgroundRenderer implements RenderLayer {
             }
         }
 
+        // The audio zoom is folded into the display sampling / overlay sampling: the display must
+        // never zoom the whole composite, otherwise the captured scene would move as well.
+        long submitStart = System.nanoTime();
         submitFluidBackground(context, style, output, false,
-                backgroundOnly ? plan.samplingBlackOverlay() : 0f);
+                backgroundOnly ? plan.samplingBlackOverlay() : 0f, 1f);
+        RenderStats.phaseSubmitNanos(System.nanoTime() - submitStart);
         return true;
+    }
+
+    /** {@link #audioReactiveScale()} with its own timing, since it takes the audio player lock. */
+    private static float audioReactiveScaleTimed() {
+        long start = System.nanoTime();
+        try {
+            return audioReactiveScale();
+        } finally {
+            RenderStats.phaseAudioNanos(System.nanoTime() - start);
+        }
     }
 
     private SceneGpuTexture buildFluid(SceneGpuContext gpu, SceneGpuTexture cover,
                                        SceneCapture.Region region, int canvasWidth,
                                        int canvasHeight, float time, float layerOpacity,
                                        int fluidBlurRadius) {
+        long layersStart = System.nanoTime();
         SceneCoverLayers.CoverUniform uniform = createCoverUniform(
                 region, time, cover, layerOpacity);
         SceneGpuTexture layers = sceneCoverLayers.apply(gpu, cover, uniform,
                 canvasWidth, canvasHeight);
+        RenderStats.phaseLayersNanos(System.nanoTime() - layersStart);
         if (layers == null) return null;
         SceneGpuTexture fluid = layers;
         if (fluidBlurRadius > 0) {
+            long blurStart = System.nanoTime();
             fluid = blurTexture(fluidBlur, gpu, layers, fluidBlurRadius,
                     Math.max(1, Math.max(canvasWidth, canvasHeight)));
+            RenderStats.phaseBlurNanos(System.nanoTime() - blurStart);
         }
+        long warpStart = System.nanoTime();
         SceneGpuTexture warped = sceneCoverWarpProcedural.apply(gpu, fluid, time);
-        SceneGpuTexture result = warped != null ? warped : fluid;
-        return sceneCoverFluidScale.apply(gpu, result, audioReactiveScale());
+        RenderStats.phaseWarpNanos(System.nanoTime() - warpStart);
+        return warped != null ? warped : fluid;
     }
 
     private static SceneGpuTexture blurTexture(SceneBlur blur, SceneGpuContext gpu,
@@ -200,11 +294,14 @@ public class BackgroundRenderer implements RenderLayer {
         int sourceLong = Math.max(source.width(), source.height());
         float scale = sourceLong / (float) Math.max(1, canvasLong);
         float sigma = (radius / 3f) * scale;
+        long allocStart = System.nanoTime();
         SceneBlur.PendingBlur pending = blur.prepare(gpu, source.width(), source.height(), sigma);
-        if (pending != null && pending.apply(gpu, source)) {
-            return pending.target();
-        }
-        return source;
+        RenderStats.phaseBlurAllocNanos(System.nanoTime() - allocStart);
+        if (pending == null) return source;
+        long passStart = System.nanoTime();
+        boolean applied = pending.apply(gpu, source);
+        RenderStats.phaseBlurPassNanos(System.nanoTime() - passStart);
+        return applied ? pending.target() : source;
     }
 
     private static float audioReactiveScale() {
@@ -221,19 +318,20 @@ public class BackgroundRenderer implements RenderLayer {
 
     private void submitFluidBackground(SceneRenderContext context, SceneStyle style,
                                        SceneGpuTexture texture, boolean applyColorAdjust,
-                                       float blackOverlay) {
+                                       float blackOverlay, float fluidScale) {
         context.submit(this, new SceneElementRenderState(
                 SceneRenderPipelines.FLUID_BACKGROUND,
                 SceneTextureSetup.single(texture),
                 context.currentPose(),
                 style,
                 style,
-                backgroundAdjustUniform(applyColorAdjust, blackOverlay)
+                backgroundAdjustUniform(applyColorAdjust, blackOverlay, fluidScale)
         ));
     }
 
     private static BackgroundAdjustUniform backgroundAdjustUniform(boolean applyColorAdjust,
-                                                                    float blackOverlay) {
+                                                                    float blackOverlay,
+                                                                    float fluidScale) {
         return new BackgroundAdjustUniform(
                 FluidBackgroundSettings.BACKGROUND_NATURAL_SATURATION,
                 FluidBackgroundSettings.HIGHLIGHT_DARKENING,
@@ -241,7 +339,8 @@ public class BackgroundRenderer implements RenderLayer {
                 FluidBackgroundSettings.HIGHLIGHT_FULL,
                 FluidBackgroundSettings.BACKGROUND_OVERALL_BRIGHTNESS,
                 applyColorAdjust,
-                blackOverlay);
+                blackOverlay,
+                fluidScale);
     }
 
     private static SceneCoverLayers.CoverUniform createCoverUniform(
@@ -373,7 +472,22 @@ public class BackgroundRenderer implements RenderLayer {
                 || Math.abs(captureLeft - left) > 0.01f
                 || Math.abs(captureTop - top) > 0.01f;
         return new CapturePlan(captureRegion, u0, v0, u1, v1,
-                targetWidth, targetHeight, needsCrop);
+                targetWidth, targetHeight, needsCrop, captureDownscale(blurRadius));
+    }
+
+    /**
+     * The captured backdrop is blurred with {@code blurRadius} screen pixels, so grabbing it at
+     * full resolution is pure oversampling: the capture, the blur pyramid sized from it and the
+     * crop target are all taken at 1/downscale. Bounded to {1, 2, 4} to keep the box filter cheap.
+     */
+    private static int captureDownscale(int blurRadius) {
+        if (blurRadius >= 64) return 4;
+        if (blurRadius >= 24) return 2;
+        return 1;
+    }
+
+    private static int downscaled(int pixels, int downscale) {
+        return Math.max(1, (pixels + downscale - 1) / downscale);
     }
 
     private void renderSolidFallback(SceneRenderContext context, SceneStyle style) {
@@ -417,10 +531,15 @@ public class BackgroundRenderer implements RenderLayer {
         }
     }
 
+    /**
+     * Overlay/second-stage background adjustment. {@code scaleOrGamma} is read as the fluid zoom by
+     * the display shader ({@code fluid_background.fsh}) and as the gamma tone-mapping mode by the
+     * overlay shader ({@code scene_cover_overlay.fsh}); both passes share this std140 block.
+     */
     private record BackgroundAdjustUniform(float saturation, float highlightDarkening,
                                            float highlightKnee, float highlightFull,
                                            float overallBrightness, boolean applyColorAdjust,
-                                           float blackOverlay)
+                                           float blackOverlay, float scaleOrGamma)
             implements SceneUniform {
         private static final String UBO_NAME = "MHBackgroundAdjust";
         private static final int UBO_SIZE = Std140Sizes.calc()
@@ -440,7 +559,7 @@ public class BackgroundRenderer implements RenderLayer {
         public void write(Std140Writer writer) {
             writer.putVec4(saturation, highlightDarkening, highlightKnee, highlightFull);
             writer.putVec4(overallBrightness, applyColorAdjust ? 1f : 0f,
-                    blackOverlay, 0f);
+                    blackOverlay, scaleOrGamma);
         }
 
         @Override
@@ -455,6 +574,6 @@ public class BackgroundRenderer implements RenderLayer {
     private record CapturePlan(SceneCapture.Region captureRegion,
                                float u0, float v0, float u1, float v1,
                                int targetWidth, int targetHeight,
-                               boolean needsCrop) {
+                               boolean needsCrop, int downscale) {
     }
 }

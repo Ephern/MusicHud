@@ -159,6 +159,16 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         hudOccluded = false;
         mHost.removed(this);
         BackgroundState.getInstance().getOverrides().clear();
+        // Only the sampling path (fluid opacity < 1) allocates the full-screen capture and the
+        // blur pyramid sized from it; releasing those is worth a lazy rebuild. The default
+        // fluid-only background holds ~2-3 MiB, which is cheaper to keep than to rebuild (~11 ms).
+        if (CLIENT_CONFIG.getGuiBackgroundFluidOpacity() < 0.999) {
+            BACKGROUND_RENDERER.release();
+        } else {
+            // Keeping the targets is cheap, but the stale cover source would block the artwork
+            // release (and be sampled again after a long pause), so drop just the cover state.
+            BACKGROUND_RENDERER.releaseCoverState();
+        }
     }
 
     @Override

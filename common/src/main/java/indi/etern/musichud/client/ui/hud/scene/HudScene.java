@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.hud.scene;
 
 import com.mojang.blaze3d.platform.Window;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.layout.HudLayouts;
 import indi.etern.musichud.client.ui.hud.metadata.ProgressBarData;
@@ -14,6 +15,7 @@ import indi.etern.musichud.client.ui.hud.renderer.debug.HudLayoutDebugRenderer;
 import indi.etern.musichud.client.ui.render.*;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.Unregister;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -48,6 +50,7 @@ public final class HudScene implements RenderScene {
     private Logger logger;
     private Supplier<String> appliedSkinSupplier;
     private int appliedStatusRevision = -1;
+    private int appliedThumbnailSize = -1;
 
     private HudScene() {
         presenter.setLyricSink(new HudPresenter.LyricSink() {
@@ -63,6 +66,28 @@ public final class HudScene implements RenderScene {
         });
         updateLayoutFromConfig();
         refreshStyle();
+        registerPipelinePrecompile();
+    }
+
+    /**
+     * The background chain's GLSL compiles on first use (~200 ms with a cold driver cache), so
+     * compiling it lazily stalls the moment the first song starts. The first client tick happens
+     * during startup, long before any background is rendered; the hook retries until the render
+     * device is ready and then unregisters itself.
+     */
+    private void registerPipelinePrecompile() {
+        try {
+            Unregister[] handle = new Unregister[1];
+            handle[0] = IClientEventService.getInstance().registerClientTickPost(() -> {
+                RenderRuntime runtime = RenderRuntime.getInstance();
+                runtime.precompileScenePipelines();
+                if (runtime.isPipelinePrecompileSettled() && handle[0] != null) {
+                    handle[0].unregister();
+                }
+            });
+        } catch (RuntimeException failure) {
+            logger().debug("While registering the scene pipeline precompile hook", failure);
+        }
     }
 
     public static HudScene getInstance() {
@@ -195,7 +220,11 @@ public final class HudScene implements RenderScene {
         }
         //noinspection ConstantValue
         if (window != null && imageDisplayData != null) {
-            presenter.setThumbnailSize((int) (imageDisplayData.getHudStyle().getWidth() * window.getGuiScale()));
+            int thumbnailSize = (int) (imageDisplayData.getHudStyle().getWidth() * window.getGuiScale());
+            if (thumbnailSize != appliedThumbnailSize) {
+                appliedThumbnailSize = thumbnailSize;
+                presenter.setThumbnailSize(thumbnailSize);
+            }
         }
     }
 

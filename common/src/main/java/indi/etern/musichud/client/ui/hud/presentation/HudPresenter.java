@@ -16,12 +16,14 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import net.minecraft.client.multiplayer.PlayerInfo;
 import net.minecraft.client.resources.language.I18n;
+import net.minecraft.locale.Language;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
 import java.time.Duration;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
+import java.util.Objects;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
@@ -54,6 +56,13 @@ public final class HudPresenter {
     private volatile long hudFadeDurationMs;
     private volatile boolean pendingSwitchToEmpty;
     private Logger logger;
+
+    /** Language instance the cached idle message belongs to; a resource reload replaces it. */
+    private Object idleMessageLanguage;
+    private long playTimeCacheSeconds = Long.MIN_VALUE;
+    private long playTimeCacheDurationSeconds = Long.MIN_VALUE;
+    private String playTimeCacheMusicDuration;
+    private String playTimeCacheText = "";
 
     private HudPresenter() {
         model.setBackground(backgroundState.getTransition());
@@ -232,13 +241,7 @@ public final class HudPresenter {
         updateHudFade();
         model.setHudAlpha(hudAlpha);
         if (!clientConfig.getHideHudWhenNotPlaying()) {
-            String title = model.getTitle();
-            if (title == null || title.isBlank()) {
-                idleMessage = I18n.get(MusicHud.MOD_ID + ".text.idle");
-                if (!idleMessage.equals(MusicHud.MOD_ID + ".text.idle")) {
-                    model.setTitle(idleMessage);
-                }
-            }
+            refreshIdleMessage();
         }
 
         Duration playedDuration = nowPlayingInfo.getPlayedDuration();
@@ -246,16 +249,59 @@ public final class HudPresenter {
         model.setPlayedDuration(playedDuration);
         model.setMusicDuration(musicDuration);
         model.setProgressRate(nowPlayingInfo.getProgressRate());
-        if (playedDuration != null && musicDuration != null && !musicDuration.isZero()) {
-            DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1
-                    ? LONG_DATE_TIME_FORMATTER
-                    : SHORT_DATE_TIME_FORMATTER;
-            String playTime = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()))
-                    + " / " + musicDurationString;
-            model.setPlayTime(playTime);
-        } else {
-            model.setPlayTime("");
+        model.setPlayTime(formatPlayTime(playedDuration, musicDuration));
+    }
+
+    /**
+     * Cached translation lookup: the idle message only changes with the language instance, so the
+     * per-frame path is a single reference comparison instead of an I18n lookup plus a string
+     * comparison.
+     */
+    private void refreshIdleMessage() {
+        String title = model.getTitle();
+        if (title != null && !title.isBlank()) {
+            return;
         }
+        Object language = Language.getInstance();
+        String message = idleMessage;
+        if (language != idleMessageLanguage || message == null) {
+            idleMessageLanguage = language;
+            message = I18n.get(MusicHud.MOD_ID + ".text.idle");
+            idleMessage = message;
+        }
+        // Only show the message when the key is actually translated.
+        if (!message.equals(MusicHud.MOD_ID + ".text.idle")) {
+            model.setTitle(message);
+        }
+    }
+
+    /**
+     * The HUD renders at frame rate but the play time string only changes once per second, so the
+     * formatting result is memoized on (played seconds, duration seconds, duration text).
+     */
+    private String formatPlayTime(@Nullable Duration playedDuration, @Nullable Duration musicDuration) {
+        if (playedDuration == null || musicDuration == null || musicDuration.isZero()) {
+            playTimeCacheSeconds = Long.MIN_VALUE;
+            playTimeCacheText = "";
+            return "";
+        }
+        long seconds = playedDuration.toSeconds();
+        long durationSeconds = musicDuration.toSeconds();
+        String total = musicDurationString;
+        if (seconds == playTimeCacheSeconds
+                && durationSeconds == playTimeCacheDurationSeconds
+                && Objects.equals(total, playTimeCacheMusicDuration)) {
+            return playTimeCacheText;
+        }
+        DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1
+                ? LONG_DATE_TIME_FORMATTER
+                : SHORT_DATE_TIME_FORMATTER;
+        String playTime = formatter.format(LocalTime.MIDNIGHT.plusSeconds(seconds)) + " / " + total;
+        playTimeCacheSeconds = seconds;
+        playTimeCacheDurationSeconds = durationSeconds;
+        playTimeCacheMusicDuration = total;
+        playTimeCacheText = playTime;
+        return playTime;
     }
 
     private void scheduleLyricLines(ScrollingLyricLineRenderer.Line line1, ScrollingLyricLineRenderer.Line line2) {

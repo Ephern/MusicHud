@@ -5,15 +5,17 @@ import indi.etern.musichud.beans.music.Album;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
-import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
+import indi.etern.musichud.client.ui.render.FluidBackgroundSettings;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 
 import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+
 /**
- * Loads, scales and caches album cover images for the HUD background.
+ * Loads the artwork of the current track: one download, one decode, explicit ownership via
+ * {@link TrackArtwork}.
  * <p>
  * Publication is serialized by {@link CoverRequestGate}; the store only publishes the
  * resulting {@link BackgroundData} to {@link BackgroundState}.
@@ -48,11 +50,10 @@ public final class CoverImageStore {
     }
 
     public void preload(Album album) {
-        int size = albumImageThumbnailSize;
-        if (size <= 0) {
-            return;
-        }
-        ImageUtils.downloadScaledAsync(album.getPicUrl(), size, size);
+        // The artwork itself is decoded once into TrackArtwork-owned textures; warming the shared
+        // texture cache here would only pay for a decode nobody samples. The raw bytes are still
+        // worth prefetching so the decode can start immediately.
+        ImageUtils.prefetchBytes(album.getPicUrl());
     }
 
     public void setThumbnailSize(int thumbnailSize,
@@ -110,16 +111,29 @@ public final class CoverImageStore {
                                                    Consumer<Duration> onLoaded) {
         if (thumbnailSize <= 0) return CompletableFuture.completedFuture(null);
         Album album = musicDetail.getAlbum();
-        return ImageUtils.downloadScaledAsync(album.getPicUrl(), thumbnailSize, thumbnailSize)
-                .thenCombine(ImageUtils.downloadAsync(album.getPicUrl()),
-                        (thumbnail, original) -> new BackgroundImages(thumbnail, 1f, original))
-                .thenAccept(backgroundImages -> coverRequests.runIfCurrent(token,
-                        () -> currentTrack.test(musicDetail), () -> {
-                            BackgroundState.getInstance().startTransition(
-                                    new BackgroundData(backgroundImages));
-                            if (onLoaded != null) {
-                                onLoaded.accept(nowPlayingInfo.getMusicDuration());
-                            }
-                        }));
+        // The scene background never samples the cover above COVER_TARGET_MAX_LONG_EDGE (the
+        // canonical target is clamped to it), so uploading the full-resolution artwork only costs a
+        // multi-megabyte render-thread decode/upload per track. Both sizes are derived from a single
+        // decode, and the textures belong to TrackArtwork instead of the shared texture cache.
+        int backgroundSize = FluidBackgroundSettings.COVER_TARGET_MAX_LONG_EDGE;
+        return CompletableFuture
+                .supplyAsync(() -> TrackArtwork.load(album.getPicUrl(), thumbnailSize, backgroundSize),
+                        MusicHud.EXECUTOR)
+                .thenAccept(artwork -> {
+                    if (artwork == null) return;
+                    boolean accepted = coverRequests.runIfCurrent(token,
+                            () -> currentTrack.test(musicDetail), () -> {
+                                TrackArtworkStore.getInstance().publish(artwork);
+                                BackgroundState.getInstance().startTransition(
+                                        new BackgroundData(artwork.images()));
+                                if (onLoaded != null) {
+                                    onLoaded.accept(nowPlayingInfo.getMusicDuration());
+                                }
+                            });
+                    if (!accepted) {
+                        // Superseded before publication: nobody will ever display it.
+                        artwork.close();
+                    }
+                });
     }
 }

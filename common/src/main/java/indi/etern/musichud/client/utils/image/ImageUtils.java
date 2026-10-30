@@ -222,12 +222,63 @@ public class ImageUtils {
         if (targetW <= 0 || targetH <= 0 || (sw <= targetW && sh <= targetH)) {
             return source;
         }
+        Bitmap scaled = deriveScaled(source, targetW, targetH);
+        source.close();
+        return scaled;
+    }
+
+    /** Box-filters {@code source} into the requested box, preserving its aspect ratio. */
+    @NotNull
+    private static Bitmap deriveScaled(@NotNull Bitmap source, int targetW, int targetH) {
+        int sw = source.getWidth();
+        int sh = source.getHeight();
         double scale = Math.min((double) targetW / sw, (double) targetH / sh);
         int tw = Math.max(1, (int) Math.round(sw * scale));
         int th = Math.max(1, (int) Math.round(sh * scale));
-        Bitmap scaled = downscalePremultiplied(source, tw, th);
-        source.close();
-        return scaled;
+        return downscalePremultiplied(source, tw, th);
+    }
+
+    /**
+     * Downloads {@code url} once and derives every requested box from a single decode.
+     * <p>
+     * Unlike {@link #downloadScaledAsync}, the returned textures are <em>not</em> registered in the
+     * shared texture cache: the caller owns them and must close them. This is used for the artwork of
+     * the track that is currently displayed, whose lifetime is managed explicitly (the crossfades
+     * hold the previous cover for a while, which cache eviction cannot express).
+     */
+    public static CompletableFuture<ImageTextureData[]> downloadScaledSetOwned(String url, int[] boxes) {
+        if (boxes.length == 0) {
+            return CompletableFuture.completedFuture(new ImageTextureData[0]);
+        }
+        return downloadBytes(url).thenApplyAsync(bytes -> {
+            int largest = 0;
+            for (int box : boxes) {
+                largest = Math.max(largest, box);
+            }
+            try {
+                // One decode feeds every box; the derived bitmaps are filtered copies of it.
+                Bitmap base = decodeScaled(bytes, largest, largest);
+                ImageTextureData[] result = new ImageTextureData[boxes.length];
+                try {
+                    for (int i = 0; i < boxes.length; i++) {
+                        boolean reusable = base.getWidth() <= boxes[i] && base.getHeight() <= boxes[i];
+                        Bitmap derived = reusable ? base : deriveScaled(base, boxes[i], boxes[i]);
+                        try {
+                            result[i] = getImageTextureData(url + "#owned" + boxes[i], derived);
+                        } finally {
+                            if (!reusable) {
+                                derived.close();
+                            }
+                        }
+                    }
+                } finally {
+                    base.close();
+                }
+                return result;
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, downloadExecutor);
     }
 
     @NotNull
@@ -284,6 +335,12 @@ public class ImageUtils {
 
     private static int clamp8(int v) {
         return v < 0 ? 0 : Math.min(v, 255);
+    }
+
+    /** Warms the raw byte cache so the next decode does not wait for the network. */
+    public static void prefetchBytes(String url) {
+        if (url == null || url.isBlank()) return;
+        downloadBytes(url);
     }
 
     private static CompletableFuture<byte[]> downloadBytes(String url) {

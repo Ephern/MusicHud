@@ -41,6 +41,14 @@ public class StreamAudioPlayer {
     private long nextSpectrumSubmission;
     private long spectrumToken;
     private boolean spectrumMuted;
+    /**
+     * Last spectrum snapshot, published by the audio/mixer thread.
+     * <p>
+     * The player monitor is held for the whole PCM decode/mix of a chunk, which blocked the render
+     * thread (audio-reactive background) for several milliseconds. Readers now take the immutable
+     * snapshot instead of the monitor; a frame of staleness is invisible for audio reactivity.
+     */
+    private volatile SpectrumSnapshot publishedSpectrum = SpectrumSnapshot.silence(0, 0);
     private PlaybackTask currentTask;
     private PlaybackTask pendingTask;
     /** Next track buffered ahead of time; not audible until it becomes current/pending. */
@@ -62,11 +70,14 @@ public class StreamAudioPlayer {
         return status.get();
     }
 
-    /** Read-only session-bound spectrum of the actual current/pending PCM mix. */
-    public synchronized SpectrumSnapshot getSpectrum() {
-        boolean muted = ClientConfig.getInstance().getMuted();
-        updateSpectrumPause(muted);
-        return spectrum.snapshot(muted);
+    /** Read-only session-bound spectrum of the actual current/pending PCM mix. Never blocks. */
+    public SpectrumSnapshot getSpectrum() {
+        return publishedSpectrum;
+    }
+
+    /** Publishes the current snapshot for {@link #getSpectrum()}; callers must hold the monitor. */
+    private void publishSpectrumLocked(boolean muted) {
+        publishedSpectrum = spectrum.snapshot(muted);
     }
 
     private void updateSpectrumPause(boolean muted) {
@@ -95,10 +106,12 @@ public class StreamAudioPlayer {
         if (registered == null || registered != submission || !task.isAudible()) return;
         boolean muted = ClientConfig.getInstance().getMuted();
         updateSpectrumPause(muted);
+        publishSpectrumLocked(muted);
         if (muted) return;
         retainAudibleSpectrumSources();
         spectrum.setActive(spectrumToken, true);
         spectrumMixer.accept(submission, chunk, mixed -> spectrum.accept(spectrumToken, mixed));
+        publishSpectrumLocked(false);
     }
 
     private void retainAudibleSpectrumSources() {
@@ -256,6 +269,7 @@ public class StreamAudioPlayer {
         spectrum.stop();
         spectrumMixer.clear();
         spectrumSubmissions.clear();
+        publishSpectrumLocked(ClientConfig.getInstance().getMuted());
         if (preloadedTask != null) {
             preloadedTask.cancel();
             preloadedTask = null;
@@ -283,6 +297,7 @@ public class StreamAudioPlayer {
         retainAudibleSpectrumSources();
         if ((currentTask == null || !currentTask.isAudible()) && (pendingTask == null || !pendingTask.isAudible())) {
             spectrum.setActive(spectrumToken, false);
+            publishSpectrumLocked(ClientConfig.getInstance().getMuted());
         }
         if (task != currentTask) return;
         // A pending successor will take over in onTaskFinished; never flash IDLE
@@ -305,6 +320,7 @@ public class StreamAudioPlayer {
             if (spectrumSubmissions.isEmpty()) {
                 spectrumMixer.clear();
                 spectrum.stop();
+                publishSpectrumLocked(ClientConfig.getInstance().getMuted());
             }
             if (currentTask != finished) return;
             currentTask = null;

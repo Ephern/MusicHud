@@ -287,10 +287,9 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
 
         int totalHeight = (int) (line1Height + line2Height);
         int startY = cachedContainerY + (cachedContainerHeight - totalHeight) / 2; // 垂直居中
-        SceneStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
 
-        float x = absolutePosition.x();
-        float y = absolutePosition.y();
+        float x = absPos.x();
+        float y = absPos.y();
         context.pushScissor((int) x, (int) y, (int) (x + hudStyle.getWidth()), (int) (y + hudStyle.getHeight()));
         for (LinePair pair : pairs) {
             float yOffset = pair.offset.getValue();

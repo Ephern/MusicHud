@@ -1,25 +1,29 @@
 package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 
-import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.Window;
+import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.RenderStats;
 import indi.etern.musichud.client.ui.render.gpu.*;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlHalfFloatAllocator;
 import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.interfaces.ClientConfig;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.DynamicUniformStorage;
+import net.minecraft.client.renderer.ShaderManager;
+import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.system.MemoryUtil;
 
 import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,10 +36,16 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     private final SceneTextureAllocator halfFloatAllocator;
     private final int maxTextureSize;
     private final boolean rgba16fTargets;
-    private final Map<PipelineKey, ScenePipeline> pipelines = new HashMap<>();
-    private final Map<UniformKey, GpuBuffer> uniformBuffers = new HashMap<>();
+    private final Map<ScenePipelineKey, ScenePipeline> pipelines = new HashMap<>();
+    // Uniform storages are ring buffers: a frame's uploads never overwrite the slices the previous
+    // frames' in-flight draws still reference. Rewriting a single buffer per uniform (as before)
+    // relies on driver-side buffer renaming and can stall.
+    private final Map<UniformKey, DynamicUniformStorage<UniformAdapter>> uniformStorages =
+            new HashMap<>();
     private final List<SceneGpuTextureImpl> textures = new ArrayList<>();
     private final List<SceneGpuMeshImpl> meshes = new ArrayList<>();
+    private final Map<String, GpuTextureView> samplerScratch = new HashMap<>();
+    private final Map<String, GpuBufferSlice> uniformScratch = new HashMap<>();
     private boolean closed;
 
     public SceneGpuContextImpl() {
@@ -69,19 +79,33 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         }
         var texture = new SceneGpuTextureImpl(format, allocated, maxTextureSize);
         textures.add(texture);
+        RenderStats.targetCreated(compactLabel(label), texture.byteSize());
         return texture;
     }
 
-    @Override
-    public SceneSampler sampler(SceneSamplerState state) {
-        assertOpen();
-        return new SceneGpuSamplerImpl(state);
+    /** Trims the {@code MusicHud …} debug labels down to a stable, log-friendly tag. */
+    private static String compactLabel(String label) {
+        String tag = label.startsWith("MusicHud ") ? label.substring("MusicHud ".length()) : label;
+        if (tag.startsWith("cover ")) {
+            return tag.substring("cover ".length());
+        }
+        if (tag.startsWith("scene ")) {
+            return tag.substring("scene ".length());
+        }
+        if (tag.startsWith("procedural ")) {
+            return tag.substring("procedural ".length());
+        }
+        if (tag.equals("canonical cover")) {
+            return "canonical";
+        }
+        return tag;
     }
 
     @Override
     public ScenePipeline pipeline(ScenePipelineKey key, SceneTextureFormat targetFormat) {
         assertOpen();
-        return pipelines.computeIfAbsent(new PipelineKey(key, targetFormat),
+        // Pipelines are target-format agnostic here, so one pipeline serves RGBA8 and RGBA16F.
+        return pipelines.computeIfAbsent(key,
                 ignored -> new VanillaScenePipeline(key.name(), createPipeline(key)));
     }
 
@@ -96,12 +120,14 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     @Override
     public void updateMesh(SceneMesh mesh, ByteBuffer vertices) {
         assertOpen();
+        RenderStats.meshUploaded(vertices.remaining());
         requireMesh(mesh).update(vertices);
     }
 
     @Override
     public void draw(SceneDraw draw) {
         assertOpen();
+        RenderStats.pass();
         var target = requireTexture(draw.target());
         var samplers = samplers(draw);
         var uniforms = uniforms(draw);
@@ -111,6 +137,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     @Override
     public void drawIndexed(SceneIndexedDraw draw) {
         assertOpen();
+        RenderStats.pass();
         var target = requireTexture(draw.draw().target());
         var mesh = requireMesh(draw.mesh());
         var samplers = samplers(draw.draw());
@@ -135,7 +162,9 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     @Override
     public void release(SceneGpuTexture texture) {
         if (!(texture instanceof SceneGpuTextureImpl impl)) return;
-        textures.remove(impl);
+        if (!closed && textures.remove(impl)) {
+            RenderStats.targetReleased(impl.byteSize());
+        }
         impl.close();
     }
 
@@ -159,37 +188,31 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     }
 
     private Map<String, GpuTextureView> samplers(SceneDraw draw) {
-        Map<String, GpuTextureView> result = new HashMap<>();
+        // Reused across passes: the map is consumed synchronously by the render pass, and the
+        // context only ever draws on the render thread.
+        samplerScratch.clear();
         for (SceneSamplerBinding binding : draw.samplers()) {
-            result.put(binding.name(), SceneTextureAdapters.view(binding.texture()));
+            samplerScratch.put(binding.name(), SceneTextureAdapters.view(binding.texture()));
         }
-        return result;
+        return samplerScratch;
     }
 
     private Map<String, GpuBufferSlice> uniforms(SceneDraw draw) {
-        Map<String, GpuBufferSlice> result = new HashMap<>();
+        uniformScratch.clear();
         for (SceneUniformBinding binding : draw.uniforms()) {
-            result.put(binding.name(), uniformSlice(draw.pipeline(), binding.name(), binding.uniform()));
+            uniformScratch.put(binding.name(), uniformSlice(draw.pipeline(), binding.name(), binding.uniform()));
         }
-        return result;
+        return uniformScratch;
     }
 
     private GpuBufferSlice uniformSlice(ScenePipeline pipeline, String name, SceneUniform uniform) {
         int size = uniform.getUBOSize();
+        RenderStats.uniformUploaded(size);
         var key = new UniformKey(pipeline.name(), name, size);
-        GpuBuffer buffer = uniformBuffers.computeIfAbsent(key,
-                ignored -> RenderSystem.getDevice().createBuffer(() -> "MusicHud GPU uniform " + name,
-                        GpuBuffer.USAGE_UNIFORM | GpuBuffer.USAGE_COPY_DST, size));
-        ByteBuffer data = MemoryUtil.memAlloc(size).order(ByteOrder.nativeOrder());
-        try {
-            data.position(0).limit(size);
-            uniform.write(data);
-            data.position(0).limit(size);
-            RenderSystem.getDevice().createCommandEncoder().writeToBuffer(buffer.slice(), data);
-        } finally {
-            MemoryUtil.memFree(data);
-        }
-        return buffer.slice();
+        DynamicUniformStorage<UniformAdapter> storage = uniformStorages.computeIfAbsent(key,
+                ignored -> new DynamicUniformStorage<>(
+                        "MusicHud GPU uniform " + name, size, 64));
+        return storage.writeUniform(new UniformAdapter(uniform));
     }
 
     private RenderPipeline createPipeline(ScenePipelineKey key) {
@@ -213,6 +236,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
             case SCENE_COVER_WARP_PROCEDURAL -> SceneNativePassRenderer.meshPipeline(
                             "scene_cover_warp_procedural")
                     .withSampler("Sampler0")
+                    .withUniform("MHWarp", UniformType.UNIFORM_BUFFER)
                     .build();
             case SCENE_COVER_LAYERS -> SceneNativePassRenderer.pipeline("scene_cover_layers")
                     .withSampler("Sampler0")
@@ -223,10 +247,6 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                     .withSampler("Sampler1")
                     .withUniform("MHOverlay", UniformType.UNIFORM_BUFFER)
                     .withUniform("MHBackgroundAdjust", UniformType.UNIFORM_BUFFER)
-                    .build();
-            case SCENE_COVER_FLUID_SCALE -> SceneNativePassRenderer.pipeline("scene_cover_fluid_scale")
-                    .withSampler("Sampler0")
-                    .withUniform("MHFluidScale", UniformType.UNIFORM_BUFFER)
                     .build();
             case SCENE_COVER_BLEND -> SceneNativePassRenderer.pipeline("scene_cover_blend")
                     .withSampler("Sampler0")
@@ -268,17 +288,72 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         RenderSystem.assertOnRenderThread();
         if (closed) return;
         closed = true;
-        for (SceneGpuTextureImpl texture : new ArrayList<>(textures)) texture.close();
+        for (SceneGpuTextureImpl texture : new ArrayList<>(textures)) {
+            RenderStats.targetReleased(texture.byteSize());
+            texture.close();
+        }
         textures.clear();
         for (SceneGpuMeshImpl mesh : new ArrayList<>(meshes)) mesh.close();
         meshes.clear();
-        for (GpuBuffer buffer : uniformBuffers.values()) buffer.close();
-        uniformBuffers.clear();
+        for (DynamicUniformStorage<UniformAdapter> storage : uniformStorages.values()) storage.close();
+        uniformStorages.clear();
         pipelines.clear();
         renderer.close();
     }
 
-    private record PipelineKey(ScenePipelineKey key, SceneTextureFormat targetFormat) {
+    /** Advances the uniform ring buffers; call once per frame after the scene was recorded. */
+    @Override
+    public void endFrame() {
+        if (closed) return;
+        for (DynamicUniformStorage<UniformAdapter> storage : uniformStorages.values()) {
+            storage.endFrame();
+        }
+    }
+
+    @Override
+    public PrecompileResult precompilePipelines() {
+        assertOpen();
+        // The shader sources are provided by the resource reload, which finishes a few ticks after
+        // the client starts. Compiling before that makes the device log "Couldn't find source" for
+        // every pipeline, so probe a representative vertex/fragment pair first.
+        if (!shaderSourcesReady()) {
+            return PrecompileResult.NOT_READY;
+        }
+        var device = RenderSystem.getDevice();
+        boolean allValid = true;
+        for (ScenePipelineKey key : ScenePipelineKey.values()) {
+            ScenePipeline pipeline = pipelines.computeIfAbsent(key,
+                    ignored -> new VanillaScenePipeline(key.name(), createPipeline(key)));
+            if (pipeline instanceof VanillaScenePipeline vanilla) {
+                allValid &= device.precompilePipeline(vanilla.renderPipeline()).isValid();
+            }
+        }
+        return allValid ? PrecompileResult.DONE : PrecompileResult.FAILED;
+    }
+
+    private static boolean shaderSourcesReady() {
+        Minecraft minecraft = Minecraft.getInstance();
+        //noinspection ConstantValue
+        ShaderManager shaders = minecraft == null ? null : minecraft.getShaderManager();
+        //noinspection ConstantValue
+        if (shaders == null) {
+            return false;
+        }
+        //noinspection ConstantValue
+        return shaders.getShader(id("core/fullscreen"), ShaderType.VERTEX) != null
+                && shaders.getShader(id("core/scene_capture"), ShaderType.FRAGMENT) != null;
+    }
+
+    private static ResourceLocation id(String path) {
+        return ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, path);
+    }
+
+    private record UniformAdapter(SceneUniform uniform)
+            implements DynamicUniformStorage.DynamicUniform {
+        @Override
+        public void write(@NotNull ByteBuffer byteBuffer) {
+            uniform.write(byteBuffer);
+        }
     }
 
     private record UniformKey(String pipeline, String name, int size) {

@@ -38,6 +38,7 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Boolean> showHudLayoutBoxes;
     private final ModConfigSpec.ConfigValue<Boolean> forceGL32Path;
     private final ModConfigSpec.ConfigValue<Boolean> forceRgba8Fallback;
+    private final ModConfigSpec.ConfigValue<Boolean> debugLogRenderStats;
     private final ModConfigSpec.ConfigValue<Integer> guiBackgroundBlurRadius;
     private final ModConfigSpec.ConfigValue<Integer> hudBackgroundBlurRadius;
     private final ModConfigSpec.ConfigValue<Double> guiBackgroundFluidOpacity;
@@ -115,6 +116,10 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Force RGBA8 background render targets for debugging")
                 .translation(MusicHud.MOD_ID + ".config.debug.forceRgba8Fallback")
                 .define("forceRgba8Fallback", false);
+        debugLogRenderStats = builder
+                .comment("Log scene render statistics (passes, live render targets, upload bytes) every few seconds")
+                .translation(MusicHud.MOD_ID + ".config.debug.logRenderStats")
+                .define("logRenderStats", false);
         guiBackgroundBlurRadius = builder
                 .comment("GUI background sampling blur radius in physical pixels (0 disables blur)")
                 .translation(MusicHud.MOD_ID + ".config.common.guiBackgroundBlurRadius")
@@ -748,6 +753,21 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setForceRgba8Fallback(boolean force) {
         forceRgba8Fallback.set(force);
+    }
+
+    @Override
+    public boolean getDebugLogRenderStats() {
+        return debugLogRenderStats.get();
+    }
+
+    @Override
+    public boolean getDefaultDebugLogRenderStats() {
+        return debugLogRenderStats.getDefault();
+    }
+
+    @Override
+    public void setDebugLogRenderStats(boolean logRenderStats) {
+        debugLogRenderStats.set(logRenderStats);
     }
 
     @Override

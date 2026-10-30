@@ -42,10 +42,8 @@ public final class SceneCoverBlend {
             gpu.draw(new SceneDraw(target,
                     gpu.pipeline(ScenePipelineKey.SCENE_COVER_BLEND, target.actualFormat()),
                     List.of(
-                            new SceneSamplerBinding("Sampler0", previous,
-                                    gpu.sampler(SceneSamplerState.linearClamp())),
-                            new SceneSamplerBinding("Sampler1", current,
-                                    gpu.sampler(SceneSamplerState.linearClamp()))),
+                            new SceneSamplerBinding("Sampler0", previous),
+                            new SceneSamplerBinding("Sampler1", current)),
                     List.of(new SceneUniformBinding(BlendUniform.UBO_NAME,
                             new BlendUniform(mix)))));
             return target;
@@ -53,6 +51,14 @@ public final class SceneCoverBlend {
             LOGGER.debug("While blending the background cover", failure);
             release(gpu);
             return null;
+        }
+    }
+
+    /** Releases the blend target; it is re-created lazily on the next blend. */
+    public void release() {
+        SceneGpuContext current = owner;
+        if (current != null) {
+            release(current);
         }
     }
 

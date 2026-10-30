@@ -1,7 +1,6 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
 import indi.etern.musichud.client.ui.render.*;
-import indi.etern.musichud.client.ui.render.pipeline.*;
 import indi.etern.musichud.client.ui.render.text.*;
 
 import icyllis.modernui.mc.text.ModernStringSplitter;
@@ -17,6 +16,8 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.network.chat.Style;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 
 @Getter
@@ -51,6 +52,9 @@ public class TextRenderer implements RenderLayer {
      * instead of a single color. {@code null} keeps the legacy flat path.
      */
     private GradientSpec gradient;
+    /** Ellipsis-trimmed text is stable per (text, available width); it is rebuilt every frame. */
+    private final Map<String, String> trimmedCache = new HashMap<>();
+    private float trimmedCacheMaxWidth = Float.NaN;
 
     public TextRenderer() {
         try {
@@ -280,13 +284,6 @@ public class TextRenderer implements RenderLayer {
         return (alphaValue << 24) | (baseColor & 0x00FFFFFF);
     }
 
-    public float calcDisplayWidth() {
-        if (hudStyle == null) {
-            return 0f;
-        }
-        return Math.min(hudStyle.getWidth(), measureDisplayWidth(hudStyle.getHeight()));
-    }
-
     public float measureDisplayWidth(float height) {
         String current = currentTextData == null ? null : currentTextData.text;
         String next = isTransitioning && nextTextData != null ? nextTextData.text : null;
@@ -324,6 +321,23 @@ public class TextRenderer implements RenderLayer {
     }
 
     private String trimToWidth(String text, float maxWidth) {
+        if (maxWidth != trimmedCacheMaxWidth) {
+            trimmedCache.clear();
+            trimmedCacheMaxWidth = maxWidth;
+        }
+        String cached = trimmedCache.get(text);
+        if (cached != null) {
+            return cached;
+        }
+        String trimmed = computeTrimmedText(text, maxWidth);
+        if (trimmedCache.size() >= 8) {
+            trimmedCache.clear();
+        }
+        trimmedCache.put(text, trimmed);
+        return trimmed;
+    }
+
+    private String computeTrimmedText(String text, float maxWidth) {
         if (modernStringSplitter != null) {
             int maxIndex = modernStringSplitter.indexByWidth(text, maxWidth, Style.EMPTY);
             String trimmed = text.substring(0, maxIndex);
