@@ -13,12 +13,9 @@ import icyllis.modernui.core.Core;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Per-lyric-line offscreen render targets and cached convolution results used by
- * {@link LineBlurRenderer}. All fields are mutated on the UI/render thread only.
- * <p>
- * A {@link GraniteSurface} image snapshot is a real copy (never a shared handle) and is
- * cached by the surface, so {@link Surface#notifyWillChange()} must be called before the
- * same target is drawn into again.
+ * Per-line offscreen targets and cached convolution results for {@link LineBlurRenderer}; touched on
+ * the UI/render thread only. A {@link GraniteSurface} snapshot is a real copy, so
+ * {@link Surface#notifyWillChange()} must be called before drawing into the same target again.
  */
 public final class LineBlurResources {
     Surface sourceSurface;

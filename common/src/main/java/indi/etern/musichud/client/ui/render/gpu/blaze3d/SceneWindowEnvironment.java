@@ -9,13 +9,8 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Samples the window/monitor state once per scene frame.
- * <p>
- * The render stats are wall-clock deltas measured on the render thread, so anything that changes how
- * Windows schedules or presents the window (losing focus, moving the window to another monitor, a
- * refresh-rate or DPI change) can show up as a phase spike even though the code path is unchanged.
- * Counting focus/monitor/framebuffer transitions inside the same reporting window as the maxima lets
- * a spike be blamed on the environment instead of the renderer.
+ * Samples the window/monitor state once per scene frame, so a phase spike can be blamed on the
+ * environment (focus loss, monitor switch, refresh-rate or DPI change) instead of the renderer.
  */
 public final class SceneWindowEnvironment {
     private static final Map<Long, Integer> MONITOR_INDEXES = new HashMap<>();

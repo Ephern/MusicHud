@@ -5,12 +5,8 @@ import java.nio.ByteOrder;
 import java.util.concurrent.ThreadLocalRandom;
 
 /**
- * Converts 24-bit signed PCM samples (little-endian, 3 bytes/sample)
- * to 16-bit signed PCM (little-endian, 2 bytes/sample) with TPDF dithering.
- * <p>
- * TPDF (Triangular Probability Density Function) dither eliminates
- * quantization harmonic distortion by adding 2-LSB peak-to-peak triangular noise
- * before truncation, decorrelating the quantization error from the signal.
+ * Converts 24-bit signed PCM (little-endian, 3 bytes/sample) to 16-bit with TPDF dithering, which
+ * decorrelates the quantization error from the signal instead of adding harmonic distortion.
  */
 public class Bit24To16Resampler implements IResampler {
 

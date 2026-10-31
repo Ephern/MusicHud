@@ -30,22 +30,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Utility for fetching api-enhanced binary releases from GitHub.
+ * Fetches api-enhanced binary releases from GitHub.
  * <p>
- * Rate-limit strategy:
- * <ul>
- *   <li>{@link #listReleaseSummaries()} — parses the Atom feed ({@code releases.atom}),
- *       which is <b>not</b> subject to REST API rate limits. Zero API quota consumed.</li>
- *   <li>{@link #downloadLatestForCurrentPlatform(Path, Consumer)} — uses GitHub's
- *       direct-download URL ({@code releases/latest/download/&lt;asset&gt;}), which
- *       issues a 302 redirect to the CDN. Zero API quota consumed.</li>
- *   <li>{@link #downloadAssetByTag(String, Path, Consumer)} — uses the direct-download
- *       URL ({@code releases/download/&lt;tag&gt;/&lt;asset&gt;}). Zero API quota consumed.</li>
- *   <li>{@link #listReleases()} — the <b>only</b> method that hits the REST API
- *       ({@code api.github.com/repos/.../releases}). Use sparingly or set
- *       {@code GITHUB_TOKEN} with {@link #setGitHubToken(String)} to raise the limit.</li>
- * </ul>
- * Not yet wired into the main flow — call methods directly as needed.
+ * Only {@link #listReleases()} hits the REST API (limited, raise it with
+ * {@link #setGitHubToken(String)}); the other calls use the Atom feed or the
+ * {@code releases/latest/download/...} redirect and consume no API quota.
  */
 public class ApiServerFetcher {
     private static final Logger LOGGER = MusicHud.getLogger(ApiServerFetcher.class);
@@ -240,13 +229,10 @@ public class ApiServerFetcher {
     }
 
     /**
-     * Download the latest binary for the current platform to a custom filename via a proxy.
-     * <b>Zero REST API quota consumed.</b>
+     * Downloads the latest binary for this platform to a custom filename through a proxy. Consumes no
+     * REST API quota.
      *
-     * @param targetDir directory to save into
-     * @param targetName custom filename to use
-     * @param proxy download proxy to route through
-     * @param progress optional detailed progress callback (downloaded bytes, total bytes), may be null
+     * @param progress optional (downloaded bytes, total bytes) callback, may be null
      */
     public static CompletableFuture<Void> downloadLatestForCurrentPlatform(Path targetDir, String targetName, DownloadProxy proxy, BiConsumer<Long, Long> progress) {
         Platform platform = Platform.detect();

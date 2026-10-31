@@ -11,17 +11,10 @@ import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * GPU-only single-line Gaussian blur used by the lyrics view.
- * <p>
- * The line subtree is rendered once into an offscreen render target (the "source"), then
- * blurred with a separable Gaussian: a horizontal pass into a scratch target, followed by a
- * vertical pass into the final target. Each pass is a weighted sum of offset copies of the
- * source image, accumulated with {@link BlendMode#PLUS}. The full-resolution result is finally
- * composited back onto the main canvas. No CPU pixel work and no read-back are involved.
- * <p>
- * Everything is cached per {@link LineBlurResources}: the source is only re-rendered when the
- * content signature or the target size changes, and the blur is only re-run when the radius or
- * the source changes.
+ * Single-line Gaussian blur for the lyrics view: the line subtree is rendered into an offscreen
+ * target, blurred by two separable passes (horizontal into scratch, vertical into the result) and
+ * composited back. No CPU pixel work and no read-back. Both steps are cached per
+ * {@link LineBlurResources} and re-run only when the content, size or radius changes.
  */
 @SuppressWarnings("UnstableApiUsage")
 public final class LineBlurRenderer {

@@ -4,13 +4,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Render-thread-only counters for the scene pipeline.
- * <p>
- * Spark (CPU sampling / allocation profiling) already covers the Java side, but it cannot observe
- * the GPU-side facts: how many offscreen passes run per frame, how many render targets are alive
- * and how much VRAM they hold, or how many bytes the uniform/mesh uploads move. This class tracks
- * only those, and {@link RenderRuntime} samples a snapshot every few seconds when the debug config
- * option is enabled.
+ * Render-thread-only counters for the scene pipeline: offscreen passes per frame, live render
+ * targets and their VRAM, uniform/mesh upload bytes. {@link RenderRuntime} samples a snapshot every
+ * few seconds while the debug option is on.
  */
 public final class RenderStats {
     private static int passes;
@@ -44,17 +40,13 @@ public final class RenderStats {
     private static long blurPassMaxNanos;
     private static long captureMaxNanos;
     private static long sceneBlurMaxNanos;
-    // Phase averages over the reporting window. A max alone cannot say whether a pass is expensive
-    // every frame or only when a target is rebuilt, which is exactly the question when sizing the
-    // background chain for an integrated GPU.
+    // Window averages: a maximum cannot tell a per-frame cost from a one-off reallocation.
     private static long transitionNanos;
     private static int transitionCalls;
     private static long audioNanos;
     private static int audioCalls;
     private static long layersNanos;
     private static int layersCalls;
-    private static long blurNanos;
-    private static int blurCalls;
     private static long warpNanos;
     private static int warpCalls;
     private static long submitNanos;
@@ -175,8 +167,6 @@ public final class RenderStats {
         audioCalls = 0;
         layersNanos = 0;
         layersCalls = 0;
-        blurNanos = 0;
-        blurCalls = 0;
         warpNanos = 0;
         warpCalls = 0;
         submitNanos = 0;
@@ -220,8 +210,6 @@ public final class RenderStats {
 
     /** Blur pyramid for the fluid canvas. */
     public static void phaseBlurNanos(long nanos) {
-        blurNanos += nanos;
-        blurCalls++;
         if (nanos > blurMaxNanos) blurMaxNanos = nanos;
     }
 
@@ -239,21 +227,21 @@ public final class RenderStats {
         if (nanos > blurPassMaxNanos) blurPassMaxNanos = nanos;
     }
 
-    /** Copying the scene colour region into the capture target (sampling path only). */
+    /** Scene capture into the capture target. */
     public static void phaseCaptureNanos(long nanos) {
         captureNanos += nanos;
         captureCalls++;
         if (nanos > captureMaxNanos) captureMaxNanos = nanos;
     }
 
-    /** Blur of the captured scene (sampling path only), allocation and passes together. */
+    /** Scene blur: allocation and passes together. */
     public static void phaseSceneBlurNanos(long nanos) {
         sceneBlurNanos += nanos;
         sceneBlurCalls++;
         if (nanos > sceneBlurMaxNanos) sceneBlurMaxNanos = nanos;
     }
 
-    /** Compact "phase=avgus/calls" suffix; the companion of {@link #phaseSpikes(long)}. */
+    /** {@code name=avgus/calls} for every phase that ran in the window. */
     public static String phaseSummary() {
         StringBuilder builder = new StringBuilder(" | phases:");
         appendAverage(builder, "transition", transitionNanos, transitionCalls);

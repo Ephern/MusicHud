@@ -136,10 +136,12 @@ public class TextRenderer implements RenderLayer {
         }
     }
 
-    public void render(SceneRenderContext context) {
-        // 更新过渡进度
+    @Override
+    public void update() {
         updateTransition();
+    }
 
+    public void render(SceneRenderContext context) {
         if (currentTextData == null || hudStyle.getHeight() <= 0 || hudStyle.getWidth() <= 0) {
             return;
         }

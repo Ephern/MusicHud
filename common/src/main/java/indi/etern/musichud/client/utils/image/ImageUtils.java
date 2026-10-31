@@ -50,20 +50,15 @@ public class ImageUtils {
     private static final Logger LOGGER = getLogger(ImageUtils.class);
 
     private static final int DEFAULT_MAX_CONCURRENT_DOWNLOADS = 40;
-    /** Largest decoded size kept per URL; bigger requests are derived from this canonical. */
     private static final int CANONICAL_MAX = 2048;
-    /** Total decoded-pixel budget held by the source cache. */
     private static final long SOURCE_CACHE_BUDGET = 128L * 1024 * 1024;
-    /** Smaller variants kept per URL before the least recently used one is dropped. */
     private static final int MAX_DERIVED_VARIANTS = 4;
     @Getter(AccessLevel.PACKAGE)
     private static final Cache<String, ImageTextureData> cachedTexturesData = CacheBuilder.newBuilder()
             .expireAfterAccess(Duration.ofMinutes(10))
             .maximumWeight(64L * 1024 * 1024)
             .weigher((Weigher<String, ImageTextureData>) (key, value) -> {
-                // Textures are closed on the render thread while this cache may be evicting on
-                // another one, so reading the (closed) pixels can throw. A weight that fails must
-                // not propagate out of the cache: fall back to the smallest unit instead.
+                // Weighing a closed texture throws; a throwing weigher fails the whole cache.
                 try {
                     DynamicTexture texture = value.getTexture();
                     NativeImage pixels = texture == null ? null : texture.getPixels();
@@ -73,16 +68,7 @@ public class ImageUtils {
                 }
             })
             .build();
-    /**
-     * Decoded pixels per URL, kept at the <em>largest</em> size requested so far. A bigger request
-     * promotes the entry (re-decode, drop the smaller variants); smaller requests are box-filtered
-     * from the canonical once and reused, so a URL is decoded at most once per size class instead of
-     * once per consumer.
-     * <p>
-     * Borrowed bitmaps must never be closed by the caller: {@link Bitmap} releases its native memory
-     * through a Cleaner, so dropping the reference is enough and no consumer can pull the pixels out
-     * from under another one.
-     */
+    /** Decoded pixels per URL at the largest size requested so far. Callers must never close them. */
     private static final Cache<String, SourceEntry> sourceCache = CacheBuilder.newBuilder()
             .expireAfterAccess(Duration.ofMinutes(10))
             .maximumWeight(SOURCE_CACHE_BUDGET)
@@ -198,13 +184,7 @@ public class ImageUtils {
         }, downloadExecutor);
     }
 
-    /**
-     * Borrowed decoded pixels covering at least {@code minW x minH}. Never close the result: the
-     * cache owns it and other consumers may be reading the same bitmap.
-     * <p>
-     * A request larger than the cached canonical promotes it (one re-decode, smaller variants
-     * dropped); a smaller request is box-filtered from the canonical and reused.
-     */
+    /** Borrowed pixels covering at least {@code minW x minH}; never close the result. */
     public static CompletableFuture<Bitmap> loadBitmap(String url, int minW, int minH) {
         int requestW = Math.max(1, minW);
         int requestH = Math.max(1, minH);
@@ -216,11 +196,11 @@ public class ImageUtils {
                 return CompletableFuture.completedFuture(ready);
             }
             if (entry.saturated) {
-                // The source is smaller than any request seen so far; decoding again cannot help.
                 cacheHits.incrementAndGet();
                 return CompletableFuture.completedFuture(entry.canonical);
             }
         }
+        //noinspection MathClampMigration
         int wanted = Math.min(CANONICAL_MAX, Math.max(requestW, requestH));
         int target;
         synchronized (entry) {
@@ -232,14 +212,11 @@ public class ImageUtils {
                 if (previous == null || entry.canonicalBox <= target) {
                     if (entry.canonical != null && entry.canonicalBox < target) {
                         cachePromotions.incrementAndGet();
-                        // The promoted source supersedes every texture derived from the smaller one.
                         invalidateTextures(url);
                     }
                     entry.canonical = bitmap;
                     entry.canonicalBox = target;
-                    // decodeScaled never upscales, so a bitmap below the requested box means the
-                    // source itself is that small: remember it, or every request would decode again.
-                    // A promo that returns the same dimensions as before is the same situation.
+                    // decodeScaled never upscales, so a smaller result means the source is that small.
                     boolean noProgress = previous != null
                             && previous.getWidth() == bitmap.getWidth()
                             && previous.getHeight() == bitmap.getHeight();
@@ -247,10 +224,11 @@ public class ImageUtils {
                             || noProgress;
                     entry.generation++;
                     entry.derived.clear();
-                    entry.canonicalBytes = bitmap.getWidth() * bitmap.getHeight() * 4;
+                    entry.canonicalBytes = (long) bitmap.getWidth() * bitmap.getHeight() * 4;
                     entry.derivedBytes = 0;
                     sourceCache.put(url, entry);
                 }
+                //noinspection resource
                 Bitmap borrowed = borrow(url, entry, requestW, requestH);
                 return borrowed != null ? borrowed : bitmap;
             }
@@ -264,16 +242,16 @@ public class ImageUtils {
             return null;
         }
         if (entry.saturated) {
-            // Already at the source's native size: the best this URL can ever provide.
             return canonical;
         }
         if (canonical.getWidth() < minW || canonical.getHeight() < minH) {
             return null;
         }
-        // Close enough: another copy would only burn memory without adding detail.
+        // Within 4/3 the extra copy adds no detail.
         if (canonical.getWidth() <= minW * 4 / 3 && canonical.getHeight() <= minH * 4 / 3) {
             return canonical;
         }
+        //noinspection MathClampMigration
         int box = Math.min(CANONICAL_MAX, Math.max(minW, minH));
         Bitmap derived = entry.derived.get(box);
         if (derived != null && !derived.isClosed()) {
@@ -331,9 +309,8 @@ public class ImageUtils {
     }
 
     /**
-     * Heuristic for art that must stay hard-edged: a small palette plus large runs of identical
-     * pixels, sampled from the centre of the image. Only used to pick nearest-neighbour filtering
-     * when such an image is <em>enlarged</em>; minification always keeps the box filter.
+     * Small palette plus long runs of identical pixels, sampled from the centre. Only picks the
+     * nearest filter for enlarged images.
      */
     private static boolean detectPixelArt(Bitmap bitmap) {
         int width = bitmap.getWidth();
@@ -395,7 +372,6 @@ public class ImageUtils {
         int canonicalBox;
         long generation;
         boolean pixelArt;
-        /** Source is already at its native size; bigger requests cannot produce more detail. */
         boolean saturated;
         long canonicalBytes;
         long derivedBytes;
@@ -408,10 +384,9 @@ public class ImageUtils {
         }
     }
 
-    /** Cache counters, appended to the render stats line while debug logging is on. */
+    /** Cache counters for the render stats line. */
     public static String describeCache() {
-        // No per-entry scan: it would take the per-URL locks and could stall the render thread while
-        // a derivation is running.
+        // No per-entry scan: it would take the per-URL locks from the render thread.
         return " | img: urls=" + sourceCache.size()
                 + " hit=" + cacheHits.get() + " decode=" + cacheDecodes.get()
                 + " promote=" + cachePromotions.get() + " filter=" + cacheDerivations.get() + " ui=" + uiUploads.get();
@@ -422,11 +397,7 @@ public class ImageUtils {
         uiUploads.incrementAndGet();
     }
 
-    /**
-     * Downloads the raw bytes of {@code url} once (shared with every other consumer of the same URL,
-     * including the full-size image used by JMTC) and turns them into a texture covering the request,
-     * cached under {@code url#WxH}.
-     */
+    /** Bytes are downloaded once per URL; the texture is cached under {@code url#WxH}. */
     public static CompletableFuture<ImageTextureData> downloadScaledAsync(String url, int targetW, int targetH) {
         String key = url + "#" + targetW + "x" + targetH;
         ImageTextureData cached = cachedTexturesData.getIfPresent(key);
@@ -441,7 +412,6 @@ public class ImageUtils {
         }
         try {
             loadBitmap(url, targetW, targetH).thenApplyAsync(bitmap ->
-                    // The bitmap is borrowed from the source cache: it must not be closed here.
                     createTexture(key, bitmap), downloadExecutor
             ).whenComplete((result, ex) -> {
                 if (ex == null) {
@@ -496,12 +466,8 @@ public class ImageUtils {
     }
 
     /**
-     * Downloads {@code url} once and derives every requested box from a single decode.
-     * <p>
-     * Unlike {@link #downloadScaledAsync}, the returned textures are <em>not</em> registered in the
-     * shared texture cache: the caller owns them and must close them. This is used for the artwork of
-     * the track that is currently displayed, whose lifetime is managed explicitly (the crossfades
-     * hold the previous cover for a while, which cache eviction cannot express).
+     * Every requested box from one decode. Unlike {@link #downloadScaledAsync} the caller owns the
+     * textures and must close them.
      */
     public static CompletableFuture<ImageTextureData[]> downloadScaledSetOwned(String url, int[] boxes) {
         if (boxes.length == 0) {
@@ -511,7 +477,7 @@ public class ImageUtils {
         for (int box : boxes) {
             largest = Math.max(largest, box);
         }
-        // One decode (shared with every other consumer of this URL) feeds every box.
+        // One decode, shared with every other consumer of this URL.
         return loadBitmap(url, largest, largest).thenApplyAsync(base -> {
             ImageTextureData[] result = new ImageTextureData[boxes.length];
             for (int i = 0; i < boxes.length; i++) {

@@ -8,13 +8,9 @@ import java.util.Map;
 import java.util.function.Consumer;
 
 /**
- * Turns the click stream the game produces for a held key back into one action per press.
- * <p>
- * {@code KeyboardHandler} runs {@code KeyMapping.click} for every key event whose action is not
- * release, and GLFW repeats presses while a key is held, so {@code while (consumeClick())} fires
- * roughly 30 times per second for a held binding. Bindings that toggle a state or advance a queue
- * must act once per gesture, which is what this guard provides: the action runs on the first press
- * and is suppressed until the key has been released again.
+ * Turns the click stream the game produces for a held key into one action per press: GLFW repeats
+ * presses while a key is held, so a toggle or queue-advancing binding would otherwise fire ~30 times
+ * per second.
  */
 public final class HeldKeyGuard {
     private final Map<KeyMapping, Boolean> held = Collections.synchronizedMap(new IdentityHashMap<>());

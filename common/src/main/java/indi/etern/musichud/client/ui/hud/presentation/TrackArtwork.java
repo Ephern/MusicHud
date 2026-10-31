@@ -10,12 +10,9 @@ import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The artwork of one track, with explicit ownership.
- * <p>
- * Both textures are derived from a single decode and are deliberately kept out of
- * {@link ImageUtils}' shared texture cache: {@link TrackArtworkStore} decides when they die. That is
- * what makes the crossfades safe — they keep sampling the previous cover for a while, which a
- * cache-eviction policy cannot express.
+ * The artwork of one track with explicit ownership. Both textures are derived from one decode and
+ * kept out of {@link ImageUtils}' shared cache so the crossfade can keep sampling the previous cover
+ * after a track switch.
  */
 public final class TrackArtwork {
     private static final Logger LOGGER = MusicHud.getLogger(TrackArtwork.class);

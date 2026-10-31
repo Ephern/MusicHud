@@ -843,15 +843,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         return view == null ? -1 : lyricLineViewList.indexOf(view);
     }
 
-    // Near-identity projective matrix (persp0 = 1e-8): makes the position matrix
-    // report hasPerspective() so arc3d skips the direct-mask glyph path (which floors
-    // every glyph to whole device pixels) and uses the transformed-mask path, which
-    // keeps fractional positions and samples the atlas with bilinear filtering.
-    // The epsilon must live in m14 (persp0), NOT m44 (persp2): Device normalizes the
-    // CTM via Matrix.normalizePerspective(), which divides m44 back to exactly 1
-    // whenever m14/m24 are zero, silently undoing an m44-based flag. With m14 != 0
-    // the normalization is skipped entirely. The resulting w-distortion
-    // (~1e-8 * scale^2 * x) is far below one physical pixel.
+    // Near-identity projective matrix (persp0 = 1e-8) so arc3d takes the transformed-mask glyph path:
+    // it keeps fractional glyph positions and bilinear atlas filtering, unlike the direct-mask path,
+    // which floors them to device pixels. The epsilon must be in m14, not m44: normalizePerspective()
+    // divides m44 back to 1 whenever m14/m24 are zero, and with m14 != 0 it is skipped entirely.
     private static final Matrix SUBPIXEL_MATRIX = new Matrix(
             1f, 0f, 1e-8f,
             0f, 1f, 0f,

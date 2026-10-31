@@ -1,15 +1,9 @@
 package indi.etern.musichud.client.ui.render.text;
 
 /**
- * Horizontal alpha mask over the left and right edges of a text box.
- * <p>
- * The mask lives in text-local (unscaled font) coordinates so the per-vertex colour writers can
- * sample it for every glyph corner; the GPU then interpolates the alpha inside each glyph quad,
- * which keeps the ramp continuous instead of snapping per glyph. {@code strength} scales how deep
- * the mask cuts instead of moving it, so an edge can fade in or out without any geometry change.
- * <p>
- * Each edge is only masked where text actually crosses that box edge: a caller that knows nothing
- * crosses the edge passes a zero strength, and a zero band collapses the ramp to a no-op.
+ * Horizontal alpha mask over the left and right edges of a text box, in text-local (unscaled font)
+ * coordinates so the per-vertex writers can sample it per glyph corner. {@code strength} scales the
+ * mask depth, so an edge fades without any geometry change.
  */
 public final class TextEdgeFade {
     public static final TextEdgeFade NONE = new TextEdgeFade(0f, 0f, 0f, 0f, 0f, 0f);
@@ -34,13 +28,7 @@ public final class TextEdgeFade {
     /**
      * Builds a mask in the local space of a single text draw.
      *
-     * @param boxLeftGui     gui x of the box left edge
-     * @param boxRightGui    gui x of the box right edge
-     * @param leftBandGui    width of the left ramp in gui pixels
-     * @param rightBandGui   width of the right ramp in gui pixels
-     * @param leftStrength   mask depth of the left edge, 0 = untouched, 1 = fully transparent at the edge
-     * @param rightStrength  mask depth of the right edge
-     * @param drawOriginGuiX gui x that local x = 0 maps to for this draw (differs for the marquee wrap copy)
+     * @param drawOriginGuiX gui x that local x = 0 maps to (differs for the marquee wrap copy)
      * @param scale          local to gui scale of this draw
      */
     public static TextEdgeFade between(float boxLeftGui, float boxRightGui,

@@ -4,15 +4,10 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * Downmixes interleaved PCM with more than 2 channels to stereo.
- * <p>
- * Channel layouts follow the standard WAV/FLAC ordering
- * ({@code FL, FR, FC, LFE, BL/BC, BR, SL, SR}). Center and surround channels are
- * folded into stereo using the conventional -3 dB ({@code 1/sqrt(2)}) coefficients,
- * while the LFE channel is discarded. Each side is then peak-normalized by the sum
- * of the absolute coefficients, so even fully correlated full-scale channels cannot
- * overflow, and clamped to the source bit depth as a final safeguard. Bit-depth
- * conversion (if any) is a separate downstream stage.
+ * Downmixes interleaved PCM with more than 2 channels to stereo using the standard WAV/FLAC layout
+ * ({@code FL, FR, FC, LFE, BL/BC, BR, SL, SR}). Center and surround fold in at -3 dB, LFE is
+ * discarded, and each side is peak-normalized by the sum of its absolute coefficients so fully
+ * correlated full-scale channels cannot overflow.
  */
 public class MultichannelToStereoMixer implements IResampler {
     private static final double SQRT1_2 = 0.7071067811865476;

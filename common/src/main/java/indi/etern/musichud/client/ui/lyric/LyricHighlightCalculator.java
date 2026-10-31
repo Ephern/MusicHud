@@ -7,20 +7,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Renderer-agnostic calculation of the karaoke highlight sweep shared by the ModernUI
- * lyric view and the HUD lyric renderer.
- * <p>
- * A word-by-word line is modelled as one monotone cubic spline whose keyframes are the
- * <b>phrase starts</b>: {@code time -> character offset}. Interior tangents use PCHIP
- * (Fritsch-Carlson weighted harmonic mean plus the one-sided endpoint rule), which is
- * C1, passes through every keyframe and is <b>monotone by construction</b>. This avoids
- * the non-monotone excursions of a natural cubic spline on very uneven phrase timings
- * (e.g. a long phrase followed by a zero/30 ms phrase), which used to pin the sweep at
- * a phrase start and delay it until late in the phrase. No clamping is needed because
- * overshoot never occurs.
- * <p>
- * The evaluated value is a fractional character offset; pixel mapping (gradient bands,
- * substring widths, scissors) stays in each renderer.
+ * Renderer-agnostic karaoke sweep shared by the lyric view and the HUD lyric renderer. A word-by-word
+ * line is one monotone cubic spline over its phrase starts (PCHIP tangents), which stays monotone on
+ * very uneven timings where a natural cubic spline overshoots and pins the sweep. The result is a
+ * fractional character offset; pixel mapping stays in each renderer.
  */
 public final class LyricHighlightCalculator {
     private final MonotoneCubicSpline spline; // null when the line is not word-by-word

@@ -27,7 +27,6 @@ import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.resources.language.I18n;
 
-import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -70,13 +69,7 @@ public class UrlImageView extends FrameLayout {
     @Getter
     private int transitionDuration = 400;
 
-    /**
-     * Shared ModernUI textures, keyed by URL only. A texture is reused for any view at or below its
-     * size (the drawable scales anyway) and replaced when a clearly larger request arrives, so the
-     * key space is the set of URLs instead of the set of (url, layout size) pairs. Uploads are the
-     * expensive part of a bind: with a size-qualified key, scrolling a list of a few hundred covers
-     * produced a new upload per rebound row (measured: 1506 evictions against 1277 hits).
-     */
+    /** Shared ModernUI textures keyed by URL; a texture at or above the requested size is reused. */
     private static final long UI_TEXTURE_BUDGET = 64L * 1024 * 1024;
     private static final int UI_TEXTURE_MIN_ENTRIES = 64;
     private static final Map<String, Image> UI_TEXTURES =
@@ -104,8 +97,7 @@ public class UrlImageView extends FrameLayout {
             if (cached == null) {
                 return null;
             }
-            // Reuse unless the cached texture is clearly smaller than this view; that converges on
-            // the largest request per URL instead of re-uploading between sizes.
+            // Reuse unless the cached texture is clearly smaller than this view.
             if (cached.getWidth() * 4 >= wantW * 3 && cached.getHeight() * 4 >= wantH * 3) {
                 imageCacheHits.incrementAndGet();
                 return cached;
@@ -141,9 +133,7 @@ public class UrlImageView extends FrameLayout {
     }
 
     /**
-     * Texture size for a {@code loadUrl(url)} call, i.e. when the caller did not state one: cover
-     * the view's own size (drawable scaling handles the rest) instead of uploading a 1024x1024
-     * texture for a row-sized thumbnail.
+     * Texture size for {@code loadUrl(url)}: the view's own size, since the drawable scales.
      */
     private int implicitTargetSize() {
         int side = Math.max(getWidth(), getHeight());
@@ -332,8 +322,7 @@ public class UrlImageView extends FrameLayout {
         if (urlString != null && urlString.equals(currentURLString)
                 && targetW == loadTargetW && targetH == loadTargetH
                 && (hasLoadedImage || loadFuture != null)) {
-            // Virtual lists re-bind their rows every layout pass; rebinding the same URL at the same
-            // size must not re-upload the image (that alone allocated a texture per card per frame).
+            // Same URL and size: the row was rebound, the texture is already correct.
             return;
         }
         loadTargetW = targetW;
@@ -354,7 +343,6 @@ public class UrlImageView extends FrameLayout {
      */
     private void actuallyLoadUrl(String urlString) {
         if (loadTargetW <= 0 || loadTargetH <= 0) {
-            // No explicit size from the caller: cover the view, not a 1024x1024 texture.
             int side = implicitTargetSize();
             effectiveLoadW = side;
             effectiveLoadH = side;
@@ -364,8 +352,6 @@ public class UrlImageView extends FrameLayout {
         }
         Image cached = reuseTexture(urlString, effectiveLoadW, effectiveLoadH);
         if (cached != null) {
-            // Re-binding a recycled row normally re-uploads the same artwork; the upload is by far
-            // the most expensive part of a bind, so reuse the ModernUI texture when we have it.
             setLoading(false);
             errorLayout.setVisibility(GONE);
             hasLoadedImage = true;

@@ -102,58 +102,70 @@ public final class HudScene implements RenderScene {
     }
 
     public void render(SceneRenderContext context) {
-        if (MusicHudScreen.isHudOccluded()) {
-            return;
-        }
         try {
-            presenter.updateFrame();
-            HudPresentationModel model = presenter.getModel();
-            if (model.getHudAlpha() <= 1e-4f) {
+            // State advances even while hidden, so transitions keep their real start time.
+            updateFrameState();
+            if (MusicHudScreen.isHudOccluded()
+                    || presenter.getModel().getHudAlpha() <= 1e-4f) {
                 return;
             }
-
-            TITLE_RENDERER.setText(model.getTitle());
-            ARTISTS_AND_ALBUM_RENDERER.setText(model.getArtistsAndAlbum());
-            PLAY_TIME_RENDERER.setText(model.getPlayTime());
-
-            Supplier<String> skinSupplier = model.getPlayerSkinSupplier();
-            if (skinSupplier != appliedSkinSupplier) {
-                PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(skinSupplier);
-                appliedSkinSupplier = skinSupplier;
-            }
-            if (appliedStatusRevision != model.getStatusRevision()) {
-                PLAYING_STATUS_RENDERER.updateStatus(model.getAudioStatus());
-                appliedStatusRevision = model.getStatusRevision();
-            }
-
-            SceneStyle baseStyle = baseHudStyle;
-            if (baseStyle != null) {
-                baseStyle.setAlpha(model.getHudAlpha());
-            }
-
-            HudLayouts currentLayout = layout;
-            if (currentLayout != null) {
-                float playTimeWidth = PLAY_TIME_RENDERER.measureDisplayWidth(currentLayout.getInfoTextSize());
-                currentLayout.arrange(PLAYER_HEAD_RENDERER.isVisible(),
-                        PLAYING_STATUS_RENDERER.isVisible(), playTimeWidth);
-            }
-            refreshThumbnailSize();
-
-            BACKGROUND_RENDERER.render(context);
-            IMAGE_RENDERER.render(context);
-            PLAYER_HEAD_RENDERER.render(context);
-            PLAYING_STATUS_RENDERER.render(context);
-            PROGRESS_RENDERER.render(context);
-            TITLE_RENDERER.render(context);
-            LYRICS_LINE_RENDERER.render(context);
-            ARTISTS_AND_ALBUM_RENDERER.render(context);
-            PLAY_TIME_RENDERER.render(context);
-
-            if (clientConfig.getShowHudLayoutBoxes()) {
-                HUD_LAYOUT_DEBUG_RENDERER.render(context);
-            }
+            drawFrame(context);
         } catch (Exception e) {
             logger().error("While rendering HUD frame", e);
+        }
+    }
+
+    private void updateFrameState() {
+        presenter.updateFrame();
+        HudPresentationModel model = presenter.getModel();
+
+        SceneStyle baseStyle = baseHudStyle;
+        if (baseStyle != null) {
+            baseStyle.setAlpha(model.getHudAlpha());
+        }
+
+        TITLE_RENDERER.setText(model.getTitle());
+        ARTISTS_AND_ALBUM_RENDERER.setText(model.getArtistsAndAlbum());
+        PLAY_TIME_RENDERER.setText(model.getPlayTime());
+
+        Supplier<String> skinSupplier = model.getPlayerSkinSupplier();
+        if (skinSupplier != appliedSkinSupplier) {
+            PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(skinSupplier);
+            appliedSkinSupplier = skinSupplier;
+        }
+        if (appliedStatusRevision != model.getStatusRevision()) {
+            PLAYING_STATUS_RENDERER.updateStatus(model.getAudioStatus());
+            appliedStatusRevision = model.getStatusRevision();
+        }
+
+        TITLE_RENDERER.update();
+        ARTISTS_AND_ALBUM_RENDERER.update();
+        PLAY_TIME_RENDERER.update();
+        PLAYER_HEAD_RENDERER.update();
+        LYRICS_LINE_RENDERER.update();
+
+        HudLayouts currentLayout = layout;
+        if (currentLayout != null) {
+            float playTimeWidth = PLAY_TIME_RENDERER.measureDisplayWidth(currentLayout.getInfoTextSize());
+            currentLayout.arrange(PLAYER_HEAD_RENDERER.isVisible(),
+                    PLAYING_STATUS_RENDERER.isVisible(), playTimeWidth);
+        }
+        refreshThumbnailSize();
+    }
+
+    private void drawFrame(SceneRenderContext context) {
+        BACKGROUND_RENDERER.render(context);
+        IMAGE_RENDERER.render(context);
+        PLAYER_HEAD_RENDERER.render(context);
+        PLAYING_STATUS_RENDERER.render(context);
+        PROGRESS_RENDERER.render(context);
+        TITLE_RENDERER.render(context);
+        LYRICS_LINE_RENDERER.render(context);
+        ARTISTS_AND_ALBUM_RENDERER.render(context);
+        PLAY_TIME_RENDERER.render(context);
+
+        if (clientConfig.getShowHudLayoutBoxes()) {
+            HUD_LAYOUT_DEBUG_RENDERER.render(context);
         }
     }
 
@@ -180,7 +192,6 @@ public final class HudScene implements RenderScene {
                 return;
             }
             HudLayouts newLayout = HudLayouts.create(base);
-            layout = newLayout;
             HUD_LAYOUT_DEBUG_RENDERER.configure(newLayout);
 
             configureBaseRenderer(base);
@@ -203,6 +214,8 @@ public final class HudScene implements RenderScene {
             newLayout.arrange(PLAYER_HEAD_RENDERER.isVisible(),
                     PLAYING_STATUS_RENDERER.isVisible(),
                     PLAY_TIME_RENDERER.measureDisplayWidth(newLayout.getInfoTextSize()));
+            // Swap after the first arrange: a live swap lets the render thread measure the same tree.
+            layout = newLayout;
             refreshThumbnailSize();
         } catch (Exception e) {
             logger().error("While refresh HUD style", e);

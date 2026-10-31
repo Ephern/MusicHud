@@ -31,11 +31,9 @@ public interface SceneGpuContext extends AutoCloseable {
     }
 
     /**
-     * Compiles every scene pipeline up front. GLSL compilation of the whole chain costs ~200 ms on
-     * a cold driver cache, which otherwise stalls the first rendered background frame.
-     * <p>
-     * The result is tri-state on purpose: waiting for the shader sources is a normal startup race
-     * (silent retry), while a compilation failure is a real error (bounded retry + one warning).
+     * Compiles every scene pipeline up front (~200 ms on a cold driver cache, which would stall the
+     * first background frame). Waiting for the shader sources is a startup race and retried silently;
+     * a compilation failure is retried with a bound and then reported once.
      */
     default PrecompileResult precompilePipelines() {
         return PrecompileResult.DONE;

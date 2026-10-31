@@ -15,9 +15,6 @@ import java.util.function.Function;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
-/*
-* 相较于Fragment在切换时保留了上下文
-* */
 @SuppressWarnings("unused")
 public class RouterContainer extends FrameLayout {
     @Getter
@@ -323,14 +320,6 @@ public class RouterContainer extends FrameLayout {
             }
         };
 
-        /**
-         * 创建过渡动画
-         * @param fromPage 当前页面,可能为 null
-         * @param toPage 目标页面
-         * @param duration 动画持续时间
-         * @param interpolator 缓动函数
-         * @return 动画列表
-         */
         public abstract List<Animator> createAnimators(@Nullable View fromPage, View toPage,
                                                        int duration, TimeInterpolator interpolator);
     }
@@ -551,14 +540,8 @@ public class RouterContainer extends FrameLayout {
     }
 
     /**
-     * 帧对齐的页面结构变更驱动。
-     * <p>通过 {@link OnPageChangeListener#onBeforeSwap} 钩子做帧对齐，并把新视图的
-     * addView 用 post 推迟到下一帧，避免影响布局的切换与页面 addView 同帧重排：
-     * <ul>
-     *     <li>SERIAL：先播旧视图离场；离场结束、旧视图 GONE（删除）的前一帧触发钩子，
-     *         post 下一帧再 addView 并入场。</li>
-     *     <li>CROSS：第一帧触发钩子并让旧视图开始淡出，post 下一帧再 addView 并入场（重叠即交叉）。</li>
-     * </ul>
+     * 帧对齐的页面结构变更：通过 {@link OnPageChangeListener#onBeforeSwap} 把新视图的 addView
+     * post 到下一帧，避免与布局重排同帧；SERIAL 等旧视图离场完成，CROSS 第一帧就开始淡出。
      */
     private void driveTransition(@Nullable View fromPage, @NonNull View toPage, String toKey,
                                  @Nullable AnimationStyle customStyle, @Nullable Easing customEasing) {

@@ -633,17 +633,9 @@ public class MusicPlayerServerService {
     }
 
     /**
-     * Validates and registers an idle play source, loading the collection (and,
-     * for INTELLIGENT, the first page with a random seed) before it becomes
-     * visible. An incoming source matching an existing entry of the same
-     * collection (id+type) only updates the play mode; on failure the previous
-     * entry is kept untouched.
-     *
-     * <p>Requests are serialized per (player, collection): handlers run on
-     * concurrent virtual threads, so two rapid mode switches could otherwise
-     * interleave between the existing-entry check and the write, leaving two
-     * modes of the same collection active at once. Serializing makes the last
-     * processed request win.</p>
+     * Registers an idle play source, loading its collection (for INTELLIGENT also the first page)
+     * first. Requests are serialized per (player, collection), so concurrent mode switches cannot
+     * leave two modes of the same collection active; the last processed request wins.
      */
     public MessagedResult<Void> addIdlePlaySource(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
         synchronized (idleSourceKeyLock(pusherInfo.playerUUID(), idlePlaySource)) {
@@ -776,14 +768,10 @@ public class MusicPlayerServerService {
     }
 
     /**
-     * Arms the one-shot resource-load deadline reset for the given music. Called by the pusher
-     * before the switch is pushed so that the client's resource request can never be missed.
-     * The duration-based wait stays the fallback when no client requests the resource.
-     *
-     * <p>Only requests reaching the server shortly after the switch count as the awaited instance's
-     * initial load. The acceptance window is capped by {@link #AWAIT_RESET_WINDOW_MAX_MILLIS} and
-     * always ends before the track's tail ({@link #AWAIT_RESET_TAIL_EXCLUSION_MILLIS}), where the
-     * client preloads its successor: a same-id request from that preload must not extend this await.</p>
+     * Arms the one-shot resource-load deadline reset for {@code music}, called before the switch is
+     * pushed. Only requests arriving shortly after the switch count (window capped by
+     * {@link #AWAIT_RESET_WINDOW_MAX_MILLIS}) and never during the tail, where the client preloads its
+     * successor.
      */
     private synchronized void beginAwaitForMusic(long musicId, long awaitMillis) {
         awaitedMusicId = musicId;
@@ -804,15 +792,9 @@ public class MusicPlayerServerService {
     }
 
     /**
-     * Resets the consecutive failure streak: a successful load anywhere means the current music
-     * is no longer considered broken.
-     *
-     * <p>Additionally, the first successful load for the music the pusher is currently awaiting
-     * restarts that await from the moment the resource became available, so a slow load no longer
-     * makes the switch happen before the track actually played through. Only players that were
-     * present at the switch qualify: a client joining mid-track is wall-clock synced and must not
-     * extend the wait. Every further successful load of the same track is ignored, and the plain
-     * duration-based wait remains untouched.</p>
+     * Resets the consecutive failure streak, and restarts the pusher's await for the music it is
+     * currently awaiting once the first successful load lands, so a slow load does not cut the track
+     * short. Only players present at the switch qualify; later loads of the same track are ignored.
      */
     private synchronized void onMusicResourceLoadSuccess(long id, UUID playerUUID, long requestReceivedAt) {
         musicResourceLoadFailureCount = -1;
@@ -911,13 +893,8 @@ public class MusicPlayerServerService {
     }
 
     /**
-     * Waits out the current track, servicing reroll requests while idle. The track's end
-     * time bounds every reroll.
-     *
-     * <p>The initial deadline is the plain duration-based wait. When the first resource load
-     * for this track succeeds, a {@link DeadlineResetRequest} restarts that wait from the
-     * moment the resource became available, giving a slow-loading track its full airtime.
-     * Without any resource request the behaviour is exactly the duration-based fallback.</p>
+     * Waits out the current track, servicing reroll requests while idle. The deadline starts as the
+     * duration-based wait and is restarted from the moment the first resource load succeeds.
      */
     private void awaitCurrentTrack(long musicId, long millis) throws InterruptedException {
         long deadline = System.currentTimeMillis() + millis;

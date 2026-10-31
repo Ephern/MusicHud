@@ -15,10 +15,8 @@ import java.util.function.Predicate;
 
 /**
  * Loads the artwork of the current track: one download, one decode, explicit ownership via
- * {@link TrackArtwork}.
- * <p>
- * Publication is serialized by {@link CoverRequestGate}; the store only publishes the
- * resulting {@link BackgroundData} to {@link BackgroundState}.
+ * {@link TrackArtwork}. Requests are serialized by {@link CoverRequestGate}; the result is published
+ * to {@link BackgroundState}.
  */
 public final class CoverImageStore {
     private static volatile CoverImageStore instance;
@@ -60,10 +58,7 @@ public final class CoverImageStore {
                                  Predicate<MusicDetail> currentTrack,
                                  Consumer<Duration> onLoaded) {
         if (thumbnailSize <= 0) return;
-        // Bucket the layout-driven size: the artwork is sampled by the GPU at the exact display
-        // size, so reloading for every pixel of a HUD resize would only restart the crossfade and
-        // re-upload a texture that looks identical. Power-of-two buckets keep the reloads to a
-        // handful while a resize is dragged.
+        // Round up to a power of two so dragging a resize does not reload per pixel.
         thumbnailSize = quantizeThumbnailSize(thumbnailSize);
         MusicDetail current;
         long token;
@@ -78,7 +73,7 @@ public final class CoverImageStore {
         }
     }
 
-    /** Rounds up to a power of two within [128, 1024]. */
+    /** Rounds up to a power of two. */
     static int quantizeThumbnailSize(int size) {
         int clamped = Math.clamp(size, 128, 1024);
         int bucket = Integer.highestOneBit(clamped);

@@ -6,10 +6,8 @@ import indi.etern.musichud.client.utils.ui.Transitionable;
 import lombok.Getter;
 
 /**
- * Holds the currently presented background and its override stack.
- * <p>
- * The transition is time-based and lazily advanced by readers, so this state does not need a
- * tick or render loop to complete a background change.
+ * Holds the presented background and its override stack. The transition advances lazily when read,
+ * so a background change completes without a tick or render loop.
  */
 @Getter
 public final class BackgroundState {

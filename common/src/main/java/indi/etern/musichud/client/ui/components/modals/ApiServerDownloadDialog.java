@@ -43,11 +43,8 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 /**
- * Button + dialog for downloading the binary API server.
- * <p>
- * The ongoing download lives in a static {@link Session}, so closing the dialog
- * (or rebuilding the whole settings page) never loses the task: reopening the
- * dialog simply re-subscribes the new views to the same session.
+ * Button and dialog for downloading the binary API server. The ongoing download lives in a static
+ * {@link Session}, so closing the dialog or rebuilding the page re-subscribes to the same task.
  */
 public class ApiServerDownloadDialog {
     private enum Page {IDLE, DOWNLOADING, DONE}

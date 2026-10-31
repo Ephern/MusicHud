@@ -8,11 +8,8 @@ import org.lwjgl.system.MemoryUtil;
 import java.nio.ByteBuffer;
 
 /**
- * Vertex/index buffers of a scene mesh.
- * <p>
- * Vertices live in two alternating buffers: an upload never touches the buffer referenced by the
- * commands recorded for the previous frames, so rewriting a mesh cannot corrupt an in-flight draw
- * while the GPU is still reading it.
+ * Vertex/index buffers of a scene mesh. Vertices alternate between two buffers, so an upload never
+ * touches the buffer referenced by commands still in flight.
  */
 final class SceneGpuMeshImpl implements SceneMesh, AutoCloseable {
     private static final int VERTEX_SLOTS = 2;

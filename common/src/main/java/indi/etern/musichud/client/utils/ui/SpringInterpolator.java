@@ -4,17 +4,9 @@ import icyllis.modernui.animation.TimeInterpolator;
 import lombok.Getter;
 
 /**
- * Normalized damped-spring easing over {@code t in [0, 1]}, covering all three regimes:
- * <ul>
- *     <li>{@code dampingFraction < 1}: under-damped &mdash; overshoots the target and
- *     settles back (this is the <b>rebound / bounce</b> behaviour);</li>
- *     <li>{@code dampingFraction == 1}: critically damped &mdash; fastest approach with
- *     no overshoot;</li>
- *     <li>{@code dampingFraction > 1}: over-damped &mdash; slower, creep-toward-target
- *     approach with no overshoot.</li>
- * </ul>
- * The response is normalized by its value at {@code duration} so the output is exactly
- * {@code 0} at {@code t = 0} and {@code 1} at {@code t = 1}.
+ * Normalized damped-spring easing over {@code t in [0, 1]}: {@code dampingFraction < 1} overshoots
+ * (rebound), {@code == 1} is critically damped, {@code > 1} creeps in. The response is normalized so
+ * the output is exactly 0 at {@code t = 0} and 1 at {@code t = 1}.
  */
 @Getter
 public class SpringInterpolator implements TimeInterpolator {

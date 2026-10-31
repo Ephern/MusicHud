@@ -27,12 +27,9 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 /**
- * Single-pass flow layout. Children are measured naturally, allocated into lines with a
- * first-fit pass, then width/weight resolved per line like a horizontal LinearLayout.
- * No nested rows or reparenting, so the first layout pass is already correct.
- * <p>
- * Reflow animates the children's actual layout frames (no translation), so the drawn
- * position always has a single source of truth.
+ * Single-pass flow layout: children are measured naturally, allocated into lines first-fit, then
+ * width/weight resolved per line. Reflow animates the actual layout frames, so the drawn position
+ * has one source of truth.
  */
 public class FlexWrapLayout extends ViewGroup {
     private static final SpringInterpolator SPRING = new SpringInterpolator(0.27f, 1f);

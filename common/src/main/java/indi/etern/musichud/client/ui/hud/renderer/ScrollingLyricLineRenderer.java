@@ -54,6 +54,7 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
     @Setter
     private SceneStyle hudStyle;
     private int cachedContainerWidth;
+    private int cachedContainerHeight;
     @Setter
     private int lineSpacing = 0;
 
@@ -81,14 +82,8 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
     }
 
     /**
-     * 设置双行文本及其样式
-     * <p>
-     * May be called from a worker thread: the request is queued and applied on the render
-     * thread (see {@link #applyPendingLines(long)}). Every request is kept in order, so rapid
-     * switches never overwrite (and thus never drop) a line; the renderer decides how to animate.
+     * 设置双行文本及其样式。可从工作线程调用：请求按顺序排队，由渲染线程应用，快速切换不会丢行。
      *
-     * @param line1   第一行的文本和颜色
-     * @param line2   第二行的文本和颜色
      * @param animate whether to start the vertical switch spring
      */
     public void setLines(Line line1, Line line2, boolean animate) {
@@ -268,25 +263,26 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
         }
     }
 
-    public void render(SceneRenderContext context) {
+    @Override
+    public void update() {
         if (hudStyle == null) {
             return;
         }
-
-        // 计算实际布局绝对坐标和尺寸
-        SceneStyle.AbsolutePosition absPos = hudStyle.calcAbsolutePosition(context);
-        // 布局缓存（每次渲染时更新）
-        int cachedContainerX = (int) absPos.x();
-        int cachedContainerY = (int) absPos.y();
         cachedContainerWidth = (int) hudStyle.getWidth();
-        int cachedContainerHeight = (int) hudStyle.getHeight();
-
+        cachedContainerHeight = (int) hudStyle.getHeight();
         if (cachedContainerWidth <= 0 || cachedContainerHeight <= 0) return;
-
         updateAnimations();
+    }
 
+    public void render(SceneRenderContext context) {
+        if (hudStyle == null || cachedContainerWidth <= 0 || cachedContainerHeight <= 0) {
+            return;
+        }
+
+        SceneStyle.AbsolutePosition absPos = hudStyle.calcAbsolutePosition(context);
+        int cachedContainerX = (int) absPos.x();
         int totalHeight = (int) (line1Height + line2Height);
-        int startY = cachedContainerY + (cachedContainerHeight - totalHeight) / 2; // 垂直居中
+        int startY = (int) absPos.y() + (cachedContainerHeight - totalHeight) / 2; // 垂直居中
 
         float x = absPos.x();
         float y = absPos.y();
@@ -393,13 +389,10 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
     }
 
     /**
-     * Highlight sweep as a per-vertex gradient: the already sung part keeps
-     * {@code sungColor} and the rest fades to {@code pendingColor} across a small smoothing
-     * band around the current character offset, so the transition runs inside a single glyph.
-     * <p>
-     * The window center travels {@code 2 * band} beyond the text span, letting the window slide
-     * completely off both ends: at sweep 0 the whole line is pending and at sweep 1 the whole
-     * line is sung, both reached continuously instead of snapping at the ends.
+     * Karaoke sweep as a per-vertex gradient: sung text keeps {@code sungColor}, the rest fades to
+     * {@code pendingColor} across a small band at the current offset, so the transition stays inside
+     * one glyph. The window center travels {@code 2 * band} past the text span, so sweep 0 and 1 are
+     * reached continuously instead of snapping.
      */
     private void renderLineHighlight(SceneRenderContext context, LineState line, int sungColor, int pendingColor,
                                      int baseX, int baseY, float lineHeight, float yOffset) {

@@ -59,16 +59,9 @@ public final class MusicHud {
     }
 
     /**
-     * Opens a resource that is shipped on the mod class path.
-     * <p>
-     * {@link Class#getResourceAsStream(String)} on a class that lives in a <em>named module</em> only
-     * searches the content of that very module (see {@code Module#getResourceAsStream}). In a NeoForge
-     * dev launch every mod (and the {@code core} library) is its own module, so loading an asset that
-     * lives in another mod would silently return {@code null}. Asking the class loader instead keeps
-     * the class-path-wide lookup that Fabric dev and the shaded production jar have.
-     *
-     * @param path resource path, with or without a leading {@code /}
-     * @return the stream, or {@code null} if no loaded mod provides that resource
+     * Opens a resource from the mod class path. {@link Class#getResourceAsStream(String)} only
+     * searches the calling class's module, which breaks in a NeoForge dev launch where every mod is
+     * its own module, so this asks the class loader instead.
      */
     public static InputStream getResourceAsStream(String path) {
         String name = path.startsWith("/") ? path.substring(1) : path;

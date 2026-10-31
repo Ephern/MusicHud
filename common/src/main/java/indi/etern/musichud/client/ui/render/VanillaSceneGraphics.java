@@ -1,5 +1,8 @@
 package indi.etern.musichud.client.ui.render;
 
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlTextureSampling;
+import com.mojang.blaze3d.platform.Window;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderPipelines;
@@ -29,7 +32,27 @@ public class VanillaSceneGraphics implements SceneGraphics {
 
     @Override
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int u1, int v1, int textureWidth, int textureHeight, int color) {
-        graphics.blit(RenderPipelines.GUI_TEXTURED, ResourceLocation.parse(texturePath), x, y, u0, v0, width, height, u1, v1, textureWidth, textureHeight, color);
+        ResourceLocation location = ResourceLocation.parse(texturePath);
+        // Upscaled blits (the 8x8 player face) keep their magnification filter.
+        GlTextureSampling.prepareBlit(location, u1, v1, textureWidth, textureHeight, width, height,
+                guiScale());
+        graphics.blit(RenderPipelines.GUI_TEXTURED, location, x, y, u0, v0, width, height, u1, v1, textureWidth, textureHeight, color);
+    }
+
+    /**
+     * Physical pixels per GUI unit, so a blit's GUI-space destination can be compared with the
+     * texture's texel count.
+     */
+    private static float guiScale() {
+        Minecraft minecraft = Minecraft.getInstance();
+        // Minecraft.getInstance() returns null during launch on some versions
+        //noinspection ConstantValue
+        if (minecraft == null) {
+            return 1f;
+        }
+        Window window = minecraft.getWindow();
+        //noinspection ConstantValue
+        return window == null ? 1f : (float) window.getGuiScale();
     }
 
     @Override

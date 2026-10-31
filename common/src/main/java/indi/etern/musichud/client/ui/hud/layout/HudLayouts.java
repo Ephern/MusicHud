@@ -156,7 +156,7 @@ public final class HudLayouts {
         return new HudLayouts(baseStyle);
     }
 
-    public void arrange(boolean headVisible, boolean statusVisible, float playTimeWidth) {
+    public synchronized void arrange(boolean headVisible, boolean statusVisible, float playTimeWidth) {
         boolean changed = lastHeadVisible != headVisible
                 || lastStatusVisible != statusVisible
                 || lastPlayTimeWidth != playTimeWidth;

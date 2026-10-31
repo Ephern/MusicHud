@@ -70,11 +70,8 @@ public class LyricHighlightTextView extends TextView {
     }
 
     /**
-     * Whether this line's appearance can still change on its own (used by the lyric blur to decide
-     * if the cached offscreen source must be re-rendered). WAITING is static. PERFORMING is always
-     * dynamic: its PERFORMING-to-DONE transition, color ramp and karaoke sweep are all advanced
-     * inside {@link #onDraw}, so skipping the draw would freeze them. DONE is dynamic while the
-     * fade-out / phrase lowering is still running.
+     * Whether this line can still change on its own, i.e. whether the cached offscreen source must be
+     * re-rendered. WAITING is static; PERFORMING and a DONE line that is still fading are dynamic.
      */
     public boolean isVisuallyAnimating() {
         if (status == HighlightStatus.PERFORMING) {

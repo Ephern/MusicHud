@@ -8,14 +8,9 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 
 /**
- * Soft compatibility with Sound Physics Perfected (SPP). SPP's
- * {@code SoundEngine.updateActiveSources()} brute-forces reverb (EFX auxiliary
- * send) onto every live OpenAL source each tick, which would otherwise wet the
- * raw sources created by this mod. Redirect its {@code alIsSource} guard so
- * it simply skips our owned sources.
- * <p>
- * Fully optional: the redirected method only exists when SPP is installed, so
- * on any other setup this injector no-ops.
+ * Keeps Sound Physics Perfected from applying reverb to this mod's OpenAL sources: SPP brute-forces
+ * an EFX auxiliary send onto every live source each tick, so its {@code alIsSource} guard is
+ * redirected to skip ours. No-ops when SPP is absent.
  */
 @Mixin(value = SoundEngine.class, priority = 9100)
 public abstract class SoundEngineSppCompatMixin {

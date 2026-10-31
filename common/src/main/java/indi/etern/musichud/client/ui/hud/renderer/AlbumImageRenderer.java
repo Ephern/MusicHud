@@ -10,12 +10,17 @@ import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.BlazeTextureRefs;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlTextureSampling;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
 import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import com.mojang.blaze3d.textures.GpuTexture;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
+import com.mojang.blaze3d.platform.Window;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 public class AlbumImageRenderer implements RenderLayer {
     private SceneRenderData currentData;
@@ -29,8 +34,8 @@ public class AlbumImageRenderer implements RenderLayer {
     public void render(SceneRenderContext context) {
         if (currentData == null) return;
 
-        SceneTextureSetup textureSetup = getMixedTextureSetup();
         SceneStyle hudStyle = currentData.getHudStyle();
+        SceneTextureSetup textureSetup = getMixedTextureSetup(hudStyle);
 
         SceneElementRenderState hudRenderState = new SceneElementRenderState(
                 SceneRenderPipelines.ROUNDED_ALBUM,
@@ -43,7 +48,7 @@ public class AlbumImageRenderer implements RenderLayer {
         context.submit(this, hudRenderState);
     }
 
-    private @NotNull SceneTextureSetup getMixedTextureSetup() {
+    private @NotNull SceneTextureSetup getMixedTextureSetup(SceneStyle hudStyle) {
         var background = currentData.getTransitionableBackground();
         BackgroundData next = background.getNext();
         BackgroundData current = background.getCurrent();
@@ -53,6 +58,8 @@ public class AlbumImageRenderer implements RenderLayer {
         if (currentTexture == null) {
             return SceneTextureSetup.NONE;
         }
+        enableTrilinearIfMinified(currentTexture, hudStyle);
+        enableTrilinearIfMinified(transitionTexture, hudStyle);
         if (transitionTexture != null) {
             return SceneTextureSetup.doubleTexture(
                     BlazeTextureRefs.of(currentTexture),
@@ -67,5 +74,21 @@ public class AlbumImageRenderer implements RenderLayer {
             icon = ImageUtils.loadBase64(MusicHud.ICON_BASE64);
         }
         return icon.getTexture();
+    }
+
+    /** Enables trilinear sampling when the texture is minified into {@code hudStyle}. */
+    private static void enableTrilinearIfMinified(@Nullable DynamicTexture texture, SceneStyle hudStyle) {
+        if (texture == null) {
+            return;
+        }
+        GpuTexture gpu = texture.getTexture();
+        if (gpu == null) {
+            return;
+        }
+        Window window = Minecraft.getInstance().getWindow();
+        float destination = (float) (hudStyle.getWidth() * (window == null ? 1.0 : window.getGuiScale()));
+        if (destination > 0f && gpu.getWidth(0) >= destination * 1.25f) {
+            GlTextureSampling.enableTrilinear(texture);
+        }
     }
 }

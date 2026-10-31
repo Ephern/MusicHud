@@ -8,12 +8,8 @@ import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
 /**
- * Owns the lifetime of the displayed {@link TrackArtwork}.
- * <p>
- * The renderers keep sampling the previous cover while a crossfade is running, and a renderer that
- * stops rendering (closed screen, hidden HUD) must not keep an artwork alive forever. Instead of
- * inferring that from cache eviction, the store keeps the retired artwork until no {@link Holder}
- * reports a reference and then closes it — on the render thread, at the end of a frame.
+ * Owns the lifetime of the displayed {@link TrackArtwork}: a retired artwork is closed at the end of
+ * a frame once no {@link Holder} reports a reference.
  */
 public final class TrackArtworkStore {
     /** Something that may still sample an artwork's textures. */

@@ -134,13 +134,9 @@ public final class RenderRuntime {
     }
 
     /**
-     * Compiles every scene pipeline (and creates the GPU context) ahead of the first rendered
-     * background. Doing this lazily stalls for ~100-200 ms once the first song starts.
-     * <p>
-     * Rate limited and idempotent: it is called from a per-tick hook until {@link
-     * #isPipelinePrecompileSettled()}. Waiting for the shader sources does not count as a failure,
-     * but it is bounded by a deadline so a genuinely missing shader cannot poll forever; a real
-     * compilation failure is retried with a backoff and then abandoned with a single warning.
+     * Compiles every scene pipeline (and creates the GPU context) ahead of the first background,
+     * which would otherwise stall for ~100-200 ms on the first song. Rate limited and idempotent;
+     * real compilation failures are retried with a backoff and then abandoned with one warning.
      */
     public void precompileScenePipelines() {
         if (scenePipelinesPrecompiled || precompileAbandoned) {
@@ -206,11 +202,7 @@ public final class RenderRuntime {
         return scenePipelinesPrecompiled || precompileAbandoned;
     }
 
-    /**
-     * The frame rate the game itself reports. Every timing in this line is wall time measured around
-     * command submission, so it inflates whenever the GPU falls behind: without the frame rate next
-     * to it, a queueing stall is indistinguishable from a regression.
-     */
+    /** Game-reported frame rate, so a submission timing can be read in context. */
     private static String frameRate() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft == null) {

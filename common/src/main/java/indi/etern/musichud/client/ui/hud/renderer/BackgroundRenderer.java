@@ -69,10 +69,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         this.currentData = data;
     }
 
-    /**
-     * Releases every offscreen target of this background. Everything is re-created lazily on the
-     * next rendered frame, so this only trades a one-frame rebuild for the idle memory footprint.
-     */
+    /** Releases every offscreen target; they are re-created lazily. */
     public void release() {
         sceneCapture.release();
         backgroundBlur.release();
@@ -84,11 +81,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         sceneCoverOverlay.release();
     }
 
-    /**
-     * Drops only the cover crossfade state. A renderer that stops rendering (closed screen, hidden
-     * HUD) must not keep the current artwork alive, and its stale cover sources would otherwise be
-     * sampled again after a long pause.
-     */
+    /** Drops the cover crossfade state, so a paused renderer does not keep the artwork alive. */
     public void releaseCoverState() {
         sceneCoverTransition.release();
         skippedFrames = 0;
@@ -112,10 +105,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         renderSolidFallback(context, currentData.getHudStyle());
     }
 
-    /**
-     * Builds the whole offscreen background chain. Timed here rather than in {@link #render} so the
-     * GUI background, which the screen drives directly, shows up in the stats too.
-     */
+    /** Builds the offscreen chain; timed here so the GUI background reaches the stats too. */
     public boolean renderFluidBackground(SceneRenderContext context, SceneStyle style) {
         long startNanos = System.nanoTime();
         try {
@@ -124,8 +114,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             if (rendered) {
                 skippedFrames = 0;
             } else if (++skippedFrames >= 2) {
-                // Two frames without a background mean this renderer is idle (hidden HUD, closed
-                // screen); holding a cover source would block the artwork release indefinitely.
+                // Idle: drop the cover source so the artwork can be released.
                 sceneCoverTransition.release();
             }
             return rendered;
@@ -221,8 +210,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
 
         SceneGpuTexture output = background;
         boolean backgroundOnly = true;
-        // scaleOrGamma = 0 keeps the overlay shader on its linear tone-mapping mode; the fluid zoom
-        // is applied to Sampler1 by the overlay shader through MHOverlay.z instead.
+        // scaleOrGamma = 0 selects the overlay shader's linear tone mapping.
         SceneUniform adjustUniform = backgroundAdjustUniform(false, 0f, 0f);
         if (fluidWanted) {
             if (!fluidAttempted) {
@@ -242,8 +230,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             }
         }
 
-        // The audio zoom is folded into the display sampling / overlay sampling: the display must
-        // never zoom the whole composite, otherwise the captured scene would move as well.
+        // The zoom stays in the sampling, or the captured scene would move with it.
         long submitStart = System.nanoTime();
         submitFluidBackground(context, style, output, false,
                 backgroundOnly ? plan.samplingBlackOverlay() : 0f, 1f);
@@ -473,18 +460,10 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
     }
 
     /**
-     * The captured backdrop is blurred with {@code blurRadius} screen pixels, so grabbing it at
-     * full resolution is pure oversampling: the capture, the blur pyramid sized from it and the
-     * crop target are all taken at 1/downscale.
-     * <p>
-     * The old fixed tiers (4 for anything above 64 px) left the GUI, whose radius is 512 px,
-     * capturing at 640x352 and running a four-level RGBA16F pyramid: the blur removes everything
-     * finer than ~128 physical pixels, so all of that detail was written only to be averaged out.
-     * Deriving the factor from the radius keeps sigma at three capture pixels or more (the smallest
-     * kernel that still looks like a blur) and drops every stage's fill rate by the same factor.
+     * Keeps sigma at three capture pixels or more, rounded down to a power of two:
+     * {@code sigma = blurRadius / (3 * downscale) >= 3  =>  downscale <= blurRadius / 9}.
      */
     private static int captureDownscale(int blurRadius) {
-        // sigma in capture pixels = blurRadius / (3 * downscale) >= 3  =>  downscale <= radius / 9.
         int affordable = Math.max(1, blurRadius / 9);
         if (affordable >= 16) return 16;
         if (affordable >= 8) return 8;
