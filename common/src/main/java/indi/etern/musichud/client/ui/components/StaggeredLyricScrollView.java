@@ -682,9 +682,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                     updateLoop();
                 }
             });
-        } catch (IllegalStateException e) {
-            if (continueUpdate) {
-                throw e;
+        } catch (Exception e) {
+            if (!(e instanceof IllegalStateException) || !e.getMessage().contains("dead thread")) {
+                logger.warn("Failed to register lyric animation updater for next frame", e);
             }
         }
     }

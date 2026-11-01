@@ -21,9 +21,14 @@ import java.util.function.Predicate;
 public final class CoverImageStore {
     private static volatile CoverImageStore instance;
 
+    private static final int THUMBNAIL_BOX = 128;
+    /** Headroom so the GPU only downscales. */
+    private static final float SOURCE_HEADROOM = 1.5f;
+    private static final int BACKGROUND_BOX = FluidBackgroundSettings.COVER_TARGET_MAX_LONG_EDGE;
+
     private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private final CoverRequestGate coverRequests = new CoverRequestGate();
-    private volatile int albumImageThumbnailSize = 128;
+    private volatile int albumArtSourceSize = BACKGROUND_BOX;
 
     private CoverImageStore() {
     }
@@ -48,51 +53,51 @@ public final class CoverImageStore {
     }
 
     public void preload(Album album) {
-        // The artwork itself is decoded once into TrackArtwork-owned textures; warming the shared
-        // texture cache here would only pay for a decode nobody samples. The raw bytes are still
-        // worth prefetching so the decode can start immediately.
+        // Only the raw bytes are worth prefetching; the textures belong to TrackArtwork.
         ImageUtils.prefetchBytes(album.getPicUrl());
     }
 
-    public void setThumbnailSize(int thumbnailSize,
-                                 Predicate<MusicDetail> currentTrack,
-                                 Consumer<Duration> onLoaded) {
-        if (thumbnailSize <= 0) return;
-        // Round up to a power of two so dragging a resize does not reload per pixel.
-        thumbnailSize = quantizeThumbnailSize(thumbnailSize);
+    /** Promotes the artwork to the display-size bucket. */
+    public void setSourceSize(int displayLongEdgePx,
+                              Predicate<MusicDetail> currentTrack,
+                              Consumer<Duration> onLoaded) {
+        if (displayLongEdgePx <= 0) return;
+        int sourceSize = quantizeSourceSize(displayLongEdgePx);
         MusicDetail current;
         long token;
         synchronized (coverRequests) {
-            if (albumImageThumbnailSize == thumbnailSize) return;
-            albumImageThumbnailSize = thumbnailSize;
+            if (albumArtSourceSize == sourceSize) return;
+            albumArtSourceSize = sourceSize;
             token = coverRequests.begin();
             current = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+            MusicHud.LOGGER.debug("Album source size {} px", sourceSize);
         }
         if (current != null && current != MusicDetail.NONE) {
-            loadAndSwitchAlbumImageWithRetry(current, token, thumbnailSize, currentTrack, onLoaded);
+            loadAndSwitchAlbumImageWithRetry(current, token, sourceSize, currentTrack, onLoaded);
         }
     }
 
-    /** Rounds up to a power of two. */
-    static int quantizeThumbnailSize(int size) {
-        int clamped = Math.clamp(size, 128, 1024);
-        int bucket = Integer.highestOneBit(clamped);
-        return bucket == clamped ? clamped : Math.min(1024, bucket << 1);
+    /** Power-of-two bucket of the display size, clamped to the background box. */
+    static int quantizeSourceSize(int displayLongEdgePx) {
+        int wanted = Math.max(1, (int) Math.ceil(displayLongEdgePx * SOURCE_HEADROOM));
+        int bucket = Integer.highestOneBit(wanted);
+        int box = bucket == wanted ? wanted : bucket << 1;
+        return Math.clamp(box, BACKGROUND_BOX, ImageUtils.CANONICAL_MAX);
     }
 
     public void load(MusicDetail musicDetail, long token,
                      Predicate<MusicDetail> currentTrack, Consumer<Duration> onLoaded) {
         loadAndSwitchAlbumImageWithRetry(
-                musicDetail, token, albumImageThumbnailSize, currentTrack, onLoaded);
+                musicDetail, token, albumArtSourceSize, currentTrack, onLoaded);
     }
 
     private void loadAndSwitchAlbumImageWithRetry(MusicDetail musicDetail, long token,
-                                                  int thumbnailSize,
+                                                  int sourceSize,
                                                   Predicate<MusicDetail> currentTrack,
                                                   Consumer<Duration> onLoaded) {
         coverRequests.runIfCurrent(token, () -> currentTrack.test(musicDetail), () -> {
             CompletableFuture<Void> future = loadAlbumImage(
-                    musicDetail, token, thumbnailSize, currentTrack, onLoaded);
+                    musicDetail, token, sourceSize, currentTrack, onLoaded);
             future.exceptionallyAsync(e -> {
                 boolean retry = coverRequests.runIfCurrent(token,
                         () -> currentTrack.test(musicDetail), BackgroundState.getInstance()::reset);
@@ -105,25 +110,21 @@ public final class CoverImageStore {
                 }
                 // Admission and launch share the publication lock; replacement cannot slip between them.
                 loadAndSwitchAlbumImageWithRetry(
-                        musicDetail, token, thumbnailSize, currentTrack, onLoaded);
+                        musicDetail, token, sourceSize, currentTrack, onLoaded);
                 return null;
             }, MusicHud.EXECUTOR);
         });
     }
 
     private CompletableFuture<Void> loadAlbumImage(MusicDetail musicDetail, long token,
-                                                   int thumbnailSize,
+                                                   int sourceSize,
                                                    Predicate<MusicDetail> currentTrack,
                                                    Consumer<Duration> onLoaded) {
-        if (thumbnailSize <= 0) return CompletableFuture.completedFuture(null);
+        if (sourceSize <= 0) return CompletableFuture.completedFuture(null);
         Album album = musicDetail.getAlbum();
-        // The scene background never samples the cover above COVER_TARGET_MAX_LONG_EDGE (the
-        // canonical target is clamped to it), so uploading the full-resolution artwork only costs a
-        // multi-megabyte render-thread decode/upload per track. Both sizes are derived from a single
-        // decode, and the textures belong to TrackArtwork instead of the shared texture cache.
-        int backgroundSize = FluidBackgroundSettings.COVER_TARGET_MAX_LONG_EDGE;
         return CompletableFuture
-                .supplyAsync(() -> TrackArtwork.load(album.getPicUrl(), thumbnailSize, backgroundSize),
+                .supplyAsync(() -> TrackArtwork.load(album.getPicUrl(), THUMBNAIL_BOX, BACKGROUND_BOX,
+                                sourceSize),
                         MusicHud.EXECUTOR)
                 .thenAccept(artwork -> {
                     if (artwork == null) return;

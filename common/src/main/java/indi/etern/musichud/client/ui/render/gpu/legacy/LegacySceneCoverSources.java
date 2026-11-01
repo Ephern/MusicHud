@@ -17,6 +17,8 @@ public final class LegacySceneCoverSources {
         if (data == null) return null;
         DynamicTexture texture = data.getTexture();
         if (texture == null) return null;
+        // Dynamic textures upload as NEAREST.
+        GlTextureSampling.ensureLinear(texture);
         NativeImage pixels = texture.getPixels();
         if (pixels == null) return null;
         return new SceneCoverSource(LegacyTextureRefs.of(texture),

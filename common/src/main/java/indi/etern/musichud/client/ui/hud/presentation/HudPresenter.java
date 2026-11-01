@@ -232,9 +232,9 @@ public final class HudPresenter {
         }
     }
 
-    public void setThumbnailSize(int thumbnailSize) {
-        coverImageStore.setThumbnailSize(
-                thumbnailSize, this::isCurrentCoverTrack, this::updateMusicDuration);
+    public void setSourceSize(int displayLongEdgePx) {
+        coverImageStore.setSourceSize(
+                displayLongEdgePx, this::isCurrentCoverTrack, this::updateMusicDuration);
     }
 
     public void updateFrame() {

@@ -46,11 +46,9 @@ public final class HudScene implements RenderScene {
     private volatile SceneRenderData hudBaseData;
     private volatile SceneRenderData imageDisplayData;
     private volatile HudLayouts layout;
-    private Window window;
     private Logger logger;
     private Supplier<String> appliedSkinSupplier;
     private int appliedStatusRevision = -1;
-    private int appliedThumbnailSize = -1;
 
     private HudScene() {
         presenter.setLyricSink(new HudPresenter.LyricSink() {
@@ -103,7 +101,7 @@ public final class HudScene implements RenderScene {
 
     public void render(SceneRenderContext context) {
         try {
-            // State advances even while hidden, so transitions keep their real start time.
+            // State advances even while hidden.
             updateFrameState();
             if (MusicHudScreen.isHudOccluded()
                     || presenter.getModel().getHudAlpha() <= 1e-4f) {
@@ -150,7 +148,32 @@ public final class HudScene implements RenderScene {
             currentLayout.arrange(PLAYER_HEAD_RENDERER.isVisible(),
                     PLAYING_STATUS_RENDERER.isVisible(), playTimeWidth);
         }
-        refreshThumbnailSize();
+        updateArtworkSourceSize();
+    }
+
+    /** Feeds the album-art display size. */
+    private void updateArtworkSourceSize() {
+        SceneRenderData data = imageDisplayData;
+        if (data == null) {
+            return;
+        }
+        Minecraft minecraft = Minecraft.getInstance();
+        //noinspection ConstantValue
+        if (minecraft == null) {
+            return;
+        }
+        Window window = minecraft.getWindow();
+        //noinspection ConstantValue
+        if (window == null) {
+            return;
+        }
+        SceneStyle style = data.getHudStyle();
+        if (style == null) {
+            return;
+        }
+        int longEdge = (int) Math.ceil(Math.max(style.getWidth(), style.getHeight())
+                * window.getGuiScale());
+        presenter.setSourceSize(longEdge);
     }
 
     private void drawFrame(SceneRenderContext context) {
@@ -216,28 +239,8 @@ public final class HudScene implements RenderScene {
                     PLAY_TIME_RENDERER.measureDisplayWidth(newLayout.getInfoTextSize()));
             // Swap after the first arrange: a live swap lets the render thread measure the same tree.
             layout = newLayout;
-            refreshThumbnailSize();
         } catch (Exception e) {
             logger().error("While refresh HUD style", e);
-        }
-    }
-
-    private void refreshThumbnailSize() {
-        if (window == null) {
-            Minecraft minecraft = Minecraft.getInstance();
-            // Minecraft.getInstance() returns null during NeoForge launch
-            //noinspection ConstantValue
-            if (minecraft != null) {
-                window = minecraft.getWindow();
-            }
-        }
-        //noinspection ConstantValue
-        if (window != null && imageDisplayData != null) {
-            int thumbnailSize = (int) (imageDisplayData.getHudStyle().getWidth() * window.getGuiScale());
-            if (thumbnailSize != appliedThumbnailSize) {
-                appliedThumbnailSize = thumbnailSize;
-                presenter.setThumbnailSize(thumbnailSize);
-            }
         }
     }
 

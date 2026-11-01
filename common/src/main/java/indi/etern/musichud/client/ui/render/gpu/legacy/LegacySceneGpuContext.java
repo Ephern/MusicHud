@@ -18,7 +18,7 @@ import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
 import indi.etern.musichud.client.ui.render.pipeline.SceneTextureRef;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
-import org.jetbrains.annotations.Nullable;
+import org.jetbrains.annotations.NotNull;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
@@ -31,6 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+@SuppressWarnings("resource")
 public final class LegacySceneGpuContext implements SceneGpuContext {
     private final Map<ScenePipelineKey, HudShaderProgram> pipelines =
             new EnumMap<>(ScenePipelineKey.class);
@@ -81,6 +82,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
             case SCENE_COVER_LAYERS -> List.of("MHCover");
             case SCENE_COVER_OVERLAY -> List.of("MHOverlay", "MHBackgroundAdjust");
             case SCENE_COVER_BLEND -> List.of("MHCoverBlend");
+            case SCENE_ARTWORK_DOWNSAMPLE -> List.of("MHArtworkDownsample");
         };
         return HudShaderManager.getOrCreate(key.name(),
                 shader(vertex), shader(name + ".fsh"), ubos);
@@ -204,7 +206,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
     }
 
     private static int textureId(SceneTextureRef ref) {
-        if (ref instanceof LegacyTextureRef legacy) return legacy.id();
+        if (ref instanceof LegacyTextureRef(int id)) return id;
         if (ref instanceof LegacySceneTexture texture) return texture.textureId();
         throw new IllegalArgumentException("Unsupported scene texture reference");
     }
@@ -245,7 +247,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
     }
 
     @Override
-    public @Nullable MainColorSource mainColorSource() {
+    public @NotNull MainColorSource mainColorSource() {
         assertOpen();
         Minecraft minecraft = Minecraft.getInstance();
         var target = minecraft.getMainRenderTarget();
