@@ -40,8 +40,11 @@ import java.net.URI;
 import java.net.URL;
 import java.time.Duration;
 import java.util.Base64;
+import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 
@@ -51,11 +54,37 @@ public class ImageUtils {
     private static final Logger LOGGER = getLogger(ImageUtils.class);
 
     private static final int DEFAULT_MAX_CONCURRENT_DOWNLOADS = 40;
+    private static final int CANONICAL_MAX = 2048;
+    private static final long SOURCE_CACHE_BUDGET = 128L * 1024 * 1024;
+    private static final int MAX_DERIVED_VARIANTS = 4;
     @Getter(AccessLevel.PACKAGE)
     private static final Cache<String, ImageTextureData> cachedTexturesData = CacheBuilder.newBuilder()
-            .expireAfterAccess(Duration.ofMinutes(20))
-            .maximumSize(256)
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .maximumWeight(64L * 1024 * 1024)
+            .weigher((Weigher<String, ImageTextureData>) (key, value) -> {
+                // Weighing a closed texture throws; a throwing weigher fails the whole cache.
+                try {
+                    DynamicTexture texture = value.getTexture();
+                    NativeImage pixels = texture == null ? null : texture.getPixels();
+                    return pixels == null ? 1 : Math.max(1, pixels.getWidth() * pixels.getHeight() * 4);
+                } catch (RuntimeException closed) {
+                    return 1;
+                }
+            })
             .build();
+    /** Decoded pixels per URL at the largest size requested so far. Callers must never close them. */
+    private static final Cache<String, SourceEntry> sourceCache = CacheBuilder.newBuilder()
+            .expireAfterAccess(Duration.ofMinutes(10))
+            .maximumWeight(SOURCE_CACHE_BUDGET)
+            .weigher((Weigher<String, SourceEntry>) (key, entry) -> entry.weightBytes())
+            .build();
+    private static final ConcurrentHashMap<String, CompletableFuture<Bitmap>> pendingSourceDecodes =
+            new ConcurrentHashMap<>();
+    private static final AtomicLong cacheHits = new AtomicLong();
+    private static final AtomicLong cachePromotions = new AtomicLong();
+    private static final AtomicLong cacheDerivations = new AtomicLong();
+    private static final AtomicLong cacheDecodes = new AtomicLong();
+    private static final AtomicLong uiUploads = new AtomicLong();
     private static final Cache<String, byte[]> cachedRemoteBytes = CacheBuilder.newBuilder()
             .expireAfterAccess(Duration.ofMinutes(2))
             .maximumWeight(64L * 1024 * 1024)
@@ -66,18 +95,6 @@ public class ImageUtils {
     private static final ConcurrentHashMap<String, CompletableFuture<ImageTextureData>> pendingDefaultProcessed =
             new ConcurrentHashMap<>();
     private static final Map<String, Image> cachedIconImageMap = new ConcurrentHashMap<>();
-    private static final BiFunction<String, InputStream, ImageTextureData> DEFAULT_PROCESSOR = (url, inputStream) -> {
-        var opts = new BitmapFactory.Options();
-        opts.inPreferredFormat = Bitmap.Format.RGBA_8888;
-
-        try (Bitmap source = BitmapFactory.decodeStream(inputStream, opts)) {
-            ImageTextureData imageTextureData = getImageTextureData(url, source);
-            cachedTexturesData.put(url, imageTextureData);
-            return imageTextureData;
-        } catch (IOException e) {
-            throw new RuntimeException(e);
-        }
-    };
     private static ExecutorService downloadExecutor;
     private static Semaphore downloadSemaphore;
     private static int maxConcurrentDownloads = DEFAULT_MAX_CONCURRENT_DOWNLOADS;
@@ -168,8 +185,12 @@ public class ImageUtils {
             return existing;
         }
         try {
-            downloadAsync(url, DEFAULT_PROCESSOR).whenComplete((result, ex) -> {
+            // The largest size the cache keeps, so later smaller requests are derived from it.
+            loadBitmap(url, CANONICAL_MAX, CANONICAL_MAX).thenApplyAsync(bitmap ->
+                    createTexture(url, bitmap), downloadExecutor
+            ).whenComplete((result, ex) -> {
                 if (ex == null) {
+                    cachedTexturesData.put(url, result);
                     placeholder.complete(result);
                 } else {
                     placeholder.completeExceptionally(ex);
@@ -196,12 +217,220 @@ public class ImageUtils {
         }, downloadExecutor);
     }
 
+    /** Borrowed pixels covering at least {@code minW x minH}; never close the result. */
+    public static CompletableFuture<Bitmap> loadBitmap(String url, int minW, int minH) {
+        int requestW = Math.max(1, minW);
+        int requestH = Math.max(1, minH);
+        SourceEntry entry = sourceCache.asMap().computeIfAbsent(url, ignored -> new SourceEntry());
+        synchronized (entry) {
+            Bitmap ready = borrow(url, entry, requestW, requestH);
+            if (ready != null) {
+                cacheHits.incrementAndGet();
+                return CompletableFuture.completedFuture(ready);
+            }
+            if (entry.saturated) {
+                cacheHits.incrementAndGet();
+                return CompletableFuture.completedFuture(entry.canonical);
+            }
+        }
+        //noinspection MathClampMigration
+        int wanted = Math.min(CANONICAL_MAX, Math.max(requestW, requestH));
+        int target;
+        synchronized (entry) {
+            target = Math.max(wanted, entry.canonicalBox);
+        }
+        return decodeSource(url, target).thenApplyAsync(bitmap -> {
+            synchronized (entry) {
+                Bitmap previous = entry.canonical;
+                if (previous == null || entry.canonicalBox <= target) {
+                    if (entry.canonical != null && entry.canonicalBox < target) {
+                        cachePromotions.incrementAndGet();
+                        invalidateTextures(url);
+                    }
+                    entry.canonical = bitmap;
+                    entry.canonicalBox = target;
+                    // decodeScaled never upscales, so a smaller result means the source is that small.
+                    boolean noProgress = previous != null
+                            && previous.getWidth() == bitmap.getWidth()
+                            && previous.getHeight() == bitmap.getHeight();
+                    entry.saturated = bitmap.getWidth() < target || bitmap.getHeight() < target
+                            || noProgress;
+                    entry.generation++;
+                    entry.derived.clear();
+                    entry.canonicalBytes = (long) bitmap.getWidth() * bitmap.getHeight() * 4;
+                    entry.derivedBytes = 0;
+                    sourceCache.put(url, entry);
+                }
+                //noinspection resource
+                Bitmap borrowed = borrow(url, entry, requestW, requestH);
+                return borrowed != null ? borrowed : bitmap;
+            }
+        }, downloadExecutor);
+    }
+
+    /** @return a borrowed bitmap within the request, or {@code null} when the canonical is too small. */
+    private static Bitmap borrow(String url, SourceEntry entry, int minW, int minH) {
+        Bitmap canonical = entry.canonical;
+        if (canonical == null || canonical.isClosed()) {
+            return null;
+        }
+        if (entry.saturated) {
+            return canonical;
+        }
+        if (canonical.getWidth() < minW || canonical.getHeight() < minH) {
+            return null;
+        }
+        // Within 4/3 the extra copy adds no detail.
+        if (canonical.getWidth() <= minW * 4 / 3 && canonical.getHeight() <= minH * 4 / 3) {
+            return canonical;
+        }
+        //noinspection MathClampMigration
+        int box = Math.min(CANONICAL_MAX, Math.max(minW, minH));
+        Bitmap derived = entry.derived.get(box);
+        if (derived != null && !derived.isClosed()) {
+            return derived;
+        }
+        derived = deriveScaled(canonical, minW, minH);
+        cacheDerivations.incrementAndGet();
+        entry.derived.put(box, derived);
+        while (entry.derived.size() > MAX_DERIVED_VARIANTS) {
+            Iterator<Integer> eldest = entry.derived.keySet().iterator();
+            eldest.next();
+            eldest.remove();
+        }
+        entry.derivedBytes = 0;
+        for (Bitmap variant : entry.derived.values()) {
+            entry.derivedBytes += variant.getWidth() * variant.getHeight() * 4L;
+        }
+        // Re-put so the weighted cache sees the new total instead of the install-time snapshot.
+        sourceCache.put(url, entry);
+        return derived;
+    }
+
+    /** Decodes {@code url} at {@code box}, single-flight per (url, box). */
+    private static CompletableFuture<Bitmap> decodeSource(String url, int box) {
+        String key = url + "#src" + box;
+        CompletableFuture<Bitmap> placeholder = new CompletableFuture<>();
+        CompletableFuture<Bitmap> existing = pendingSourceDecodes.putIfAbsent(key, placeholder);
+        if (existing != null) {
+            return existing;
+        }
+        cacheDecodes.incrementAndGet();
+        downloadBytes(url).thenApplyAsync(bytes -> {
+            try {
+                Bitmap decoded = decodeScaled(bytes, box, box);
+                SourceEntry entry = sourceCache.getIfPresent(url);
+                if (entry != null) {
+                    boolean pixelArt = detectPixelArt(decoded);
+                    synchronized (entry) {
+                        entry.pixelArt = pixelArt;
+                    }
+                }
+                return decoded;
+            } catch (IOException e) {
+                throw new CompletionException(e);
+            }
+        }, downloadExecutor).whenComplete((bitmap, error) -> {
+            if (error == null) {
+                placeholder.complete(bitmap);
+            } else {
+                placeholder.completeExceptionally(error);
+            }
+            pendingSourceDecodes.remove(key, placeholder);
+        });
+        return placeholder;
+    }
+
     /**
-     * Downloads the raw bytes of {@code url} once (shared with every other consumer of the same URL,
-     * including the full-size image used by JMTC), decodes them and downscales to fit within
-     * {@code targetW x targetH} preserving aspect ratio, then caches the resulting texture under
-     * {@code url#WxH}. The original {@link #downloadAsync(String)} pipeline is untouched.
+     * Small palette plus long runs of identical pixels, sampled from the centre. Only picks the
+     * nearest filter for enlarged images.
      */
+    private static boolean detectPixelArt(Bitmap bitmap) {
+        int width = bitmap.getWidth();
+        int height = bitmap.getHeight();
+        if (width < 16 || height < 16) {
+            return false;
+        }
+        int sample = Math.min(256, Math.min(width, height));
+        int originX = (width - sample) / 2;
+        int originY = (height - sample) / 2;
+        int[] pixels = new int[sample * sample];
+        try {
+            bitmap.getPixels(pixels, 0, sample, originX, originY, sample, sample);
+        } catch (RuntimeException failure) {
+            return false;
+        }
+        java.util.HashSet<Integer> colors = new java.util.HashSet<>();
+        int identical = 0;
+        int compared = 0;
+        for (int y = 0; y < sample; y++) {
+            int row = y * sample;
+            for (int x = 0; x < sample; x++) {
+                int color = pixels[row + x];
+                if (colors.size() <= 512) {
+                    colors.add(color);
+                }
+                if (x + 1 < sample) {
+                    compared++;
+                    if (pixels[row + x + 1] == color) identical++;
+                }
+                if (y + 1 < sample) {
+                    compared++;
+                    if (pixels[row + sample + x] == color) identical++;
+                }
+            }
+        }
+        return compared > 0 && colors.size() <= 256 && identical * 10 >= compared * 6;
+    }
+
+    /** @return true when the decoded image looks like hard-edged pixel art. */
+    public static boolean isPixelArt(String url) {
+        SourceEntry entry = sourceCache.getIfPresent(url);
+        if (entry == null) {
+            return false;
+        }
+        synchronized (entry) {
+            return entry.pixelArt;
+        }
+    }
+
+    /** Drops cached textures that were derived from a superseded (smaller) source. */
+    private static void invalidateTextures(String url) {
+        String prefix = url + "#";
+        cachedTexturesData.asMap().keySet().removeIf(key -> key.startsWith(prefix));
+    }
+
+    private static final class SourceEntry {
+        Bitmap canonical;
+        int canonicalBox;
+        long generation;
+        boolean pixelArt;
+        boolean saturated;
+        long canonicalBytes;
+        long derivedBytes;
+        final LinkedHashMap<Integer, Bitmap> derived = new LinkedHashMap<>(8, 0.75f, true);
+
+        int weightBytes() {
+            synchronized (this) {
+                return (int) Math.min(Integer.MAX_VALUE, canonicalBytes + derivedBytes);
+            }
+        }
+    }
+
+    /** Cache counters for the render stats line. */
+    public static String describeCache() {
+        // No per-entry scan: it would take the per-URL locks from the render thread.
+        return " | img: urls=" + sourceCache.size()
+                + " hit=" + cacheHits.get() + " decode=" + cacheDecodes.get()
+                + " promote=" + cachePromotions.get() + " filter=" + cacheDerivations.get() + " ui=" + uiUploads.get();
+    }
+
+    /** Counts ModernUI texture uploads, i.e. how often a widget actually re-created its image. */
+    public static void noteUiUpload() {
+        uiUploads.incrementAndGet();
+    }
+
+    /** Bytes are downloaded once per URL; the texture is cached under {@code url#WxH}. */
     public static CompletableFuture<ImageTextureData> downloadScaledAsync(String url, int targetW, int targetH) {
         String key = url + "#" + targetW + "x" + targetH;
         ImageTextureData cached = cachedTexturesData.getIfPresent(key);
@@ -215,19 +444,11 @@ public class ImageUtils {
             return existing;
         }
         try {
-            downloadBytes(url).thenApplyAsync(bytes -> {
-                try {
-                    Bitmap scaled = decodeScaled(bytes, targetW, targetH);
-                    ImageTextureData data = getImageTextureData(key, scaled);
-                    scaled.close();
-                    cachedTexturesData.put(key, data);
-                    LOGGER.debug("Successfully processed scaled: {}", key);
-                    return data;
-                } catch (IOException e) {
-                    throw new CompletionException(e);
-                }
-            }, downloadExecutor).whenComplete((result, ex) -> {
+            loadBitmap(url, targetW, targetH).thenApplyAsync(bitmap ->
+                    createTexture(key, bitmap), downloadExecutor
+            ).whenComplete((result, ex) -> {
                 if (ex == null) {
+                    cachedTexturesData.put(key, result);
                     placeholder.complete(result);
                 } else {
                     placeholder.completeExceptionally(ex);
@@ -239,6 +460,12 @@ public class ImageUtils {
             pendingDefaultProcessed.remove(key, placeholder);
         }
         return placeholder;
+    }
+
+    private static ImageTextureData createTexture(String key, Bitmap bitmap) {
+        ImageTextureData data = getImageTextureData(key, bitmap);
+        LOGGER.debug("Successfully processed scaled: {}", key);
+        return data;
     }
 
     @NotNull
@@ -255,12 +482,50 @@ public class ImageUtils {
         if (targetW <= 0 || targetH <= 0 || (sw <= targetW && sh <= targetH)) {
             return source;
         }
+        Bitmap scaled = deriveScaled(source, targetW, targetH);
+        source.close();
+        return scaled;
+    }
+
+    /** Box-filters {@code source} into the requested box, preserving its aspect ratio. */
+    @NotNull
+    private static Bitmap deriveScaled(@NotNull Bitmap source, int targetW, int targetH) {
+        int sw = source.getWidth();
+        int sh = source.getHeight();
         double scale = Math.min((double) targetW / sw, (double) targetH / sh);
         int tw = Math.max(1, (int) Math.round(sw * scale));
         int th = Math.max(1, (int) Math.round(sh * scale));
-        Bitmap scaled = downscalePremultiplied(source, tw, th);
-        source.close();
-        return scaled;
+        return downscalePremultiplied(source, tw, th);
+    }
+
+    /**
+     * Every requested box from one decode. Unlike {@link #downloadScaledAsync} the caller owns the
+     * textures and must close them.
+     */
+    public static CompletableFuture<ImageTextureData[]> downloadScaledSetOwned(String url, int[] boxes) {
+        if (boxes.length == 0) {
+            return CompletableFuture.completedFuture(new ImageTextureData[0]);
+        }
+        int largest = 0;
+        for (int box : boxes) {
+            largest = Math.max(largest, box);
+        }
+        // One decode, shared with every other consumer of this URL.
+        return loadBitmap(url, largest, largest).thenApplyAsync(base -> {
+            ImageTextureData[] result = new ImageTextureData[boxes.length];
+            for (int i = 0; i < boxes.length; i++) {
+                boolean derived = base.getWidth() > boxes[i] || base.getHeight() > boxes[i];
+                Bitmap pixels = derived ? deriveScaled(base, boxes[i], boxes[i]) : base;
+                try {
+                    result[i] = getImageTextureData(url + "#owned" + boxes[i], pixels);
+                } finally {
+                    if (derived) {
+                        pixels.close();
+                    }
+                }
+            }
+            return result;
+        }, downloadExecutor);
     }
 
     @NotNull
@@ -317,6 +582,12 @@ public class ImageUtils {
 
     private static int clamp8(int v) {
         return v < 0 ? 0 : Math.min(v, 255);
+    }
+
+    /** Warms the raw byte cache so the next decode does not wait for the network. */
+    public static void prefetchBytes(String url) {
+        if (url == null || url.isBlank()) return;
+        downloadBytes(url);
     }
 
     private static CompletableFuture<byte[]> downloadBytes(String url) {

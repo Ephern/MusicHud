@@ -29,8 +29,8 @@ public class AlbumImageRenderer implements RenderLayer {
     public void render(SceneRenderContext context) {
         if (currentData == null) return;
 
-        SceneTextureSetup textureSetup = getMixedTextureSetup();
         SceneStyle hudStyle = currentData.getHudStyle();
+        SceneTextureSetup textureSetup = getMixedTextureSetup(hudStyle);
 
         SceneElementRenderState hudRenderState = new SceneElementRenderState(
                 SceneRenderPipelines.ROUNDED_ALBUM,
@@ -43,7 +43,7 @@ public class AlbumImageRenderer implements RenderLayer {
         context.submit(this, hudRenderState);
     }
 
-    private @NotNull SceneTextureSetup getMixedTextureSetup() {
+    private @NotNull SceneTextureSetup getMixedTextureSetup(SceneStyle hudStyle) {
         var background = currentData.getTransitionableBackground();
         BackgroundData next = background.getNext();
         BackgroundData current = background.getCurrent();

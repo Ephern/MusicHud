@@ -351,10 +351,9 @@ public class LyricLineView extends LinearLayout {
     }
 
     /**
-     * Cheap signature of everything that affects the rendered line, so the offscreen source is
-     * only re-rendered when it actually changes. It is forced to change every frame while the
-     * child is still animating (PERFORMING, or the DONE fade/lowering) and also tracks the row's
-     * scale, which can outlast the color fade during the highlight exit.
+     * Signature of everything that affects the rendered line, so the offscreen source is re-rendered
+     * only when it changes. It changes every frame while the child animates, and tracks the row scale,
+     * which outlasts the colour fade.
      */
     private long computeBlurContentStamp() {
         long stamp = 17L;

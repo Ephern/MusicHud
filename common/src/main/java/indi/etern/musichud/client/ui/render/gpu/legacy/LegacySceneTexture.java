@@ -36,6 +36,10 @@ final class LegacySceneTexture implements SceneGpuTexture, AutoCloseable {
         return target.height;
     }
 
+    long byteSize() {
+        return (long) width() * height() * 4L;
+    }
+
     @Override
     public SceneTextureFormat format() {
         return requestedFormat;

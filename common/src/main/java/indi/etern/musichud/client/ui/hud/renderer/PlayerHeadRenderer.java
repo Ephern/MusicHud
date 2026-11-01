@@ -84,7 +84,7 @@ public class PlayerHeadRenderer implements RenderLayer {
     }
 
     @Override
-    public void render(SceneRenderContext context) {
+    public void update() {
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null) return;
 
@@ -103,17 +103,20 @@ public class PlayerHeadRenderer implements RenderLayer {
             setTarget(skin);
         }
 
-        long currentTimeMillis = System.currentTimeMillis();
-        float progress = progressAt(currentTimeMillis);
-        if (progress >= 1f) {
+        if (progressAt(System.currentTimeMillis()) >= 1f) {
             // Transition settled: keep only the target layer, fully opaque, ready for the next one.
             layers.removeIf(layer -> !Objects.equals(layer.skin, targetSkin));
             for (SkinLayer layer : layers) {
                 layer.startAlpha = 1f;
             }
         }
+    }
+
+    @Override
+    public void render(SceneRenderContext context) {
         if (layers.isEmpty()) return;
 
+        float progress = progressAt(System.currentTimeMillis());
         SceneStyle.AbsolutePosition absolutePosition = hudStyle.calcAbsolutePosition(context);
         int w = (int) hudStyle.getWidth();
         int h = (int) hudStyle.getHeight();

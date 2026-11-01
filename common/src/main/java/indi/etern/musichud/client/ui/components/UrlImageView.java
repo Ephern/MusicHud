@@ -27,7 +27,11 @@ import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.resources.language.I18n;
 
+import java.util.Iterator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.atomic.AtomicLong;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -48,6 +52,9 @@ public class UrlImageView extends FrameLayout {
     private boolean hasLoadedImage = false;
     private int loadTargetW = 0;
     private int loadTargetH = 0;
+    /** Size this load actually requests: the caller's, or the view's own size when it gave none. */
+    private int effectiveLoadW = 0;
+    private int effectiveLoadH = 0;
     private boolean isAttachedToWindow = false;
     private CompletableFuture<Void> loadFuture;
     private AnimatorSet currentAnimator;
@@ -61,6 +68,80 @@ public class UrlImageView extends FrameLayout {
     @Setter
     @Getter
     private int transitionDuration = 400;
+
+    /** Shared ModernUI textures keyed by URL; a texture at or above the requested size is reused. */
+    private static final long UI_TEXTURE_BUDGET = 64L * 1024 * 1024;
+    private static final int UI_TEXTURE_MIN_ENTRIES = 64;
+    private static final Map<String, Image> UI_TEXTURES =
+            new LinkedHashMap<>(256, 0.75f, true);
+    private static long uiTextureBytes;
+
+    private static final AtomicLong imageCacheHits = new AtomicLong();
+    private static final AtomicLong imageCacheUploads = new AtomicLong();
+    private static final AtomicLong imageCacheEvictions = new AtomicLong();
+
+    /** Cache state for the render stats line. */
+    public static String describeImageCache() {
+        synchronized (UI_TEXTURES) {
+            return " | uicache: hit=" + imageCacheHits.get()
+                    + " upload=" + imageCacheUploads.get()
+                    + " evict=" + imageCacheEvictions.get()
+                    + " live=" + UI_TEXTURES.size()
+                    + " " + (uiTextureBytes / 1048576L) + "MiB";
+        }
+    }
+
+    private static Image reuseTexture(String url, int wantW, int wantH) {
+        synchronized (UI_TEXTURES) {
+            Image cached = UI_TEXTURES.get(url);
+            if (cached == null) {
+                return null;
+            }
+            // Reuse unless the cached texture is clearly smaller than this view.
+            if (cached.getWidth() * 4 >= wantW * 3 && cached.getHeight() * 4 >= wantH * 3) {
+                imageCacheHits.incrementAndGet();
+                return cached;
+            }
+            return null;
+        }
+    }
+
+    private static void storeTexture(String url, Image image) {
+        synchronized (UI_TEXTURES) {
+            Image previous = UI_TEXTURES.put(url, image);
+            if (previous != null) {
+                uiTextureBytes -= textureBytes(previous);
+            }
+            uiTextureBytes += textureBytes(image);
+            imageCacheUploads.incrementAndGet();
+            Iterator<Map.Entry<String, Image>> eldest = UI_TEXTURES.entrySet().iterator();
+            while (uiTextureBytes > UI_TEXTURE_BUDGET && UI_TEXTURES.size() > UI_TEXTURE_MIN_ENTRIES
+                    && eldest.hasNext()) {
+                Map.Entry<String, Image> entry = eldest.next();
+                if (entry.getValue() == image) {
+                    continue;
+                }
+                uiTextureBytes -= textureBytes(entry.getValue());
+                eldest.remove();
+                imageCacheEvictions.incrementAndGet();
+            }
+        }
+    }
+
+    private static long textureBytes(Image image) {
+        return (long) Math.max(1, image.getWidth()) * Math.max(1, image.getHeight()) * 4L;
+    }
+
+    /**
+     * Texture size for {@code loadUrl(url)}: the view's own size, since the drawable scales.
+     */
+    private int implicitTargetSize() {
+        int side = Math.max(getWidth(), getHeight());
+        if (side <= 0) {
+            side = dp(96);
+        }
+        return Math.clamp(side, 32, 1024);
+    }
 
     public UrlImageView(Context context) {
         super(context);
@@ -238,6 +319,12 @@ public class UrlImageView extends FrameLayout {
      * 传入与原图相同的 URL 时可复用 ImageUtils 的字节缓存（含 JMTC 下载的全尺寸图）。
      */
     public void loadUrl(String urlString, int targetW, int targetH) {
+        if (urlString != null && urlString.equals(currentURLString)
+                && targetW == loadTargetW && targetH == loadTargetH
+                && (hasLoadedImage || loadFuture != null)) {
+            // Same URL and size: the row was rebound, the texture is already correct.
+            return;
+        }
         loadTargetW = targetW;
         loadTargetH = targetH;
         cancelLoad();
@@ -255,6 +342,22 @@ public class UrlImageView extends FrameLayout {
      * 实际执行加载的方法
      */
     private void actuallyLoadUrl(String urlString) {
+        if (loadTargetW <= 0 || loadTargetH <= 0) {
+            int side = implicitTargetSize();
+            effectiveLoadW = side;
+            effectiveLoadH = side;
+        } else {
+            effectiveLoadW = loadTargetW;
+            effectiveLoadH = loadTargetH;
+        }
+        Image cached = reuseTexture(urlString, effectiveLoadW, effectiveLoadH);
+        if (cached != null) {
+            setLoading(false);
+            errorLayout.setVisibility(GONE);
+            hasLoadedImage = true;
+            createDrawable(cached, urlString);
+            return;
+        }
         setLoading(true);
         errorLayout.setVisibility(GONE);
 
@@ -279,6 +382,8 @@ public class UrlImageView extends FrameLayout {
                             }
                             Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
                             if (textureFromBitmap != null) {
+                                ImageUtils.noteUiUpload();
+                                storeTexture(base64String, textureFromBitmap);
                                 createDrawable(textureFromBitmap, base64String);
                             }
                         } catch (Exception e) {
@@ -293,22 +398,24 @@ public class UrlImageView extends FrameLayout {
     }
 
     private void loadNetworkImage(String urlString) {
+        int targetW = effectiveLoadW;
+        int targetH = effectiveLoadH;
         loadFuture = CompletableFuture.runAsync(() -> {
             if (urlString.equals(currentURLString)) {
                 try {
-                    CompletableFuture<ImageTextureData> future = loadTargetW > 0 && loadTargetH > 0
-                            ? ImageUtils.downloadScaledAsync(urlString, loadTargetW, loadTargetH)
-                            : ImageUtils.downloadAsync(urlString);
-                    future.thenAcceptAsync(imageTextureData -> {
+                    // Borrowed from the shared source cache: never close it, the cache owns it and
+                    // other views may be reading the same pixels. ModernUI uploads its own texture.
+                    CompletableFuture<icyllis.modernui.graphics.Bitmap> future =
+                            ImageUtils.loadBitmap(urlString, targetW, targetH);
+                    future.thenAcceptAsync(bitmap -> {
                         if (urlString.equals(currentURLString)) {
                             MuiModApi.postToUiThread(() -> {
-                                if (imageTextureData != null) {
-                                    try (Bitmap bitmap = imageTextureData.convertToBitmap()) {
-                                        if (bitmap == null) {
-                                            throw new RuntimeException("failed to load image");
-                                        }
+                                if (bitmap != null) {
+                                    try {
                                         Image textureFromBitmap = Image.createTextureFromBitmap(bitmap);
                                         if (textureFromBitmap != null) {
+                                            ImageUtils.noteUiUpload();
+                                            storeTexture(urlString, textureFromBitmap);
                                             createDrawable(textureFromBitmap, urlString);
                                         }
                                     } catch (Exception e) {
@@ -344,6 +451,11 @@ public class UrlImageView extends FrameLayout {
         int imageViewWidth = getWidth();
         int imageViewHeight = getHeight();
         boolean useFilter = image.getWidth() * image.getHeight() >= 0.25 * imageViewWidth * imageViewHeight;
+        if (ImageUtils.isPixelArt(urlString)) {
+            // Hard-edged art must not be smoothed when it is enlarged; minification still filters.
+            boolean enlarged = image.getWidth() < imageViewWidth || image.getHeight() < imageViewHeight;
+            useFilter = !enlarged;
+        }
         drawable.setFilter(useFilter);
 
         if (circular) {

@@ -7,7 +7,10 @@ public final class FluidBackgroundSettings {
     public static final float BACKGROUND_NATURAL_SATURATION = 1.75f;
     public static final float COVER_TARGET_LONG_EDGE_SCALE = 0.5f;
     public static final int COVER_TARGET_MIN_LONG_EDGE = 64;
-    public static final int COVER_TARGET_MAX_LONG_EDGE = 640;
+    // The fluid canvas is upsampled to the panel and the layer composite is blurred with a
+    // sigma proportional to the canvas long edge, so 320 keeps the same on-screen blur while
+    // cutting the whole fluid chain's fill rate (and its blur pyramid) by ~4x.
+    public static final int COVER_TARGET_MAX_LONG_EDGE = 320;
     public static final float COVER_TRANSITION_SECONDS = 0.5f;
     public static final int BLUR_MAX_LEVELS = 4;
     public static final float COVER_LAYER_OPACITY = 1.0f;

@@ -2,6 +2,7 @@
 
 // u_Params.x: master fluid opacity
 // u_Params.y: background sampling black overlay
+// u_Params.z: fluid zoom (>= 1; the audio-reactive scale used to be its own full pass)
 layout(std140) uniform MHOverlay {
     vec4 u_Params;
 };
@@ -66,7 +67,8 @@ vec3 applyBrightness(vec3 rgb, float brightness, float gammaMode) {
 
 void main() {
     vec4 scene = texture(Sampler0, texCoord);
-    vec4 cover = texture(Sampler1, texCoord);
+    vec4 cover = texture(Sampler1,
+            clamp((texCoord - 0.5) / max(u_Params.z, 1.0) + 0.5, 0.0, 1.0));
 
     vec3 coverRgb = applyNaturalSaturation(cover.rgb, u_Adjust.x);
     coverRgb = applyHighlightDarkening(coverRgb, u_Adjust.y, u_Adjust.z, u_Adjust.w);

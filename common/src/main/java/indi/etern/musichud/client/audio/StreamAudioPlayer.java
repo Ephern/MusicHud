@@ -15,15 +15,12 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Consumer;
 
 /**
- * Orchestrator of {@link PlaybackTask}s: maintains the global playback status,
- * the currently audible task and the pending (preloading) task, and coordinates
- * cross-fade transitions between them.
+ * Orchestrator of {@link PlaybackTask}s: the global playback status, the audible task, the
+ * preloading task and the crossfades between them.
  * <p>
- * Switch semantics: when a new task is submitted while another is audible, the
- * transition duration is {@code max(outgoing.fadeOut, incoming.fadeIn)} and BOTH
- * directions ramp over that duration. The incoming task starts downloading
- * (preloading) immediately, overlapping the outgoing fade-out; it begins
- * fading in only after the outgoing task has fully faded out.
+ * A switch while a task is audible ramps both directions over
+ * {@code max(outgoing.fadeOut, incoming.fadeIn)}; the incoming task preloads immediately and only
+ * starts fading in after the outgoing one has fully faded out.
  */
 public class StreamAudioPlayer {
     /** Default fade duration for the fade-in node of a task. */
@@ -41,6 +38,14 @@ public class StreamAudioPlayer {
     private long nextSpectrumSubmission;
     private long spectrumToken;
     private boolean spectrumMuted;
+    /**
+     * Last spectrum snapshot, published by the audio/mixer thread.
+     * <p>
+     * The player monitor is held for the whole PCM decode/mix of a chunk, which blocked the render
+     * thread (audio-reactive background) for several milliseconds. Readers now take the immutable
+     * snapshot instead of the monitor; a frame of staleness is invisible for audio reactivity.
+     */
+    private volatile SpectrumSnapshot publishedSpectrum = SpectrumSnapshot.silence(0, 0);
     private PlaybackTask currentTask;
     private PlaybackTask pendingTask;
     /** Next track buffered ahead of time; not audible until it becomes current/pending. */
@@ -62,11 +67,14 @@ public class StreamAudioPlayer {
         return status.get();
     }
 
-    /** Read-only session-bound spectrum of the actual current/pending PCM mix. */
-    public synchronized SpectrumSnapshot getSpectrum() {
-        boolean muted = ClientConfig.getInstance().getMuted();
-        updateSpectrumPause(muted);
-        return spectrum.snapshot(muted);
+    /** Read-only session-bound spectrum of the actual current/pending PCM mix. Never blocks. */
+    public SpectrumSnapshot getSpectrum() {
+        return publishedSpectrum;
+    }
+
+    /** Publishes the current snapshot for {@link #getSpectrum()}; callers must hold the monitor. */
+    private void publishSpectrumLocked(boolean muted) {
+        publishedSpectrum = spectrum.snapshot(muted);
     }
 
     private void updateSpectrumPause(boolean muted) {
@@ -95,10 +103,12 @@ public class StreamAudioPlayer {
         if (registered == null || registered != submission || !task.isAudible()) return;
         boolean muted = ClientConfig.getInstance().getMuted();
         updateSpectrumPause(muted);
+        publishSpectrumLocked(muted);
         if (muted) return;
         retainAudibleSpectrumSources();
         spectrum.setActive(spectrumToken, true);
         spectrumMixer.accept(submission, chunk, mixed -> spectrum.accept(spectrumToken, mixed));
+        publishSpectrumLocked(false);
     }
 
     private void retainAudibleSpectrumSources() {
@@ -225,13 +235,8 @@ public class StreamAudioPlayer {
     }
 
     /**
-     * Whether {@code task} is allowed to preload its successor right now: only the
-     * audible current task may do so, and only while no transition is pending.
-     * <p>
-     * Without this an outgoing task (still {@code currentTask} until its successor
-     * becomes audible) could preload the track <em>after</em> the pending one, i.e.
-     * open an audio connection a full track too early, which then risks a dropped
-     * or expired stream when that track finally starts.
+     * Whether {@code task} may preload its successor: only the audible task, and only while no
+     * transition is pending. Otherwise an outgoing task would open the connection a full track early.
      */
     synchronized boolean canPreloadFrom(PlaybackTask task) {
         return currentTask == task && pendingTask == null;
@@ -256,6 +261,7 @@ public class StreamAudioPlayer {
         spectrum.stop();
         spectrumMixer.clear();
         spectrumSubmissions.clear();
+        publishSpectrumLocked(ClientConfig.getInstance().getMuted());
         if (preloadedTask != null) {
             preloadedTask.cancel();
             preloadedTask = null;
@@ -283,6 +289,7 @@ public class StreamAudioPlayer {
         retainAudibleSpectrumSources();
         if ((currentTask == null || !currentTask.isAudible()) && (pendingTask == null || !pendingTask.isAudible())) {
             spectrum.setActive(spectrumToken, false);
+            publishSpectrumLocked(ClientConfig.getInstance().getMuted());
         }
         if (task != currentTask) return;
         // A pending successor will take over in onTaskFinished; never flash IDLE
@@ -305,6 +312,7 @@ public class StreamAudioPlayer {
             if (spectrumSubmissions.isEmpty()) {
                 spectrumMixer.clear();
                 spectrum.stop();
+                publishSpectrumLocked(ClientConfig.getInstance().getMuted());
             }
             if (currentTask != finished) return;
             currentTask = null;

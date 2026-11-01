@@ -12,12 +12,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
 /**
- * WAV audio decoder, supporting PCM (8/16/24/32-bit signed, mono/stereo).
- * Automatically resamples 24-bit and 32-bit to 16-bit.
- * <p>
- * When {@code useFloat32} is set and the source is stereo with 24/32-bit
- * samples, the decoded PCM is emitted losslessly as float32
- * ({@code AL_FORMAT_STEREO_FLOAT32}) instead of being dithered down to 16-bit.
+ * WAV decoder for PCM (8/16/24/32-bit, mono/stereo). With {@code useFloat32} a stereo 24/32-bit
+ * source is emitted losslessly as float32 ({@code AL_FORMAT_STEREO_FLOAT32}); everything else is
+ * resampled to 16-bit.
  */
 public class WavStreamDecoder implements AudioDecoder {
     private final InputStream inputStream;

@@ -58,7 +58,7 @@ The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradl
 
 - `common/.../client/ui/render/gpu/` is the version-neutral scene layer. It must not import `com.mojang.blaze3d.*`, `com.mojang.renderpearl.*`, `org.lwjgl.*`, `net.neoforged.*`, or `net.minecraft.*`.
 - `gpu/blaze3d/` is the 1.21.6-1.21.8 blaze3d command adapter. `gpu/blaze3d/gl/` is the only place allowed to use raw OpenGL and NeoForge `ValidationGpuDevice` reflection.
-- Effects use `SceneGpuContext` plus `SceneTextureFormat`/`SceneSamplerState`/`SceneUniform`; they must not cast to backend types or probe GL directly.
+- Effects use `SceneGpuContext` plus `SceneTextureFormat`/`SceneSamplerBinding`/`SceneUniform`; they must not cast to backend types or probe GL directly. Filtering/address mode live on the texture (set at allocation), not on the binding.
 - `SceneGpuContext` has no generic readback API. Add readback only with a backend capability and a real implementation; the native RGBA16F shim advertises RGBA8 metadata and must never be used for CPU transfer.
 
 ## Frameworks & Dependencies

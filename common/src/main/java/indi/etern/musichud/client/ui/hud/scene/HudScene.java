@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.hud.scene;
 
 import com.mojang.blaze3d.platform.Window;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.hud.layout.HudLayouts;
 import indi.etern.musichud.client.ui.hud.metadata.ProgressBarData;
@@ -14,6 +15,7 @@ import indi.etern.musichud.client.ui.hud.renderer.debug.HudLayoutDebugRenderer;
 import indi.etern.musichud.client.ui.render.*;
 import indi.etern.musichud.client.ui.screen.MusicHudScreen;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.Unregister;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
@@ -48,6 +50,7 @@ public final class HudScene implements RenderScene {
     private Logger logger;
     private Supplier<String> appliedSkinSupplier;
     private int appliedStatusRevision = -1;
+    private int appliedThumbnailSize = -1;
 
     private HudScene() {
         presenter.setLyricSink(new HudPresenter.LyricSink() {
@@ -63,6 +66,28 @@ public final class HudScene implements RenderScene {
         });
         updateLayoutFromConfig();
         refreshStyle();
+        registerPipelinePrecompile();
+    }
+
+    /**
+     * The background chain's GLSL compiles on first use (~200 ms with a cold driver cache), so
+     * compiling it lazily stalls the moment the first song starts. The first client tick happens
+     * during startup, long before any background is rendered; the hook retries until the render
+     * device is ready and then unregisters itself.
+     */
+    private void registerPipelinePrecompile() {
+        try {
+            Unregister[] handle = new Unregister[1];
+            handle[0] = IClientEventService.getInstance().registerClientTickPost(() -> {
+                RenderRuntime runtime = RenderRuntime.getInstance();
+                runtime.precompileScenePipelines();
+                if (runtime.isPipelinePrecompileSettled() && handle[0] != null) {
+                    handle[0].unregister();
+                }
+            });
+        } catch (RuntimeException failure) {
+            logger().debug("While registering the scene pipeline precompile hook", failure);
+        }
     }
 
     public static HudScene getInstance() {
@@ -77,58 +102,70 @@ public final class HudScene implements RenderScene {
     }
 
     public void render(SceneRenderContext context) {
-        if (MusicHudScreen.isHudOccluded()) {
-            return;
-        }
         try {
-            presenter.updateFrame();
-            HudPresentationModel model = presenter.getModel();
-            if (model.getHudAlpha() <= 1e-4f) {
+            // State advances even while hidden, so transitions keep their real start time.
+            updateFrameState();
+            if (MusicHudScreen.isHudOccluded()
+                    || presenter.getModel().getHudAlpha() <= 1e-4f) {
                 return;
             }
-
-            TITLE_RENDERER.setText(model.getTitle());
-            ARTISTS_AND_ALBUM_RENDERER.setText(model.getArtistsAndAlbum());
-            PLAY_TIME_RENDERER.setText(model.getPlayTime());
-
-            Supplier<String> skinSupplier = model.getPlayerSkinSupplier();
-            if (skinSupplier != appliedSkinSupplier) {
-                PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(skinSupplier);
-                appliedSkinSupplier = skinSupplier;
-            }
-            if (appliedStatusRevision != model.getStatusRevision()) {
-                PLAYING_STATUS_RENDERER.updateStatus(model.getAudioStatus());
-                appliedStatusRevision = model.getStatusRevision();
-            }
-
-            SceneStyle baseStyle = baseHudStyle;
-            if (baseStyle != null) {
-                baseStyle.setAlpha(model.getHudAlpha());
-            }
-
-            HudLayouts currentLayout = layout;
-            if (currentLayout != null) {
-                float playTimeWidth = PLAY_TIME_RENDERER.measureDisplayWidth(currentLayout.getInfoTextSize());
-                currentLayout.arrange(PLAYER_HEAD_RENDERER.isVisible(),
-                        PLAYING_STATUS_RENDERER.isVisible(), playTimeWidth);
-            }
-            refreshThumbnailSize();
-
-            BACKGROUND_RENDERER.render(context);
-            IMAGE_RENDERER.render(context);
-            PLAYER_HEAD_RENDERER.render(context);
-            PLAYING_STATUS_RENDERER.render(context);
-            PROGRESS_RENDERER.render(context);
-            TITLE_RENDERER.render(context);
-            LYRICS_LINE_RENDERER.render(context);
-            ARTISTS_AND_ALBUM_RENDERER.render(context);
-            PLAY_TIME_RENDERER.render(context);
-
-            if (clientConfig.getShowHudLayoutBoxes()) {
-                HUD_LAYOUT_DEBUG_RENDERER.render(context);
-            }
+            drawFrame(context);
         } catch (Exception e) {
             logger().error("While rendering HUD frame", e);
+        }
+    }
+
+    private void updateFrameState() {
+        presenter.updateFrame();
+        HudPresentationModel model = presenter.getModel();
+
+        SceneStyle baseStyle = baseHudStyle;
+        if (baseStyle != null) {
+            baseStyle.setAlpha(model.getHudAlpha());
+        }
+
+        TITLE_RENDERER.setText(model.getTitle());
+        ARTISTS_AND_ALBUM_RENDERER.setText(model.getArtistsAndAlbum());
+        PLAY_TIME_RENDERER.setText(model.getPlayTime());
+
+        Supplier<String> skinSupplier = model.getPlayerSkinSupplier();
+        if (skinSupplier != appliedSkinSupplier) {
+            PLAYER_HEAD_RENDERER.setPlayerSkinSupplier(skinSupplier);
+            appliedSkinSupplier = skinSupplier;
+        }
+        if (appliedStatusRevision != model.getStatusRevision()) {
+            PLAYING_STATUS_RENDERER.updateStatus(model.getAudioStatus());
+            appliedStatusRevision = model.getStatusRevision();
+        }
+
+        TITLE_RENDERER.update();
+        ARTISTS_AND_ALBUM_RENDERER.update();
+        PLAY_TIME_RENDERER.update();
+        PLAYER_HEAD_RENDERER.update();
+        LYRICS_LINE_RENDERER.update();
+
+        HudLayouts currentLayout = layout;
+        if (currentLayout != null) {
+            float playTimeWidth = PLAY_TIME_RENDERER.measureDisplayWidth(currentLayout.getInfoTextSize());
+            currentLayout.arrange(PLAYER_HEAD_RENDERER.isVisible(),
+                    PLAYING_STATUS_RENDERER.isVisible(), playTimeWidth);
+        }
+        refreshThumbnailSize();
+    }
+
+    private void drawFrame(SceneRenderContext context) {
+        BACKGROUND_RENDERER.render(context);
+        IMAGE_RENDERER.render(context);
+        PLAYER_HEAD_RENDERER.render(context);
+        PLAYING_STATUS_RENDERER.render(context);
+        PROGRESS_RENDERER.render(context);
+        TITLE_RENDERER.render(context);
+        LYRICS_LINE_RENDERER.render(context);
+        ARTISTS_AND_ALBUM_RENDERER.render(context);
+        PLAY_TIME_RENDERER.render(context);
+
+        if (clientConfig.getShowHudLayoutBoxes()) {
+            HUD_LAYOUT_DEBUG_RENDERER.render(context);
         }
     }
 
@@ -155,7 +192,6 @@ public final class HudScene implements RenderScene {
                 return;
             }
             HudLayouts newLayout = HudLayouts.create(base);
-            layout = newLayout;
             HUD_LAYOUT_DEBUG_RENDERER.configure(newLayout);
 
             configureBaseRenderer(base);
@@ -178,6 +214,8 @@ public final class HudScene implements RenderScene {
             newLayout.arrange(PLAYER_HEAD_RENDERER.isVisible(),
                     PLAYING_STATUS_RENDERER.isVisible(),
                     PLAY_TIME_RENDERER.measureDisplayWidth(newLayout.getInfoTextSize()));
+            // Swap after the first arrange: a live swap lets the render thread measure the same tree.
+            layout = newLayout;
             refreshThumbnailSize();
         } catch (Exception e) {
             logger().error("While refresh HUD style", e);
@@ -195,7 +233,11 @@ public final class HudScene implements RenderScene {
         }
         //noinspection ConstantValue
         if (window != null && imageDisplayData != null) {
-            presenter.setThumbnailSize((int) (imageDisplayData.getHudStyle().getWidth() * window.getGuiScale()));
+            int thumbnailSize = (int) (imageDisplayData.getHudStyle().getWidth() * window.getGuiScale());
+            if (thumbnailSize != appliedThumbnailSize) {
+                appliedThumbnailSize = thumbnailSize;
+                presenter.setThumbnailSize(thumbnailSize);
+            }
         }
     }
 

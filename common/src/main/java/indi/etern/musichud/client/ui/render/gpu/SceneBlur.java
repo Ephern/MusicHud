@@ -86,7 +86,7 @@ public final class SceneBlur {
                 format);
     }
 
-    private void release() {
+    public void release() {
         SceneGpuContext current = owner;
         if (current != null) {
             for (int i = 1; i < downsamples.length; i++) {
@@ -178,8 +178,7 @@ public final class SceneBlur {
                              SceneGpuTexture source, SceneGpuTexture target, SceneUniform uniform) {
             try {
                 gpu.draw(new SceneDraw(target, gpu.pipeline(key, target.actualFormat()),
-                        List.of(new SceneSamplerBinding("Sampler0", source,
-                                gpu.sampler(SceneSamplerState.linearClamp()))),
+                        List.of(new SceneSamplerBinding("Sampler0", source)),
                         List.of(new SceneUniformBinding(BlurUniform.UBO_NAME, uniform))));
                 return true;
             } catch (RuntimeException failure) {

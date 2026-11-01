@@ -14,10 +14,9 @@ public final class SourcePcmClock {
     public enum Mode { DEVICE_CLOCK, SOURCE_LATENCY, QUERY_TIME }
 
     /**
-     * sampleOffset is relative to the entire remaining OpenAL queue, including processed buffers.
-     * outputLatencyNanos is -1 when unavailable; queryDurationNanos measures only the host query
-     * interval and is not a bound on backend/device timing error. extensionError preserves a
-     * failed optional query so callers can report degradation instead of claiming measured latency.
+     * {@code sampleOffset} is relative to the whole remaining queue (processed buffers included);
+     * {@code outputLatencyNanos} is -1 when unavailable; {@code extensionError} preserves a failed
+     * optional query so callers can report degradation.
      */
     public record Reading(long sampleOffset, long capturedNanos, long queryDurationNanos,
                    long outputLatencyNanos, Mode mode, int extensionError) { }

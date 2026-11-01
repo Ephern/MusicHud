@@ -3,15 +3,13 @@ package indi.etern.musichud.client.ui.render.gpu.legacy;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.systems.RenderSystem;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.render.gpu.SceneDraw;
-import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
+import indi.etern.musichud.client.ui.render.RenderStats;
+import indi.etern.musichud.client.ui.render.gpu.SceneDraw;import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
 import indi.etern.musichud.client.ui.render.gpu.SceneIndexedDraw;
 import indi.etern.musichud.client.ui.render.gpu.SceneMesh;
 import indi.etern.musichud.client.ui.render.gpu.ScenePipelineKey;
-import indi.etern.musichud.client.ui.render.gpu.SceneSampler;
 import indi.etern.musichud.client.ui.render.gpu.SceneSamplerBinding;
-import indi.etern.musichud.client.ui.render.gpu.SceneSamplerState;
 import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
 import indi.etern.musichud.client.ui.render.gpu.SceneUniformBinding;
 import indi.etern.musichud.client.ui.render.pipeline.HudShaderManager;
@@ -58,14 +56,9 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
         try (LegacyGlStateScope ignored = LegacyGlStateScope.capture()) {
             LegacySceneTexture texture = new LegacySceneTexture(width, height, format);
             textures.add(texture);
+            RenderStats.targetCreated(label, texture.byteSize());
             return texture;
         }
-    }
-
-    @Override
-    public SceneSampler sampler(SceneSamplerState state) {
-        assertOpen();
-        return new LegacySceneSampler(state);
     }
 
     @Override
@@ -84,10 +77,9 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
                  SCENE_BLUR_COPY -> List.of("MHBlur");
             case SCENE_BLUR_CROP -> List.of("MHCrop");
             case SCENE_COVER_RESOLVE -> List.of("MHCoverResolve");
-            case SCENE_COVER_WARP_PROCEDURAL -> List.of();
+            case SCENE_COVER_WARP_PROCEDURAL -> List.of("MHWarp");
             case SCENE_COVER_LAYERS -> List.of("MHCover");
             case SCENE_COVER_OVERLAY -> List.of("MHOverlay", "MHBackgroundAdjust");
-            case SCENE_COVER_FLUID_SCALE -> List.of("MHFluidScale");
             case SCENE_COVER_BLEND -> List.of("MHCoverBlend");
         };
         return HudShaderManager.getOrCreate(key.name(),
@@ -96,6 +88,17 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
 
     private static ResourceLocation shader(String file) {
         return ResourceLocation.fromNamespaceAndPath(MusicHud.MOD_ID, "shaders/core/" + file);
+    }
+
+    @Override
+    public PrecompileResult precompilePipelines() {
+        assertOpen();
+        for (ScenePipelineKey key : ScenePipelineKey.values()) {
+            if (requirePipeline(pipeline(key, SceneTextureFormat.RGBA8)).getProgramId() <= 0) {
+                return PrecompileResult.FAILED;
+            }
+        }
+        return PrecompileResult.DONE;
     }
 
     @Override
@@ -113,6 +116,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
         assertOpen();
         try (LegacyGlStateScope ignored = LegacyGlStateScope.capture()) {
             requireMesh(mesh).update(vertices);
+            RenderStats.meshUploaded(vertices.remaining());
         }
     }
 
@@ -127,6 +131,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
             GlStateManager._glBindVertexArray(fullscreenVertexArray);
             GL11.glDrawArrays(GL11.GL_TRIANGLES, 0, 3);
             target.unbind();
+            RenderStats.pass();
         }
     }
 
@@ -142,6 +147,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
             mesh.draw();
             GlStateManager._glBindVertexArray(0);
             target.unbind();
+            RenderStats.pass();
         }
     }
 
@@ -160,8 +166,12 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
             int location = program.getUniformOrSamplerLocation(binding.name());
             if (location >= 0) GL20.glUniform1i(location, unit);
         }
-        for (SceneUniformBinding binding : uniforms) {
-            uploadUniform(program, binding.name(), binding.uniform());
+        if (!uniforms.isEmpty()) {
+            long start = System.nanoTime();
+            for (SceneUniformBinding binding : uniforms) {
+                uploadUniform(program, binding.name(), binding.uniform());
+            }
+            RenderStats.addUniformNanos(System.nanoTime() - start);
         }
     }
 
@@ -171,6 +181,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
         final int bindingPoint = binding != null
                 ? binding : HudShaderManager.getOrCreateBindingPoint(name);
         int size = uniform.getUBOSize();
+        RenderStats.uniformUploaded(size);
         String key = program.getProgramId() + "/" + name;
         ByteBuffer buffer = uniformBuffers.computeIfAbsent(key,
                 ignored -> ByteBuffer.allocateDirect(size).order(ByteOrder.nativeOrder()));
@@ -221,6 +232,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
         try (LegacyGlStateScope ignored = LegacyGlStateScope.capture()) {
             legacy.close();
         }
+        RenderStats.targetReleased(legacy.byteSize());
     }
 
     @Override

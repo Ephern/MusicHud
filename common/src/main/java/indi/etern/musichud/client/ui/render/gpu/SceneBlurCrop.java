@@ -44,8 +44,7 @@ public final class SceneBlurCrop {
         try {
             gpu.draw(new SceneDraw(target,
                     gpu.pipeline(ScenePipelineKey.SCENE_BLUR_CROP, target.actualFormat()),
-                    List.of(new SceneSamplerBinding("Sampler0", source,
-                            gpu.sampler(SceneSamplerState.linearClamp()))),
+                    List.of(new SceneSamplerBinding("Sampler0", source)),
                     List.of(new SceneUniformBinding(CropUniform.UBO_NAME,
                             new CropUniform(u0, v0, u1, v1)))));
             return target;
@@ -53,6 +52,14 @@ public final class SceneBlurCrop {
             LOGGER.debug("While cropping the blurred scene", failure);
             release(gpu);
             return null;
+        }
+    }
+
+    /** Releases the crop target; it is re-created lazily on the next crop. */
+    public void release() {
+        SceneGpuContext current = owner;
+        if (current != null) {
+            release(current);
         }
     }
 

@@ -860,6 +860,13 @@ public class ConfigView extends LinearLayout {
                     .setDefaultValue(clientConfig.getDefaultForceRgba8Fallback())
                     .create(mContent);
 
+            new PreferencesFragment.BooleanOption(context,
+                    I18n.get(MusicHud.MOD_ID + ".config.debug.logRenderStats"),
+                    clientConfig::getDebugLogRenderStats,
+                    clientConfig::setDebugLogRenderStats)
+                    .setDefaultValue(clientConfig.getDefaultDebugLogRenderStats())
+                    .create(mContent);
+
             var params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params.setMargins(0, mContent.dp(6), 0, 0);
             mParent.addView(mContent, params);

@@ -33,7 +33,9 @@ import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 @NoArgsConstructor(access = AccessLevel.PRIVATE)
 public class MusicPlayerServerService {
@@ -74,8 +76,18 @@ public class MusicPlayerServerService {
     private int musicResourceLoadFailureCount = 0;
     /** Music id the failure streak belongs to. */
     private long musicResourceLoadFailureMusicId = -1;
-    /** Message attached to the next switch triggered by a resource-failure skip. */
-    private volatile String pendingSwitchMessage;
+    /**
+     * Message attached to the next skip request; consumed exactly once together with the request.
+     */
+    private final AtomicReference<String> pendingSwitchMessage = new AtomicReference<>();
+    /**
+     * Set while a skip request is pending. Deliberately a flag rather than a counter: extra requests
+     * arriving before the pending one is honoured are duplicates of the same intent, so a held key,
+     * a macro or several clients voting at once still advance exactly one track. It is cleared when
+     * the skip is honoured, so replaying the same track starts a fresh, independent attempt instead
+     * of skipping itself in a loop.
+     */
+    private final AtomicBoolean skipRequestPending = new AtomicBoolean();
     /** Music id the pusher currently awaits; the one-shot resource-load reset only applies to it. */
     private long awaitedMusicId = -1;
     /** Music id whose one-shot await-deadline reset has already been claimed. */
@@ -181,16 +193,14 @@ public class MusicPlayerServerService {
                     nowPlayingStartTime = ZonedDateTime.now();
                     logger.info("Switched to music: {} (ID: {})", playingMusic.getName(), playingMusic.getId());
                     awaitCurrentTrack(playingMusic.getId(), waitMillis);
-                } catch (InterruptedException ignored) {//When force switch
-                    logger.info("Skip current, switch to nextIdle");
-                    String switchMessage = pendingSwitchMessage;
-                    pendingSwitchMessage = null;
-                    if (switchMessage != null) {
-                        message = switchMessage;
-                    } else if (MusicHud.getCurrentEnvironment().getSide() != Environment.Side.CLIENT
-                            || (IClientDistUtil.getInstance().inIntegratedServer() && !IClientDistUtil.getInstance().inSinglePlayer())) {
-                        message = MusicHud.MOD_ID + ".text.votePassed";
+                } catch (InterruptedException interrupted) {
+                    // Only a pending request is a skip; a leftover or shutdown wake-up must not
+                    // advance the queue, otherwise one click could consume two tracks.
+                    if (!consumeSkipRequest()) {
+                        continue;
                     }
+                    logger.info("Skip current, switch to nextIdle");
+                    message = takeSkipMessage();
                 } catch (Exception e) {
                     String message1 = MusicHud.MOD_ID + ".text.musicPushError";
                     if (e instanceof MusicResourceLoadingException e1) {
@@ -214,8 +224,12 @@ public class MusicPlayerServerService {
                     try {
                         //noinspection BusyWait
                         Thread.sleep(1000);
-                    } catch (InterruptedException ignored) {
-                        break;
+                    } catch (InterruptedException interrupted) {
+                        // A skip during the error backoff still counts; a shutdown is left to the
+                        // loop condition.
+                        if (consumeSkipRequest()) {
+                            message = takeSkipMessage();
+                        }
                     }
                 }
             }
@@ -253,7 +267,7 @@ public class MusicPlayerServerService {
      * ready fall back to users that merely have an available source and let
      * {@link #sampleIdleTrackByPusherInfo} wait for their loading inside the deadline.
      */
-    private Optional<Traceable<MusicDetail>> getRandomMusicFromIdleSources(Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources) {
+    private Optional<Traceable<MusicDetail>> getRandomMusicFromIdleSources(Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources) throws InterruptedException {
         final long deadline = System.currentTimeMillis() + INTELLIGENT_LOAD_WAIT_MILLIS;
         while (true) {
             cleanupBrokenSources(idlePlaySources);
@@ -305,7 +319,7 @@ public class MusicPlayerServerService {
      * weighting a source and delegating the actual track pick to its play mode.
      */
     private static Optional<Traceable<MusicDetail>> sampleIdleTrackByPusherInfo(
-            Collection<IdlePlaySource> userSources, PusherInfo pusherInfo, long deadline) {
+            Collection<IdlePlaySource> userSources, PusherInfo pusherInfo, long deadline) throws InterruptedException {
         if (userSources == null || userSources.isEmpty()) {
             return Optional.empty();
         }
@@ -333,9 +347,7 @@ public class MusicPlayerServerService {
             }
 
             if (!loadingSources.isEmpty() && System.currentTimeMillis() < deadline) {
-                if (!awaitAnyLoading(loadingSources, deadline)) {
-                    return Optional.empty();
-                }
+                awaitAnyLoading(loadingSources, deadline);
                 continue;
             }
             return Optional.empty();
@@ -343,7 +355,7 @@ public class MusicPlayerServerService {
     }
 
     /** R2 source weighting (by actual track count) followed by R3 mode sampling. */
-    private static Optional<Traceable<MusicDetail>> weightedSampleRandomTrack(List<SelectableSource> readySources) {
+    private static Optional<Traceable<MusicDetail>> weightedSampleRandomTrack(List<SelectableSource> readySources) throws InterruptedException {
         int totalWeight = readySources.stream()
                 .mapToInt(source -> source.playSource().getMusicCollection().getMusicDetails().size())
                 .sum();
@@ -364,10 +376,13 @@ public class MusicPlayerServerService {
 
     /**
      * Blocks until one of the loading sources completes or the deadline passes.
-     *
-     * @return {@code false} when the calling thread was interrupted
+     * <p>
+     * An interrupt is propagated instead of being swallowed and re-asserted: re-asserting left the
+     * flag set, so the caller looped straight back into the same blocking call and spun on the flag
+     * until the deadline. The pusher validates the request when it handles the exception.
      */
-    private static boolean awaitAnyLoading(List<SelectableSource> loadingSources, long waitDeadline) {
+    private static void awaitAnyLoading(List<SelectableSource> loadingSources, long waitDeadline)
+            throws InterruptedException {
         CompletableFuture<?> loading = null;
         for (SelectableSource selectableSource : loadingSources) {
             CompletableFuture<?> future = selectableSource.playSource().getPlayMode().loadingFuture(selectableSource.playSource());
@@ -382,12 +397,8 @@ public class MusicPlayerServerService {
             } else {
                 Thread.sleep(200);
             }
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            return false;
         } catch (ExecutionException | TimeoutException ignored) {
         }
-        return true;
     }
 
     private void cleanupBrokenSources(Map<PusherInfo, Set<IdlePlaySource>> idlePlaySources) {
@@ -446,6 +457,43 @@ public class MusicPlayerServerService {
             }
         }
         return instance;
+    }
+
+    /**
+     * Records one skip request and wakes the pusher.
+     * <p>
+     * The interrupt is only a wake-up; the request itself is the {@link #skipRequestPending} flag, so
+     * a stale interrupt, a second wake-up or a blocking call consuming the interrupt cannot skip an
+     * extra track. Requests coalesce while one is pending, which caps a held skip key (GLFW turns
+     * key repeats into clicks) or a burst of identical votes at one skip per track.
+     */
+    private void requestSkip(String message) {
+        if (message != null) {
+            pendingSwitchMessage.set(message);
+        }
+        skipRequestPending.set(true);
+        Thread thread = pusherThread;
+        if (thread != null) {
+            thread.interrupt();
+        }
+    }
+
+    /** Consumes the pending skip request, if any; pusher thread only. */
+    private boolean consumeSkipRequest() {
+        return skipRequestPending.getAndSet(false);
+    }
+
+    /** Message that belongs to the skip request just consumed, consumed exactly once. */
+    private String takeSkipMessage() {
+        String switchMessage = pendingSwitchMessage.getAndSet(null);
+        if (switchMessage != null) {
+            return switchMessage;
+        }
+        if (MusicHud.getCurrentEnvironment().getSide() != Environment.Side.CLIENT
+                || (IClientDistUtil.getInstance().inIntegratedServer() && !IClientDistUtil.getInstance().inSinglePlayer())) {
+            return MusicHud.MOD_ID + ".text.votePassed";
+        }
+        return "";
     }
 
     private void updateContinuable(boolean continuable) {
@@ -585,17 +633,9 @@ public class MusicPlayerServerService {
     }
 
     /**
-     * Validates and registers an idle play source, loading the collection (and,
-     * for INTELLIGENT, the first page with a random seed) before it becomes
-     * visible. An incoming source matching an existing entry of the same
-     * collection (id+type) only updates the play mode; on failure the previous
-     * entry is kept untouched.
-     *
-     * <p>Requests are serialized per (player, collection): handlers run on
-     * concurrent virtual threads, so two rapid mode switches could otherwise
-     * interleave between the existing-entry check and the write, leaving two
-     * modes of the same collection active at once. Serializing makes the last
-     * processed request win.</p>
+     * Registers an idle play source, loading its collection (for INTELLIGENT also the first page)
+     * first. Requests are serialized per (player, collection), so concurrent mode switches cannot
+     * leave two modes of the same collection active; the last processed request wins.
      */
     public MessagedResult<Void> addIdlePlaySource(IdlePlaySource idlePlaySource, PusherInfo pusherInfo) {
         synchronized (idleSourceKeyLock(pusherInfo.playerUUID(), idlePlaySource)) {
@@ -728,14 +768,10 @@ public class MusicPlayerServerService {
     }
 
     /**
-     * Arms the one-shot resource-load deadline reset for the given music. Called by the pusher
-     * before the switch is pushed so that the client's resource request can never be missed.
-     * The duration-based wait stays the fallback when no client requests the resource.
-     *
-     * <p>Only requests reaching the server shortly after the switch count as the awaited instance's
-     * initial load. The acceptance window is capped by {@link #AWAIT_RESET_WINDOW_MAX_MILLIS} and
-     * always ends before the track's tail ({@link #AWAIT_RESET_TAIL_EXCLUSION_MILLIS}), where the
-     * client preloads its successor: a same-id request from that preload must not extend this await.</p>
+     * Arms the one-shot resource-load deadline reset for {@code music}, called before the switch is
+     * pushed. Only requests arriving shortly after the switch count (window capped by
+     * {@link #AWAIT_RESET_WINDOW_MAX_MILLIS}) and never during the tail, where the client preloads its
+     * successor.
      */
     private synchronized void beginAwaitForMusic(long musicId, long awaitMillis) {
         awaitedMusicId = musicId;
@@ -756,15 +792,9 @@ public class MusicPlayerServerService {
     }
 
     /**
-     * Resets the consecutive failure streak: a successful load anywhere means the current music
-     * is no longer considered broken.
-     *
-     * <p>Additionally, the first successful load for the music the pusher is currently awaiting
-     * restarts that await from the moment the resource became available, so a slow load no longer
-     * makes the switch happen before the track actually played through. Only players that were
-     * present at the switch qualify: a client joining mid-track is wall-clock synced and must not
-     * extend the wait. Every further successful load of the same track is ignored, and the plain
-     * duration-based wait remains untouched.</p>
+     * Resets the consecutive failure streak, and restarts the pusher's await for the music it is
+     * currently awaiting once the first successful load lands, so a slow load does not cut the track
+     * short. Only players present at the switch qualify; later loads of the same track are ignored.
      */
     private synchronized void onMusicResourceLoadSuccess(long id, UUID playerUUID, long requestReceivedAt) {
         musicResourceLoadFailureCount = -1;
@@ -806,14 +836,12 @@ public class MusicPlayerServerService {
         }
         musicResourceLoadFailureCount = 0;
         musicResourceLoadFailureMusicId = -1;
-        Thread thread = pusherThread;
-        if (thread == null) {
+        if (pusherThread == null) {
             return;
         }
         logger.warn("Music resource loading failed {} times consecutively for current playing music: {} (ID: {}), skipping",
                 failures, playingMusic.getName(), id);
-        pendingSwitchMessage = MusicHud.MOD_ID + ".text.switchDueToNoValidResource";
-        thread.interrupt();
+        requestSkip(MusicHud.MOD_ID + ".text.switchDueToNoValidResource");
     }
 
     private @NonNull MusicResourceInfo getMusicResourceInfoWithoutCache(Quality quality, MusicDetail musicDetail, UUID playerUUID) {
@@ -865,25 +893,35 @@ public class MusicPlayerServerService {
     }
 
     /**
-     * Waits out the current track, servicing reroll requests while idle. The track's end
-     * time bounds every reroll.
-     *
-     * <p>The initial deadline is the plain duration-based wait. When the first resource load
-     * for this track succeeds, a {@link DeadlineResetRequest} restarts that wait from the
-     * moment the resource became available, giving a slow-loading track its full airtime.
-     * Without any resource request the behaviour is exactly the duration-based fallback.</p>
+     * Waits out the current track, servicing reroll requests while idle. The deadline starts as the
+     * duration-based wait and is restarted from the moment the first resource load succeeds.
      */
     private void awaitCurrentTrack(long musicId, long millis) throws InterruptedException {
         long deadline = System.currentTimeMillis() + millis;
         while (true) {
             if (Thread.interrupted()) {
-                throw new InterruptedException();
+                // The flag is cleared here and only a pending request turns it into a skip; anything
+                // else (shutdown ping, wake-up left over from an honoured skip) keeps the wait going.
+                if (consumeSkipRequest()) {
+                    throw new InterruptedException();
+                }
+                continue;
             }
             long remaining = deadline - System.currentTimeMillis();
             if (remaining <= 0) {
                 return;
             }
-            PusherEvent event = pendingPusherEvents.poll(remaining, TimeUnit.MILLISECONDS);
+            PusherEvent event;
+            try {
+                event = pendingPusherEvents.poll(remaining, TimeUnit.MILLISECONDS);
+            } catch (InterruptedException interruptedWhilePolling) {
+                // Same validation as above: an interrupt arriving mid-poll must not end the track
+                // unless it carries an unhonoured request.
+                if (consumeSkipRequest()) {
+                    throw interruptedWhilePolling;
+                }
+                continue;
+            }
             switch (event) {
                 case null -> {
                     return;
@@ -976,7 +1014,7 @@ public class MusicPlayerServerService {
             if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
                 IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
                 if (clientDistUtil.inSinglePlayer()) {
-                    if (pusherThread != null) pusherThread.interrupt();
+                    requestSkip(null);
                     logger.info("Skip current music in singleplayer");
                     return;
                 }
@@ -1002,9 +1040,7 @@ public class MusicPlayerServerService {
                 voteRate = Math.clamp(voteRate, 0.0f, 1.0f);
                 if (voteRate >= 0.5) {
                     logger.info("Try to skip current music as voting rate reach: {} >= 0.5", voteRate);
-                    if (pusherThread != null) {
-                        pusherThread.interrupt();
-                    }
+                    requestSkip(null);
                     resetTo(MusicDetail.NONE);
                 }
             }

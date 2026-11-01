@@ -23,32 +23,43 @@ public final class SceneCapture {
 
     public @Nullable SceneGpuTexture capture(SceneGpuContext gpu,
                                              SceneGpuContext.MainColorSource source,
-                                             Region region) {
-        PendingCapture pending = prepare(gpu, source, region);
+                                             Region region, int downscale) {
+        PendingCapture pending = prepare(gpu, source, region, downscale);
         if (pending == null || !pending.fill()) return null;
         return pending.target();
     }
 
     public @Nullable PendingCapture prepare(SceneGpuContext gpu,
                                             SceneGpuContext.MainColorSource source,
-                                            Region region) {
+                                            Region region, int downscale) {
         if (source == null || source.texture() == null || source.width() <= 0 || source.height() <= 0) {
             return null;
         }
         if (region.width() <= 0f || region.height() <= 0f) return null;
-        int width = Math.max(1, (int) Math.ceil(region.width()));
-        int height = Math.max(1, (int) Math.ceil(region.height()));
+        int scale = Math.max(1, downscale);
+        int width = Math.max(1, (int) Math.ceil(region.width() / scale));
+        int height = Math.max(1, (int) Math.ceil(region.height() / scale));
         SceneGpuTexture output = target(gpu, width, height);
         if (output == null) return null;
-        try {
-            gpu.clear(output, 0);
-        } catch (RuntimeException failure) {
-            LOGGER.debug("While clearing a scene capture target", failure);
-            return null;
-        }
+        // No pre-clear: the capture shader writes every fragment (out-of-range samples become
+        // transparent black), so clearing first would only cost an extra full-target write.
         CaptureUniform uniform = new CaptureUniform(region.left(), region.top(),
-                region.width(), region.height(), source.width(), source.height());
+                region.width(), region.height(), source.width(), source.height(), scale);
         return new PendingCapture(gpu, output, source.texture(), uniform);
+    }
+
+    /**
+     * Releases the capture target. It is re-created lazily on the next capture, which lets an idle
+     * background (hidden HUD, closed screen) drop its offscreen memory.
+     */
+    public void release() {
+        if (target != null && owner != null) {
+            owner.release(target);
+        }
+        target = null;
+        owner = null;
+        targetWidth = 0;
+        targetHeight = 0;
     }
 
     private @Nullable SceneGpuTexture target(SceneGpuContext gpu, int width, int height) {
@@ -102,8 +113,7 @@ public final class SceneCapture {
             if (filled) return true;
             try {
                 gpu.draw(new SceneDraw(target, gpu.pipeline(ScenePipelineKey.SCENE_CAPTURE, target.actualFormat()),
-                        List.of(new SceneSamplerBinding("Sampler0", source,
-                                gpu.sampler(SceneSamplerState.linearClamp()))),
+                        List.of(new SceneSamplerBinding("Sampler0", source)),
                         List.of(new SceneUniformBinding(CaptureUniform.UBO_NAME, uniform))));
                 filled = true;
                 return true;
@@ -119,7 +129,8 @@ public final class SceneCapture {
     }
 
     private record CaptureUniform(float left, float top, float width, float height,
-                                  int sourceWidth, int sourceHeight) implements SceneUniform {
+                                  int sourceWidth, int sourceHeight,
+                                  int downscale) implements SceneUniform {
         private static final String UBO_NAME = "MHCapture";
         private static final int UBO_SIZE = Std140Sizes.calc().putVec4().putVec4().get();
 
@@ -136,7 +147,7 @@ public final class SceneCapture {
         @Override
         public void write(Std140Writer writer) {
             writer.putVec4(left, top, width, height);
-            writer.putVec4(sourceWidth, sourceHeight, 0f, 0f);
+            writer.putVec4(sourceWidth, sourceHeight, downscale, 0f);
         }
 
         @Override
