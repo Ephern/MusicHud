@@ -50,7 +50,7 @@ public class ImageUtils {
     private static final Logger LOGGER = getLogger(ImageUtils.class);
 
     private static final int DEFAULT_MAX_CONCURRENT_DOWNLOADS = 40;
-    private static final int CANONICAL_MAX = 2048;
+    public static final int CANONICAL_MAX = 2048;
     private static final long SOURCE_CACHE_BUDGET = 128L * 1024 * 1024;
     private static final int MAX_DERIVED_VARIANTS = 4;
     @Getter(AccessLevel.PACKAGE)
@@ -138,37 +138,6 @@ public class ImageUtils {
 
     public static int getQueuedDownloads() {
         return downloadSemaphore.getQueueLength();
-    }
-
-    public static CompletableFuture<ImageTextureData> downloadAsync(String url) {
-        ImageTextureData cached = cachedTexturesData.getIfPresent(url);
-        if (cached != null) {
-            LOGGER.debug("Cache hit for URL: {}", url);
-            return CompletableFuture.completedFuture(cached);
-        }
-        CompletableFuture<ImageTextureData> placeholder = new CompletableFuture<>();
-        CompletableFuture<ImageTextureData> existing = pendingDefaultProcessed.putIfAbsent(url, placeholder);
-        if (existing != null) {
-            return existing;
-        }
-        try {
-            // The largest size the cache keeps, so later smaller requests are derived from it.
-            loadBitmap(url, CANONICAL_MAX, CANONICAL_MAX).thenApplyAsync(bitmap ->
-                    createTexture(url, bitmap), downloadExecutor
-            ).whenComplete((result, ex) -> {
-                if (ex == null) {
-                    cachedTexturesData.put(url, result);
-                    placeholder.complete(result);
-                } else {
-                    placeholder.completeExceptionally(ex);
-                }
-                pendingDefaultProcessed.remove(url, placeholder);
-            });
-        } catch (Throwable t) {
-            placeholder.completeExceptionally(t);
-            pendingDefaultProcessed.remove(url, placeholder);
-        }
-        return placeholder;
     }
 
     public static <R> CompletableFuture<R> downloadAsync(String url, BiFunction<String, InputStream, R> streamProcessor) {
@@ -473,12 +442,8 @@ public class ImageUtils {
         if (boxes.length == 0) {
             return CompletableFuture.completedFuture(new ImageTextureData[0]);
         }
-        int largest = 0;
-        for (int box : boxes) {
-            largest = Math.max(largest, box);
-        }
-        // One decode, shared with every other consumer of this URL.
-        return loadBitmap(url, largest, largest).thenApplyAsync(base -> {
+        // Derive every box from the canonical so each one is a single box filter.
+        return loadBitmap(url, CANONICAL_MAX, CANONICAL_MAX).thenApplyAsync(base -> {
             ImageTextureData[] result = new ImageTextureData[boxes.length];
             for (int i = 0; i < boxes.length; i++) {
                 boolean derived = base.getWidth() > boxes[i] || base.getHeight() > boxes[i];
@@ -701,13 +666,21 @@ public class ImageUtils {
 
     @NotNull
     private static ImageTextureData getImageTextureData(String data, Bitmap source) {
+        // Convert off-thread; only the upload needs the render thread.
+        NativeImage image = convertBitmapToNativeImage(source);
         AtomicReference<DynamicTexture> texture = new AtomicReference<>();
-        if (RenderSystem.isOnRenderThread()) {
-            texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), convertBitmapToNativeImage(source)));
-        } else {
-            Minecraft.getInstance().submit(() ->
-                    texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), convertBitmapToNativeImage(source)))
-            ).join();
+        try {
+            if (RenderSystem.isOnRenderThread()) {
+                texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), image));
+            } else {
+                Minecraft.getInstance().submit(() ->
+                        texture.set(new DynamicTexture(() -> "image_" + source.hashCode(), image))
+                ).join();
+            }
+        } finally {
+            if (texture.get() == null) {
+                image.close();
+            }
         }
         return new ImageTextureData(data, texture.get());
     }

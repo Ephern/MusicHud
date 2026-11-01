@@ -9,8 +9,10 @@ import net.minecraft.client.Minecraft;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.Arrays;
+
 /**
- * The artwork of one track with explicit ownership. Both textures are derived from one decode and
+ * The artwork of one track with explicit ownership. Every texture is derived from one decode and
  * kept out of {@link ImageUtils}' shared cache so the crossfade can keep sampling the previous cover
  * after a track switch.
  */
@@ -19,37 +21,52 @@ public final class TrackArtwork {
 
     private final ImageTextureData background;
     private final ImageTextureData thumbnail;
+    private final ImageTextureData source;
     private boolean closed;
 
-    private TrackArtwork(ImageTextureData background, ImageTextureData thumbnail) {
+    private TrackArtwork(ImageTextureData background, ImageTextureData thumbnail, ImageTextureData source) {
         this.background = background;
         this.thumbnail = thumbnail;
+        this.source = source;
     }
 
-    /**
-     * Decodes the artwork once and derives the display thumbnail and the (much smaller) background
-     * source. Blocks; call it from a worker thread.
-     */
-    public static @Nullable TrackArtwork load(String picUrl, int thumbnailSize, int backgroundSize) {
-        if (picUrl == null || picUrl.isBlank() || thumbnailSize < 1 || backgroundSize < 1) {
+    /** Decodes once and derives the thumbnail, background and resample sources. Blocks. */
+    public static @Nullable TrackArtwork load(String picUrl, int thumbnailSize, int backgroundSize,
+                                              int sourceSize) {
+        if (picUrl == null || picUrl.isBlank() || thumbnailSize < 1 || backgroundSize < 1
+                || sourceSize < 1) {
             return null;
         }
-        boolean shared = thumbnailSize == backgroundSize;
-        int[] boxes = shared
-                ? new int[]{backgroundSize}
-                : new int[]{thumbnailSize, backgroundSize};
+        int[] boxes = Arrays.stream(new int[]{thumbnailSize, backgroundSize, sourceSize})
+                .filter(box -> box > 0)
+                .distinct()
+                .sorted()
+                .toArray();
         try {
             ImageTextureData[] textures = ImageUtils.downloadScaledSetOwned(picUrl, boxes).join();
-            if (textures.length == 0 || textures[0] == null) {
+            ImageTextureData thumbnail = pick(textures, boxes, thumbnailSize);
+            if (thumbnail == null) {
                 return null;
             }
-            return shared
-                    ? new TrackArtwork(textures[0], textures[0])
-                    : new TrackArtwork(textures[1], textures[0]);
+            //noinspection resource
+            ImageTextureData background = pick(textures, boxes, backgroundSize);
+            //noinspection resource
+            ImageTextureData source = pick(textures, boxes, sourceSize);
+            return new TrackArtwork(background != null ? background : thumbnail, thumbnail,
+                    source != null ? source : thumbnail);
         } catch (RuntimeException failure) {
             LOGGER.debug("While loading the track artwork", failure);
             return null;
         }
+    }
+
+    private static @Nullable ImageTextureData pick(ImageTextureData[] textures, int[] boxes, int box) {
+        for (int i = 0; i < boxes.length; i++) {
+            if (boxes[i] == box) {
+                return textures[i];
+            }
+        }
+        return null;
     }
 
     /** Source for the scene background layers (small). */
@@ -62,12 +79,17 @@ public final class TrackArtwork {
         return thumbnail;
     }
 
+    /** Resample source for the display art. */
+    public ImageTextureData source() {
+        return source;
+    }
+
     public BackgroundImages images() {
-        return new BackgroundImages(thumbnail, 1f, background);
+        return new BackgroundImages(thumbnail, 1f, background, source);
     }
 
     public boolean holds(ImageTextureData data) {
-        return data != null && (data == background || data == thumbnail);
+        return data != null && (data == background || data == thumbnail || data == source);
     }
 
     public boolean isClosed() {
@@ -77,7 +99,7 @@ public final class TrackArtwork {
     }
 
     /**
-     * Releases both textures. The GL resources are destroyed on the render thread, so this may be
+     * Releases the textures. The GL resources are destroyed on the render thread, so this may be
      * called from any thread and is idempotent.
      */
     public void close() {
@@ -104,6 +126,9 @@ public final class TrackArtwork {
         closeQuietly(background);
         if (thumbnail != background) {
             closeQuietly(thumbnail);
+        }
+        if (source != background && source != thumbnail) {
+            closeQuietly(source);
         }
     }
 

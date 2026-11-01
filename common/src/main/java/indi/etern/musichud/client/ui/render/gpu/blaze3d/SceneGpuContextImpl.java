@@ -30,6 +30,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
 
+@SuppressWarnings("resource")
 public final class SceneGpuContextImpl implements SceneGpuContext {
     private final SceneNativePassRenderer renderer = new SceneNativePassRenderer();
     private final SceneTextureAllocator blazeAllocator;
@@ -252,6 +253,10 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                     .withSampler("Sampler0")
                     .withSampler("Sampler1")
                     .withUniform("MHCoverBlend", UniformType.UNIFORM_BUFFER)
+                    .build();
+            case SCENE_ARTWORK_DOWNSAMPLE -> SceneNativePassRenderer.pipeline("scene_artwork_downsample")
+                    .withSampler("Sampler0")
+                    .withUniform("MHArtworkDownsample", UniformType.UNIFORM_BUFFER)
                     .build();
         };
     }

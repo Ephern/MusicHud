@@ -17,16 +17,14 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-/**
- * Builds mip chains for textures that are sampled minified, so downscaled icons and covers stop
- * aliasing. Raw GL lives in this package only.
- */
+/** Mip chains for textures sampled minified. */
 public final class GlTextureSampling {
     private static final Logger LOGGER = MusicHud.getLogger(GlTextureSampling.class);
-    /** Keyed by texture instance: GL ids are recycled on reload, instances are not. */
     private static final Set<GpuTexture> PREPARED =
             Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     private static final Set<GpuTexture> FAILED =
+            Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
+    private static final Set<GpuTexture> LINEAR =
             Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     private static final float MINIFY_THRESHOLD = 1.25f;
 
@@ -52,8 +50,7 @@ public final class GlTextureSampling {
         if (gpu == null) {
             return;
         }
-        // Callers may pass the slot size instead of the full texture size, so both are needed to
-        // know how many texels the sampled region actually covers.
+        // Callers may pass the slot size, so the texel count comes from the real texture size.
         float texelsWide = sourceWidth * gpu.getWidth(0) / (float) Math.max(1, textureWidth);
         float texelsHigh = sourceHeight * gpu.getHeight(0) / (float) Math.max(1, textureHeight);
         float scale = Math.max(1f, pixelScale);
@@ -63,7 +60,17 @@ public final class GlTextureSampling {
         }
     }
 
-    /** Generates the mip chain and switches the texture to trilinear minification, once per texture. */
+    /** Switches the texture to bilinear filtering with clamped addressing. */
+    public static void ensureLinear(@Nullable AbstractTexture texture) {
+        GpuTexture gpu = texture == null ? null : texture.getTexture();
+        if (gpu == null || !LINEAR.add(gpu)) {
+            return;
+        }
+        texture.setFilter(true, false);
+        texture.setClamp(true);
+    }
+
+    /** Generates the mip chain and switches to trilinear minification. */
     public static void enableTrilinear(@Nullable AbstractTexture texture) {
         GpuTexture gpu = texture == null ? null : texture.getTexture();
         if (!(gpu instanceof GlTexture gl) || gl.isClosed()) {

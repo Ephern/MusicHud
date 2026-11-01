@@ -10,17 +10,21 @@ public class BackgroundImages {
     public volatile float imageAspect;
     /** Borrowed full-resolution decode, before HUD thumbnail resampling. */
     public final ImageTextureData original;
+    /** Resample source for the display art. */
+    public final ImageTextureData source;
     /** Wall-clock time when this image set became available for rendering. */
     public final long changedAtMillis;
 
     public BackgroundImages(ImageTextureData current, float imageAspect) {
-        this(current, imageAspect, null);
+        this(current, imageAspect, null, null);
     }
 
-    public BackgroundImages(ImageTextureData current, float imageAspect, ImageTextureData original) {
+    public BackgroundImages(ImageTextureData current, float imageAspect,
+                            ImageTextureData original, ImageTextureData source) {
         this.current = current;
         this.imageAspect = imageAspect;
         this.original = original;
+        this.source = source;
         this.changedAtMillis = MusicHud.getRunningMillis();
     }
 }
