@@ -84,6 +84,29 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         return texture;
     }
 
+    @Override
+    public SceneGpuTexture createNativeRenderTarget(String label, int width, int height,
+                                                    SceneTextureFormat format) {
+        assertOpen();
+        if (width < 1 || height < 1 || width > maxTextureSize || height > maxTextureSize) {
+            throw new IllegalArgumentException(
+                    "Invalid scene target size: " + width + "x" + height);
+        }
+        boolean halfFloat = format == SceneTextureFormat.RGBA16F
+                && rgba16fTargets
+                && !ClientConfig.getInstance().getForceRgba8Fallback();
+        SceneTextureAllocator.SceneAllocatedTexture allocated;
+        try {
+            allocated = halfFloatAllocator.allocate(label, width, height, halfFloat);
+        } catch (RuntimeException | LinkageError failure) {
+            allocated = blazeAllocator.allocate(label, width, height, false);
+        }
+        var texture = new SceneGpuTextureImpl(format, allocated, maxTextureSize);
+        textures.add(texture);
+        RenderStats.targetCreated(compactLabel(label), texture.byteSize());
+        return texture;
+    }
+
     /** Trims the {@code MusicHud …} debug labels down to a stable, log-friendly tag. */
     private static String compactLabel(String label) {
         String tag = label.startsWith("MusicHud ") ? label.substring("MusicHud ".length()) : label;
@@ -221,6 +244,10 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
             case SCENE_CAPTURE -> SceneNativePassRenderer.pipeline("scene_capture")
                     .withSampler("Sampler0")
                     .withUniform("MHCapture", UniformType.UNIFORM_BUFFER)
+                    .build();
+            case SCENE_BACKGROUND_BAKE -> SceneNativePassRenderer.pipeline("scene_background_bake")
+                    .withSampler("Sampler0")
+                    .withUniform("MHBackgroundBake", UniformType.UNIFORM_BUFFER)
                     .build();
             case SCENE_BLUR_DOWNSAMPLE -> blurPipeline("scene_blur_downsample");
             case SCENE_BLUR_GAUSSIAN -> blurPipeline("scene_blur_gaussian");

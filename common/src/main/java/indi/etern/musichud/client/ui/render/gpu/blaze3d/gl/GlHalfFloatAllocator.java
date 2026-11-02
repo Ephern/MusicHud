@@ -29,7 +29,8 @@ public final class GlHalfFloatAllocator implements SceneTextureAllocator {
             nativeTexture.flushModeChanges(0);
             GpuTexture wrapped = NeoForgeValidationBridge.wrap(device, nativeTexture);
             return new SceneAllocatedTexture(wrapped, device.createTextureView(wrapped),
-                    halfFloat ? SceneTextureFormat.RGBA16F : SceneTextureFormat.RGBA8);
+                    halfFloat ? SceneTextureFormat.RGBA16F : SceneTextureFormat.RGBA8,
+                    nativeTexture.glId());
         } catch (RuntimeException | Error failure) {
             nativeTexture.close();
             throw failure;

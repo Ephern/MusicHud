@@ -30,6 +30,7 @@ import indi.etern.musichud.client.ui.hud.renderer.BackgroundRenderer;
 import indi.etern.musichud.client.ui.hud.renderer.BackgroundTarget;
 import indi.etern.musichud.client.ui.render.HorizontalAlign;
 import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.gpu.MinecraftBackgroundTexture;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import indi.etern.musichud.client.ui.render.VerticalAlign;
@@ -106,6 +107,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
         if (callback != null && !callback.hasDefaultBackground()) {
+            MinecraftBackgroundTexture.clear();
             hudOccluded = true;
             return;
         }
@@ -126,6 +128,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
                     new VanillaSceneGraphics(gr),
                     context -> {
                         if (!BACKGROUND_RENDERER.renderFluidBackground(context, backgroundStyle)) {
+                            MinecraftBackgroundTexture.clear();
                             renderSolidBackground(gr, progress);
                         }
                     }

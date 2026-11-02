@@ -1,11 +1,23 @@
 package indi.etern.musichud.client.ui.components;
 
+import icyllis.arc3d.core.ColorInfo;
+import icyllis.arc3d.core.ColorSpaces;
+import icyllis.arc3d.core.ImageInfo;
+import icyllis.arc3d.core.Rect2f;
+import icyllis.arc3d.core.SamplingOptions;
+import icyllis.arc3d.engine.Engine;
+import icyllis.arc3d.granite.GraniteSurface;
+import icyllis.arc3d.granite.RecordingContext;
+import icyllis.arc3d.sketch.Image;
+import icyllis.arc3d.sketch.Surface;
 import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorListener;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.core.Core;
 import icyllis.modernui.graphics.*;
+import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.view.MotionEvent;
@@ -135,6 +147,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private int cachedTopFadeHeight = -1;
     private int cachedBottomFadeHeight = -1;
     private float cachedFadeStrength = -1f;
+    // The edge fade erases the destination with DST_OUT; rendering the subtree here first keeps
+    // the erase local to this view instead of the whole ModernUI layer.
+    private Surface fadeSurface;
+    private int fadeSurfaceWidth;
+    private int fadeSurfaceHeight;
+    private Image fadeSnapshot;
+    private boolean fadeIsolationDisabled;
     // One spring-backed RowWave per lyric row (see buildLyricRows).
     private final List<RowWave> rows = new ArrayList<>();
     @Getter
@@ -632,6 +651,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         for (LyricLineView view : lyricLineViewList) {
             view.releaseBlurSurfaces();
         }
+        releaseFadeResources();
     }
 
     private void startUpdateLoop() {
@@ -852,6 +872,124 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             0f, 1f, 0f,
             0f, 0f, 1f
     );
+
+    @Override
+    public void draw(@NotNull Canvas canvas) {
+        if (canvas instanceof ArcCanvas arc && needsFadeIsolation() && renderFadeIsolated(arc)) {
+            return;
+        }
+        super.draw(canvas);
+    }
+
+    /** True while at least one edge fade is actually drawn (content overflows the viewport). */
+    private boolean needsFadeIsolation() {
+        if (!fadeEdgesEnabled || fadeIsolationDisabled || fadeEdgeMaxStrength <= 0f) {
+            return false;
+        }
+        int height = getHeight();
+        return getWidth() > 0 && height > 0 && container.getHeight() > height;
+    }
+
+    /**
+     * Renders the subtree into an offscreen target and composites it back, so the fade's DST_OUT
+     * only erases this view's content instead of the whole parent layer.
+     */
+    private boolean renderFadeIsolated(@NotNull ArcCanvas canvas) {
+        Surface surface = ensureFadeSurface();
+        if (surface == null) {
+            return false;
+        }
+        try {
+            surface.notifyWillChange();
+            var surfaceCanvas = surface.getCanvas();
+            surfaceCanvas.clear(0);
+            Canvas offscreen = new ArcCanvas(surfaceCanvas);
+            offscreen.save();
+            offscreen.translate(-getScrollX(), -getScrollY());
+            super.draw(offscreen);
+            offscreen.restore();
+
+            replaceFadeSnapshot(surface.makeImageSnapshot());
+            if (fadeSnapshot == null) {
+                return false;
+            }
+
+            int width = getWidth();
+            int height = getHeight();
+            int scrollX = getScrollX();
+            int scrollY = getScrollY();
+            var nativeCanvas = canvas.getCanvas();
+            nativeCanvas.save();
+            nativeCanvas.drawImageRect(fadeSnapshot,
+                    new Rect2f(0, 0, width, height),
+                    new Rect2f(scrollX, scrollY, scrollX + width, scrollY + height),
+                    SamplingOptions.LINEAR, null,
+                    icyllis.arc3d.sketch.Canvas.SRC_RECT_CONSTRAINT_FAST);
+            nativeCanvas.restore();
+            return true;
+        } catch (Throwable failure) {
+            fadeIsolationDisabled = true;
+            releaseFadeResources();
+            if (logger == null) {
+                logger = MusicHud.getLogger(StaggeredLyricScrollView.class);
+            }
+            logger.error("Disabling lyric fade isolation after an error", failure);
+            return false;
+        }
+    }
+
+    private @Nullable Surface ensureFadeSurface() {
+        int width = getWidth();
+        int height = getHeight();
+        if (width <= 0 || height <= 0) {
+            return null;
+        }
+        if (fadeSurface != null && fadeSurfaceWidth == width && fadeSurfaceHeight == height) {
+            return fadeSurface;
+        }
+        releaseFadeResources();
+        try {
+            RecordingContext context = Core.requireUiRecordingContext();
+            ImageInfo info = ImageInfo.make(width, height,
+                    ColorInfo.CT_RGBA_8888, ColorInfo.AT_PREMUL, ColorSpaces.SRGB);
+            Surface surface = GraniteSurface.makeRenderTarget(context, info, false,
+                    Engine.SurfaceOrigin.kUpperLeft, "musichud-lyric-fade");
+            if (surface == null) {
+                return null;
+            }
+            fadeSurface = surface;
+            fadeSurfaceWidth = width;
+            fadeSurfaceHeight = height;
+            return surface;
+        } catch (RuntimeException failure) {
+            if (logger == null) {
+                logger = MusicHud.getLogger(StaggeredLyricScrollView.class);
+            }
+            logger.debug("While creating the lyric fade surface", failure);
+            releaseFadeResources();
+            return null;
+        }
+    }
+
+    private void replaceFadeSnapshot(@Nullable Image image) {
+        if (fadeSnapshot == image) {
+            return;
+        }
+        if (fadeSnapshot != null) {
+            fadeSnapshot.unref();
+        }
+        fadeSnapshot = image;
+    }
+
+    private void releaseFadeResources() {
+        replaceFadeSnapshot(null);
+        if (fadeSurface != null) {
+            fadeSurface.unref();
+            fadeSurface = null;
+        }
+        fadeSurfaceWidth = 0;
+        fadeSurfaceHeight = 0;
+    }
 
     @Override
     protected void dispatchDraw(Canvas canvas) {

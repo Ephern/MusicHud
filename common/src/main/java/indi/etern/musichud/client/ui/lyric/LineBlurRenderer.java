@@ -142,25 +142,51 @@ public final class LineBlurRenderer {
             return;
         }
         float[] weights = gaussianWeights(sigma, halfTaps);
-        Image horizontal = convolveAxis(res, res.sourceImage, res.scratchSurface,
-                surfaceWidth, surfaceHeight, weights, halfTaps, true);
+        drawAxis(res.sourceImage, res.scratchSurface, surfaceWidth, surfaceHeight,
+                weights, halfTaps, true, res.tapPaint);
+        Image horizontal = res.scratchSurface.makeImageSnapshot();
         if (horizontal == null) {
             return;
         }
-        Image vertical = convolveAxis(res, horizontal, res.finalSurface,
-                surfaceWidth, surfaceHeight, weights, halfTaps, false);
+        drawAxis(horizontal, res.finalSurface, surfaceWidth, surfaceHeight,
+                weights, halfTaps, false, res.tapPaint);
         horizontal.unref();
-        res.replaceFinalImage(vertical);
+        res.replaceFinalImage(res.finalSurface.makeImageSnapshot());
     }
 
-    private static Image convolveAxis(LineBlurResources res, Image source, Surface target,
-                                      int surfaceWidth, int surfaceHeight,
-                                      float[] weights, int halfTaps, boolean horizontal) {
+    /**
+     * Two-pass separable convolution of an existing image into {@code target}; the caller owns
+     * {@code target} and can apply a mask before snapshotting it.
+     */
+    public static boolean convolveInto(Image source, int width, int height, float sigma,
+                                       Surface scratch, Surface target, Paint paint) {
+        int halfTaps = Math.max(1, (int) Math.ceil(3f * sigma));
+        float[] weights = gaussianWeights(sigma, halfTaps);
+        drawAxis(source, scratch, width, height, weights, halfTaps, true, paint);
+        Image horizontal = scratch.makeImageSnapshot();
+        if (horizontal == null) {
+            return false;
+        }
+        try {
+            drawAxis(horizontal, target, width, height, weights, halfTaps, false, paint);
+        } finally {
+            horizontal.unref();
+        }
+        return true;
+    }
+
+    public static float downscaleFor(float radius) {
+        return chooseDownscale(radius);
+    }
+
+    private static void drawAxis(Image source, Surface target,
+                                 int surfaceWidth, int surfaceHeight,
+                                 float[] weights, int halfTaps, boolean horizontal,
+                                 Paint paint) {
         target.notifyWillChange();
         icyllis.arc3d.sketch.Canvas canvas = target.getCanvas();
         canvas.clear(0);
         Rect2f srcRect = new Rect2f(0, 0, surfaceWidth, surfaceHeight);
-        Paint paint = res.tapPaint;
         paint.setBlendMode(BlendMode.PLUS);
         for (int i = -halfTaps; i <= halfTaps; i++) {
             float weight = weights[i + halfTaps];
@@ -175,7 +201,6 @@ public final class LineBlurRenderer {
                     icyllis.arc3d.sketch.Canvas.SRC_RECT_CONSTRAINT_FAST);
         }
         paint.setBlendMode(null);
-        return target.makeImageSnapshot();
     }
 
     private static float[] gaussianWeights(float sigma, int halfTaps) {

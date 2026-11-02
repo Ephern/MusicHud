@@ -86,7 +86,8 @@ public class Modal {
             }
         };
 
-        PanelStyle.factory(card, 1.0, clientConfig.getPanelBrightness(), card.dp(CORNER_RADIUS), null)
+        PanelStyle.factory(card, clientConfig.getPanelOpacity(), clientConfig.getPanelBrightness(),
+                        card.dp(CORNER_RADIUS), null, true)
                 .applyBackgroundTo(card);
 
         int topPadding = card.dp(CONTENT_PADDING);
@@ -237,9 +238,12 @@ public class Modal {
         }
 
         ObjectAnimator dimFadeOut = ObjectAnimator.ofFloat(dimView, View.ALPHA, dimView.getAlpha(), 0f);
-        ObjectAnimator cardFadeOut = ObjectAnimator.ofFloat(card, View.ALPHA, card.getAlpha(), 0f);
-        ObjectAnimator cardScaleXOut = ObjectAnimator.ofFloat(card, View.SCALE_X, card.getScaleX(), 0.95f);
-        ObjectAnimator cardScaleYOut = ObjectAnimator.ofFloat(card, View.SCALE_Y, card.getScaleY(), 0.95f);
+        ObjectAnimator cardFadeOut = ObjectAnimator.ofFloat(card, View.ALPHA,
+                card.getAlpha(), 0f);
+        ObjectAnimator cardScaleXOut = ObjectAnimator.ofFloat(card, View.SCALE_X,
+                card.getScaleX(), 0.95f);
+        ObjectAnimator cardScaleYOut = ObjectAnimator.ofFloat(card, View.SCALE_Y,
+                card.getScaleY(), 0.95f);
 
         AnimatorSet set = new AnimatorSet();
         set.playTogether(dimFadeOut, cardFadeOut, cardScaleXOut, cardScaleYOut);

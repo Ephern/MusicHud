@@ -10,6 +10,6 @@ public interface SceneTextureAllocator {
     boolean supportsHalfFloat();
 
     record SceneAllocatedTexture(GpuTexture texture, GpuTextureView view,
-                                 SceneTextureFormat actualFormat) {
+                                 SceneTextureFormat actualFormat, int glTextureId) {
     }
 }

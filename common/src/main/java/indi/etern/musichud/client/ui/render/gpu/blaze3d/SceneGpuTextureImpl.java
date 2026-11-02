@@ -9,6 +9,7 @@ import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
 final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
     private final SceneTextureFormat format;
     private final SceneTextureFormat actualFormat;
+    private final int glTextureId;
     private final GpuTexture texture;
     private final GpuTextureView view;
     private boolean closed;
@@ -27,6 +28,7 @@ final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
         }
         this.format = format;
         this.actualFormat = allocated.actualFormat();
+        this.glTextureId = allocated.glTextureId();
         this.texture = allocated.texture();
         this.view = allocated.view();
     }
@@ -65,6 +67,11 @@ final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
     @Override
     public SceneTextureFormat actualFormat() {
         return actualFormat;
+    }
+
+    @Override
+    public int glTextureId() {
+        return glTextureId;
     }
 
     /** Approximate VRAM footprint of this target, used by the debug render statistics. */
