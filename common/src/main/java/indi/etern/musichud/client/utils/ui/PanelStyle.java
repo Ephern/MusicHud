@@ -6,7 +6,10 @@ import icyllis.modernui.view.View;
 public final class PanelStyle {
     private static final int BORDER_RGB = 0x7F7F7F;
     private static final int STROKE_WIDTH_DP = 1;
-    private static final int BACK_DROP_BLUR_RADIUS = 128;
+    /** Backdrop blur radius of the modal card, in dp. */
+    public static final int BACK_DROP_BLUR_RADIUS = 128;
+    /** Backdrop blur radius of the HUD config side panel, in dp. */
+    public static final int PANEL_BACK_DROP_BLUR_RADIUS = 32;
 
     private PanelStyle() {
     }
@@ -39,7 +42,7 @@ public final class PanelStyle {
                 .cornerRadius(cornerRadiusPx)
                 .padding(padding)
                 .backdropBlur(backdropBlur)
-                .backdropBlurRadius(backdropBlur ? view.dp(BACK_DROP_BLUR_RADIUS) : 0)
+                .backdropBlurRadius(backdropBlur ? view.dp(PANEL_BACK_DROP_BLUR_RADIUS) : 0)
                 .build();
     }
 

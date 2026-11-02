@@ -388,7 +388,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             // Keep the previous target alive for one more frame: a UI recording may still sample it.
             retiredBakes.add(backgroundBake);
             if (retiredBakes.size() > 2) {
-                gpu.release(retiredBakes.remove(0));
+                gpu.release(retiredBakes.removeFirst());
             }
         } else if (bakeOwner != null && bakeOwner != gpu) {
             retiredBakes.clear();

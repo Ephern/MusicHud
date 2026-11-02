@@ -4,7 +4,9 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.presentation.TrackArtworkStore;
 import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
+import indi.etern.musichud.client.ui.render.gpu.SceneGlState;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneGpuContextImpl;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneWindowEnvironment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
@@ -84,6 +86,29 @@ public final class RenderRuntime {
             }
         }
         return gpu;
+    }
+
+    /**
+     * Runs the deferred backdrop blurs with the sources the UI recorded this frame. Called after the
+     * UI layer is submitted, so both backends finish their own pass before the other touches GL.
+     */
+    public void flushPendingSceneWork() {
+        RenderSystem.assertOnRenderThread();
+        try {
+            if (!SceneBlurSlot.hasPending()) {
+                return;
+            }
+            SceneGlState.prepareBlaze3D();
+            try {
+                SceneBlurSlot.runAll(gpu());
+            } finally {
+                // Leave Blaze3D in a known state for the GUI pass that follows this frame.
+                SceneGlState.prepareBlaze3D();
+                SceneGlState.restoreArc3D();
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.debug("While running deferred backdrop blur", failure);
+        }
     }
 
     private void pollDebugTargetOptions() {

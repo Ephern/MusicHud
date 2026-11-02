@@ -1,21 +1,13 @@
 package indi.etern.musichud.client.ui.components;
 
-import icyllis.arc3d.core.ColorInfo;
-import icyllis.arc3d.core.ColorSpaces;
-import icyllis.arc3d.core.ImageInfo;
 import icyllis.arc3d.core.Rect2f;
 import icyllis.arc3d.core.SamplingOptions;
-import icyllis.arc3d.engine.Engine;
-import icyllis.arc3d.granite.GraniteSurface;
-import icyllis.arc3d.granite.RecordingContext;
 import icyllis.arc3d.sketch.Image;
-import icyllis.arc3d.sketch.Surface;
 import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorListener;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.core.Core;
 import icyllis.modernui.graphics.*;
 import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.mc.MuiModApi;
@@ -31,6 +23,7 @@ import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
+import indi.etern.musichud.client.ui.render.gpu.SceneOffscreen;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.client.utils.ui.SpringValue;
@@ -149,9 +142,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private float cachedFadeStrength = -1f;
     // The edge fade erases the destination with DST_OUT; rendering the subtree here first keeps
     // the erase local to this view instead of the whole ModernUI layer.
-    private Surface fadeSurface;
-    private int fadeSurfaceWidth;
-    private int fadeSurfaceHeight;
+    private final SceneOffscreen fadeTarget = new SceneOffscreen("musichud-lyric-fade");
     private Image fadeSnapshot;
     private boolean fadeIsolationDisabled;
     // One spring-backed RowWave per lyric row (see buildLyricRows).
@@ -895,27 +886,19 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
      * only erases this view's content instead of the whole parent layer.
      */
     private boolean renderFadeIsolated(@NotNull ArcCanvas canvas) {
-        Surface surface = ensureFadeSurface();
-        if (surface == null) {
+        int width = getWidth();
+        int height = getHeight();
+        if (!fadeTarget.ensure(width, height) && !fadeTarget.isReady()) {
             return false;
         }
         try {
-            surface.notifyWillChange();
-            var surfaceCanvas = surface.getCanvas();
-            surfaceCanvas.clear(0);
-            Canvas offscreen = new ArcCanvas(surfaceCanvas);
-            offscreen.save();
-            offscreen.translate(-getScrollX(), -getScrollY());
-            super.draw(offscreen);
-            offscreen.restore();
-
-            replaceFadeSnapshot(surface.makeImageSnapshot());
+            Image snapshot = fadeTarget.renderSnapshot(-getScrollX(), -getScrollY(),
+                    super::draw);
+            replaceFadeSnapshot(snapshot);
             if (fadeSnapshot == null) {
                 return false;
             }
 
-            int width = getWidth();
-            int height = getHeight();
             int scrollX = getScrollX();
             int scrollY = getScrollY();
             var nativeCanvas = canvas.getCanvas();
@@ -938,39 +921,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
     }
 
-    private @Nullable Surface ensureFadeSurface() {
-        int width = getWidth();
-        int height = getHeight();
-        if (width <= 0 || height <= 0) {
-            return null;
-        }
-        if (fadeSurface != null && fadeSurfaceWidth == width && fadeSurfaceHeight == height) {
-            return fadeSurface;
-        }
-        releaseFadeResources();
-        try {
-            RecordingContext context = Core.requireUiRecordingContext();
-            ImageInfo info = ImageInfo.make(width, height,
-                    ColorInfo.CT_RGBA_8888, ColorInfo.AT_PREMUL, ColorSpaces.SRGB);
-            Surface surface = GraniteSurface.makeRenderTarget(context, info, false,
-                    Engine.SurfaceOrigin.kUpperLeft, "musichud-lyric-fade");
-            if (surface == null) {
-                return null;
-            }
-            fadeSurface = surface;
-            fadeSurfaceWidth = width;
-            fadeSurfaceHeight = height;
-            return surface;
-        } catch (RuntimeException failure) {
-            if (logger == null) {
-                logger = MusicHud.getLogger(StaggeredLyricScrollView.class);
-            }
-            logger.debug("While creating the lyric fade surface", failure);
-            releaseFadeResources();
-            return null;
-        }
-    }
-
     private void replaceFadeSnapshot(@Nullable Image image) {
         if (fadeSnapshot == image) {
             return;
@@ -983,20 +933,25 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     private void releaseFadeResources() {
         replaceFadeSnapshot(null);
-        if (fadeSurface != null) {
-            fadeSurface.unref();
-            fadeSurface = null;
-        }
-        fadeSurfaceWidth = 0;
-        fadeSurfaceHeight = 0;
+        fadeTarget.close();
     }
 
     @Override
     protected void dispatchDraw(Canvas canvas) {
         canvas.save();
         canvas.concat(SUBPIXEL_MATRIX);
+        // Phase 1 renders every defocused row into its own offscreen target, so the render thread can
+        // blur them before this frame's composites are executed. Phase 2 then draws them in order.
+        int padding = blurPaddingPx();
+        for (LyricLineView lyricLineView : lyricLineViewList) {
+            lyricLineView.prepareBlurSource(padding);
+        }
         super.dispatchDraw(canvas);
         canvas.restore();
+    }
+
+    private int blurPaddingPx() {
+        return Math.max(dp(1), LineBlurRenderer.maxPaddingFor(dp(MAX_BLUR_DP)));
     }
 
     @Override

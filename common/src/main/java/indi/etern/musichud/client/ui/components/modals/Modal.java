@@ -66,13 +66,10 @@ public class Modal {
             }
         };
 
-        FrameLayout overlayFrame = new FrameLayout(context);
-
         dimView = new View(context);
         dimView.setBackground(new ColorDrawable(SCREEN_DIM_COLOR));
         dimView.setClickable(true);
         dimView.setOnClickListener(v -> dismiss());
-        overlayFrame.addView(dimView, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
         card = new LinearLayout(context) {
             {
@@ -87,7 +84,7 @@ public class Modal {
         };
 
         PanelStyle.factory(card, clientConfig.getPanelOpacity(), clientConfig.getPanelBrightness(),
-                        card.dp(CORNER_RADIUS), null, true)
+                        card.dp(CORNER_RADIUS), null)
                 .applyBackgroundTo(card);
 
         int topPadding = card.dp(CONTENT_PADDING);
@@ -169,6 +166,10 @@ public class Modal {
         FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
                 card.dp(MAX_WIDTH), WRAP_CONTENT);
         cardParams.gravity = Gravity.CENTER;
+
+        ModalOverlay overlayFrame = new ModalOverlay(context, dimView, card, SCREEN_DIM_COLOR,
+                card.dp(CORNER_RADIUS), card.dp(PanelStyle.BACK_DROP_BLUR_RADIUS));
+        overlayFrame.addView(dimView, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
         overlayFrame.addView(card, cardParams);
 
         popupWindow.setContentView(overlayFrame);

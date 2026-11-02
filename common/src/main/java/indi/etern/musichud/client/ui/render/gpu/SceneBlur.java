@@ -32,9 +32,13 @@ public final class SceneBlur {
         this.format = format;
     }
 
-    public @Nullable PendingBlur prepare(SceneGpuContext gpu, int width, int height, float sigma) {
-        if (gpu == null || width < 1 || height < 1 || !(sigma > 0f) || !Float.isFinite(sigma)) {
-            return null;
+    /**
+     * Pyramid level a blur of this size and sigma will use. Consumers key their target cache on it,
+     * because a level change makes {@link #targets} release the previous result texture.
+     */
+    public static int levelFor(int width, int height, float sigma) {
+        if (width < 1 || height < 1 || !(sigma > 0f) || !Float.isFinite(sigma)) {
+            return 0;
         }
         int level = 0;
         int levelWidth = width;
@@ -45,6 +49,18 @@ public final class SceneBlur {
             level++;
             levelWidth /= 2;
             levelHeight /= 2;
+            sigmaLow *= 0.5f;
+        }
+        return level;
+    }
+
+    public @Nullable PendingBlur prepare(SceneGpuContext gpu, int width, int height, float sigma) {
+        if (gpu == null || width < 1 || height < 1 || !(sigma > 0f) || !Float.isFinite(sigma)) {
+            return null;
+        }
+        int level = levelFor(width, height, sigma);
+        float sigmaLow = sigma;
+        for (int i = 0; i < level; i++) {
             sigmaLow *= 0.5f;
         }
         if (!targets(gpu, width, height, level)) return null;

@@ -154,6 +154,9 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Override
     public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         mHost.render(gr, mouseX, mouseY, deltaTick);
+        // Runs after the UI layer is submitted, so both backends finish their own pass before the
+        // other touches GL; the blur result is sampled by the next frame.
+        RenderRuntime.getInstance().flushPendingSceneWork();
     }
 
     @Override

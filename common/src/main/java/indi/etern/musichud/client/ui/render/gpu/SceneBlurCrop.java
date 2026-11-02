@@ -12,10 +12,19 @@ import java.util.List;
 public final class SceneBlurCrop {
     private static final Logger LOGGER = MusicHud.getLogger(SceneBlurCrop.class);
 
+    private final SceneTextureFormat format;
     private SceneGpuContext owner;
     private int width;
     private int height;
     private SceneGpuTexture target;
+
+    public SceneBlurCrop() {
+        this(SceneTextureFormat.RGBA16F);
+    }
+
+    public SceneBlurCrop(SceneTextureFormat format) {
+        this.format = format;
+    }
 
     public @Nullable SceneGpuTexture apply(SceneGpuContext gpu, SceneGpuTexture source,
                                            float u0, float v0, float u1, float v1,
@@ -31,7 +40,7 @@ public final class SceneBlurCrop {
             release(gpu);
             try {
                 target = gpu.createRenderTarget("MusicHud blur crop", width, height,
-                        SceneTextureFormat.RGBA16F);
+                        format);
                 owner = gpu;
                 this.width = width;
                 this.height = height;
