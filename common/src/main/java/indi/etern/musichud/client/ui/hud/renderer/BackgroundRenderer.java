@@ -17,13 +17,20 @@ import indi.etern.musichud.client.ui.render.RenderStats;
 import indi.etern.musichud.client.ui.render.SceneElementRenderState;
 import indi.etern.musichud.client.ui.render.SceneRenderContext;
 import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.gpu.MinecraftBackgroundTexture;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlur;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurCrop;
 import indi.etern.musichud.client.ui.render.gpu.SceneCapture;
+import indi.etern.musichud.client.ui.render.gpu.SceneDraw;
+import indi.etern.musichud.client.ui.render.gpu.ScenePipelineKey;
+import indi.etern.musichud.client.ui.render.gpu.SceneSamplerBinding;
+import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
+import indi.etern.musichud.client.ui.render.gpu.SceneUniformBinding;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverLayers;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverOverlay;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverSource;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverTransition;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverWarpProcedural;
 import indi.etern.musichud.client.ui.render.gpu.legacy.LegacySceneCoverSources;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
@@ -38,6 +45,9 @@ import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder {
     private static final float EPSILON = 1e-4f;
     private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
@@ -48,6 +58,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
     private static final float DRIFT_FREQ_Y2 = (float) Math.sqrt(4.93);
     private static final float ORBIT_DRIFT_FREQ_SCALE = (float) Math.sqrt(1.2);
     private final BackgroundFrameResolver frameResolver;
+    private final BackgroundTarget target;
     private final SceneCapture sceneCapture = new SceneCapture();
     private final SceneBlur backgroundBlur = new SceneBlur();
     private final SceneBlurCrop backgroundCrop = new SceneBlurCrop();
@@ -60,8 +71,14 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
     private final DynamicStatusUniform dynamicStatusUniform = DynamicStatusUniform.getInstance();
     /** Consecutive frames in which this renderer produced no background. */
     private int skippedFrames;
+    private SceneGpuTexture backgroundBake;
+    private SceneGpuContext bakeOwner;
+    private int backgroundBakeWidth;
+    private int backgroundBakeHeight;
+    private final List<SceneGpuTexture> retiredBakes = new ArrayList<>();
 
     public BackgroundRenderer(BackgroundTarget target) {
+        this.target = target;
         this.frameResolver = new BackgroundFrameResolver(target);
     }
 
@@ -71,6 +88,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
 
     /** Releases every offscreen target; they are re-created lazily. */
     public void release() {
+        MinecraftBackgroundTexture.clear();
         sceneCapture.release();
         backgroundBlur.release();
         backgroundCrop.release();
@@ -179,9 +197,10 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             if (fluid != null) {
                 float scale = audioReactiveScaleTimed();
                 long submitStart = System.nanoTime();
-                submitFluidBackground(context, style, fluid, true, 0f, scale);
+                boolean presented = submitOrPublishBackground(context, gpu, source, style, fluid,
+                        true, 0f, scale);
                 RenderStats.phaseSubmitNanos(System.nanoTime() - submitStart);
-                return true;
+                return presented;
             }
         }
 
@@ -238,10 +257,10 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
 
         // The zoom stays in the sampling, or the captured scene would move with it.
         long submitStart = System.nanoTime();
-        submitFluidBackground(context, style, output, false,
+        boolean presented = submitOrPublishBackground(context, gpu, source, style, output, false,
                 backgroundOnly ? plan.samplingBlackOverlay() : 0f, 1f);
         RenderStats.phaseSubmitNanos(System.nanoTime() - submitStart);
-        return true;
+        return presented;
     }
 
     /** {@link #audioReactiveScale()} with its own timing, since it takes the audio player lock. */
@@ -317,6 +336,116 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
                 style,
                 backgroundAdjustUniform(applyColorAdjust, blackOverlay, fluidScale)
         ));
+    }
+
+    /**
+     * The GUI background can be baked into a texture and drawn at the bottom of the ModernUI layer,
+     * which makes it visible to in-layer backdrop blurs. Falls back to the Blaze3D GUI element when
+     * no consumer is attached or the bake fails.
+     */
+    private boolean submitOrPublishBackground(SceneRenderContext context, SceneGpuContext gpu,
+                                              SceneGpuContext.MainColorSource source, SceneStyle style,
+                                              SceneGpuTexture texture, boolean applyColorAdjust,
+                                              float blackOverlay, float fluidScale) {
+        if (target == BackgroundTarget.GUI) {
+            // The GUI background only exists inside the ModernUI layer; there is no Blaze3D
+            // fallback element anymore.
+            return bakeForLayer(gpu, source, style, texture,
+                    applyColorAdjust, blackOverlay, fluidScale);
+        }
+        submitFluidBackground(context, style, texture, applyColorAdjust, blackOverlay, fluidScale);
+        return true;
+    }
+
+    private boolean bakeForLayer(SceneGpuContext gpu, SceneGpuContext.MainColorSource source,
+                                 SceneStyle style, SceneGpuTexture texture,
+                                 boolean applyColorAdjust, float blackOverlay, float fluidScale) {
+        int width = source.width();
+        int height = source.height();
+        if (width <= 0 || height <= 0) return false;
+        SceneGpuTexture baked = bakeTarget(gpu, width, height);
+        if (baked == null || !SceneInterop.capabilities().canExport()) return false;
+        BackgroundBakeUniform uniform = new BackgroundBakeUniform(
+                width, height, style.getRadius() * source.guiScale(), style.calcAbsoluteAlpha(),
+                FluidBackgroundSettings.BACKGROUND_NATURAL_SATURATION,
+                FluidBackgroundSettings.HIGHLIGHT_DARKENING,
+                FluidBackgroundSettings.HIGHLIGHT_KNEE,
+                FluidBackgroundSettings.HIGHLIGHT_FULL,
+                FluidBackgroundSettings.BACKGROUND_OVERALL_BRIGHTNESS,
+                applyColorAdjust, blackOverlay, fluidScale);
+        try {
+            gpu.draw(new SceneDraw(baked,
+                    gpu.pipeline(ScenePipelineKey.SCENE_BACKGROUND_BAKE, baked.actualFormat()),
+                    List.of(new SceneSamplerBinding("Sampler0", texture)),
+                    List.of(new SceneUniformBinding(BackgroundBakeUniform.UBO_NAME, uniform))));
+        } catch (RuntimeException failure) {
+            LOGGER.debug("While baking the GUI background for the ModernUI layer", failure);
+            return false;
+        }
+        MinecraftBackgroundTexture.publish(baked);
+        return true;
+    }
+
+    private SceneGpuTexture bakeTarget(SceneGpuContext gpu, int width, int height) {
+        if (backgroundBake != null && bakeOwner == gpu
+                && backgroundBakeWidth == width && backgroundBakeHeight == height) {
+            return backgroundBake;
+        }
+        if (backgroundBake != null && bakeOwner == gpu) {
+            // Keep the previous target alive for one more frame: a UI recording may still sample it.
+            retiredBakes.add(backgroundBake);
+            if (retiredBakes.size() > 2) {
+                gpu.release(retiredBakes.removeFirst());
+            }
+        } else if (bakeOwner != null && bakeOwner != gpu) {
+            retiredBakes.clear();
+        }
+        backgroundBake = null;
+        bakeOwner = gpu;
+        backgroundBakeWidth = width;
+        backgroundBakeHeight = height;
+        try {
+            backgroundBake = gpu.createNativeRenderTarget("MusicHud GUI background bake",
+                    width, height, SceneTextureFormat.RGBA8);
+            return backgroundBake;
+        } catch (RuntimeException failure) {
+            LOGGER.debug("While creating the GUI background bake target", failure);
+            backgroundBake = null;
+            return null;
+        }
+    }
+
+    private record BackgroundBakeUniform(float width, float height, float radius, float alpha,
+                                         float saturation, float highlightDarkening,
+                                         float highlightKnee, float highlightFull,
+                                         float overallBrightness, boolean applyColorAdjust,
+                                         float blackOverlay, float fluidScale)
+            implements SceneUniform {
+        private static final String UBO_NAME = "MHBackgroundBake";
+        private static final int UBO_SIZE = Std140Sizes.calc()
+                .putVec4().putVec4().putVec4().get();
+
+        @Override
+        public String getUBOName() {
+            return UBO_NAME;
+        }
+
+        @Override
+        public int getUBOSize() {
+            return UBO_SIZE;
+        }
+
+        @Override
+        public void write(Std140Writer writer) {
+            writer.putVec4(width, height, radius, alpha);
+            writer.putVec4(saturation, highlightDarkening, highlightKnee, highlightFull);
+            writer.putVec4(overallBrightness, applyColorAdjust ? 1f : 0f, blackOverlay, fluidScale);
+        }
+
+        @Override
+        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
+            return false;
+        }
     }
 
     private static BackgroundAdjustUniform backgroundAdjustUniform(boolean applyColorAdjust,

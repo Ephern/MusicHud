@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.render.gpu;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.pipeline.SceneTextureRef;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
@@ -12,18 +13,45 @@ import java.util.List;
 public final class SceneBlurCrop {
     private static final Logger LOGGER = MusicHud.getLogger(SceneBlurCrop.class);
 
+    private final SceneTextureFormat format;
     private SceneGpuContext owner;
     private int width;
     private int height;
     private SceneGpuTexture target;
 
+    public SceneBlurCrop() {
+        this(SceneTextureFormat.RGBA16F);
+    }
+
+    public SceneBlurCrop(SceneTextureFormat format) {
+        this.format = format;
+    }
+
     public @Nullable SceneGpuTexture apply(SceneGpuContext gpu, SceneGpuTexture source,
                                            float u0, float v0, float u1, float v1,
                                            int width, int height) {
+        if (source == null) {
+            return null;
+        }
+        SceneTextureRef result = applyRef(gpu, source, source.width(), source.height(),
+                u0, v0, u1, v1, width, height);
+        if (result == source) {
+            return source;
+        }
+        return result instanceof SceneGpuTexture texture ? texture : null;
+    }
+
+    /**
+     * @param source may be a foreign (interop) texture, so its size is passed explicitly
+     */
+    public @Nullable SceneTextureRef applyRef(SceneGpuContext gpu, SceneTextureRef source,
+                                              int sourceWidth, int sourceHeight,
+                                              float u0, float v0, float u1, float v1,
+                                              int width, int height) {
         if (gpu == null || source == null || width < 1 || height < 1) {
             return null;
         }
-        if (source.width() == width && source.height() == height
+        if (sourceWidth == width && sourceHeight == height
                 && u0 <= 0f && v0 <= 0f && u1 >= 1f && v1 >= 1f) {
             return source;
         }
@@ -31,7 +59,7 @@ public final class SceneBlurCrop {
             release(gpu);
             try {
                 target = gpu.createRenderTarget("MusicHud blur crop", width, height,
-                        SceneTextureFormat.RGBA16F);
+                        format);
                 owner = gpu;
                 this.width = width;
                 this.height = height;

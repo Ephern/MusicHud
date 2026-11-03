@@ -12,6 +12,7 @@ import indi.etern.musichud.client.ui.render.gpu.ScenePipelineKey;
 import indi.etern.musichud.client.ui.render.gpu.SceneSamplerBinding;
 import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
 import indi.etern.musichud.client.ui.render.gpu.SceneUniformBinding;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import indi.etern.musichud.client.ui.render.pipeline.HudShaderManager;
 import indi.etern.musichud.client.ui.render.pipeline.HudShaderProgram;
 import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
@@ -45,6 +46,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
     public LegacySceneGpuContext() {
         RenderSystem.assertOnRenderThread();
         fullscreenVertexArray = GlStateManager._glGenVertexArrays();
+        SceneInterop.install(LegacyInteropBackend.INSTANCE);
     }
 
     @Override
@@ -63,6 +65,12 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
     }
 
     @Override
+    public SceneGpuTexture createNativeRenderTarget(String label, int width, int height,
+                                                    SceneTextureFormat format) {
+        return createRenderTarget(label, width, height, format);
+    }
+
+    @Override
     public ScenePipeline pipeline(ScenePipelineKey key, SceneTextureFormat targetFormat) {
         assertOpen();
         return pipelines.computeIfAbsent(key, this::createPipeline);
@@ -74,6 +82,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
                 ? name + ".vsh" : "fullscreen.vsh";
         List<String> ubos = switch (key) {
             case SCENE_CAPTURE -> List.of("MHCapture");
+            case SCENE_BACKGROUND_BAKE -> List.of("MHBackgroundBake");
             case SCENE_BLUR_DOWNSAMPLE, SCENE_BLUR_GAUSSIAN, SCENE_BLUR_UPSAMPLE,
                  SCENE_BLUR_COPY -> List.of("MHBlur");
             case SCENE_BLUR_CROP -> List.of("MHCrop");
@@ -208,6 +217,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
     private static int textureId(SceneTextureRef ref) {
         if (ref instanceof LegacyTextureRef(int id)) return id;
         if (ref instanceof LegacySceneTexture texture) return texture.textureId();
+        if (ref instanceof LegacyTextureIdRef idRef) return idRef.textureId();
         throw new IllegalArgumentException("Unsupported scene texture reference");
     }
 
@@ -266,6 +276,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
         } else {
             destroyAll();
         }
+        SceneInterop.install(null);
     }
 
     private void destroyAll() {

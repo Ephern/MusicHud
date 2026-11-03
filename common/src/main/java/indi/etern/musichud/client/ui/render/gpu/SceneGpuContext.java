@@ -11,6 +11,13 @@ public interface SceneGpuContext extends AutoCloseable {
                                        SceneTextureFormat format);
 
     /**
+     * Like {@link #createRenderTarget}, but prefers the native allocator so the texture is
+     * addressable by the interop backend (it is what cross-API sampling wraps).
+     */
+    SceneGpuTexture createNativeRenderTarget(String label, int width, int height,
+                                             SceneTextureFormat format);
+
+    /**
      * {@code targetFormat} is only a hint: a pipeline is target-format agnostic (blend state and
      * vertex format do not depend on it), so implementations may share one pipeline across formats.
      */

@@ -4,9 +4,11 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.presentation.TrackArtworkStore;
 import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.legacy.LegacySceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.legacy.SceneWindowEnvironment;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ICommonEventService;
@@ -15,6 +17,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.Locale;
 
+@SuppressWarnings("resource")
 public final class RenderRuntime {
     private static final Logger LOGGER = MusicHud.getLogger(RenderRuntime.class);
     private static final long STATS_LOG_INTERVAL_MS = 5_000;
@@ -84,6 +87,29 @@ public final class RenderRuntime {
             }
         }
         return gpu;
+    }
+
+    /**
+     * Runs the deferred backdrop blurs with the sources the UI recorded this frame. Called after the
+     * UI layer is submitted, so both backends finish their own pass before the other touches GL.
+     */
+    public void flushPendingSceneWork() {
+        RenderSystem.assertOnRenderThread();
+        try {
+            if (!SceneBlurSlot.hasPending()) {
+                return;
+            }
+            SceneInterop.prepareGameGraphics();
+            try {
+                SceneBlurSlot.runAll(gpu());
+            } finally {
+                // Leave the game's backend in a known state for the GUI pass that follows.
+                SceneInterop.prepareGameGraphics();
+                SceneInterop.restoreArc3d();
+            }
+        } catch (RuntimeException | LinkageError failure) {
+            LOGGER.debug("While running deferred backdrop blur", failure);
+        }
     }
 
     private void pollDebugTargetOptions() {
@@ -205,6 +231,7 @@ public final class RenderRuntime {
     /** Game-reported frame rate, so a submission timing can be read in context. */
     private static String frameRate() {
         Minecraft minecraft = Minecraft.getInstance();
+        //noinspection ConstantValue
         if (minecraft == null) {
             return "fps=?";
         }

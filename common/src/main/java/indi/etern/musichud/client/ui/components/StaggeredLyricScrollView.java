@@ -1,11 +1,15 @@
 package indi.etern.musichud.client.ui.components;
 
+import icyllis.arc3d.core.Rect2f;
+import icyllis.arc3d.core.SamplingOptions;
+import icyllis.arc3d.sketch.Image;
 import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorListener;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.*;
+import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.view.MotionEvent;
@@ -19,6 +23,7 @@ import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
+import indi.etern.musichud.client.ui.render.gpu.SceneOffscreen;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.client.utils.ui.SpringValue;
@@ -135,6 +140,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private int cachedTopFadeHeight = -1;
     private int cachedBottomFadeHeight = -1;
     private float cachedFadeStrength = -1f;
+    // The edge fade erases the destination with DST_OUT; rendering the subtree here first keeps
+    // the erase local to this view instead of the whole ModernUI layer.
+    private final SceneOffscreen fadeTarget = new SceneOffscreen("musichud-lyric-fade");
+    private Image fadeSnapshot;
+    private boolean fadeIsolationDisabled;
     // One spring-backed RowWave per lyric row (see buildLyricRows).
     private final List<RowWave> rows = new ArrayList<>();
     @Getter
@@ -632,6 +642,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         for (LyricLineView view : lyricLineViewList) {
             view.releaseBlurSurfaces();
         }
+        releaseFadeResources();
     }
 
     private void startUpdateLoop() {
@@ -801,7 +812,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             boolean visible = view.getHeight() > 0
                     && bottom >= scrollY - margin
                     && top <= viewportBottom + margin;
-            if (visible && blurEnabled && !manual && referenceIndex >= 0 && view.isBlurEligible()) {
+            boolean blurred = visible && blurEnabled && !manual && referenceIndex >= 0
+                    && view.isBlurEligible();
+            view.setBlurPipelineEnabled(blurred);
+            if (blurred) {
                 float target = LineBlurRenderer.radiusForDistance(Math.abs(i - referenceIndex), maxRadius);
                 view.setBlurTarget(target, nowNanos);
                 if (view.isBlurInitialized()) {
@@ -854,11 +868,93 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     );
 
     @Override
+    public void draw(@NotNull Canvas canvas) {
+        if (canvas instanceof ArcCanvas arc && needsFadeIsolation() && renderFadeIsolated(arc)) {
+            return;
+        }
+        super.draw(canvas);
+    }
+
+    /** True while at least one edge fade is actually drawn (content overflows the viewport). */
+    private boolean needsFadeIsolation() {
+        if (!fadeEdgesEnabled || fadeIsolationDisabled || fadeEdgeMaxStrength <= 0f) {
+            return false;
+        }
+        int height = getHeight();
+        return getWidth() > 0 && height > 0 && container.getHeight() > height;
+    }
+
+    /**
+     * Renders the subtree into an offscreen target and composites it back, so the fade's DST_OUT
+     * only erases this view's content instead of the whole parent layer.
+     */
+    private boolean renderFadeIsolated(@NotNull ArcCanvas canvas) {
+        int width = getWidth();
+        int height = getHeight();
+        if (!fadeTarget.ensure(width, height) && !fadeTarget.isReady()) {
+            return false;
+        }
+        try {
+            Image snapshot = fadeTarget.renderSnapshot(-getScrollX(), -getScrollY(),
+                    super::draw);
+            replaceFadeSnapshot(snapshot);
+            if (fadeSnapshot == null) {
+                return false;
+            }
+
+            int scrollX = getScrollX();
+            int scrollY = getScrollY();
+            var nativeCanvas = canvas.getCanvas();
+            nativeCanvas.save();
+            nativeCanvas.drawImageRect(fadeSnapshot,
+                    new Rect2f(0, 0, width, height),
+                    new Rect2f(scrollX, scrollY, scrollX + width, scrollY + height),
+                    SamplingOptions.LINEAR, null,
+                    icyllis.arc3d.sketch.Canvas.SRC_RECT_CONSTRAINT_FAST);
+            nativeCanvas.restore();
+            return true;
+        } catch (Throwable failure) {
+            fadeIsolationDisabled = true;
+            releaseFadeResources();
+            if (logger == null) {
+                logger = MusicHud.getLogger(StaggeredLyricScrollView.class);
+            }
+            logger.error("Disabling lyric fade isolation after an error", failure);
+            return false;
+        }
+    }
+
+    private void replaceFadeSnapshot(@Nullable Image image) {
+        if (fadeSnapshot == image) {
+            return;
+        }
+        if (fadeSnapshot != null) {
+            fadeSnapshot.unref();
+        }
+        fadeSnapshot = image;
+    }
+
+    private void releaseFadeResources() {
+        replaceFadeSnapshot(null);
+        fadeTarget.close();
+    }
+
+    @Override
     protected void dispatchDraw(Canvas canvas) {
         canvas.save();
         canvas.concat(SUBPIXEL_MATRIX);
+        // Phase 1 renders every defocused row into its own offscreen target, so the render thread can
+        // blur them before this frame's composites are executed. Phase 2 then draws them in order.
+        int padding = blurPaddingPx();
+        for (LyricLineView lyricLineView : lyricLineViewList) {
+            lyricLineView.prepareBlurSource(padding);
+        }
         super.dispatchDraw(canvas);
         canvas.restore();
+    }
+
+    private int blurPaddingPx() {
+        return Math.max(dp(1), LineBlurRenderer.maxPaddingFor(dp(MAX_BLUR_DP)));
     }
 
     @Override

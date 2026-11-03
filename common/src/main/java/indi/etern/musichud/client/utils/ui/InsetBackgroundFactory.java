@@ -4,12 +4,14 @@ import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.animation.StateListAnimator;
 import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
+import icyllis.modernui.graphics.drawable.LayerDrawable;
 import icyllis.modernui.graphics.drawable.RippleDrawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.util.ColorStateList;
 import icyllis.modernui.util.IntProperty;
 import icyllis.modernui.view.View;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.drawable.BackdropBlurDrawable;
 import lombok.Builder;
 
 @Builder
@@ -28,12 +30,32 @@ public class InsetBackgroundFactory {
     int strokeColor = 0;
     @Builder.Default
     long transitionDuration = 100;
+    @Builder.Default
+    boolean backdropBlur = false;
+    @Builder.Default
+    int backdropBlurRadius = 0;
     public record Padding(int left,int top,int right,int bottom) {}
 
     public void applyBackgroundTo(View view) {
         ShapeDrawable background = newShapeDrawable();
         RippleDrawable ripple = new RippleDrawable(Theme.ITEM_RIPPLE_COLOR_STATES, background, null);
-        view.setBackground(new InsetDrawable(ripple, inset));
+        InsetDrawable tint = new InsetDrawable(ripple, inset);
+        if (backdropBlur && backdropBlurRadius > 0) {
+            BackdropBlurDrawable blur = new BackdropBlurDrawable(cornerRadius, backdropBlurRadius);
+            view.setBackground(new LayerDrawable(new InsetDrawable(blur, inset), tint));
+            view.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override
+                public void onViewAttachedToWindow(View v) {
+                }
+
+                @Override
+                public void onViewDetachedFromWindow(View v) {
+                    blur.release();
+                }
+            });
+        } else {
+            view.setBackground(tint);
+        }
         attachStateTransition(view, background);
     }
 

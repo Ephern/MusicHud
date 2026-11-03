@@ -678,7 +678,12 @@ public class MainFragment extends Fragment {
                 showLyricsPanel();
             }
 
-            return base;
+            var root = new FrameLayout(context);
+            root.setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+            root.addView(new MinecraftBackgroundView(context),
+                    new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+            root.addView(base, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+            return root;
         } catch (Exception e) {
             visible = false;
             throw e;

@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.components;
 
+import icyllis.arc3d.sketch.Image;
 import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorSet;
 import icyllis.modernui.animation.ObjectAnimator;
@@ -17,11 +18,13 @@ import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
 import indi.etern.musichud.client.ui.lyric.LineBlurResources;
+import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import indi.etern.musichud.client.utils.ui.RhythmAnimator;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.client.utils.ui.SpringValue;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
+import lombok.Setter;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -55,8 +58,21 @@ public class LyricLineView extends LinearLayout {
     private static final float BLUR_SPRING_RESPONSE_SECONDS = 0.3f;
     private final SpringValue blurSpring = new SpringValue(BLUR_SPRING_RESPONSE_SECONDS, 1f);
     private final LineBlurResources blurResources = new LineBlurResources();
+    private final SceneBlurSlot blurSlot = new SceneBlurSlot();
+    private Image frameImage;
+    private int frameSurfaceWidth;
+    private int frameSurfaceHeight;
+    private int framePadding;
     private float blurRadius = 0f;
     private float blurTarget = 0f;
+    /**
+     * -- SETTER --
+     *  Marks the row as taking part in this frame's blur pass. While enabled the row keeps its
+     *  offscreen source and result current even at radius zero, so a row that just lost its
+     *  highlight composites a near-current image instead of a stale one.
+     */
+    @Setter
+    private boolean blurPipelineEnabled;
     private boolean blurDisabled = false;
     @Getter
     private boolean blurInitialized = false;
@@ -315,39 +331,77 @@ public class LyricLineView extends LinearLayout {
     public void releaseBlurResources() {
         blurDisabled = true;
         blurResources.close();
+        blurSlot.unregister();
+        frameImage = null;
     }
 
     /** Releases the offscreen render targets but keeps the row blur-capable (e.g. temporary hide). */
     public void releaseBlurSurfaces() {
         blurResources.release();
+        frameImage = null;
+    }
+
+    private boolean canPrepareBlur() {
+        return blurPipelineEnabled
+                && !blurDisabled
+                && !blurSlot.isDisabled()
+                && isBlurEligible()
+                && getWidth() > 0
+                && getHeight() > 0;
+    }
+
+    /**
+     * Parent phase 1: renders the row content offscreen and asks the render thread to blur it. The
+     * composite happens later in {@link #dispatchDraw}; the blur result is already filled by then.
+     */
+    public void prepareBlurSource(int padding) {
+        frameImage = null;
+        if (!canPrepareBlur()) {
+            return;
+        }
+        try {
+            if (!blurResources.prepare(getWidth(), getHeight(), padding, blurRadius,
+                    computeBlurContentStamp(), super::dispatchDraw, blurSlot)) {
+                return;
+            }
+            // Below the blurrable radius the row is drawn sharp; the pipeline was still fed above so
+            // the image is ready the moment the radius crosses over.
+            if (!LineBlurRenderer.isBlurrable(blurRadius)) {
+                return;
+            }
+            Image image = blurSlot.image();
+            if (image == null) {
+                return;
+            }
+            if (image.getWidth() != blurResources.width()
+                    || image.getHeight() != blurResources.height()) {
+                return;
+            }
+            frameImage = image;
+            frameSurfaceWidth = blurResources.width();
+            frameSurfaceHeight = blurResources.height();
+            framePadding = blurResources.padding();
+        } catch (Throwable failure) {
+            blurDisabled = true;
+            blurResources.release();
+            blurSlot.shutdown();
+            frameImage = null;
+            if (logger == null) {
+                logger = MusicHud.getLogger(LyricLineView.class);
+            }
+            logger.error("Disabling lyric blur after an error", failure);
+        }
     }
 
     @Override
     protected void dispatchDraw(@NotNull Canvas canvas) {
         //noinspection UnstableApiUsage
-        if (blurDisabled
-                || blurRadius < 0.5f
-                || !isBlurEligible()
-                || !(canvas instanceof ArcCanvas arcCanvas)
-                || getWidth() <= 0
-                || getHeight() <= 0) {
-            super.dispatchDraw(canvas);
+        if (frameImage != null && canvas instanceof ArcCanvas arcCanvas) {
+            LineBlurRenderer.drawResult(arcCanvas, frameImage, frameSurfaceWidth, frameSurfaceHeight,
+                    framePadding);
             return;
         }
-        try {
-            if (!LineBlurRenderer.drawBlurred(arcCanvas, getWidth(), getHeight(),
-                    blurRadius, computeBlurContentStamp(), blurResources, super::dispatchDraw)) {
-                super.dispatchDraw(canvas);
-            }
-        } catch (Throwable t) {
-            blurDisabled = true;
-            blurResources.release();
-            if (logger == null) {
-                logger = MusicHud.getLogger(LyricLineView.class);
-            }
-            logger.error("Disabling lyric blur after an error", t);
-            super.dispatchDraw(canvas);
-        }
+        super.dispatchDraw(canvas);
     }
 
     /**
@@ -375,6 +429,12 @@ public class LyricLineView extends LinearLayout {
             stamp = stamp * 31 + subText.getCurrentTextColor();
         }
         return stamp;
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        blurSlot.register();
     }
 
     @Override

@@ -149,7 +149,8 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         panel.setMaxHeight(Math.max(0, windowHeight() - 2 * margin));
         panel.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
 
-        PanelStyle.factory(panel, 1.0, clientConfig.getPanelBrightness(), panel.dp(12), null)
+        PanelStyle.factory(panel, 0.7, 0.1,
+                        panel.dp(12), null, true)
                 .applyBackgroundTo(panel);
 
         LinearLayout content = new LinearLayout(context);
