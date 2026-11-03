@@ -1,4 +1,7 @@
 {
+  "music_hud.modernuiRequired.title": "ModernUI Required",
+  "music_hud.modernuiRequired.message": "Music HUD requires ModernUI 3.13.0 or newer",
+  "music_hud.modernuiRequired.download": "Download ModernUI",
   "key.category.music_hud.music_hud": "Music HUD",
   "music_hud.text.cloudUploadCancelled": "Cancelled",
   "music_hud.text.cloudUploadMatchUncertain": "Status unknown, refresh to check",

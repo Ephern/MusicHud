@@ -1,4 +1,7 @@
 {
+  "music_hud.modernuiRequired.title": "需要 ModernUI",
+  "music_hud.modernuiRequired.message": "Music HUD 依赖 ModernUI 3.13.0 或更高版本",
+  "music_hud.modernuiRequired.download": "下载 ModernUI",
   "key.category.music_hud.music_hud": "Music HUD",
   "music_hud.text.cloudUploadCancelled": "已取消",
   "music_hud.text.cloudUploadMatchUncertain": "状态未知，可刷新查看",

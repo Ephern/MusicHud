@@ -1,6 +1,7 @@
 package indi.etern.musichud.platform.mod.forgeConfig.config;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.RuntimeFlags;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
@@ -336,11 +337,15 @@ public class ClientConfigDefinition implements ClientConfig {
 
     @Override
     public boolean getEnable() {
-        return enable.get();
+        return RuntimeFlags.isClientUiAvailable() && enable.get();
     }
 
     @Override
     public void setEnable(boolean enable) {
+        if (!RuntimeFlags.isClientUiAvailable()) {
+            // The effective value is forced off; writing it back would overwrite the user's choice.
+            return;
+        }
         this.enable.set(enable);
     }
 
@@ -581,7 +586,7 @@ public class ClientConfigDefinition implements ClientConfig {
 
     @Override
     public boolean getEnabledInIntegratedServer() {
-        return enabledInIntegratedServer.get();
+        return RuntimeFlags.isClientUiAvailable() && enabledInIntegratedServer.get();
     }
 
     @Override
@@ -591,6 +596,9 @@ public class ClientConfigDefinition implements ClientConfig {
 
     @Override
     public void setEnabledInIntegratedServer(boolean enabledInIntegratedServer) {
+        if (!RuntimeFlags.isClientUiAvailable()) {
+            return;
+        }
         this.enabledInIntegratedServer.set(enabledInIntegratedServer);
     }
 
