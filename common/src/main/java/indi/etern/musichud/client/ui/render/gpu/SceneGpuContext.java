@@ -11,8 +11,8 @@ public interface SceneGpuContext extends AutoCloseable {
                                        SceneTextureFormat format);
 
     /**
-     * Like {@link #createRenderTarget}, but prefers the native GL allocator so
-     * {@link SceneGpuTexture#glTextureId()} is populated for cross-API sampling.
+     * Like {@link #createRenderTarget}, but prefers the native allocator so the texture is
+     * addressable by the interop backend (it is what cross-API sampling wraps).
      */
     SceneGpuTexture createNativeRenderTarget(String label, int width, int height,
                                              SceneTextureFormat format);

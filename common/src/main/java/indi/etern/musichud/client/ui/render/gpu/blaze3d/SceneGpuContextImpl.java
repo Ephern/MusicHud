@@ -13,6 +13,8 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.render.RenderStats;
 import indi.etern.musichud.client.ui.render.gpu.*;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlHalfFloatAllocator;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
+import indi.etern.musichud.client.ui.render.interop.gl.GlInteropBackend;
 import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -56,6 +58,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         this.halfFloatAllocator = new GlHalfFloatAllocator(device);
         this.maxTextureSize = device.getMaxTextureSize();
         this.rgba16fTargets = halfFloatAllocator.supportsHalfFloat();
+        SceneInterop.install(GlInteropBackend.INSTANCE);
     }
 
     @Override
@@ -331,6 +334,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         uniformStorages.clear();
         pipelines.clear();
         renderer.close();
+        SceneInterop.install(null);
     }
 
     /** Advances the uniform ring buffers; call once per frame after the scene was recorded. */

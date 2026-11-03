@@ -3,10 +3,9 @@ package indi.etern.musichud.client.ui.render;
 import com.mojang.blaze3d.systems.RenderSystem;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.presentation.TrackArtworkStore;
-import indi.etern.musichud.client.ui.components.UrlImageView;
-import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
+import indi.etern.musichud.client.ui.components.UrlImageView;import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
-import indi.etern.musichud.client.ui.render.gpu.SceneGlState;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneGpuContextImpl;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneWindowEnvironment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
@@ -17,6 +16,7 @@ import org.apache.logging.log4j.Logger;
 
 import java.util.Locale;
 
+@SuppressWarnings("resource")
 public final class RenderRuntime {
     private static final Logger LOGGER = MusicHud.getLogger(RenderRuntime.class);
     private static final long STATS_LOG_INTERVAL_MS = 5_000;
@@ -98,13 +98,13 @@ public final class RenderRuntime {
             if (!SceneBlurSlot.hasPending()) {
                 return;
             }
-            SceneGlState.prepareBlaze3D();
+            SceneInterop.prepareGameGraphics();
             try {
                 SceneBlurSlot.runAll(gpu());
             } finally {
-                // Leave Blaze3D in a known state for the GUI pass that follows this frame.
-                SceneGlState.prepareBlaze3D();
-                SceneGlState.restoreArc3D();
+                // Leave the game's backend in a known state for the GUI pass that follows.
+                SceneInterop.prepareGameGraphics();
+                SceneInterop.restoreArc3d();
             }
         } catch (RuntimeException | LinkageError failure) {
             LOGGER.debug("While running deferred backdrop blur", failure);
@@ -230,6 +230,7 @@ public final class RenderRuntime {
     /** Game-reported frame rate, so a submission timing can be read in context. */
     private static String frameRate() {
         Minecraft minecraft = Minecraft.getInstance();
+        //noinspection ConstantValue
         if (minecraft == null) {
             return "fps=?";
         }

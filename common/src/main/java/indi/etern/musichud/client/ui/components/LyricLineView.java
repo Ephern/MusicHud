@@ -24,6 +24,7 @@ import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.client.utils.ui.SpringValue;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
+import lombok.Setter;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -64,9 +65,14 @@ public class LyricLineView extends LinearLayout {
     private int framePadding;
     private float blurRadius = 0f;
     private float blurTarget = 0f;
-    /** Radius of the blur currently published by {@link #blurSlot}; NaN before the first request. */
-    private float requestedRadius = Float.NaN;
-    private boolean blurWasActive = false;
+    /**
+     * -- SETTER --
+     *  Marks the row as taking part in this frame's blur pass. While enabled the row keeps its
+     *  offscreen source and result current even at radius zero, so a row that just lost its
+     *  highlight composites a near-current image instead of a stale one.
+     */
+    @Setter
+    private boolean blurPipelineEnabled;
     private boolean blurDisabled = false;
     @Getter
     private boolean blurInitialized = false;
@@ -327,23 +333,18 @@ public class LyricLineView extends LinearLayout {
         blurResources.close();
         blurSlot.unregister();
         frameImage = null;
-        requestedRadius = Float.NaN;
-        blurWasActive = false;
     }
 
     /** Releases the offscreen render targets but keeps the row blur-capable (e.g. temporary hide). */
     public void releaseBlurSurfaces() {
         blurResources.release();
         frameImage = null;
-        requestedRadius = Float.NaN;
-        blurWasActive = false;
     }
 
-    /** True while this row would be composited from the deferred blur. */
-    public boolean isBlurActive() {
-        return !blurDisabled
+    private boolean canPrepareBlur() {
+        return blurPipelineEnabled
+                && !blurDisabled
                 && !blurSlot.isDisabled()
-                && LineBlurRenderer.isBlurrable(blurRadius)
                 && isBlurEligible()
                 && getWidth() > 0
                 && getHeight() > 0;
@@ -355,30 +356,25 @@ public class LyricLineView extends LinearLayout {
      */
     public void prepareBlurSource(int padding) {
         frameImage = null;
-        boolean active = isBlurActive();
-        boolean justActivated = active && !blurWasActive;
-        blurWasActive = active;
-        if (!active) {
+        if (!canPrepareBlur()) {
             return;
         }
         try {
-            float previousRequestRadius = requestedRadius;
             if (!blurResources.prepare(getWidth(), getHeight(), padding, blurRadius,
                     computeBlurContentStamp(), super::dispatchDraw, blurSlot)) {
                 return;
             }
-            requestedRadius = blurRadius;
-            // The published texture was produced with the radius requested one frame ago. When the
-            // row was not blurred at all in between (e.g. it just lost its highlight), that texture
-            // is much blurrier than the current radius, and compositing it would wash the row out
-            // for one frame; sharp is the better approximation.
-            if (justActivated || Float.isNaN(previousRequestRadius)
-                    || Math.abs(previousRequestRadius - blurRadius)
-                    > Math.max(4f, blurRadius * 0.5f)) {
+            // Below the blurrable radius the row is drawn sharp; the pipeline was still fed above so
+            // the image is ready the moment the radius crosses over.
+            if (!LineBlurRenderer.isBlurrable(blurRadius)) {
                 return;
             }
             Image image = blurSlot.image();
             if (image == null) {
+                return;
+            }
+            if (image.getWidth() != blurResources.width()
+                    || image.getHeight() != blurResources.height()) {
                 return;
             }
             frameImage = image;

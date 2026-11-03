@@ -6,7 +6,8 @@ import com.mojang.blaze3d.textures.GpuTextureView;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
 import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
 
-final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
+@SuppressWarnings("resource")
+public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
     private final SceneTextureFormat format;
     private final SceneTextureFormat actualFormat;
     private final int glTextureId;
@@ -69,7 +70,7 @@ final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
         return actualFormat;
     }
 
-    @Override
+    /** Native OpenGL texture name, only meaningful for the GL interop backend. */
     public int glTextureId() {
         return glTextureId;
     }

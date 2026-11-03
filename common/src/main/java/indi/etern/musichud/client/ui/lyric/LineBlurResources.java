@@ -1,14 +1,17 @@
 package indi.etern.musichud.client.ui.lyric;
 
-import icyllis.arc3d.opengl.GLTexture;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import indi.etern.musichud.client.ui.render.gpu.SceneOffscreen;
-
 /**
  * Offscreen source target of one lyric row, plus the cached state that decides when it must be
  * re-rendered and re-blurred. The blurred result itself lives in {@link SceneBlurSlot}.
  */
 public final class LineBlurResources {
+    /** Below this the spring's float jitter is invisible and must not trigger a re-convolution. */
+    private static final float RADIUS_EPSILON = 0.05f;
+    /** The pipeline must keep producing results at radius zero so losing focus is seamless. */
+    private static final float MIN_SIGMA = 0.2f;
+
     private final SceneOffscreen target = new SceneOffscreen("musichud-line-blur-src");
     private int padding;
 
@@ -40,16 +43,17 @@ public final class LineBlurResources {
         }
         this.padding = padding;
         boolean contentChanged = recreated || cachedContentStamp != contentStamp;
-        boolean radiusChanged = cachedRadius != radius;
+        boolean radiusChanged = Float.isNaN(cachedRadius)
+                || Math.abs(cachedRadius - radius) >= RADIUS_EPSILON;
         if (contentChanged) {
             target.render(padding, padding, drawer::draw);
             cachedContentStamp = contentStamp;
         }
         if (contentChanged || radiusChanged) {
-            GLTexture texture = SceneBlurSlot.textureOf(target.surface());
+            var texture = SceneBlurSlot.imageOf(target.surface());
             if (texture != null) {
                 slot.request(texture, 0f, 0f, 1f, 1f, width, height,
-                        LineBlurRenderer.sigmaFor(radius));
+                        Math.max(LineBlurRenderer.sigmaFor(radius), MIN_SIGMA));
             }
             cachedRadius = radius;
         }

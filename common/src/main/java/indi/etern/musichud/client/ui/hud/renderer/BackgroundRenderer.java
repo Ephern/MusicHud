@@ -30,6 +30,7 @@ import indi.etern.musichud.client.ui.render.gpu.SceneCoverLayers;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverOverlay;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverSource;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverTransition;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import indi.etern.musichud.client.ui.render.gpu.SceneCoverWarpProcedural;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.BlazeSceneCoverSources;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
@@ -357,7 +358,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         int height = source.height();
         if (width <= 0 || height <= 0) return false;
         SceneGpuTexture baked = bakeTarget(gpu, width, height);
-        if (baked == null || baked.glTextureId() == 0) return false;
+        if (baked == null || !SceneInterop.capabilities().canExport()) return false;
         BackgroundBakeUniform uniform = new BackgroundBakeUniform(
                 width, height, style.getRadius() * source.guiScale(), style.calcAbsoluteAlpha(),
                 FluidBackgroundSettings.BACKGROUND_NATURAL_SATURATION,

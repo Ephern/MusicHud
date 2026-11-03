@@ -19,12 +19,12 @@ import indi.etern.musichud.client.ui.render.gpu.SceneBlurPainter;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import indi.etern.musichud.client.ui.render.gpu.SceneOffscreen;
 import org.apache.logging.log4j.Logger;
-import org.jetbrains.annotations.Nullable;
 
 /**
  * Mutable content of the modal popup: the dim layer plus the card. The card is rendered into its own
  * surface, so the backdrop can be blurred and composited between the dim and the card.
  */
+@SuppressWarnings("UnstableApiUsage")
 public final class ModalOverlay extends FrameLayout {
     private static final Logger LOGGER = MusicHud.getLogger(ModalOverlay.class);
     private static final Matrix4 IDENTITY = new Matrix4();
@@ -140,7 +140,7 @@ public final class ModalOverlay extends FrameLayout {
         if (device.width() <= 0 || device.height() <= 0) {
             return;
         }
-        int padding = (int) Math.ceil(blurRadiusPx) + 2;
+        int padding = blurRadiusPx + 2;
         int snapLeft = Math.max(0, device.left() - padding);
         int snapTop = Math.max(0, device.top() - padding);
         int snapRight = Math.min(layer.getWidth(), device.right() + padding);
@@ -160,7 +160,7 @@ public final class ModalOverlay extends FrameLayout {
                     } finally {
                         snapshot.unref();
                     }
-                    var source = SceneBlurSlot.textureOf(backdropTarget.surface());
+                    var source = SceneBlurSlot.imageOf(backdropTarget.surface());
                     if (source != null) {
                         blurSlot.request(source, 0f, 0f, 1f, 1f, snapWidth, snapHeight,
                                 blurRadiusPx / 3f);

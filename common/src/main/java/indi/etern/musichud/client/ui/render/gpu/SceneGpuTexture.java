@@ -10,7 +10,4 @@ public interface SceneGpuTexture extends SceneTextureRef {
     SceneTextureFormat format();
 
     SceneTextureFormat actualFormat();
-
-    /** Native OpenGL texture name, or 0 when the backend cannot expose one. */
-    int glTextureId();
 }

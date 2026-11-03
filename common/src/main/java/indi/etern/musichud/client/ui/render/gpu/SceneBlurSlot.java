@@ -2,14 +2,16 @@ package indi.etern.musichud.client.ui.render.gpu;
 
 import icyllis.arc3d.core.RefCnt;
 import icyllis.arc3d.granite.GraniteSurface;
-import icyllis.arc3d.opengl.GLTexture;
 import icyllis.arc3d.sketch.Image;
 import icyllis.arc3d.sketch.Surface;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.interop.InteropSource;
+import indi.etern.musichud.client.ui.render.interop.InteropUsage;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
+import indi.etern.musichud.client.ui.render.pipeline.SceneTextureRef;
 import lombok.Getter;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
-import org.lwjgl.opengl.GL11;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -17,7 +19,7 @@ import java.util.List;
 
 /**
  * Per-consumer blur pipeline. The UI thread records the blur source into an arc3d surface and hands
- * its texture over; the render thread crops and blurs it with {@link SceneBlur}, then publishes the
+ * its image over; the render thread crops and blurs it with {@link SceneBlur}, then publishes the
  * result so the recording that samples it sees the fresh content.
  */
 public final class SceneBlurSlot {
@@ -30,7 +32,7 @@ public final class SceneBlurSlot {
 
     private final Object requestLock = new Object();
 
-    private GLTexture pendingSource;
+    private icyllis.arc3d.engine.Image pendingSource;
     private float u0;
     private float v0;
     private float u1 = 1f;
@@ -41,22 +43,19 @@ public final class SceneBlurSlot {
     private boolean pending;
 
     private Pipeline pipeline;
-    private WrappedSceneTexture source;
+    private InteropSource source;
+    private icyllis.arc3d.engine.Image sourceKey;
     private final PublishedSceneTexture published = new PublishedSceneTexture();
     @Getter
     private volatile boolean disabled;
 
-    /** UI thread: references the backing texture of an arc3d render target. */
-    public static @Nullable GLTexture textureOf(@Nullable Surface surface) {
+    /** UI thread: references the backing image of an arc3d render target. */
+    public static @Nullable icyllis.arc3d.engine.Image imageOf(@Nullable Surface surface) {
         if (!(surface instanceof GraniteSurface granite)) {
             return null;
         }
         var proxy = granite.getBackingTarget();
-        if (proxy == null) {
-            return null;
-        }
-        var image = proxy.getImage();
-        return image instanceof GLTexture texture ? RefCnt.create(texture) : null;
+        return proxy == null ? null : RefCnt.create(proxy.getImage());
     }
 
     public void register() {
@@ -82,12 +81,12 @@ public final class SceneBlurSlot {
     }
 
     /** UI thread: hands over a reference to the blur source region. */
-    public void request(@Nullable GLTexture texture,
+    public void request(@Nullable icyllis.arc3d.engine.Image image,
                         float u0, float v0, float u1, float v1,
                         int outWidth, int outHeight, float sigma) {
-        if (texture == null || disabled || outWidth < 1 || outHeight < 1 || !(sigma > 0f)) {
-            if (texture != null) {
-                texture.unref();
+        if (image == null || disabled || outWidth < 1 || outHeight < 1 || !(sigma > 0f)) {
+            if (image != null) {
+                image.unref();
             }
             return;
         }
@@ -95,7 +94,7 @@ public final class SceneBlurSlot {
             if (pendingSource != null) {
                 pendingSource.unref();
             }
-            pendingSource = texture;
+            pendingSource = image;
             this.u0 = u0;
             this.v0 = v0;
             this.u1 = u1;
@@ -172,7 +171,7 @@ public final class SceneBlurSlot {
             discardPending();
             return;
         }
-        GLTexture texture;
+        icyllis.arc3d.engine.Image image;
         float u0;
         float v0;
         float u1;
@@ -184,7 +183,7 @@ public final class SceneBlurSlot {
             if (!pending || pendingSource == null) {
                 return;
             }
-            texture = pendingSource;
+            image = pendingSource;
             pendingSource = null;
             pending = false;
             u0 = this.u0;
@@ -195,26 +194,31 @@ public final class SceneBlurSlot {
             outHeight = this.outHeight;
             sigma = this.sigma;
         }
+        InteropSource input = null;
         try {
-            WrappedSceneTexture input = useSource(texture);
+            input = useSource(image);
             if (input == null) {
                 return;
             }
+            SceneInterop.beginRead(input);
             Pipeline current = usePipeline(gpu, outWidth, outHeight, sigma);
-            SceneGpuTexture blurSource = input;
+            SceneTextureRef blurSource = input;
+            int blurWidth = input.width();
+            int blurHeight = input.height();
             boolean cropped = u0 > 0f || v0 > 0f || u1 < 1f || v1 < 1f
-                    || input.width() != outWidth || input.height() != outHeight;
+                    || blurWidth != outWidth || blurHeight != outHeight;
             if (cropped) {
-                SceneGpuTexture crop = current.crop.apply(gpu, input,
+                blurSource = current.crop.applyRef(gpu, input, blurWidth, blurHeight,
                         u0, v0, u1, v1, outWidth, outHeight);
-                if (crop == null) {
+                if (blurSource == null) {
                     return;
                 }
-                blurSource = crop;
+                blurWidth = outWidth;
+                blurHeight = outHeight;
             }
             SceneBlur.PendingBlur pendingBlur = current.blur.prepare(gpu,
-                    blurSource.width(), blurSource.height(), sigma);
-            if (pendingBlur == null || !pendingBlur.apply(gpu, blurSource)) {
+                    blurWidth, blurHeight, sigma);
+            if (pendingBlur == null || !pendingBlur.apply(gpu, blurSource, blurWidth, blurHeight)) {
                 return;
             }
             SceneGpuTexture target = pendingBlur.target();
@@ -224,29 +228,25 @@ public final class SceneBlurSlot {
             // A broken slot must not take the whole UI down; the consumer falls back to a sharp draw.
             LOGGER.error("Disabling backdrop blur after an error", failure);
             shutdown();
+        } finally {
+            if (input != null) {
+                SceneInterop.endRead(input);
+            }
         }
     }
 
-    private @Nullable WrappedSceneTexture useSource(GLTexture texture) {
-        if (texture.getHandle() == 0) {
-            texture.unref();
-            return null;
-        }
-        if (!GL11.glIsTexture(texture.getHandle())) {
-            LOGGER.warn("Blur source texture {} is no longer valid", texture.getHandle());
-            texture.unref();
-            return null;
-        }
-        if (source != null && source.sourceTexture() == texture) {
-            texture.unref();
+    private @Nullable InteropSource useSource(icyllis.arc3d.engine.Image image) {
+        if (source != null && sourceKey == image) {
+            image.unref();
             return source;
         }
-        WrappedSceneTexture wrapped = WrappedSceneTexture.wrap(texture);
+        InteropSource wrapped = SceneInterop.importImage(image, InteropUsage.SAMPLE);
         if (wrapped == null) {
             return null;
         }
-        WrappedSceneTexture previous = source;
+        InteropSource previous = source;
         source = wrapped;
+        sourceKey = image;
         if (previous != null) {
             scheduleRelease(previous::close);
         }
@@ -270,8 +270,9 @@ public final class SceneBlurSlot {
 
     private void releaseNow() {
         discardPending();
-        WrappedSceneTexture previousSource = source;
+        InteropSource previousSource = source;
         source = null;
+        sourceKey = null;
         if (previousSource != null) {
             scheduleRelease(previousSource::close);
         }

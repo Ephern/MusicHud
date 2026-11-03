@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.render.gpu;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.render.FluidBackgroundSettings;
+import indi.etern.musichud.client.ui.render.pipeline.SceneTextureRef;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
@@ -145,53 +146,74 @@ public final class SceneBlur {
         }
 
         public boolean apply(SceneGpuContext gpu, SceneGpuTexture source) {
-            if (gpu != this.gpu || source == null
-                    || source.width() != sourceWidth || source.height() != sourceHeight) {
+            if (source == null) {
                 return false;
             }
-            SceneGpuTexture current = source;
+            return apply(gpu, source, source.width(), source.height());
+        }
+
+        /**
+         * @param source the texture to read; it may be a foreign (interop) texture, so the size is
+         *               passed explicitly instead of read back from it
+         */
+        public boolean apply(SceneGpuContext gpu, SceneTextureRef source, int width, int height) {
+            if (gpu != this.gpu || source == null
+                    || width != sourceWidth || height != sourceHeight) {
+                return false;
+            }
+            SceneTextureRef current = source;
+            int currentWidth = width;
+            int currentHeight = height;
             for (int i = 1; i <= level; i++) {
                 SceneGpuTexture next = downsamples[i];
                 if (!pass(gpu, ScenePipelineKey.SCENE_BLUR_DOWNSAMPLE, current, next,
-                        BlurUniform.downsample(current.width(), current.height()))) {
-                    return fallback(gpu, source);
+                        BlurUniform.downsample(currentWidth, currentHeight))) {
+                    return fallback(gpu, source, width, height);
                 }
                 current = next;
+                currentWidth = next.width();
+                currentHeight = next.height();
             }
 
-            SceneGpuTexture verticalTarget = level == 0 ? result : current;
+            SceneGpuTexture verticalTarget = level == 0 ? result : downsamples[level];
             if (!pass(gpu, ScenePipelineKey.SCENE_BLUR_GAUSSIAN, current, scratch,
-                    BlurUniform.gaussian(current.width(), current.height(), 1f, 0f, sigmaLow))) {
-                return fallback(gpu, source);
+                    BlurUniform.gaussian(currentWidth, currentHeight, 1f, 0f, sigmaLow))) {
+                return fallback(gpu, source, width, height);
             }
             if (!pass(gpu, ScenePipelineKey.SCENE_BLUR_GAUSSIAN, scratch, verticalTarget,
                     BlurUniform.gaussian(scratch.width(), scratch.height(), 0f, 1f, sigmaLow))) {
-                return fallback(gpu, source);
+                return fallback(gpu, source, width, height);
             }
             if (level == 0) return true;
 
+            current = verticalTarget;
+            currentWidth = verticalTarget.width();
+            currentHeight = verticalTarget.height();
             for (int i = level - 1; i >= 1; i--) {
                 SceneGpuTexture next = downsamples[i];
                 if (!pass(gpu, ScenePipelineKey.SCENE_BLUR_UPSAMPLE, current, next,
-                        BlurUniform.upsample(current.width(), current.height()))) {
-                    return fallback(gpu, source);
+                        BlurUniform.upsample(currentWidth, currentHeight))) {
+                    return fallback(gpu, source, width, height);
                 }
                 current = next;
+                currentWidth = next.width();
+                currentHeight = next.height();
             }
             if (!pass(gpu, ScenePipelineKey.SCENE_BLUR_UPSAMPLE, current, result,
-                    BlurUniform.upsample(current.width(), current.height()))) {
-                return fallback(gpu, source);
+                    BlurUniform.upsample(currentWidth, currentHeight))) {
+                return fallback(gpu, source, width, height);
             }
             return true;
         }
 
-        private boolean fallback(SceneGpuContext gpu, SceneGpuTexture source) {
+        private boolean fallback(SceneGpuContext gpu, SceneTextureRef source,
+                                 int width, int height) {
             return pass(gpu, ScenePipelineKey.SCENE_BLUR_COPY, source, result,
-                    BlurUniform.copy(source.width(), source.height()));
+                    BlurUniform.copy(width, height));
         }
 
         private boolean pass(SceneGpuContext gpu, ScenePipelineKey key,
-                             SceneGpuTexture source, SceneGpuTexture target, SceneUniform uniform) {
+                             SceneTextureRef source, SceneGpuTexture target, SceneUniform uniform) {
             try {
                 gpu.draw(new SceneDraw(target, gpu.pipeline(key, target.actualFormat()),
                         List.of(new SceneSamplerBinding("Sampler0", source)),

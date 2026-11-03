@@ -812,7 +812,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             boolean visible = view.getHeight() > 0
                     && bottom >= scrollY - margin
                     && top <= viewportBottom + margin;
-            if (visible && blurEnabled && !manual && referenceIndex >= 0 && view.isBlurEligible()) {
+            boolean blurred = visible && blurEnabled && !manual && referenceIndex >= 0
+                    && view.isBlurEligible();
+            view.setBlurPipelineEnabled(blurred);
+            if (blurred) {
                 float target = LineBlurRenderer.radiusForDistance(Math.abs(i - referenceIndex), maxRadius);
                 view.setBlurTarget(target, nowNanos);
                 if (view.isBlurInitialized()) {
