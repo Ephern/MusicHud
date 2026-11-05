@@ -20,6 +20,7 @@ import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButt
 import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.server.api.playmode.PlayMode;
@@ -150,7 +151,7 @@ public class MusicTrackItem extends LinearLayout {
                     //noinspection unchecked
                     MusicService.getInstance().loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
                             .thenAccept((musicCollection) ->
-                                    MuiModApi.postToUiThread(() -> RouterContainer.getInstance().pushNavigate(
+                                    MuiModApi.postToUiThread(() -> MainFragment.getInstance().getRouterContainer().pushNavigate(
                                             new MusicCollectionDetailView(getContext(), musicCollection)))
                             );
                 }
@@ -282,7 +283,7 @@ public class MusicTrackItem extends LinearLayout {
             artistButton.setText(artist.getName());
             artistButton.setSingleLine();
             artistButton.setOnClickListener(button -> {
-                RouterContainer routerContainer = RouterContainer.getInstance();
+                RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                 if (routerContainer != null) {
                     routerContainer.pushNavigate(
                             new ArtistDetailView(context, artist)
@@ -312,7 +313,7 @@ public class MusicTrackItem extends LinearLayout {
             albumButton.setSingleLine();
             albumButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
             albumButton.setOnClickListener(button -> {
-                RouterContainer routerContainer = RouterContainer.getInstance();
+                RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                 if (routerContainer != null) {
                     routerContainer.pushNavigate(
                             new MusicCollectionDetailView(context, album)

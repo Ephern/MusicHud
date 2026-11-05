@@ -30,6 +30,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.server.api.playmode.PlayMode;
@@ -104,7 +105,7 @@ public class MusicInfoCard extends LinearLayout {
                     MusicService.getInstance().loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
                             .thenAccept((musicCollection) ->
                                     MuiModApi.postToUiThread(() -> {
-                                        RouterContainer router = RouterContainer.getInstance();
+                                        RouterContainer router = MainFragment.getInstance().getRouterContainer();
                                         if (router != null) {
                                             router.pushNavigate(new MusicCollectionDetailView(context, musicCollection));
                                         }
@@ -288,7 +289,7 @@ public class MusicInfoCard extends LinearLayout {
                     artistsBuilder.setSpan(new ClickableSpan() {
                         @Override
                         public void onClick(View widget) {
-                            RouterContainer routerContainer = RouterContainer.getInstance();
+                            RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                             if (routerContainer != null) {
                                 routerContainer.pushNavigate(
                                         new ArtistDetailView(context, artist)
@@ -315,7 +316,7 @@ public class MusicInfoCard extends LinearLayout {
                 albumBuilder.setSpan(new ClickableSpan() {
                     @Override
                     public void onClick(View widget) {
-                        RouterContainer routerContainer = RouterContainer.getInstance();
+                        RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                         if (routerContainer != null) {
                             routerContainer.pushNavigate(
                                     new MusicCollectionDetailView(context, album)

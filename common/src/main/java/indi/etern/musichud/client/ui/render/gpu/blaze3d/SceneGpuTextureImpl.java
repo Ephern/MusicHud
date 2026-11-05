@@ -81,6 +81,11 @@ public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable
     }
 
     @Override
+    public boolean isClosed() {
+        return closed;
+    }
+
+    @Override
     public void close() {
         RenderSystem.assertOnRenderThread();
         if (closed) return;

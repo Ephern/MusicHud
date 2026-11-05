@@ -19,18 +19,15 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.MusicListFactory;
 import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.ui.components.RouterContainer;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.layouts.WaterfallLayout;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.network.RequestResponseManager;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentAlbumRecordRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentAlbumRecordResponse;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentPlaylistRecordRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentPlaylistRecordResponse;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentTrackRecordRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentTrackRecordResponse;
+import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import lombok.NonNull;
 import net.minecraft.client.resources.language.I18n;
 
@@ -38,7 +35,6 @@ import java.time.Duration;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -70,7 +66,7 @@ public class PlayHistoryView extends LinearLayout {
             backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), backIcon, dp(16), dp(16)));
         }
         backButton.setOnClickListener(view -> {
-            RouterContainer routerContainer = RouterContainer.getInstance();
+            RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
             if (routerContainer != null) {
                 routerContainer.popNavigate();
             }

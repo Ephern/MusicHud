@@ -25,10 +25,12 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.CloudTrackItem;
 import indi.etern.musichud.client.ui.components.RouterContainer;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.modals.Modal;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.layouts.CloudTrackItemAdapter;
 import indi.etern.musichud.client.ui.layouts.VirtualizedListLayout;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.ByteUnitFormatter;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
@@ -41,7 +43,6 @@ import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.nio.file.Paths;
 import java.util.*;
-import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -91,7 +92,7 @@ public class CloudDriveView extends LinearLayout {
             backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), backIcon, dp(16), dp(16)));
         }
         backButton.setOnClickListener(view -> {
-            RouterContainer routerContainer = RouterContainer.getInstance();
+            RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
             if (routerContainer != null) {
                 routerContainer.popNavigate();
             }

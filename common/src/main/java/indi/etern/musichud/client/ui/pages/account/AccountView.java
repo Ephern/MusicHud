@@ -17,11 +17,13 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.RouterContainer;
-import indi.etern.musichud.client.ui.components.cards.ArtistCard;
-import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
-import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.components.cards.ArtistCard;
+import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
+import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
@@ -33,7 +35,6 @@ import net.minecraft.client.resources.language.I18n;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
-import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -264,14 +265,14 @@ public class AccountView extends LinearLayout {
                 .build();
         buildCard(context, backgroundFactory1, buttons, I18n.get(MusicHud.MOD_ID + ".button.history"), "/assets/music_hud/textures/gui/icons/rotate_ccw_clock.png",
                 v -> {
-                    RouterContainer routerContainer = RouterContainer.getInstance();
+                    RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                     if (routerContainer != null) {
                         routerContainer.pushNavigate(new PlayHistoryView(context));
                     }
                 });
         buildCard(context, backgroundFactory1, buttons, I18n.get(MusicHud.MOD_ID + ".button.cloud"), "/assets/music_hud/textures/gui/icons/cloud.png",
                 v -> {
-                    RouterContainer routerContainer = RouterContainer.getInstance();
+                    RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                     if (routerContainer != null) {
                         routerContainer.pushNavigate(new CloudDriveView(context));
                     }

@@ -25,9 +25,10 @@ public class SearchMusicResultView extends LinearLayout {
     private static SearchMusicResultView instance;
     private static List<MusicDetail> result;
     private final InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
-            .cornerRadius(dp(12))
+            .cornerRadius(dp(7))
             .inset(dp(1))
-            .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build();
+            .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4)))
+            .build();
 
     public SearchMusicResultView(Context context) {
         super(context);

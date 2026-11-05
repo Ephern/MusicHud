@@ -20,6 +20,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.ui.components.RouterContainer;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
@@ -27,6 +28,7 @@ import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundOverrideStack;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
@@ -38,7 +40,6 @@ import net.minecraft.client.resources.language.I18n;
 import java.util.Objects;
 import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
-import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -92,7 +93,7 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
         }
         Tooltip.attach(backButton, tooltipText);
         backButton.setOnClickListener(view -> {
-            RouterContainer.getInstance().popNavigate();
+            MainFragment.getInstance().getRouterContainer().popNavigate();
             backButton.setOnClickListener(null);
         });
         InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
@@ -489,7 +490,7 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
         if (!routeActive || !isAttachedToWindow() || data == null) {
             return false;
         }
-        RouterContainer router = RouterContainer.getInstance();
+        RouterContainer router = MainFragment.getInstance().getRouterContainer();
         if (router == null || router.getEffectivePage() != this) {
             return false;
         }

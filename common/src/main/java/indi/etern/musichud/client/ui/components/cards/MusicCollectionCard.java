@@ -23,6 +23,7 @@ import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.components.buttons.ToggleSubscribeButton;
 import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.CountFormatter;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
@@ -220,7 +221,7 @@ public class MusicCollectionCard extends LinearLayout {
             setClickable(true);
             setFocusable(true);
             setOnClickListener(v -> {
-                RouterContainer routerContainer = RouterContainer.getInstance();
+                RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                 if (routerContainer != null) {
                     routerContainer.pushNavigate(
                             new MusicCollectionDetailView(context, musicCollection)

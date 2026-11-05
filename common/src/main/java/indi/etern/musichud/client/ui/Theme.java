@@ -76,8 +76,8 @@ public class Theme {
     public static final int TEXT_SIZE_NORMAL = 12;
     public static final int TEXT_SIZE_LARGE = 15;
     public static final int TEXT_SIZE_LARGER = 18;
-    public static final int MAIN_LYRIC_SIZE = 28;
-    public static final int SUB_LYRIC_SIZE = 16;
+    public static final int MAIN_LYRIC_SIZE = 34;
+    public static final int SUB_LYRIC_SIZE = 18;
     public static final int SIDEBAR_MAIN_LYRIC_SIZE = 18;
     public static final int SIDEBAR_SUB_LYRIC_SIZE = 12;
     public static final float EMPHASIZE_LYRIC_ALPHA = 0.9f;

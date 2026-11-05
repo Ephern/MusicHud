@@ -11,7 +11,8 @@
     "ScreenMixin",
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
-    "SpanSetMixin"
+    "SpanSetMixin",
+    "UIManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

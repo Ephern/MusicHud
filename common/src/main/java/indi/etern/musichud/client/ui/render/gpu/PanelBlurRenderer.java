@@ -11,8 +11,9 @@ import java.util.List;
 /**
  * Blurs the main render target under the HUD config side panel.
  * <p>
- * The UI records before this runs, so the panel samples the previous frame's result. Targets are
- * therefore retired for a couple of frames instead of being released when the region changes.
+ * The panel is published here, before the UI recording that samples it is submitted, so the content
+ * shown this frame is current. A replaced result is retired rather than released: a recording made
+ * before the replacement may still sample it.
  */
 public final class PanelBlurRenderer {
     private static final Logger LOGGER = MusicHud.getLogger(PanelBlurRenderer.class);
@@ -58,16 +59,17 @@ public final class PanelBlurRenderer {
     }
 
     private Pipeline usePipeline(int width, int height, float sigma) {
-        int level = SceneBlur.levelFor(width, height, sigma);
+        // SceneBlur keeps its result across level changes, so only a size change needs a new
+        // pipeline.
         Pipeline current = pipeline;
-        if (current != null && current.width == width && current.height == height
-                && current.level == level) {
+        if (current != null && current.width == width && current.height == height) {
+            current.level = SceneBlur.levelFor(width, height, sigma);
             return current;
         }
         if (current != null) {
             retired.add(new Retired(frame, current));
         }
-        pipeline = new Pipeline(width, height, level);
+        pipeline = new Pipeline(width, height, SceneBlur.levelFor(width, height, sigma));
         return pipeline;
     }
 
@@ -95,7 +97,7 @@ public final class PanelBlurRenderer {
     private static final class Pipeline {
         final int width;
         final int height;
-        final int level;
+        int level;
         final SceneCapture capture = new SceneCapture();
         final SceneBlur blur = new SceneBlur(SceneTextureFormat.RGBA8);
 

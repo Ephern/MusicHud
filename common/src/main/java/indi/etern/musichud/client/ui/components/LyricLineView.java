@@ -103,7 +103,7 @@ public class LyricLineView extends LinearLayout {
                     for (int i = 0; i < 3; i++) {
                         TextView dot = new TextView(getContext());
                         dot.setText("●");
-                        dot.setTextSize(mainLyricSize * 1.25f);
+                        dot.setTextSize(subLyricSize);
                         LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
                         dotParams.setMargins(dp(2), 0, dp(2), 0);
                         dot.setLayoutParams(dotParams);

@@ -3,9 +3,8 @@ package indi.etern.musichud.client.ui.render;
 import com.mojang.blaze3d.systems.RenderSystem;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.presentation.TrackArtworkStore;
-import indi.etern.musichud.client.ui.components.UrlImageView;import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
+import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
-import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneGpuContextImpl;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneWindowEnvironment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
@@ -86,29 +85,6 @@ public final class RenderRuntime {
             }
         }
         return gpu;
-    }
-
-    /**
-     * Runs the deferred backdrop blurs with the sources the UI recorded this frame. Called after the
-     * UI layer is submitted, so both backends finish their own pass before the other touches GL.
-     */
-    public void flushPendingSceneWork() {
-        RenderSystem.assertOnRenderThread();
-        try {
-            if (!SceneBlurSlot.hasPending()) {
-                return;
-            }
-            SceneInterop.prepareGameGraphics();
-            try {
-                SceneBlurSlot.runAll(gpu());
-            } finally {
-                // Leave the game's backend in a known state for the GUI pass that follows.
-                SceneInterop.prepareGameGraphics();
-                SceneInterop.restoreArc3d();
-            }
-        } catch (RuntimeException | LinkageError failure) {
-            LOGGER.debug("While running deferred backdrop blur", failure);
-        }
     }
 
     private void pollDebugTargetOptions() {

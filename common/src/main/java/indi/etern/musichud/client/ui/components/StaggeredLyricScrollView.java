@@ -22,6 +22,8 @@ import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
+import indi.etern.musichud.client.ui.render.gpu.BlurRecordingContext;
+import indi.etern.musichud.client.ui.render.gpu.MidFrameCommit;
 import indi.etern.musichud.client.ui.render.gpu.SceneOffscreen;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
@@ -148,6 +150,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     @Getter
     @Setter
     private boolean fadeEdgesEnabled = true;
+    @Getter
+    @Setter
+    private boolean drawFadeEdgesWhenManualScroll = false;
     @Getter
     @Setter
     private float fadeEdgeMaxStrength = 1.0f;
@@ -890,6 +895,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         for (LyricLineView lyricLineView : lyricLineViewList) {
             lyricLineView.prepareBlurSource(padding);
         }
+        MidFrameCommit.commitIfPending(BlurRecordingContext.get());
         super.dispatchDraw(canvas);
         canvas.restore();
     }
@@ -924,7 +930,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
         float edgeFadeExtraAlpha;
         long elapsedTime = MuiModApi.getElapsedTime();
-        if (scrollStatus == ScrollStatus.MANUAL) {
+        if (drawFadeEdgesWhenManualScroll) {
+            edgeFadeExtraAlpha = 1;
+        } else if (scrollStatus == ScrollStatus.MANUAL) {
             long timeMillis = elapsedTime - lastUserStartScrollTime;
             if (timeMillis < 0) {
                 edgeFadeExtraAlpha = 1;

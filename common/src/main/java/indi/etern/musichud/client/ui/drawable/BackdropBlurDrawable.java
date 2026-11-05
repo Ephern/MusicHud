@@ -8,6 +8,7 @@ import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.view.View;
 import indi.etern.musichud.client.ui.render.gpu.HudPanelBackdrop;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurPainter;
+import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import org.jetbrains.annotations.NotNull;
 
 /**
@@ -88,7 +89,7 @@ public final class BackdropBlurDrawable extends Drawable {
         }
         view = null;
         attachListener = null;
-        painter.close();
+        SceneBlurSlot.retire(painter::close);
         HudPanelBackdrop.clear();
     }
 }

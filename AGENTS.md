@@ -26,7 +26,7 @@ Multi-loader Minecraft mod (Fabric + NeoForge + Paper), specific Minecraft versi
 - **`core` module is a plain `java-library` (NO Loom)** — excluded by `build.gradle:16`: `configure(subprojects.findAll { it.name != 'core' })`.
   - Platform modules (`fabric`/`neoforge`) add `core` via a dedicated `coreLib` configuration that extends `compileClasspath` + `runtimeClasspath` but **NOT** `developmentFabric`/`developmentNeoForge` — this prevents Architectury Transformer from applying unnecessary transforms (`GenerateFakeFabricMod`, `RemapInjectables`).
 - **`-Dfabric.dli.config` must be overridden in Fabric `loom.runs`** — Architectury Loom 1.17.487 generates DLI config at `.gradle/loom-cache/projects/<subproject>/launch.cfg` but the injector property points to `<subproject>/.gradle/loom-cache/launch.cfg`. Without the override, `dev-launch-injector` enters pass-through mode → mods and Minecraft assets won't load.
-- **Mixin count: 7** — `SoundEngineMixin`, `SoundEngineSppCompatMixin`, `GuiRendererSceneMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin`, `ModernUiGuardMixin` + `MusicHudMixinPlugin` (plugin class). The plugin skips the ModernUI-dependent mixins when the runtime probe fails.
+- **Mixin count: 8** — `SoundEngineMixin`, `SoundEngineSppCompatMixin`, `GuiRendererSceneMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin`, `ModernUiGuardMixin`, `UIManagerMixin` + `MusicHudMixinPlugin` (plugin class). The plugin skips the ModernUI-dependent mixins when the runtime probe fails.
 - **ModernUI 3.13+ is required for the client UI** — this branch resolves the official Maven artifacts (`dev.icyllis:modernui-core` + `icyllis.modernui:ModernUI-NeoForge:1.21.8-3.13.0.+`). Branches covering 1.21.9+ have no official build and must use the Lumen fork (`github.com/MOPELotus/ModernUI-MC-Lumen`, not published to Maven; place its jar in `libs/`). Fabric declares the dependency under `recommends` because the same jar runs on servers; the client probes `icyllis.arc3d.engine.ImageProxy` at runtime and falls back to a vanilla `ModernUiRequiredScreen` with the HUD left unregistered.
 
 ## Architecture
@@ -52,7 +52,7 @@ The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradl
 - **Auto-Registration**: `RegistrationManager` loads classes by string array, instantiates `Register` implementors. `@RegisterMark` annotation marks registered classes. Called via `performCommonAutoRegistration()` / `performSideAutoRegistration()`.
 - **Custom Network Protocol**: 30+ `CustomPacketPayload` classes in `network/payloads/`. Request/response cycle (`requestResponseCycle/`) + push messages (`pushMessages/`). Register via `INetworkRegister`.
 - **Virtual Threads**: `MusicHud.EXECUTOR` = `Executors.newVirtualThreadPerTaskExecutor()`. Used for audio decoding, API server management, network I/O.
-- **Mixin**: Config `music_hud.mixins.json`. 7 classes: `SoundEngineMixin`, `SoundEngineSppCompatMixin`, `GuiRendererSceneMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin`, `ModernUiGuardMixin` + `MusicHudMixinPlugin`.
+- **Mixin**: Config `music_hud.mixins.json`. 8 classes: `SoundEngineMixin`, `SoundEngineSppCompatMixin`, `GuiRendererSceneMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin`, `ModernUiGuardMixin`, `UIManagerMixin` + `MusicHudMixinPlugin`.
 - **Config**: Forge Config API Port (Fabric, shared with NeoForge) / native NeoForge `ModConfig` / Paper `config.yml`.
 
 ## Render Backend Boundary
