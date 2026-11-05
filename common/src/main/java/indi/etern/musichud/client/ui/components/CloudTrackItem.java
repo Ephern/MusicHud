@@ -169,7 +169,7 @@ public class CloudTrackItem extends LinearLayout {
                 progressBar.setProgress((int) Math.min(Integer.MAX_VALUE, total), false);
                 progressBar.setIndeterminate(false);
                 statusText.setText(I18n.get(MusicHud.MOD_ID + ".text.cloudUploadDone"));
-                statusText.setTooltipText(null);
+                Tooltip.attach(statusText, null);
                 actionButton.setVisibility(GONE);
                 removeButton.setVisibility(GONE);
             }
@@ -183,7 +183,7 @@ public class CloudTrackItem extends LinearLayout {
                 progressBar.setProgress((int) Math.min(max, done), true);
                 progressBar.setIndeterminate(false);
                 statusText.setText(total > 0 ? (done * 100 / total) + "%" : "");
-                statusText.setTooltipText(null);
+                Tooltip.attach(statusText, null);
                 applyIcon(actionButton, ICON_CANCEL, I18n.get(MusicHud.MOD_ID + ".button.cancel"));
                 actionButton.setVisibility(VISIBLE);
                 removeButton.setVisibility(GONE);
@@ -198,7 +198,7 @@ public class CloudTrackItem extends LinearLayout {
                 String hint = task == null ? "" : task.getErrorMessage();
                 boolean uncertain = hint != null && !hint.isBlank();
                 statusText.setText(uncertain ? hint : I18n.get(MusicHud.MOD_ID + ".text.cloudUploadMatching"));
-                statusText.setTooltipText(uncertain ? hint : null);
+                Tooltip.attach(statusText, uncertain ? hint : null);
                 actionButton.setVisibility(GONE);
                 removeButton.setVisibility(VISIBLE);
             }
@@ -209,7 +209,7 @@ public class CloudTrackItem extends LinearLayout {
                 progressBar.setProgress(0, false);
                 progressBar.setIndeterminate(false);
                 statusText.setText(I18n.get(MusicHud.MOD_ID + ".text.cloudUploadQueued"));
-                statusText.setTooltipText(null);
+                Tooltip.attach(statusText, null);
                 actionButton.setVisibility(GONE);
                 removeButton.setVisibility(VISIBLE);
             }
@@ -234,7 +234,7 @@ public class CloudTrackItem extends LinearLayout {
                         int length = spannableString.length();
                         spannableString.setSpan(ImageUtils.getIconSpan(icon), length - 1, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                     }
-                    statusText.setTooltipText(message);
+                    Tooltip.attach(statusText, message);
                 }
                 applyIcon(actionButton, ICON_RETRY, I18n.get(MusicHud.MOD_ID + ".button.retry"));
                 actionButton.setVisibility(VISIBLE);
@@ -248,7 +248,7 @@ public class CloudTrackItem extends LinearLayout {
     }
 
     private void applyIcon(ImageButton button, String iconPath, String tooltip) {
-        button.setTooltipText(tooltip);
+        Tooltip.attach(button, tooltip);
         button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         Image icon = ImageUtils.getImageFromResource(iconPath);
         if (icon != null) {

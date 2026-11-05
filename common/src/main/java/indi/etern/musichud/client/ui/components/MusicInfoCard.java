@@ -5,13 +5,20 @@ import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.SpannableStringBuilder;
 import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.TextPaint;
+import icyllis.modernui.text.method.LinkMovementMethod;
+import icyllis.modernui.text.style.ClickableSpan;
+import icyllis.modernui.text.style.ForegroundColorSpan;
 import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
-import icyllis.modernui.widget.Button;
+import icyllis.modernui.widget.ImageButton;
+import icyllis.modernui.widget.ImageView;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ProgressBar;
 import icyllis.modernui.widget.TextView;
@@ -20,10 +27,7 @@ import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.buttons.ModifyPlaylistTrackModalButton;
-import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButton;
-import indi.etern.musichud.client.ui.components.buttons.VoteSkipButton;
-import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.utils.image.ImageUtils;
@@ -42,23 +46,20 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 @Getter
 public class MusicInfoCard extends LinearLayout {
+    private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final DateTimeFormatter timeFormatterWithoutHour = DateTimeFormatter.ofPattern("mm:ss");
     private final UrlImageView albumImage;
     private final LinearLayout musicInfo;
-    private final TextView titleText;
-    private final FlexWrapLayout artists;
-    private final LinearLayout albumContainer;
+    private final MarqueeTextView titleText;
+    private final MarqueeTextView artistsText;
+    private final MarqueeTextView albumText;
     private final PusherWidget pusherWidget;
-    private final Button sourceButton;
+    private final ImageButton sourceButton;
     private final ProgressBar progressBar;
     private final TextView playedTimeText;
     private final TextView totalTimeText;
-    private final LinearLayout buttonsLayout;
-    private final ToggleTrackLikeStateButton likeButton;
-    private final ModifyPlaylistTrackModalButton addToPlaylistButton;
-    private final VoteSkipButton skipCurrentButton;
     private final LayoutTransition layoutTransition;
 
     public MusicInfoCard(Context context, int sideWidth) {
@@ -76,40 +77,24 @@ public class MusicInfoCard extends LinearLayout {
         musicInfo = new LinearLayout(context);
         musicInfo.setOrientation(LinearLayout.VERTICAL);
 
-        titleText = new TextView(context);
+        LinearLayout titleRow = new LinearLayout(context);
+        titleRow.setOrientation(LinearLayout.HORIZONTAL);
+        titleRow.setGravity(Gravity.CENTER_VERTICAL);
+
+        titleText = new MarqueeTextView(context);
         titleText.setTextSize(Theme.TEXT_SIZE_LARGE);
         titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
         titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
-        musicInfo.addView(titleText);
+        titleRow.addView(titleText, new LinearLayout.LayoutParams(0, WRAP_CONTENT, 1));
 
-        artists = new FlexWrapLayout(context);
-        artists.setMinimumHeight(artists.dp(16));
-        artists.setLayoutTransition(null);
-        musicInfo.addView(artists);
-
-        albumContainer = new LinearLayout(context);
-        albumContainer.setOrientation(LinearLayout.HORIZONTAL);
-        albumContainer.setGravity(Gravity.TOP | Gravity.LEFT);
-        musicInfo.addView(albumContainer);
-
-        LinearLayout pusherRow = new LinearLayout(context);
-        pusherRow.setOrientation(LinearLayout.HORIZONTAL);
-        pusherRow.setGravity(Gravity.CENTER_VERTICAL);
-
-        pusherWidget = new PusherWidget(context);
-        pusherRow.addView(pusherWidget);
-
-        LinearLayout.LayoutParams pusherRowParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        int dp2 = musicInfo.dp(2);
-        pusherRowParams.setMargins(0, dp2, 0, dp2);
-        musicInfo.addView(pusherRow, pusherRowParams);
-
-        sourceButton = new Button(context);
+        sourceButton = new ImageButton(context);
         sourceButton.setVisibility(View.GONE);
-        sourceButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        sourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        sourceButton.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        sourceButton.setSingleLine();
+        sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
+        if (sourceIcon != null) {
+            sourceButton.setImageDrawable(new InsetDrawable(
+                    new ScaledImageDrawable(context.getResources(), sourceIcon, dp(16), dp(16)), dp(1)));
+        }
         sourceButton.setOnClickListener(view -> {
             Object tag = sourceButton.getTag();
             if (tag instanceof SourceMeta sourceMeta) {
@@ -129,9 +114,34 @@ public class MusicInfoCard extends LinearLayout {
         });
         InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .padding(new InsetBackgroundFactory.Padding(0, sourceButton.dp(1), 0, sourceButton.dp(1)))
-                .cornerRadius(sourceButton.dp(4)).build().applyBackgroundTo(sourceButton);
-        musicInfo.addView(sourceButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
+                .cornerRadius(dp(4)).build().applyBackgroundTo(sourceButton);
+        LinearLayout.LayoutParams sourceParams = new LinearLayout.LayoutParams(dp(18), dp(18));
+        sourceParams.setMargins(dp(4), 0, 0, 0);
+        titleRow.addView(sourceButton, sourceParams);
+
+        pusherWidget = new PusherWidget(context);
+        LinearLayout.LayoutParams pusherParams = new LinearLayout.LayoutParams(dp(18), dp(18));
+        pusherParams.setMargins(dp(4), 0, 0, 0);
+        titleRow.addView(pusherWidget, pusherParams);
+
+        musicInfo.addView(titleRow, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+        artistsText = new MarqueeTextView(context);
+        artistsText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        artistsText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        artistsText.setGravity(Gravity.CENTER_VERTICAL);
+        artistsText.setMinimumHeight(artistsText.dp(16));
+        artistsText.setMovementMethod(LinkMovementMethod.getInstance());
+        artistsText.setHighlightColor(0x33FFFFFF);
+        musicInfo.addView(artistsText);
+
+        albumText = new MarqueeTextView(context);
+        albumText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        albumText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        albumText.setMovementMethod(LinkMovementMethod.getInstance());
+        albumText.setHighlightColor(0x33FFFFFF);
+        albumText.setVisibility(View.GONE);
+        musicInfo.addView(albumText);
 
         progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
         progressBar.setMin(0);
@@ -159,34 +169,6 @@ public class MusicInfoCard extends LinearLayout {
         totalTimeText.setTextSize(Theme.TEXT_SIZE_NORMAL);
         progressTexts.addView(totalTimeText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
 
-        buttonsLayout = new LinearLayout(context);
-        buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
-
-        InsetBackgroundFactory buttonsBackground = InsetBackgroundFactory.builder()
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .padding(new InsetBackgroundFactory.Padding(buttonsLayout.dp(2), buttonsLayout.dp(1), buttonsLayout.dp(2), buttonsLayout.dp(1)))
-                .cornerRadius(buttonsLayout.dp(4)).build();
-        {
-            likeButton = new ToggleTrackLikeStateButton(context);
-            buttonsBackground.applyBackgroundTo(likeButton);
-            buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
-        }
-        {
-            addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
-            buttonsBackground.applyBackgroundTo(addToPlaylistButton);
-            buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
-        }
-        {
-            skipCurrentButton = new VoteSkipButton(context);
-            buttonsBackground.applyBackgroundTo(skipCurrentButton);
-            buttonsLayout.addView(skipCurrentButton, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
-        }
-
-        LinearLayout.LayoutParams buttonsParams = new LinearLayout.LayoutParams(MATCH_PARENT, dp(40));
-        buttonsParams.setMargins(0, dp(2), 0, 0);
-        musicInfo.addView(buttonsLayout, buttonsParams);
-        musicInfo.setMinimumHeight(dp(132));
-
         LinearLayout.LayoutParams musicInfoParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         musicInfoParams.setMargins(dp(4), dp(4), dp(4), 0);
         addView(musicInfo, musicInfoParams);
@@ -206,21 +188,19 @@ public class MusicInfoCard extends LinearLayout {
         try {
             albumImage.clear();
             titleText.setText("");
-            artists.removeAllViews();
-            albumContainer.removeAllViews();
+            artistsText.setText("");
+            albumText.setText("");
+            albumText.setVisibility(View.GONE);
             pusherWidget.clear();
             pusherWidget.setVisibility(View.GONE);
             sourceButton.setVisibility(View.GONE);
             sourceButton.setTag(null);
+            Tooltip.attach(sourceButton, null);
             progressBar.setIndeterminate(false);
             progressBar.setProgress(0);
             progressBar.setVisibility(View.GONE);
             playedTimeText.setText("");
             totalTimeText.setText("");
-            buttonsLayout.setVisibility(View.GONE);
-            likeButton.bindMusicList(null);
-            addToPlaylistButton.bindMusicDetail(null);
-            skipCurrentButton.reset();
         } finally {
             musicInfo.setLayoutTransition(layoutTransition);
         }
@@ -231,18 +211,17 @@ public class MusicInfoCard extends LinearLayout {
             albumImage.loadUrl(MusicHud.ICON_BASE64);
             titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
             titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            artists.removeAllViews();
-            albumContainer.removeAllViews();
+            artistsText.setText("");
+            albumText.setText("");
+            albumText.setVisibility(View.GONE);
             pusherWidget.clear();
             pusherWidget.setVisibility(View.GONE);
             sourceButton.setVisibility(View.GONE);
             sourceButton.setTag(null);
+            Tooltip.attach(sourceButton, null);
             progressBar.setVisibility(View.GONE);
             playedTimeText.setText("");
             totalTimeText.setText("");
-            buttonsLayout.setVisibility(View.GONE);
-            likeButton.bindMusicList(null);
-            addToPlaylistButton.bindMusicDetail(null);
         } else {
             MusicDetail musicDetail = musicDetailTrace.value();
             titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
@@ -290,67 +269,69 @@ public class MusicInfoCard extends LinearLayout {
                 }
 
                 sourceButton.setVisibility(View.VISIBLE);
-                sourceButton.setText(text);
+                Tooltip.attach(sourceButton, text);
             } else {
                 sourceButton.setVisibility(View.GONE);
                 sourceButton.setTag(null);
+                Tooltip.attach(sourceButton, null);
             }
             Context context = ModernUI.getInstance();
-            artists.removeAllViews();
-            int index = 0;
-            InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
-                    .inset(0)
-                    .cornerRadius(buttonsLayout.dp(2))
-                    .padding(new InsetBackgroundFactory.Padding(0, 0, 0, 0))
-                    .build();
+            SpannableStringBuilder artistsBuilder = new SpannableStringBuilder();
             for (Artist artist : musicDetail.getArtists()) {
-                if (index != 0) {
-                    TextView split = new TextView(context);
-                    split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                    split.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                    split.setText(" / ");
-                    split.setSingleLine();
-                    artists.addView(split);
+                if (artistsBuilder.length() > 0) {
+                    artistsBuilder.append(" / ");
                 }
-                index++;
-                Button artistButton = new Button(context);
-                backgroundFactory.applyBackgroundTo(artistButton);
-                artistButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
-                boolean validArtist = artist.getId() > 0;
-                artistButton.setEnabled(validArtist);
-                artistButton.setTextColor(validArtist ? Theme.PRIMARY_COLOR : Theme.SECONDARY_TEXT_COLOR);
-                artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                artistButton.setText(artist.getName());
-                artistButton.setSingleLine();
-                artistButton.setOnClickListener(button -> {
-                    RouterContainer routerContainer = RouterContainer.getInstance();
-                    if (routerContainer != null) {
-                        routerContainer.pushNavigate(
-                                new ArtistDetailView(context, artist)
-                        );
-                    }
-                });
-                artists.addView(artistButton);
-            }
+                int start = artistsBuilder.length();
+                artistsBuilder.append(artist.getName());
+                int end = artistsBuilder.length();
+                if (artist.getId() > 0) {
+                    artistsBuilder.setSpan(new ClickableSpan() {
+                        @Override
+                        public void onClick(View widget) {
+                            RouterContainer routerContainer = RouterContainer.getInstance();
+                            if (routerContainer != null) {
+                                routerContainer.pushNavigate(
+                                        new ArtistDetailView(context, artist)
+                                );
+                            }
+                        }
 
-            albumContainer.removeAllViews();
-            Button albumButton = new Button(context);
-            backgroundFactory.applyBackgroundTo(albumButton);
-            boolean validAlbum = album.getId() > 0;
-            albumButton.setEnabled(validAlbum);
-            albumButton.setTextColor(validAlbum ? Theme.PRIMARY_COLOR : Theme.SECONDARY_TEXT_COLOR);
-            albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            albumButton.setTextAlignment(View.TEXT_ALIGNMENT_TEXT_START);
-            albumButton.setText(musicDetail.getAlbum().getName());
-            albumButton.setOnClickListener(button -> {
-                RouterContainer routerContainer = RouterContainer.getInstance();
-                if (routerContainer != null) {
-                    routerContainer.pushNavigate(
-                            new MusicCollectionDetailView(context, musicDetail.getAlbum())
-                    );
+                        @Override
+                        public void updateDrawState(TextPaint ds) {
+                            ds.setColor(Theme.PRIMARY_COLOR);
+                            ds.setUnderline(false);
+                        }
+                    }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                } else {
+                    artistsBuilder.setSpan(new ForegroundColorSpan(Theme.SECONDARY_TEXT_COLOR),
+                            start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
-            });
-            albumContainer.addView(albumButton);
+            }
+            artistsText.setText(artistsBuilder);
+
+            String albumName = album.getName() == null ? "" : album.getName();
+            SpannableStringBuilder albumBuilder = new SpannableStringBuilder(albumName);
+            if (!albumName.isEmpty() && album.getId() > 0) {
+                albumBuilder.setSpan(new ClickableSpan() {
+                    @Override
+                    public void onClick(View widget) {
+                        RouterContainer routerContainer = RouterContainer.getInstance();
+                        if (routerContainer != null) {
+                            routerContainer.pushNavigate(
+                                    new MusicCollectionDetailView(context, album)
+                            );
+                        }
+                    }
+
+                    @Override
+                    public void updateDrawState(TextPaint ds) {
+                        ds.setColor(Theme.PRIMARY_COLOR);
+                        ds.setUnderline(false);
+                    }
+                }, 0, albumBuilder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+            albumText.setText(albumBuilder);
+            albumText.setVisibility(albumName.isEmpty() ? View.GONE : View.VISIBLE);
 
             Duration musicDuration = Duration.of(musicDetail.getDurationMillis(), ChronoUnit.MILLIS);
             DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
@@ -363,11 +344,7 @@ public class MusicInfoCard extends LinearLayout {
             playedTimeText.setText(playedTimeString);
             totalTimeText.setText(totalTimeString);
 
-            skipCurrentButton.reset();
             progressBar.setVisibility(View.VISIBLE);
-            likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(musicDetail).currentUsersLikeList());
-            addToPlaylistButton.bindMusicDetail(musicDetail);
-            buttonsLayout.setVisibility(View.VISIBLE);
         }
     }
 }

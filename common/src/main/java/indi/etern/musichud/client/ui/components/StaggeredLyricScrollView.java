@@ -15,7 +15,6 @@ import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
-import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
@@ -49,10 +48,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final int AUTO_RECENTER_DELAY_MILLIS = 1000;
     public static final float MAX_DELAY_MILLIS = 800;
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
+    public static final float MAX_BLUR_DP = 8f;
     private static final float SPACER_HEIGHT_RATIO = 0.7f;
     private static final int SWITCH_DURATION = 400;
     private static final int SCROLL_RESPONSE_MILLIS = 550;
-    private static final float SCROLL_DAMPING = 0.95f;
+    private static final float SCROLL_DAMPING = 1f;
     // The parent scroll delta is scaled by this before it is fed into each row's live decoupling.
     // It must stay 0.5: icyllis.modernui.graphics.RenderProperties.computeTransform applies the
     // view's x/y translation twice (preTranslate + postTranslate both carry it), so a rendered
@@ -62,22 +62,24 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     // amplitude and duration never depend on its distance from the highlighted row. Only the
     // per-row start delay differs, and that delay is scheduled by the scroll view, never the row.
     private static final int ROW_RESPONSE_MILLIS = SCROLL_RESPONSE_MILLIS;
-    private static final float ROW_DAMPING = 1f;
+    private static final float ROW_DAMPING = 0.85f;
     // A very short highlighted line collapses the whole delay wave (see durationFactor) so a fast
     // sequence of short lines never blocks; the per-row delay ratios are preserved.
     private static final int DELAY_SHORTEN_TAU_MILLIS = 200;
     private static final SpringInterpolator SWITCH_INTERPOLATOR =
             new SpringInterpolator((float) SWITCH_DURATION / 1000, 0.9f);
-    private static final float MAX_BLUR_DP = 8f;
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
+    // Near-identity projective matrix (persp0 = 1e-8) so arc3d takes the transformed-mask glyph path:
+    // it keeps fractional glyph positions and bilinear atlas filtering, unlike the direct-mask path,
+    // which floors them to device pixels. The epsilon must be in m14, not m44: normalizePerspective()
+    // divides m44 back to 1 whenever m14/m24 are zero, and with m14 != 0 it is skipped entirely.
+    private static final Matrix SUBPIXEL_MATRIX = new Matrix(
+            1f, 0f, 1e-8f,
+            0f, 1f, 0f,
+            0f, 0f, 1f
+    );
     private static Logger logger;
     private final Map<LyricLine, LyricLineView> lyricLines = new LinkedHashMap<>();
-    @Getter
-    @Setter
-    private int mainLyricSize = Theme.MAIN_LYRIC_SIZE;
-    @Getter
-    @Setter
-    private int subLyricSize = Theme.SUB_LYRIC_SIZE;
     @Getter
     private final List<LyricLineView> lyricLineViewList = new ArrayList<>();
     private final LinearLayout container;
@@ -100,8 +102,22 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             }
         }
     };
+    // The edge fade erases the destination with DST_OUT; rendering the subtree here first keeps
+    // the erase local to this view instead of the whole ModernUI layer.
+    private final SceneOffscreen fadeTarget = new SceneOffscreen("musichud-lyric-fade");
+    // One spring-backed RowWave per lyric row (see buildLyricRows).
+    private final List<RowWave> rows = new ArrayList<>();
     Runnable staggeringEndListener = null;
     boolean scrollFinished = false;
+    @Setter
+    @Getter
+    private int lyricFollowOffset = dp(80);
+    @Getter
+    @Setter
+    private int mainLyricSize = Theme.MAIN_LYRIC_SIZE;
+    @Getter
+    @Setter
+    private int subLyricSize = Theme.SUB_LYRIC_SIZE;
     private View bottomSpacer;
     @Getter
     private volatile ScrollStatus scrollStatus = ScrollStatus.FOLLOW_LYRICS;
@@ -140,13 +156,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private int cachedTopFadeHeight = -1;
     private int cachedBottomFadeHeight = -1;
     private float cachedFadeStrength = -1f;
-    // The edge fade erases the destination with DST_OUT; rendering the subtree here first keeps
-    // the erase local to this view instead of the whole ModernUI layer.
-    private final SceneOffscreen fadeTarget = new SceneOffscreen("musichud-lyric-fade");
     private Image fadeSnapshot;
     private boolean fadeIsolationDisabled;
-    // One spring-backed RowWave per lyric row (see buildLyricRows).
-    private final List<RowWave> rows = new ArrayList<>();
     @Getter
     private float lastTargetScrollPosition;
     private volatile MusicDetail musicDetail;
@@ -193,6 +204,18 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }));
 
         scrollSpring = new SpringValue((float) SCROLL_RESPONSE_MILLIS / 1000, SCROLL_DAMPING);
+    }
+
+    /**
+     * Only a highlighted line that lasts tens-to-hundreds of milliseconds visibly shortens the
+     * wave; normal lines keep the full delay.
+     */
+    private static float durationFactor(@Nullable LyricLine highlighted) {
+        if (highlighted == null) return 1f;
+        Duration duration = highlighted.getDuration();
+        if (duration == null) return 1f;
+        float x = (float) duration.toMillis() / DELAY_SHORTEN_TAU_MILLIS;
+        return 1f - (float) Math.exp(-x * x);
     }
 
     public void switchLyrics(MusicDetail musicDetail, Collection<LyricLine> lyrics) {
@@ -253,7 +276,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
         if (lyrics == null) return;
         Context context = getContext();
-        container.addView(new FrameLayout(context), new LayoutParams(0, dp(64)));
+        container.addView(new View(context), new LayoutParams(0, dp(64)));
 
         rows.clear();
         for (LyricLine line : lyrics) {
@@ -281,72 +304,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     public void clearLyrics() {
         switchLyrics(MusicDetail.NONE, null);
-    }
-
-    /**
-     * One lyric row's animation state: an absolute {@link SpringValue} driving the rendered
-     * translationY (minus the live decoupling), plus a normalized progress {@link SpringValue} that
-     * releases that decoupling. Both are retargeted with {@link SpringValue#setTarget}, so a rapid
-     * switch keeps the running value and velocity instead of resetting the animation. The row knows
-     * nothing about delays or scroll - the scroll view schedules every retarget.
-     */
-    private static final class RowWave {
-        final LyricLineView view;
-        final SpringValue spring;
-        final SpringValue progress;
-
-        RowWave(LyricLineView view) {
-            this.view = view;
-            this.spring = new SpringValue((float) ROW_RESPONSE_MILLIS / 1000, ROW_DAMPING);
-            this.progress = new SpringValue((float) ROW_RESPONSE_MILLIS / 1000, ROW_DAMPING);
-        }
-
-        void retarget(float target, long nowNanos) {
-            spring.setTarget(target, nowNanos);
-        }
-
-        void retargetProgress(float target, long nowNanos) {
-            progress.setTarget(target, nowNanos);
-        }
-
-        /**
-         * Snap the release factor. Safe at a wave start because the compensation has just been
-         * rebased to zero, so the factor does not affect the rendered value or its velocity.
-         */
-        void snapProgress(float value) {
-            progress.jumpTo(value);
-        }
-
-        /** Shift the running base spring by {@code delta} without interrupting it (keeps velocity). */
-        void translate(float delta) {
-            spring.translate(delta);
-        }
-
-        void update(long nowNanos) {
-            spring.update(nowNanos);
-            progress.update(nowNanos);
-        }
-
-        boolean isSettled() {
-            return spring.isSettled() && progress.isSettled();
-        }
-
-        void jumpTo(float value) {
-            spring.jumpTo(value);
-            progress.jumpTo(1f);
-        }
-
-        float getValue() {
-            return spring.getValue();
-        }
-
-        float getTarget() {
-            return spring.getTarget();
-        }
-
-        float getProgress() {
-            return progress.getValue();
-        }
     }
 
     public void resyncToCurrentLyric() {
@@ -452,8 +409,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             post(() -> jumpToLyric(target));
             return;
         }
-        int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
-        int targetScrollY = Math.clamp(targetTop - dp(80), 0, maxScroll);
+        int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight - target.getHeight());
+        int targetScrollY = Math.clamp(targetTop - lyricFollowOffset, 0, maxScroll);
 
         resetStaggerState();
         scrollSpring.jumpTo(targetScrollY);
@@ -473,8 +430,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             post(() -> scrollToLyric(target));
             return;
         }
-        int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight);
-        int targetScrollY = Math.clamp(targetTop - dp(80), 0, maxScroll);
+        int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight - target.getHeight());
+        int targetScrollY = Math.clamp(targetTop - lyricFollowOffset, 0, maxScroll);
         lastTargetScrollPosition = targetScrollY;
 
         long now = MuiModApi.getFrameTimeNanos();
@@ -540,18 +497,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     /**
-     * Only a highlighted line that lasts tens-to-hundreds of milliseconds visibly shortens the
-     * wave; normal lines keep the full delay.
+     * Snap every row to rest at its target offset (used when the scroll position is forced).
      */
-    private static float durationFactor(@Nullable LyricLine highlighted) {
-        if (highlighted == null) return 1f;
-        Duration duration = highlighted.getDuration();
-        if (duration == null) return 1f;
-        float x = (float) duration.toMillis() / DELAY_SHORTEN_TAU_MILLIS;
-        return 1f - (float) Math.exp(-x * x);
-    }
-
-    /** Snap every row to rest at its target offset (used when the scroll position is forced). */
     private void snapRows() {
         clearStaggerState();
         for (RowWave row : rows) {
@@ -561,7 +508,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
     }
 
-    /** Drop every in-flight stagger scheduling array; the rows keep their current value/velocity. */
+    /**
+     * Drop every in-flight stagger scheduling array; the rows keep their current value/velocity.
+     */
     private void clearStaggerState() {
         staggeredActive = false;
         delayMillis = null;
@@ -857,16 +806,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         return view == null ? -1 : lyricLineViewList.indexOf(view);
     }
 
-    // Near-identity projective matrix (persp0 = 1e-8) so arc3d takes the transformed-mask glyph path:
-    // it keeps fractional glyph positions and bilinear atlas filtering, unlike the direct-mask path,
-    // which floors them to device pixels. The epsilon must be in m14, not m44: normalizePerspective()
-    // divides m44 back to 1 whenever m14/m24 are zero, and with m14 != 0 it is skipped entirely.
-    private static final Matrix SUBPIXEL_MATRIX = new Matrix(
-            1f, 0f, 1e-8f,
-            0f, 1f, 0f,
-            0f, 0f, 1f
-    );
-
     @Override
     public void draw(@NotNull Canvas canvas) {
         if (canvas instanceof ArcCanvas arc && needsFadeIsolation() && renderFadeIsolated(arc)) {
@@ -875,7 +814,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         super.draw(canvas);
     }
 
-    /** True while at least one edge fade is actually drawn (content overflows the viewport). */
+    /**
+     * True while at least one edge fade is actually drawn (content overflows the viewport).
+     */
     private boolean needsFadeIsolation() {
         if (!fadeEdgesEnabled || fadeIsolationDisabled || fadeEdgeMaxStrength <= 0f) {
             return false;
@@ -1084,6 +1025,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (container == null || lyricLineViewList.isEmpty()) {
             return;
         }
+        // The rows were built/laid out while hidden, so any blur source and published result may be
+        // stale; force a fresh render + request instead of waiting for the radius to change.
+        lyricLineViewList.forEach(LyricLineView::invalidateBlur);
         resetStaggerState();
         scrollStatus = ScrollStatus.IDLE;
         post(() -> {
@@ -1112,5 +1056,73 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     enum ScrollStatus {
         IDLE, MANUAL, RECENTER, FOLLOW_LYRICS
+    }
+
+    /**
+     * One lyric row's animation state: an absolute {@link SpringValue} driving the rendered
+     * translationY (minus the live decoupling), plus a normalized progress {@link SpringValue} that
+     * releases that decoupling. Both are retargeted with {@link SpringValue#setTarget}, so a rapid
+     * switch keeps the running value and velocity instead of resetting the animation. The row knows
+     * nothing about delays or scroll - the scroll view schedules every retarget.
+     */
+    private static final class RowWave {
+        final LyricLineView view;
+        final SpringValue spring;
+        final SpringValue progress;
+
+        RowWave(LyricLineView view) {
+            this.view = view;
+            this.spring = new SpringValue((float) ROW_RESPONSE_MILLIS / 1000, ROW_DAMPING);
+            this.progress = new SpringValue((float) ROW_RESPONSE_MILLIS / 1000, ROW_DAMPING);
+        }
+
+        void retarget(float target, long nowNanos) {
+            spring.setTarget(target, nowNanos);
+        }
+
+        void retargetProgress(float target, long nowNanos) {
+            progress.setTarget(target, nowNanos);
+        }
+
+        /**
+         * Snap the release factor. Safe at a wave start because the compensation has just been
+         * rebased to zero, so the factor does not affect the rendered value or its velocity.
+         */
+        void snapProgress(float value) {
+            progress.jumpTo(value);
+        }
+
+        /**
+         * Shift the running base spring by {@code delta} without interrupting it (keeps velocity).
+         */
+        void translate(float delta) {
+            spring.translate(delta);
+        }
+
+        void update(long nowNanos) {
+            spring.update(nowNanos);
+            progress.update(nowNanos);
+        }
+
+        boolean isSettled() {
+            return spring.isSettled() && progress.isSettled();
+        }
+
+        void jumpTo(float value) {
+            spring.jumpTo(value);
+            progress.jumpTo(1f);
+        }
+
+        float getValue() {
+            return spring.getValue();
+        }
+
+        float getTarget() {
+            return spring.getTarget();
+        }
+
+        float getProgress() {
+            return progress.getValue();
+        }
     }
 }

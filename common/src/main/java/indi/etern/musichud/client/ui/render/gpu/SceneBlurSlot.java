@@ -110,6 +110,12 @@ public final class SceneBlurSlot {
         return disabled ? null : published.image();
     }
 
+    /** UI thread: drops the published result, so the next composite waits for a fresh pass. */
+    public void invalidatePublished() {
+        published.publish(null);
+        published.release();
+    }
+
     /** True when at least one registered slot has a queued blur. */
     public static boolean hasPending() {
         synchronized (ACTIVE_LOCK) {

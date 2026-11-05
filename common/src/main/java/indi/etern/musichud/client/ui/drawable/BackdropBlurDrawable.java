@@ -5,6 +5,7 @@ import icyllis.arc3d.sketch.Image;
 import icyllis.modernui.graphics.Canvas;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.pipeline.ArcCanvas;
+import icyllis.modernui.view.View;
 import indi.etern.musichud.client.ui.render.gpu.HudPanelBackdrop;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurPainter;
 import org.jetbrains.annotations.NotNull;
@@ -19,14 +20,34 @@ public final class BackdropBlurDrawable extends Drawable {
     private final int blurRadius;
     private final SceneBlurPainter painter = new SceneBlurPainter();
 
+    private View view;
+    private View.OnAttachStateChangeListener attachListener;
+    private boolean released;
+
     public BackdropBlurDrawable(int cornerRadius, int blurRadius) {
         this.cornerRadius = Math.max(0, cornerRadius);
         this.blurRadius = Math.max(0, blurRadius);
     }
 
+    /** Releases the blur when the view detaches. The view must already use this drawable. */
+    public void attachTo(@NotNull View view) {
+        this.view = view;
+        attachListener = new View.OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View v) {
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View v) {
+                release();
+            }
+        };
+        view.addOnAttachStateChangeListener(attachListener);
+    }
+
     @Override
     public void draw(@NotNull Canvas canvas) {
-        if (blurRadius <= 0 || !(canvas instanceof ArcCanvas arc)) {
+        if (released || blurRadius <= 0 || !(canvas instanceof ArcCanvas arc)) {
             return;
         }
         var bounds = getBounds();
@@ -58,6 +79,15 @@ public final class BackdropBlurDrawable extends Drawable {
     }
 
     public void release() {
+        if (released) {
+            return;
+        }
+        released = true;
+        if (view != null && attachListener != null) {
+            view.removeOnAttachStateChangeListener(attachListener);
+        }
+        view = null;
+        attachListener = null;
         painter.close();
         HudPanelBackdrop.clear();
     }

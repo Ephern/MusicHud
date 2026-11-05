@@ -1,43 +1,34 @@
 package indi.etern.musichud.client.ui.components;
 
-import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.view.Gravity;
-import icyllis.modernui.widget.LinearLayout;
-import icyllis.modernui.widget.TextView;
+import icyllis.modernui.view.MotionEvent;
+import icyllis.modernui.widget.FrameLayout;
+import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.PusherInfo;
-import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import lombok.NonNull;
+import net.minecraft.client.resources.language.I18n;
+import org.jetbrains.annotations.NotNull;
 
-import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
-public class PusherWidget extends LinearLayout {
+/**
+ * Compact requester marker: the avatar alone, the player name lives in the tooltip.
+ */
+public class PusherWidget extends FrameLayout {
     private final PlayerHeadView pusherHeadView;
-    private final TextView pusherText;
+    private final Tooltip tooltip;
 
     public PusherWidget(Context context) {
         super(context);
         pusherHeadView = new PlayerHeadView(context);
-        LayoutParams layoutParams = new LayoutParams(dp(18), dp(18));
-        layoutParams.setMargins(0, 0, dp(4), 0);
-        addView(pusherHeadView, layoutParams);
-        pusherText = new TextView(context);
-        pusherText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        pusherText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        pusherText.setSingleLine();
-        LinearLayout.LayoutParams pusherTextParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        pusherTextParams.gravity = Gravity.CENTER_VERTICAL;
-        addView(pusherText, pusherTextParams);
-
-        LayoutTransition layoutTransition = new LayoutTransition();
-        layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
-        setLayoutTransition(layoutTransition);
+        addView(pusherHeadView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        tooltip = Tooltip.attach(this, null);
     }
 
     public void clear() {
         pusherHeadView.setPlayerSkinSupplier(null);
-        pusherText.setText("");
+        tooltip.setText(null);
     }
 
     public void bind(@NonNull PusherInfo pusherInfo) {
@@ -51,6 +42,12 @@ public class PusherWidget extends LinearLayout {
             pusherHeadView.setVisibility(GONE);
             return null;
         });
-        pusherText.setText(pusherInfo.playerName());
+        tooltip.setText(I18n.get(MusicHud.MOD_ID + ".text.pusherSource") + pusherInfo.playerName());
+    }
+
+    @Override
+    protected boolean dispatchHoverEvent(@NotNull MotionEvent event) {
+        tooltip.handleHover(event);
+        return super.dispatchHoverEvent(event);
     }
 }

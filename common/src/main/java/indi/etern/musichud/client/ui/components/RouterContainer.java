@@ -397,16 +397,27 @@ public class RouterContainer extends FrameLayout {
             return;
         }
 
+        // Keep the visible sub-page as the exit page so the outgoing animation has something to
+        // animate; the deeper ones are not visible and can go right away. finishTransition removes it.
+        boolean animateExit = !isTransitioning;
+        View exitPage = null;
         while (!routeStack.empty()) {
             String popKey = routeStack.pop();
             View view = dynamicViews.get(popKey);
             if (view != null) {
                 notifyRoutePopped(view);
-                removeView(view);
+                if (animateExit && exitPage == null) {
+                    exitPage = view;
+                } else {
+                    removeView(view);
+                }
             }
         }
 
         if (isTransitioning) {
+            if (exitPage != null) {
+                removeView(exitPage);
+            }
             pendingNavigationKey = key;
             transitionTargetKey = key;
             if (currentAnimation != null && currentAnimation.isRunning()) {
@@ -424,7 +435,8 @@ public class RouterContainer extends FrameLayout {
         }
 
         View targetPage = getOrCreatePage(key);
-        View currentPage = currentPageKey != null ? pageCache.get(currentPageKey) : null;
+        View currentPage = exitPage != null ? exitPage
+                : currentPageKey != null ? pageCache.get(currentPageKey) : null;
 
         routeStack.push(key);
 

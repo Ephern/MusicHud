@@ -33,6 +33,7 @@ import net.minecraft.client.resources.language.I18n;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Consumer;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -285,7 +286,7 @@ public class AccountView extends LinearLayout {
         {
             ImageButton refreshButton = new ImageButton(context);
             backgroundFactory2.applyBackgroundTo(refreshButton);
-            refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+            Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
             refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
             Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
@@ -298,7 +299,7 @@ public class AccountView extends LinearLayout {
         {
             ImageButton logoutButton = new ImageButton(context);
             backgroundFactory2.applyBackgroundTo(logoutButton);
-            logoutButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
+            Tooltip.attach(logoutButton, I18n.get(MusicHud.MOD_ID + ".button.logout"));
             logoutButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
             Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/log_out.png");

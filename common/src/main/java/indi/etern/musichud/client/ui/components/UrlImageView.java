@@ -521,7 +521,7 @@ public class UrlImageView extends FrameLayout {
 
     private void showError(String message) {
         progressRing.setVisibility(GONE);
-        retryButton.setTooltipText(message);
+        Tooltip.attach(retryButton, message);
         errorLayout.setVisibility(VISIBLE);
     }
 

@@ -46,6 +46,7 @@ import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -213,7 +214,7 @@ public class HomeView extends LinearLayout {
             rotateNextToPlayButton = new ImageButton(context);
             rotateNextToPlayButton.setVisibility(GONE);
             rotateNextToPlayButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            rotateNextToPlayButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.rotateNextToPlay"));
+            Tooltip.attach(rotateNextToPlayButton, I18n.get(MusicHud.MOD_ID + ".button.rotateNextToPlay"));
             Image rotateIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/refresh_ccw_dot.png");
             rotateNextToPlayButton.setImageDrawable(new ScaledImageDrawable(context.getResources(), rotateIcon, dp(16), dp(16)));
             InsetBackgroundFactory.builder()

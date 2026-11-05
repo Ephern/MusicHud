@@ -64,6 +64,12 @@ public final class LineBlurResources {
         return padding;
     }
 
+    /** Forces the next prepare() to re-render the source and re-request the blur. */
+    public void invalidate() {
+        cachedContentStamp = Long.MIN_VALUE;
+        cachedRadius = Float.NaN;
+    }
+
     public int width() {
         return target.width();
     }

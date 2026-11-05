@@ -30,6 +30,8 @@ import indi.etern.musichud.client.utils.CountFormatter;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
+import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.utils.CollectionUpdateNotifier;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
@@ -41,17 +43,23 @@ import java.util.Objects;
 import java.util.SequencedSet;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class MusicCollectionDetailView extends LinearLayout implements RouterContainer.RouteAware {
+public class MusicCollectionDetailView extends FrameLayout implements RouterContainer.RouteAware {
     private static final MusicService musicService = MusicService.getInstance();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final int COVER_SIZE = 1024;
+    private static final int BAR_TOP_MARGIN = 12;
+    private static final int BAR_CORNER_RADIUS = 16;
     private static final String ICON_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/list_music.png";
     private static final String ICON_LIKE_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/heart_filled.png";
     private static final String ICON_RECOMMEND_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/radio.png";
     private static final String ICON_DISC_ALBUM = "/assets/music_hud/textures/gui/icons/disc_album.png";
+    private final LinearLayout topBar;
+    private final ScrollView scrollView;
     private final ProgressBar progressBar;
     private final MusicVirtualizedListLayout virtualList;
     private final UrlImageView imageView;
@@ -75,14 +83,11 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         super(context);
 
         this.musicCollection = musicCollection;
-        setOrientation(VERTICAL);
         String collectionNameI18n = musicCollection.getNameI18nKey();
 
-        LinearLayout topBar = new LinearLayout(context);
-        topBar.setOrientation(HORIZONTAL);
-
-        LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        topBar.setLayoutParams(params);
+        topBar = new LinearLayout(context);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setClickable(true);
 
         ImageButton backButton = new ImageButton(context);
         String tooltipText = I18n.get(MusicHud.MOD_ID + ".button.back");
@@ -91,39 +96,39 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
             backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), image, dp(16), dp(16)));
         }
-        backButton.setTooltipText(tooltipText);
+        Tooltip.attach(backButton, tooltipText);
         backButton.setOnClickListener(view -> {
             RouterContainer.getInstance().popNavigate();
             backButton.setOnClickListener(null);
         });
         InsetBackgroundFactory.builder()
                 .inset(0)
-                .cornerRadius(dp(4))
+                .cornerRadius(dp(8))
                 .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
                 .build()
                 .applyBackgroundTo(backButton);
-        LayoutParams backButtonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
+        LinearLayout.LayoutParams backButtonParams = new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT);
         backButtonParams.setMargins(0, 0, dp(4), 0);
         topBar.addView(backButton, backButtonParams);
 
         imageView = new UrlImageView(context);
-        LayoutParams imageParams = new LayoutParams(imageSize, imageSize);
+        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(imageSize, imageSize);
         topBar.addView(imageView, imageParams);
         imageView.setCornerRadius(dp(8));
         loadCoverImage();
 
         LinearLayout infoView = new LinearLayout(context);
         infoView.setGravity(Gravity.TOP);
-        infoView.setOrientation(VERTICAL);
-        LayoutParams params1 = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
+        infoView.setOrientation(LinearLayout.VERTICAL);
+        LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
         params1.setMargins(dp(16), 0, 0, 0);
         topBar.addView(infoView, params1);
 
         LinearLayout row1 = new LinearLayout(context);
-        row1.setOrientation(HORIZONTAL);
+        row1.setOrientation(LinearLayout.HORIZONTAL);
         row1.setBaselineAligned(false);
         row1.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams row1Params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        LinearLayout.LayoutParams row1Params = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         row1Params.setMargins(0, 0, 0, dp(2));
         infoView.addView(row1, row1Params);
 
@@ -131,7 +136,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         typeText.setTextSize(Theme.TEXT_SIZE_LARGE);
         typeText.setTextColor(Theme.NORMAL_TEXT_COLOR);
         typeText.setText(I18n.get(collectionNameI18n));
-        LayoutParams typeParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         typeParams.setMargins(0, 0, dp(16), 0);
         row1.addView(typeText, typeParams);
 
@@ -140,7 +145,7 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
                 musicTrackCountView = new TextView(context);
                 musicTrackCountView.setTextSize(Theme.TEXT_SIZE_LARGE);
                 updatePlaylistTrackCountView(playlist);
-                LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
+                LinearLayout.LayoutParams params3 = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
                 params3.setMargins(0, 0, dp(12), 0);
                 row1.addView(musicTrackCountView, params3);
             }
@@ -154,14 +159,14 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
                     text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
                 playedCountView.setText(text);
-                row1.addView(playedCountView, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
+                row1.addView(playedCountView, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
             }
         } else if (musicCollection instanceof Album album) {
             {
                 musicTrackCountView = new TextView(context);
                 musicTrackCountView.setTextSize(Theme.TEXT_SIZE_LARGE);
                 updateAlbumTrackCountView(album);
-                LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
+                LinearLayout.LayoutParams params3 = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
                 params3.setMargins(0, 0, dp(12), 0);
                 row1.addView(musicTrackCountView, params3);
             }
@@ -176,10 +181,10 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
                     text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
                 albumTypeText.setText(text);
-                row1.addView(albumTypeText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
+                row1.addView(albumTypeText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
             }
         }
-        row1.addView(new View(context), new LayoutParams(dp(16), MATCH_PARENT, 0));
+        row1.addView(new View(context), new LinearLayout.LayoutParams(dp(16), MATCH_PARENT, 0));
 
 
         InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
@@ -192,18 +197,18 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         {
             ImageButton refreshButton = new ImageButton(context);
             backgroundFactory.applyBackgroundTo(refreshButton);
-            refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+            Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
             refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
             Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
             refreshButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(resources, image1, dp(12), dp(16)), dp(3)));
             refreshButton.setOnClickListener((v) -> refreshData(true));
-            row1.addView(refreshButton, new LayoutParams(dp28, dp28));
+            row1.addView(refreshButton, new LinearLayout.LayoutParams(dp28, dp28));
         }
         {
             ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
             backgroundFactory.applyBackgroundTo(toggleSubscribeButton);
-            row1.addView(toggleSubscribeButton, new LayoutParams(dp28, dp28, 0));
+            row1.addView(toggleSubscribeButton, new LinearLayout.LayoutParams(dp28, dp28, 0));
             if (musicCollection instanceof Playlist playlist) {
                 Profile current = Profile.getCurrent();
                 if (current == null || current.equals(Profile.ANONYMOUS) || playlist.getCreator().getUserId() == current.getUserId()) {
@@ -219,26 +224,25 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         }
         {
             var idlePlaySourceWidget = new IdlePlaySourceWidget(context, this.musicCollection, dp(28));
-            row1.addView(idlePlaySourceWidget, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+            row1.addView(idlePlaySourceWidget, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
         }
 
         TextView name = new TextView(context);
         name.setTextSize(Theme.TEXT_SIZE_LARGER);
         name.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         name.setText(musicCollection.getName());
-        LayoutParams params2 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        LinearLayout.LayoutParams params2 = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         params2.setMargins(0, 0, 0, dp(8));
         infoView.addView(name, params2);
 
         ScrollView descriptionScrollView = new ScrollView(context);
-        LayoutParams scrollParams = new LinearLayout.LayoutParams(MATCH_PARENT, 0, 1);
+        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(MATCH_PARENT, 0, 1);
         infoView.addView(descriptionScrollView, scrollParams);
 
         TextView extraInfo = new TextView(context);
         extraInfo.setTextSize(Theme.TEXT_SIZE_NORMAL);
         extraInfo.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        LayoutParams descriptionParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        extraInfo.setLayoutParams(descriptionParams);
+        extraInfo.setLayoutParams(new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
         descriptionScrollView.addView(extraInfo);
 
         if (musicCollection instanceof Playlist playlist) {
@@ -257,31 +261,32 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
             );
         }
 
-        LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        topBarParams.setMargins(0, dp(24), 0, 0);
-        addView(topBar, topBarParams);
+        // The list fills the page and scrolls underneath the floating bar, so it is added first.
+        virtualList = new MusicVirtualizedListLayout(context);
+        scrollView = new ScrollView(context);
+        scrollView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
+        scrollView.setClipToPadding(false);
+        scrollView.addView(virtualList, new ScrollView.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) ->
+                updateVirtualWindow());
+        scrollView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+                updateVirtualWindow());
+        scrollView.post(this::updateVirtualWindow);
+        LayoutParams params = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
+        params.setMargins(dp(2), 0, dp(2), 0);
+        addView(scrollView, params);
 
         progressBar = new ProgressBar(context);
-        LayoutParams progressParams = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
+        FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
         progressParams.setMargins(0, dp(32), 0, 0);
         addView(progressBar, progressParams);
 
-        virtualList = new MusicVirtualizedListLayout(context);
-        ScrollView scrollView = new ScrollView(context);
-        scrollView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
-        LayoutParams tracksParams = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
-        tracksParams.setMargins(0, dp(24), 0, 0);
-        addView(scrollView, tracksParams);
-        scrollView.addView(virtualList, new ScrollView.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-        scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) ->
-                virtualList.updateWindow(scrollY, v.getHeight()));
-        scrollView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            int height = bottom - top;
-            if (height > 0) {
-                virtualList.updateWindow(v.getScrollY(), height);
-            }
-        });
-        scrollView.post(() -> virtualList.updateWindow(0, scrollView.getHeight()));
+        applyTopBarBackground();
+        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        topBarParams.gravity = Gravity.TOP;
+        topBarParams.setMargins(0, dp(BAR_TOP_MARGIN), 0, 0);
+        // Added last: its backdrop blur samples the content recorded underneath.
+        addView(topBar, topBarParams);
 
         if (musicCollection instanceof Playlist playlist) {//TODO intelligent recommendations list for like list
             collectionId = playlist.getId();
@@ -294,6 +299,41 @@ public class MusicCollectionDetailView extends LinearLayout implements RouterCon
         }
 
         refreshData(false);
+    }
+
+    /**
+     * The list inset equals the space the floating bar occupies, which is only known after measure.
+     * Applying it before laying children out keeps the first frame below the bar.
+     */
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
+        int inset = lp.topMargin + topBar.getMeasuredHeight();
+        if (scrollView.getPaddingTop() != inset) {
+            scrollView.setPadding(0, inset, 0, 0);
+        }
+        super.onLayout(changed, left, top, right, bottom);
+    }
+
+    private void updateVirtualWindow() {
+        int viewport = scrollView.getHeight();
+        if (viewport <= 0) {
+            return;
+        }
+        // The list is laid out below the bar, so shift the window up by that inset to keep the
+        // content covered by the bar realized (it is what the bar's blur samples).
+        virtualList.updateWindow(scrollView.getScrollY() - scrollView.getPaddingTop(), viewport);
+    }
+
+    private void applyTopBarBackground() {
+        PanelStyle.factory(
+                topBar,
+                clientConfig.getPanelOpacity(),
+                clientConfig.getPanelBrightness(),
+                dp(BAR_CORNER_RADIUS),
+                new InsetBackgroundFactory.Padding(dp(10), dp(8), dp(10), dp(8)),
+                InsetBackgroundFactory.BackdropBlur.UI_LAYER
+        ).applyBackgroundTo(topBar);
     }
 
     @Override

@@ -41,6 +41,7 @@ import org.lwjgl.util.tinyfd.TinyFileDialogs;
 
 import java.nio.file.Paths;
 import java.util.*;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -83,7 +84,7 @@ public class CloudDriveView extends LinearLayout {
         addView(topBar, topBarParams);
 
         ImageButton backButton = new ImageButton(context);
-        backButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.back"));
+        Tooltip.attach(backButton, I18n.get(MusicHud.MOD_ID + ".button.back"));
         Image backIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
         if (backIcon != null) {
             backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
@@ -122,7 +123,7 @@ public class CloudDriveView extends LinearLayout {
 
         ImageButton refreshButton = new ImageButton(context);
         iconBackgroundFactory.applyBackgroundTo(refreshButton);
-        refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+        Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
         refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         Image refreshIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
         if (refreshIcon != null) {
@@ -134,7 +135,7 @@ public class CloudDriveView extends LinearLayout {
 
         ImageButton uploadButton = new ImageButton(context);
         iconBackgroundFactory.applyBackgroundTo(uploadButton);
-        uploadButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.upload"));
+        Tooltip.attach(uploadButton, I18n.get(MusicHud.MOD_ID + ".button.upload"));
         uploadButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         Image uploadIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/upload.png");
         if (uploadIcon != null) {

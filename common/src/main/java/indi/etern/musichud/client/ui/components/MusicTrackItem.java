@@ -132,7 +132,7 @@ public class MusicTrackItem extends LinearLayout {
 
         pusherWidget = new PusherWidget(context);
         pusherWidget.setVisibility(View.GONE);
-        LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        LayoutParams params2 = new LayoutParams(dp(18), dp(18));
         params2.setMargins(0, 0, dp(12), 0);
         infoRow.addView(pusherWidget, params2);
 

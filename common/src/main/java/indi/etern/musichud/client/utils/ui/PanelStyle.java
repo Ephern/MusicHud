@@ -6,10 +6,7 @@ import icyllis.modernui.view.View;
 public final class PanelStyle {
     private static final int BORDER_RGB = 0x7F7F7F;
     private static final int STROKE_WIDTH_DP = 1;
-    /** Backdrop blur radius of the modal card, in dp. */
     public static final int BACK_DROP_BLUR_RADIUS = 128;
-    /** Backdrop blur radius of the HUD config side panel, in dp. */
-    public static final int PANEL_BACK_DROP_BLUR_RADIUS = 32;
 
     private PanelStyle() {
     }
@@ -28,13 +25,14 @@ public final class PanelStyle {
     public static InsetBackgroundFactory factory(View view, double opacity, double brightness,
                                                  int cornerRadiusPx,
                                                  InsetBackgroundFactory.Padding padding) {
-        return factory(view, opacity, brightness, cornerRadiusPx, padding, false);
+        return factory(view, opacity, brightness, cornerRadiusPx, padding,
+                InsetBackgroundFactory.BackdropBlur.NONE);
     }
 
     public static InsetBackgroundFactory factory(View view, double opacity, double brightness,
                                                  int cornerRadiusPx,
                                                  InsetBackgroundFactory.Padding padding,
-                                                 boolean backdropBlur) {
+                                                 InsetBackgroundFactory.BackdropBlur backdropBlur) {
         return InsetBackgroundFactory.builder()
                 .backgroundColor(ColorStateList.valueOf(fillColor(opacity, brightness)))
                 .strokeWidth(view.dp(STROKE_WIDTH_DP))
@@ -42,7 +40,8 @@ public final class PanelStyle {
                 .cornerRadius(cornerRadiusPx)
                 .padding(padding)
                 .backdropBlur(backdropBlur)
-                .backdropBlurRadius(backdropBlur ? view.dp(PANEL_BACK_DROP_BLUR_RADIUS) : 0)
+                .backdropBlurRadius(backdropBlur == InsetBackgroundFactory.BackdropBlur.NONE
+                        ? 0 : view.dp(BACK_DROP_BLUR_RADIUS))
                 .build();
     }
 
