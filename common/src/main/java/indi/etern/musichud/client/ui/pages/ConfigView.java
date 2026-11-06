@@ -16,8 +16,8 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.beans.option.ScrobbleOption;
 import indi.etern.musichud.beans.option.MultichannelMode;
+import indi.etern.musichud.beans.option.ScrobbleOption;
 import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.modals.ApiServerDownloadDialog;
@@ -32,9 +32,11 @@ import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
-import indi.etern.musichud.server.api.*;
+import indi.etern.musichud.server.api.ApiProvider;
+import indi.etern.musichud.server.api.ApiServerManager;
+import indi.etern.musichud.server.api.ILoginApiService;
+import indi.etern.musichud.server.api.MusicPlayerServerService;
 import indi.etern.musichud.utils.http.ApiClient;
-import lombok.Getter;
 import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
@@ -45,7 +47,6 @@ import org.lwjgl.glfw.GLFW;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.function.Consumer;
@@ -57,637 +58,609 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class ConfigView extends LinearLayout {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final ServerConfig serverConfig = ServerConfig.getInstance();
-    @Getter
-    static volatile ConfigView instance;
     private final ConnectionManager connectionManager = ConnectionManager.getInstance();
-    private final List<LinearLayout> panelCategories = new ArrayList<>();
 
     public ConfigView(Context context) {
         super(context);
-        try {
-            instance = this;
+        var baseParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
+        setLayoutParams(baseParams);
 
-            var baseParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
-            setLayoutParams(baseParams);
+        var scrollView = new ScrollView(context);
+        scrollView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
+        scrollView.setFillViewport(true);
+        addView(scrollView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-            var scrollView = new ScrollView(context);
-            scrollView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
-            scrollView.setFillViewport(true);
-            addView(scrollView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        LinearLayout view = new LinearLayout(context);
+        view.setOrientation(LinearLayout.VERTICAL);
+        view.setGravity(Gravity.CENTER_HORIZONTAL);
+        var baseTransition = new LayoutTransition();
+        baseTransition.enableTransitionType(LayoutTransition.CHANGING);
+        view.setLayoutTransition(baseTransition);
+        scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-            LinearLayout view = new LinearLayout(context);
-            view.setOrientation(LinearLayout.VERTICAL);
-            view.setGravity(Gravity.CENTER_HORIZONTAL);
-            var baseTransition = new LayoutTransition();
-            baseTransition.enableTransitionType(LayoutTransition.CHANGING);
-            view.setLayoutTransition(baseTransition);
-            scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(32)));
 
-            view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(32)));
+        var commonCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
+        new PreferencesFragment.BooleanOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.enable"),
+                clientConfig::getEnable,
+                clientConfig::setEnable)
+                .setDefaultValue(clientConfig.getDefaultEnable())
+                .setOnChanged(() -> {
+                    MuiModApi.postToUiThread(MainFragment::refresh);
+                    if (clientConfig.getEnable()) {
+                        connectionManager.connectAsPrevious();
+                    } else {
+                        connectionManager.disconnect();
+                    }
+                })
+                .create(commonCategory);
+        new PreferencesFragment.BooleanOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricsSidebar"),
+                clientConfig::getEnableLyricsSidebar,
+                clientConfig::setEnableLyricsSidebar)
+                .setDefaultValue(clientConfig.getDefaultEnableLyricsSidebar())
+                .setOnChanged(MainFragment::refreshLyricsSidebarVisibility)
+                .create(commonCategory);
+        new PreferencesFragment.BooleanOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics"),
+                clientConfig::getShowTranslatedCnLyrics,
+                clientConfig::setShowTranslatedCnLyrics)
+                .setDefaultValue(clientConfig.getDefaultShowTranslatedCnLyrics())
+                .setOnChanged(MainFragment::refreshLyricViews)
+                .create(commonCategory);
+        new PreferencesFragment.BooleanOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricBlur"),
+                clientConfig::getEnableLyricBlur,
+                clientConfig::setEnableLyricBlur)
+                .setDefaultValue(clientConfig.getDefaultEnableLyricBlur())
+                .setOnChanged(MainFragment::refreshLyricViews)
+                .create(commonCategory);
+        new PreferencesFragment.BooleanOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying"),
+                clientConfig::getDisableVanillaMusic,
+                clientConfig::setDisableVanillaMusic)
+                .setDefaultValue(clientConfig.getDefaultDisableVanillaMusic())
+                .create(commonCategory);
+        new PreferencesFragment.BooleanOption(context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume"),
+                clientConfig::getMixWithVanillaSoundVolume,
+                clientConfig::setMixWithVanillaSoundVolume)
+                .setDefaultValue(clientConfig.getDefaultMixWithVanillaSoundVolume())
+                .setOnChanged(MainFragment::refreshCoverScale)
+                .create(commonCategory);
+        new AdaptiveIntegerOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.soundVolume"),
+                clientConfig::getSoundVolume,
+                clientConfig::setSoundVolume)
+                .setRange(0, 100)
+                .setDefaultValue(clientConfig.getDefaultSoundVolume())
+                .setOnChanged(MainFragment::refreshCoverScale)
+                .create(commonCategory);
+        new AdaptiveIntegerOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.soundVolumeInterval"),
+                clientConfig::getSoundVolumeInterval,
+                clientConfig::setSoundVolumeInterval)
+                .setRange(1, 100)
+                .setDefaultValue(clientConfig.getDefaultSoundVolumeInterval())
+                .create(commonCategory);
+        Quality[] qualities = {Quality.STANDARD, Quality.EX_HIGH, Quality.LOSSLESS, Quality.HIRES, Quality.JY_EFFECT, Quality.DOLBY, Quality.JY_MASTER, Quality.SKY};
+        List<Quality> qualitiesList = Arrays.stream(qualities).toList();
+        new PreferencesFragment.DropDownOption<>(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.primaryChosenQuality"),
+                qualities,
+                qualitiesList::indexOf,
+                clientConfig::getPrimaryChosenQuality,
+                clientConfig::setPrimaryChosenQuality)
+                .setDefaultValue(clientConfig.getDefaultPrimaryChosenQuality())
+                .create(commonCategory);
+        MultichannelMode[] multichannelModes = {MultichannelMode.PREFER_DISCRETE, MultichannelMode.FORCE_DOWNMIX};
+        List<MultichannelMode> multichannelModesList = Arrays.stream(multichannelModes).toList();
+        new PreferencesFragment.DropDownOption<>(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.multichannelMode"),
+                multichannelModes,
+                multichannelModesList::indexOf,
+                clientConfig::getMultichannelMode,
+                clientConfig::setMultichannelMode)
+                .setDefaultValue(clientConfig.getDefaultMultichannelMode())
+                .create(commonCategory);
+        ScrobbleOption[] scrobbleOptions = {ScrobbleOption.NONE, ScrobbleOption.ONLY_SELF, ScrobbleOption.ALL};
+        List<ScrobbleOption> scrobbleOptionsList = Arrays.stream(scrobbleOptions).toList();
+        new PreferencesFragment.DropDownOption<>(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.scrobbleOption"),
+                scrobbleOptions,
+                scrobbleOptionsList::indexOf,
+                clientConfig::getScrobbleOption,
+                clientConfig::setScrobbleOption)
+                .setDefaultValue(clientConfig.getDefaultScrobbleOption())
+                .create(commonCategory);
+        new AdaptiveFloatOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundFluidOpacity"),
+                clientConfig::getGuiBackgroundFluidOpacity,
+                clientConfig::setGuiBackgroundFluidOpacity)
+                .setRange(0, 1, 100)
+                .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidOpacity())
+                .create(commonCategory);
+        new AdaptiveIntegerOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundBlurRadius"),
+                clientConfig::getGuiBackgroundBlurRadius,
+                clientConfig::setGuiBackgroundBlurRadius)
+                .setRange(0, 1024)
+                .setDefaultValue(clientConfig.getDefaultGuiBackgroundBlurRadius())
+                .create(commonCategory);
+        new AdaptiveFloatOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundSamplingBlackOverlay"),
+                clientConfig::getGuiBackgroundSamplingBlackOverlay,
+                clientConfig::setGuiBackgroundSamplingBlackOverlay)
+                .setRange(0, 1, 100)
+                .setDefaultValue(clientConfig.getDefaultGuiBackgroundSamplingBlackOverlay())
+                .create(commonCategory);
+        new AdaptiveFloatOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.panelOpacity"),
+                clientConfig::getPanelOpacity,
+                clientConfig::setPanelOpacity)
+                .setRange(0, 1, 100)
+                .setDefaultValue(clientConfig.getDefaultPanelOpacity())
+                .setOnChanged(this::refreshPanelStyles)
+                .create(commonCategory);
+        new AdaptiveFloatOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.common.panelBrightness"),
+                clientConfig::getPanelBrightness,
+                clientConfig::setPanelBrightness)
+                .setRange(0, 1, 100)
+                .setDefaultValue(clientConfig.getDefaultPanelBrightness())
+                .setOnChanged(this::refreshPanelStyles)
+                .create(commonCategory);
+        var transition1 = new LayoutTransition();
+        transition1.enableTransitionType(LayoutTransition.CHANGING);
+        commonCategory.setLayoutTransition(transition1);
 
-            var commonCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.enable"),
-                    clientConfig::getEnable,
-                    clientConfig::setEnable)
-                    .setDefaultValue(clientConfig.getDefaultEnable())
-                    .setOnChanged(() -> {
-                        MuiModApi.postToUiThread(MainFragment::refresh);
-                        if (clientConfig.getEnable()) {
-                            connectionManager.connectAsPrevious();
+        Button openHudConfigButton = new Button(context);
+        openHudConfigButton.setText(I18n.get(MusicHud.MOD_ID + ".config.openHudConfig"));
+        openHudConfigButton.setTextColor(Theme.PRIMARY_COLOR);
+        openHudConfigButton.setTextSize(14);
+        InsetBackgroundFactory openHudBgFactory = InsetBackgroundFactory.builder().inset(0).cornerRadius(dp(8)).build();
+        openHudBgFactory.applyBackgroundTo(openHudConfigButton);
+        openHudConfigButton.setOnClickListener((v) -> {
+            Minecraft minecraft = Minecraft.getInstance();
+            minecraft.execute(() -> minecraft.setScreen(HudConfigScreen.createScreen(
+                    new HudConfigFragment(),
+                    minecraft.screen,
+                    I18n.get(MusicHud.MOD_ID + ".config.hudScreenTitle"))));
+        });
+        commonCategory.addView(openHudConfigButton, new LayoutParams(MATCH_PARENT, dp(40)));
+        view.addView(commonCategory);
+
+        var multiplayerCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.externalServer"));
+        new PreferencesFragment.BooleanOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.externalServer.autoConnect"),
+                clientConfig::getEnableAutoConnect,
+                clientConfig::setEnableAutoConnect)
+                .setDefaultValue(clientConfig.getDefaultEnableAutoConnect())
+                .create(multiplayerCategory);
+        new PreferencesFragment.BooleanOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.externalServer.enableIsolatedMode"),
+                clientConfig::getEnableIsolatedMode,
+                clientConfig::setEnableIsolatedMode)
+                .setDefaultValue(clientConfig.getDefaultEnableIsolatedMode())
+                .setOnChanged(() -> {
+                    if (ConnectionStateMachine.getConnectStatus() != ConnectionStateMachine.ConnectStatus.CONNECTED) {
+                        if (clientConfig.getEnableIsolatedMode()) {
+                            connectionManager.switchToIsolate();
                         } else {
                             connectionManager.disconnect();
                         }
-                    })
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricsSidebar"),
-                    clientConfig::getEnableLyricsSidebar,
-                    clientConfig::setEnableLyricsSidebar)
-                    .setDefaultValue(clientConfig.getDefaultEnableLyricsSidebar())
-                    .setOnChanged(MainFragment::refreshLyricsSidebarVisibility)
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics"),
-                    clientConfig::getShowTranslatedCnLyrics,
-                    clientConfig::setShowTranslatedCnLyrics)
-                    .setDefaultValue(clientConfig.getDefaultShowTranslatedCnLyrics())
-                    .setOnChanged(MainFragment::refreshLyricViews)
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricBlur"),
-                    clientConfig::getEnableLyricBlur,
-                    clientConfig::setEnableLyricBlur)
-                    .setDefaultValue(clientConfig.getDefaultEnableLyricBlur())
-                    .setOnChanged(MainFragment::refreshLyricViews)
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.disableVanillaMusicWhilePlaying"),
-                    clientConfig::getDisableVanillaMusic,
-                    clientConfig::setDisableVanillaMusic)
-                    .setDefaultValue(clientConfig.getDefaultDisableVanillaMusic())
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.mixWithVanillaSoundVolume"),
-                    clientConfig::getMixWithVanillaSoundVolume,
-                    clientConfig::setMixWithVanillaSoundVolume)
-                    .setDefaultValue(clientConfig.getDefaultMixWithVanillaSoundVolume())
-                    .setOnChanged(MainFragment::refreshCoverScale)
-                    .create(commonCategory);
-            new AdaptiveIntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.soundVolume"),
-                    clientConfig::getSoundVolume,
-                    clientConfig::setSoundVolume)
-                    .setRange(0, 100)
-                    .setDefaultValue(clientConfig.getDefaultSoundVolume())
-                    .setOnChanged(MainFragment::refreshCoverScale)
-                    .create(commonCategory);
-            new AdaptiveIntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.soundVolumeInterval"),
-                    clientConfig::getSoundVolumeInterval,
-                    clientConfig::setSoundVolumeInterval)
-                    .setRange(1, 100)
-                    .setDefaultValue(clientConfig.getDefaultSoundVolumeInterval())
-                    .create(commonCategory);
-            Quality[] qualities = {Quality.STANDARD, Quality.EX_HIGH, Quality.LOSSLESS, Quality.HIRES, Quality.JY_EFFECT, Quality.DOLBY, Quality.JY_MASTER, Quality.SKY};
-            List<Quality> qualitiesList = Arrays.stream(qualities).toList();
-            new PreferencesFragment.DropDownOption<>(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.primaryChosenQuality"),
-                    qualities,
-                    qualitiesList::indexOf,
-                    clientConfig::getPrimaryChosenQuality,
-                    clientConfig::setPrimaryChosenQuality)
-                    .setDefaultValue(clientConfig.getDefaultPrimaryChosenQuality())
-                    .create(commonCategory);
-            MultichannelMode[] multichannelModes = {MultichannelMode.PREFER_DISCRETE, MultichannelMode.FORCE_DOWNMIX};
-            List<MultichannelMode> multichannelModesList = Arrays.stream(multichannelModes).toList();
-            new PreferencesFragment.DropDownOption<>(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.multichannelMode"),
-                    multichannelModes,
-                    multichannelModesList::indexOf,
-                    clientConfig::getMultichannelMode,
-                    clientConfig::setMultichannelMode)
-                    .setDefaultValue(clientConfig.getDefaultMultichannelMode())
-                    .create(commonCategory);
-            ScrobbleOption[] scrobbleOptions = {ScrobbleOption.NONE, ScrobbleOption.ONLY_SELF, ScrobbleOption.ALL};
-            List<ScrobbleOption> scrobbleOptionsList = Arrays.stream(scrobbleOptions).toList();
-            new PreferencesFragment.DropDownOption<>(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.scrobbleOption"),
-                    scrobbleOptions,
-                    scrobbleOptionsList::indexOf,
-                    clientConfig::getScrobbleOption,
-                    clientConfig::setScrobbleOption)
-                    .setDefaultValue(clientConfig.getDefaultScrobbleOption())
-                    .create(commonCategory);
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundFluidOpacity"),
-                    clientConfig::getGuiBackgroundFluidOpacity,
-                    clientConfig::setGuiBackgroundFluidOpacity)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundFluidOpacity())
-                    .create(commonCategory);
-            new AdaptiveIntegerOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundBlurRadius"),
-                    clientConfig::getGuiBackgroundBlurRadius,
-                    clientConfig::setGuiBackgroundBlurRadius)
-                    .setRange(0, 1024)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundBlurRadius())
-                    .create(commonCategory);
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.guiBackgroundSamplingBlackOverlay"),
-                    clientConfig::getGuiBackgroundSamplingBlackOverlay,
-                    clientConfig::setGuiBackgroundSamplingBlackOverlay)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultGuiBackgroundSamplingBlackOverlay())
-                    .create(commonCategory);
-            new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.enableSidebarBackground"),
-                    clientConfig::getEnableSidebarBackground,
-                    clientConfig::setEnableSidebarBackground)
-                    .setDefaultValue(clientConfig.getDefaultEnableSidebarBackground())
-                    .setOnChanged(MainFragment::refreshPanelStyle)
-                    .create(commonCategory);
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.panelOpacity"),
-                    clientConfig::getPanelOpacity,
-                    clientConfig::setPanelOpacity)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultPanelOpacity())
-                    .setOnChanged(this::refreshPanelStyles)
-                    .create(commonCategory);
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.common.panelBrightness"),
-                    clientConfig::getPanelBrightness,
-                    clientConfig::setPanelBrightness)
-                    .setRange(0, 1, 100)
-                    .setDefaultValue(clientConfig.getDefaultPanelBrightness())
-                    .setOnChanged(this::refreshPanelStyles)
-                    .create(commonCategory);
-            var transition1 = new LayoutTransition();
-            transition1.enableTransitionType(LayoutTransition.CHANGING);
-            commonCategory.setLayoutTransition(transition1);
-
-            Button openHudConfigButton = new Button(context);
-            openHudConfigButton.setText(I18n.get(MusicHud.MOD_ID + ".config.openHudConfig"));
-            openHudConfigButton.setTextColor(Theme.PRIMARY_COLOR);
-            openHudConfigButton.setTextSize(14);
-            InsetBackgroundFactory openHudBgFactory = InsetBackgroundFactory.builder().inset(0).cornerRadius(dp(8)).build();
-            openHudBgFactory.applyBackgroundTo(openHudConfigButton);
-            openHudConfigButton.setOnClickListener((v) -> {
-                Minecraft minecraft = Minecraft.getInstance();
-                minecraft.execute(() -> minecraft.setScreen(HudConfigScreen.createScreen(
-                        new HudConfigFragment(),
-                        minecraft.screen,
-                        I18n.get(MusicHud.MOD_ID + ".config.hudScreenTitle"))));
-            });
-            commonCategory.addView(openHudConfigButton, new LayoutParams(MATCH_PARENT, dp(40)));
-            view.addView(commonCategory);
-
-            var multiplayerCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.externalServer"));
-            new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.externalServer.autoConnect"),
-                    clientConfig::getEnableAutoConnect,
-                    clientConfig::setEnableAutoConnect)
-                    .setDefaultValue(clientConfig.getDefaultEnableAutoConnect())
-                    .create(multiplayerCategory);
-            new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.externalServer.enableIsolatedMode"),
-                    clientConfig::getEnableIsolatedMode,
-                    clientConfig::setEnableIsolatedMode)
-                    .setDefaultValue(clientConfig.getDefaultEnableIsolatedMode())
-                    .setOnChanged(() -> {
-                        if (ConnectionStateMachine.getConnectStatus() != ConnectionStateMachine.ConnectStatus.CONNECTED) {
-                            if (clientConfig.getEnableIsolatedMode()) {
-                                connectionManager.switchToIsolate();
-                            } else {
-                                connectionManager.disconnect();
-                            }
-                            MainFragment.refresh();
-                        }
-                    }).create(multiplayerCategory);
-
-            AutoConnectServerFilterType[] filterTypes = {AutoConnectServerFilterType.BLACK_LIST, AutoConnectServerFilterType.WHITE_LIST};
-            List<AutoConnectServerFilterType> filterTypeList = Arrays.stream(filterTypes).toList();
-            new PreferencesFragment.DropDownOption<>(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.externalServer.serverFilterType"),
-                    filterTypes,
-                    filterTypeList::indexOf,
-                    clientConfig::getConnectServerFilterType,
-                    clientConfig::setConnectServerFilterType)
-                    .setDefaultValue(clientConfig.getDefaultConnectServerFilterType())
-                    .create(multiplayerCategory);
-
-            LinearLayout blackList = PreferencesFragment.createStringListOption(
-                    context,
-                    MusicHud.MOD_ID + ".config.externalServer.blackList",
-                    new ConfigItem<>() {
-                        @Override
-                        public List<String> getPath() {
-                            return List.of(MusicHud.MOD_ID, "config", "externalServer", "blackList");
-                        }
-
-                        @Override
-                        public void set(List<? extends String> value) {
-                            //noinspection unchecked
-                            clientConfig.setBlackList((List<String>) value);
-                        }
-
-                        @Override
-                        public List<? extends String> getDefault() {
-                            return List.of();
-                        }
-
-                        @Override
-                        public @Nullable Range<List<? extends String>> getRange() {
-                            return null;
-                        }
-
-                        @Override
-                        public List<? extends String> get() {
-                            return clientConfig.getBlackList();
-                        }
-                    }, clientConfig::save);
-            LinearLayout whiteList = PreferencesFragment.createStringListOption(
-                    context,
-                    MusicHud.MOD_ID + ".config.externalServer.whiteList",
-                    new ConfigItem<>() {
-                        @Override
-                        public List<String> getPath() {
-                            return List.of(MusicHud.MOD_ID, "config", "externalServer", "whiteList");
-                        }
-
-                        @Override
-                        public void set(List<? extends String> value) {
-                            //noinspection unchecked
-                            clientConfig.setWhiteList((List<String>) value);
-                        }
-
-                        @Override
-                        public List<? extends String> getDefault() {
-                            return List.of();
-                        }
-
-                        @Override
-                        public @Nullable Range<List<? extends String>> getRange() {
-                            return null;
-                        }
-
-                        @Override
-                        public List<? extends String> get() {
-                            return clientConfig.getWhiteList();
-                        }
-                    }, clientConfig::save);
-            multiplayerCategory.addView(blackList);
-            multiplayerCategory.addView(whiteList);
-            view.addView(multiplayerCategory);
-
-            var integratedServerCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.integratedServer"));
-            view.addView(integratedServerCategory, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
-            ApiServerManager apiServerManager = ApiServerManager.getInstance();
-            new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.enable"),
-                    clientConfig::getEnabledInIntegratedServer,
-                    clientConfig::setEnabledInIntegratedServer)
-                    .setDefaultValue(clientConfig.getDefaultEnabledInIntegratedServer()).setOnChanged(() -> {
-                        ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
-                        if (clientConfig.getEnabledInIntegratedServer()) {
-                            if (apiServerManager != null) {
-                                apiServerManager.restartApiServer();
-                            }
-                            loginApiService.reconnectAll();
-                        } else {
-                            MusicPlayerServerService.getInstance().reset();
-                            loginApiService.disconnectToAll();
-                            if (apiServerManager != null) {
-                                apiServerManager.stopApiServer();
-                            }
-                        }
-                    })
-                    .create(integratedServerCategory);
-
-            new AdaptiveFloatOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.integratedServer.pusherVoteAdditionalRate"),
-                    serverConfig::getPusherVoteAdditionalRate,
-                    serverConfig::setPusherVoteAdditionalRate)
-                    .setRange(0, 1)
-                    .setDefaultValue(serverConfig.getDefaultPusherVoteAdditionalRate())
-                    .create(integratedServerCategory);
-
-            var apiCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.apiServer"));
-            LinearLayout.LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(0, dp(6), 0, dp(6));
-            view.addView(apiCategory, params1);
-
-            new PreferencesFragment.BooleanOption(
-                    context,
-                    I18n.get(MusicHud.MOD_ID + ".config.apiServer.startupBinaryApiServerWhenLaunch"),
-                    serverConfig::getStartupBinaryApiServerWhenLaunch,
-                    serverConfig::setStartupBinaryApiServerWhenLaunch)
-                    .setDefaultValue(serverConfig.getDefaultStartupBinaryApiServerWhenLaunch())
-                    .create(apiCategory);
-
-            {
-                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.serverApiBaseUrl"));
-                EditText input = inputBox.findViewById(R.id.input);
-                if (input != null) {
-                    input.setMinimumWidth(dp(256));
-                    input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-                    input.setText(serverConfig.getServerApiBaseUrl());
-                    input.setOnKeyListener((v, c, e) -> {
-                        if (c == GLFW.GLFW_KEY_ENTER) {
-                            input.clearFocus();
-                            return true;
-                        }
-                        return false;
-                    });
-                    input.setOnFocusChangeListener((v, b) -> {
-                        if (!b) {
-                            serverConfig.setServerApiBaseUrl(input.getText().toString());
-                        }
-                    });
-                }
-                apiCategory.addView(inputBox);
-            }
-
-            final EditText[] serverApiBinaryPathInput = {null};
-
-            {
-                LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.serverApiBinaryExecutablePath"));
-                EditText input = inputBox.findViewById(R.id.input);
-                if (input != null) {
-                    input.setMinimumWidth(dp(256));
-                    input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-                    input.setText(serverConfig.getServerApiBinaryExecutablePath());
-                    input.setOnKeyListener((v, c, e) -> {
-                        if (c == GLFW.GLFW_KEY_ENTER) {
-                            input.clearFocus();
-                            return true;
-                        }
-                        return false;
-                    });
-                    input.setOnFocusChangeListener((v, b) -> {
-                        if (!b) {
-                            serverConfig.setServerApiBinaryExecutablePath(input.getText().toString());
-                        }
-                    });
-                }
-                serverApiBinaryPathInput[0] = input;
-                apiCategory.addView(inputBox);
-            }
-
-            LinearLayout apiServerStatusLayout = new LinearLayout(context);
-            apiServerStatusLayout.setOrientation(LinearLayout.HORIZONTAL);
-            apiServerStatusLayout.setGravity(Gravity.LEFT);
-            apiServerStatusLayout.setVerticalGravity(Gravity.CENTER);
-            LayoutParams params3 = new LayoutParams(MATCH_PARENT, dp(44));
-            params3.setMargins(dp(6), 0, dp(6), 0);
-            apiServerStatusLayout.setLayoutParams(params3);
-
-            TextView apiStatusLabel = new TextView(context);
-            apiStatusLabel.setTextSize(14);
-            String binaryApiStatusTemplate = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
-            apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerManager.getBinaryApiServerStatus().i18nKey())));
-
-            InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder().inset(0).cornerRadius(dp(4))
-                    .padding(new InsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
-
-            Button downloadApiServerButton = new ApiServerDownloadDialog(context, backgroundFactory,
-                    configPath -> {
-                        serverConfig.setServerApiBinaryExecutablePath(configPath);
-                        if (serverApiBinaryPathInput[0] != null) {
-                            serverApiBinaryPathInput[0].setText(configPath);
-                        }
-                    }).createButton();
-
-            Button stopApiServerButton = new Button(context);
-            stopApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.stopApiServer"));
-            stopApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
-            stopApiServerButton.setTextSize(14);
-            backgroundFactory.applyBackgroundTo(stopApiServerButton);
-            stopApiServerButton.setOnClickListener((v1) -> apiServerManager.stopApiServer());
-
-            Button restartApiServerButton = new Button(context);
-            restartApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.restartApiServer"));
-            restartApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
-            restartApiServerButton.setTextSize(14);
-            backgroundFactory.applyBackgroundTo(restartApiServerButton);
-            restartApiServerButton.setOnClickListener((v1) -> apiServerManager.restartApiServer());
-
-            apiServerStatusLayout.addView(apiStatusLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
-            apiServerStatusLayout.addView(downloadApiServerButton);
-            apiServerStatusLayout.addView(stopApiServerButton);
-            apiServerStatusLayout.addView(restartApiServerButton);
-            apiCategory.addView(apiServerStatusLayout);
-
-            LinearLayout apiVersionLinearLayout = new LinearLayout(context);
-            apiVersionLinearLayout.setOrientation(LinearLayout.HORIZONTAL);
-            apiVersionLinearLayout.setGravity(Gravity.LEFT);
-            apiVersionLinearLayout.setVerticalGravity(Gravity.CENTER);
-            LayoutParams params2 = new LayoutParams(MATCH_PARENT, dp(44));
-            params2.setMargins(dp(6), 0, dp(6), 0);
-            apiVersionLinearLayout.setLayoutParams(params2);
-
-            TextView apiVersionLabel = new TextView(context);
-            apiVersionLabel.setTextSize(14);
-            String apiServiceVersionTemplate = I18n.get(MusicHud.MOD_ID + ".text.apiServiceVersion");
-            apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
-
-            Button checkVersionButton = new Button(context);
-            checkVersionButton.setText(I18n.get(MusicHud.MOD_ID + ".button.checkApiServerVersion"));
-            checkVersionButton.setTextColor(Theme.PRIMARY_COLOR);
-            checkVersionButton.setTextSize(14);
-            backgroundFactory.applyBackgroundTo(checkVersionButton);
-            checkVersionButton.setOnClickListener((v) -> {
-                ApiClient.checkAvailable();
-                apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
-            });
-
-            apiVersionLinearLayout.addView(apiVersionLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
-            apiVersionLinearLayout.addView(checkVersionButton);
-            apiCategory.addView(apiVersionLinearLayout);
-
-            LinearLayout apiLogLayout = new LinearLayout(context);
-            apiLogLayout.setOrientation(LinearLayout.HORIZONTAL);
-            apiLogLayout.setGravity(Gravity.LEFT);
-            apiLogLayout.setVerticalGravity(Gravity.CENTER);
-            LayoutParams logParams = new LayoutParams(MATCH_PARENT, dp(44));
-            logParams.setMargins(dp(6), 0, dp(6), 0);
-            apiLogLayout.setLayoutParams(logParams);
-
-            TextView apiLogLabel = new TextView(context);
-            apiLogLabel.setTextSize(14);
-            updateApiLogLabel(apiLogLabel);
-
-            Button refreshApiLogButton = new Button(context);
-            refreshApiLogButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refreshApiLog"));
-            refreshApiLogButton.setTextColor(Theme.PRIMARY_COLOR);
-            refreshApiLogButton.setTextSize(14);
-            backgroundFactory.applyBackgroundTo(refreshApiLogButton);
-            refreshApiLogButton.setOnClickListener(v -> updateApiLogLabel(apiLogLabel));
-
-            Button openApiLogDirButton = new Button(context);
-            openApiLogDirButton.setText(I18n.get(MusicHud.MOD_ID + ".button.openApiLogDir"));
-            openApiLogDirButton.setTextColor(Theme.PRIMARY_COLOR);
-            openApiLogDirButton.setTextSize(14);
-            backgroundFactory.applyBackgroundTo(openApiLogDirButton);
-            openApiLogDirButton.setOnClickListener(v -> {
-                Path logDir = apiServerManager.getLogDir();
-                try {
-                    Files.createDirectories(logDir);
-                } catch (IOException ignored) {
-                }
-                Util.getPlatform().openFile(logDir.toFile());
-                updateApiLogLabel(apiLogLabel);
-            });
-
-            Button clearApiLogButton = new Button(context);
-            clearApiLogButton.setText(I18n.get(MusicHud.MOD_ID + ".button.clearApiLogs"));
-            clearApiLogButton.setTextColor(Theme.ERROR_TEXT_COLOR);
-            clearApiLogButton.setTextSize(14);
-            backgroundFactory.applyBackgroundTo(clearApiLogButton);
-            clearApiLogButton.setOnClickListener(v -> {
-                LinearLayout warnContent = new LinearLayout(context);
-                warnContent.setOrientation(LinearLayout.VERTICAL);
-                TextView warnText = new TextView(context);
-                warnText.setText(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.warning"));
-                warnText.setTextSize(Theme.TEXT_SIZE_LARGE);
-                warnText.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                warnContent.addView(warnText);
-                new Modal(context, warnContent,
-                        new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.button1"), (btn, modal) -> {
-                            ApiServerManager.getInstance().clearLogs();
-                            updateApiLogLabel(apiLogLabel);
-                            modal.dismiss();
-                        }),
-                        new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.button2"), (btn, modal) -> modal.dismiss())
-                ).show();
-            });
-
-            apiLogLayout.addView(apiLogLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
-            apiLogLayout.addView(refreshApiLogButton);
-            apiLogLayout.addView(openApiLogDirButton);
-            apiLogLayout.addView(clearApiLogButton);
-            apiCategory.addView(apiLogLayout);
-
-            var envVarCategory = createPanelCategory(view, null);
-            {
-                var transition = new LayoutTransition();
-                transition.enableTransitionType(LayoutTransition.CHANGING);
-                envVarCategory.setLayoutTransition(transition);
-
-                final Button title = new ToggleButton(context, null, R.attr.borderlessButtonStyle);
-                title.setText(I18n.get(MusicHud.MOD_ID + ".config.apiServer.environmentVariables"));
-                title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
-                {
-                    var icon = new StateListDrawable();
-                    icon.addState(new int[]{R.attr.state_checked}, new BuiltinIconDrawable(
-                            context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_UP
-                    ));
-                    icon.addState(StateSet.WILD_CARD, new BuiltinIconDrawable(
-                            context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_DOWN
-                    ));
-                    icon.setTintList(title.getTextColors());
-                    title.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon, null);
-                }
-                title.setOnClickListener(new EnvVarAccordion(envVarCategory));
-                envVarCategory.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-            }
-            LayoutParams envVarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            envVarParams.setMargins(0, dp(6), 0, dp(6));
-            view.addView(envVarCategory, envVarParams);
-
-            var debugCategory = createPanelCategory(view, null);
-            {
-                var transition = new LayoutTransition();
-                transition.enableTransitionType(LayoutTransition.CHANGING);
-                debugCategory.setLayoutTransition(transition);
-
-                final Button title = new ToggleButton(context, null, R.attr.borderlessButtonStyle);
-                title.setText(I18n.get(MusicHud.MOD_ID + ".config.category.debug"));
-                title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
-                {
-                    var icon = new StateListDrawable();
-                    icon.addState(new int[]{R.attr.state_checked}, new BuiltinIconDrawable(
-                            context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_UP
-                    ));
-                    icon.addState(StateSet.WILD_CARD, new BuiltinIconDrawable(
-                            context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_DOWN
-                    ));
-                    icon.setTintList(title.getTextColors());
-                    title.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon, null);
-                }
-                title.setOnClickListener(new DebugAccordion(debugCategory));
-                debugCategory.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-            }
-            LayoutParams debugParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            debugParams.setMargins(0, dp(6), 0, dp(128));
-            view.addView(debugCategory, debugParams);
-
-            Consumer<ApiServerManager.BinaryApiServerStatus> listener = apiServerStatus -> MuiModApi.postToUiThread(
-                    () -> {
-                        apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerStatus.i18nKey())));
-                        apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
-                        updateApiLogLabel(apiLogLabel);
+                        MainFragment.refresh();
                     }
-            );
-            List<Consumer<ApiServerManager.BinaryApiServerStatus>> apiStatusListeners = apiServerManager.getApiStatusListeners();
-            apiStatusListeners.add(listener);
-            addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-                @Override
-                public void onViewAttachedToWindow(View v) {
-                }
+                }).create(multiplayerCategory);
 
-                @Override
-                public void onViewDetachedFromWindow(View v) {
-                    apiStatusListeners.remove(listener);
-                    Util.ioPool().execute(() -> {
-                        clientConfig.save();
-                        serverConfig.save();
-                    });
-                }
-            });
-        } catch (Exception e) {
-            instance = null;
-            throw e;
+        AutoConnectServerFilterType[] filterTypes = {AutoConnectServerFilterType.BLACK_LIST, AutoConnectServerFilterType.WHITE_LIST};
+        List<AutoConnectServerFilterType> filterTypeList = Arrays.stream(filterTypes).toList();
+        new PreferencesFragment.DropDownOption<>(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.externalServer.serverFilterType"),
+                filterTypes,
+                filterTypeList::indexOf,
+                clientConfig::getConnectServerFilterType,
+                clientConfig::setConnectServerFilterType)
+                .setDefaultValue(clientConfig.getDefaultConnectServerFilterType())
+                .create(multiplayerCategory);
+
+        LinearLayout blackList = PreferencesFragment.createStringListOption(
+                context,
+                MusicHud.MOD_ID + ".config.externalServer.blackList",
+                new ConfigItem<>() {
+                    @Override
+                    public List<String> getPath() {
+                        return List.of(MusicHud.MOD_ID, "config", "externalServer", "blackList");
+                    }
+
+                    @Override
+                    public void set(List<? extends String> value) {
+                        //noinspection unchecked
+                        clientConfig.setBlackList((List<String>) value);
+                    }
+
+                    @Override
+                    public List<? extends String> getDefault() {
+                        return List.of();
+                    }
+
+                    @Override
+                    public @Nullable Range<List<? extends String>> getRange() {
+                        return null;
+                    }
+
+                    @Override
+                    public List<? extends String> get() {
+                        return clientConfig.getBlackList();
+                    }
+                }, clientConfig::save);
+        LinearLayout whiteList = PreferencesFragment.createStringListOption(
+                context,
+                MusicHud.MOD_ID + ".config.externalServer.whiteList",
+                new ConfigItem<>() {
+                    @Override
+                    public List<String> getPath() {
+                        return List.of(MusicHud.MOD_ID, "config", "externalServer", "whiteList");
+                    }
+
+                    @Override
+                    public void set(List<? extends String> value) {
+                        //noinspection unchecked
+                        clientConfig.setWhiteList((List<String>) value);
+                    }
+
+                    @Override
+                    public List<? extends String> getDefault() {
+                        return List.of();
+                    }
+
+                    @Override
+                    public @Nullable Range<List<? extends String>> getRange() {
+                        return null;
+                    }
+
+                    @Override
+                    public List<? extends String> get() {
+                        return clientConfig.getWhiteList();
+                    }
+                }, clientConfig::save);
+        multiplayerCategory.addView(blackList);
+        multiplayerCategory.addView(whiteList);
+        view.addView(multiplayerCategory);
+
+        var integratedServerCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.integratedServer"));
+        view.addView(integratedServerCategory, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+        ApiServerManager apiServerManager = ApiServerManager.getInstance();
+        new PreferencesFragment.BooleanOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.integratedServer.enable"),
+                clientConfig::getEnabledInIntegratedServer,
+                clientConfig::setEnabledInIntegratedServer)
+                .setDefaultValue(clientConfig.getDefaultEnabledInIntegratedServer()).setOnChanged(() -> {
+                    ILoginApiService loginApiService = ILoginApiService.getInstance(ApiProvider.NCM);
+                    if (clientConfig.getEnabledInIntegratedServer()) {
+                        if (apiServerManager != null) {
+                            apiServerManager.restartApiServer();
+                        }
+                        loginApiService.reconnectAll();
+                    } else {
+                        MusicPlayerServerService.getInstance().reset();
+                        loginApiService.disconnectToAll();
+                        if (apiServerManager != null) {
+                            apiServerManager.stopApiServer();
+                        }
+                    }
+                })
+                .create(integratedServerCategory);
+
+        new AdaptiveFloatOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.integratedServer.pusherVoteAdditionalRate"),
+                serverConfig::getPusherVoteAdditionalRate,
+                serverConfig::setPusherVoteAdditionalRate)
+                .setRange(0, 1)
+                .setDefaultValue(serverConfig.getDefaultPusherVoteAdditionalRate())
+                .create(integratedServerCategory);
+
+        var apiCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.apiServer"));
+        LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        params1.setMargins(0, dp(6), 0, dp(6));
+        view.addView(apiCategory, params1);
+
+        new PreferencesFragment.BooleanOption(
+                context,
+                I18n.get(MusicHud.MOD_ID + ".config.apiServer.startupBinaryApiServerWhenLaunch"),
+                serverConfig::getStartupBinaryApiServerWhenLaunch,
+                serverConfig::setStartupBinaryApiServerWhenLaunch)
+                .setDefaultValue(serverConfig.getDefaultStartupBinaryApiServerWhenLaunch())
+                .create(apiCategory);
+
+        {
+            LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.serverApiBaseUrl"));
+            EditText input = inputBox.findViewById(R.id.input);
+            if (input != null) {
+                input.setMinimumWidth(dp(256));
+                input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+                input.setText(serverConfig.getServerApiBaseUrl());
+                input.setOnKeyListener((v, c, e) -> {
+                    if (c == GLFW.GLFW_KEY_ENTER) {
+                        input.clearFocus();
+                        return true;
+                    }
+                    return false;
+                });
+                input.setOnFocusChangeListener((v, b) -> {
+                    if (!b) {
+                        serverConfig.setServerApiBaseUrl(input.getText().toString());
+                    }
+                });
+            }
+            apiCategory.addView(inputBox);
         }
+
+        final EditText[] serverApiBinaryPathInput = {null};
+
+        {
+            LinearLayout inputBox = PreferencesFragment.createInputBox(context, I18n.get(MusicHud.MOD_ID + ".config.apiServer.serverApiBinaryExecutablePath"));
+            EditText input = inputBox.findViewById(R.id.input);
+            if (input != null) {
+                input.setMinimumWidth(dp(256));
+                input.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+                input.setText(serverConfig.getServerApiBinaryExecutablePath());
+                input.setOnKeyListener((v, c, e) -> {
+                    if (c == GLFW.GLFW_KEY_ENTER) {
+                        input.clearFocus();
+                        return true;
+                    }
+                    return false;
+                });
+                input.setOnFocusChangeListener((v, b) -> {
+                    if (!b) {
+                        serverConfig.setServerApiBinaryExecutablePath(input.getText().toString());
+                    }
+                });
+            }
+            serverApiBinaryPathInput[0] = input;
+            apiCategory.addView(inputBox);
+        }
+
+        LinearLayout apiServerStatusLayout = new LinearLayout(context);
+        apiServerStatusLayout.setOrientation(LinearLayout.HORIZONTAL);
+        apiServerStatusLayout.setGravity(Gravity.LEFT);
+        apiServerStatusLayout.setVerticalGravity(Gravity.CENTER);
+        LayoutParams params3 = new LayoutParams(MATCH_PARENT, dp(44));
+        params3.setMargins(dp(6), 0, dp(6), 0);
+        apiServerStatusLayout.setLayoutParams(params3);
+
+        TextView apiStatusLabel = new TextView(context);
+        apiStatusLabel.setTextSize(14);
+        String binaryApiStatusTemplate = I18n.get(MusicHud.MOD_ID + ".text.binaryApiStatus");
+        apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerManager.getBinaryApiServerStatus().i18nKey())));
+
+        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder().inset(0).cornerRadius(dp(4))
+                .padding(new InsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
+
+        Button downloadApiServerButton = new ApiServerDownloadDialog(context, backgroundFactory,
+                configPath -> {
+                    serverConfig.setServerApiBinaryExecutablePath(configPath);
+                    if (serverApiBinaryPathInput[0] != null) {
+                        serverApiBinaryPathInput[0].setText(configPath);
+                    }
+                }).createButton();
+
+        Button stopApiServerButton = new Button(context);
+        stopApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.stopApiServer"));
+        stopApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
+        stopApiServerButton.setTextSize(14);
+        backgroundFactory.applyBackgroundTo(stopApiServerButton);
+        stopApiServerButton.setOnClickListener((v1) -> apiServerManager.stopApiServer());
+
+        Button restartApiServerButton = new Button(context);
+        restartApiServerButton.setText(I18n.get(MusicHud.MOD_ID + ".button.restartApiServer"));
+        restartApiServerButton.setTextColor(Theme.PRIMARY_COLOR);
+        restartApiServerButton.setTextSize(14);
+        backgroundFactory.applyBackgroundTo(restartApiServerButton);
+        restartApiServerButton.setOnClickListener((v1) -> apiServerManager.restartApiServer());
+
+        apiServerStatusLayout.addView(apiStatusLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+        apiServerStatusLayout.addView(downloadApiServerButton);
+        apiServerStatusLayout.addView(stopApiServerButton);
+        apiServerStatusLayout.addView(restartApiServerButton);
+        apiCategory.addView(apiServerStatusLayout);
+
+        LinearLayout apiVersionLinearLayout = new LinearLayout(context);
+        apiVersionLinearLayout.setOrientation(LinearLayout.HORIZONTAL);
+        apiVersionLinearLayout.setGravity(Gravity.LEFT);
+        apiVersionLinearLayout.setVerticalGravity(Gravity.CENTER);
+        LayoutParams params2 = new LayoutParams(MATCH_PARENT, dp(44));
+        params2.setMargins(dp(6), 0, dp(6), 0);
+        apiVersionLinearLayout.setLayoutParams(params2);
+
+        TextView apiVersionLabel = new TextView(context);
+        apiVersionLabel.setTextSize(14);
+        String apiServiceVersionTemplate = I18n.get(MusicHud.MOD_ID + ".text.apiServiceVersion");
+        apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
+
+        Button checkVersionButton = new Button(context);
+        checkVersionButton.setText(I18n.get(MusicHud.MOD_ID + ".button.checkApiServerVersion"));
+        checkVersionButton.setTextColor(Theme.PRIMARY_COLOR);
+        checkVersionButton.setTextSize(14);
+        backgroundFactory.applyBackgroundTo(checkVersionButton);
+        checkVersionButton.setOnClickListener((v) -> {
+            ApiClient.checkAvailable();
+            apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
+        });
+
+        apiVersionLinearLayout.addView(apiVersionLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+        apiVersionLinearLayout.addView(checkVersionButton);
+        apiCategory.addView(apiVersionLinearLayout);
+
+        LinearLayout apiLogLayout = new LinearLayout(context);
+        apiLogLayout.setOrientation(LinearLayout.HORIZONTAL);
+        apiLogLayout.setGravity(Gravity.LEFT);
+        apiLogLayout.setVerticalGravity(Gravity.CENTER);
+        LayoutParams logParams = new LayoutParams(MATCH_PARENT, dp(44));
+        logParams.setMargins(dp(6), 0, dp(6), 0);
+        apiLogLayout.setLayoutParams(logParams);
+
+        TextView apiLogLabel = new TextView(context);
+        apiLogLabel.setTextSize(14);
+        updateApiLogLabel(apiLogLabel);
+
+        Button refreshApiLogButton = new Button(context);
+        refreshApiLogButton.setText(I18n.get(MusicHud.MOD_ID + ".button.refreshApiLog"));
+        refreshApiLogButton.setTextColor(Theme.PRIMARY_COLOR);
+        refreshApiLogButton.setTextSize(14);
+        backgroundFactory.applyBackgroundTo(refreshApiLogButton);
+        refreshApiLogButton.setOnClickListener(v -> updateApiLogLabel(apiLogLabel));
+
+        Button openApiLogDirButton = new Button(context);
+        openApiLogDirButton.setText(I18n.get(MusicHud.MOD_ID + ".button.openApiLogDir"));
+        openApiLogDirButton.setTextColor(Theme.PRIMARY_COLOR);
+        openApiLogDirButton.setTextSize(14);
+        backgroundFactory.applyBackgroundTo(openApiLogDirButton);
+        openApiLogDirButton.setOnClickListener(v -> {
+            Path logDir = apiServerManager.getLogDir();
+            try {
+                Files.createDirectories(logDir);
+            } catch (IOException ignored) {
+            }
+            Util.getPlatform().openFile(logDir.toFile());
+            updateApiLogLabel(apiLogLabel);
+        });
+
+        Button clearApiLogButton = new Button(context);
+        clearApiLogButton.setText(I18n.get(MusicHud.MOD_ID + ".button.clearApiLogs"));
+        clearApiLogButton.setTextColor(Theme.ERROR_TEXT_COLOR);
+        clearApiLogButton.setTextSize(14);
+        backgroundFactory.applyBackgroundTo(clearApiLogButton);
+        clearApiLogButton.setOnClickListener(v -> {
+            LinearLayout warnContent = new LinearLayout(context);
+            warnContent.setOrientation(LinearLayout.VERTICAL);
+            TextView warnText = new TextView(context);
+            warnText.setText(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.warning"));
+            warnText.setTextSize(Theme.TEXT_SIZE_LARGE);
+            warnText.setTextColor(Theme.NORMAL_TEXT_COLOR);
+            warnContent.addView(warnText);
+            new Modal(context, warnContent,
+                    new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.button1"), (btn, modal) -> {
+                        ApiServerManager.getInstance().clearLogs();
+                        updateApiLogLabel(apiLogLabel);
+                        modal.dismiss();
+                    }),
+                    new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearApiLogs.button2"), (btn, modal) -> modal.dismiss())
+            ).show();
+        });
+
+        apiLogLayout.addView(apiLogLabel, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+        apiLogLayout.addView(refreshApiLogButton);
+        apiLogLayout.addView(openApiLogDirButton);
+        apiLogLayout.addView(clearApiLogButton);
+        apiCategory.addView(apiLogLayout);
+
+        var envVarCategory = createPanelCategory(view, null);
+        {
+            var transition = new LayoutTransition();
+            transition.enableTransitionType(LayoutTransition.CHANGING);
+            envVarCategory.setLayoutTransition(transition);
+
+            final Button title = new ToggleButton(context, null, R.attr.borderlessButtonStyle);
+            title.setText(I18n.get(MusicHud.MOD_ID + ".config.apiServer.environmentVariables"));
+            title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+            {
+                var icon = new StateListDrawable();
+                icon.addState(new int[]{R.attr.state_checked}, new BuiltinIconDrawable(
+                        context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_UP
+                ));
+                icon.addState(StateSet.WILD_CARD, new BuiltinIconDrawable(
+                        context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_DOWN
+                ));
+                icon.setTintList(title.getTextColors());
+                title.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon, null);
+            }
+            title.setOnClickListener(new EnvVarAccordion(envVarCategory));
+            envVarCategory.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        }
+        LayoutParams envVarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        envVarParams.setMargins(0, dp(6), 0, dp(6));
+        view.addView(envVarCategory, envVarParams);
+
+        var debugCategory = createPanelCategory(view, null);
+        {
+            var transition = new LayoutTransition();
+            transition.enableTransitionType(LayoutTransition.CHANGING);
+            debugCategory.setLayoutTransition(transition);
+
+            final Button title = new ToggleButton(context, null, R.attr.borderlessButtonStyle);
+            title.setText(I18n.get(MusicHud.MOD_ID + ".config.category.debug"));
+            title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
+            {
+                var icon = new StateListDrawable();
+                icon.addState(new int[]{R.attr.state_checked}, new BuiltinIconDrawable(
+                        context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_UP
+                ));
+                icon.addState(StateSet.WILD_CARD, new BuiltinIconDrawable(
+                        context.getResources(), BuiltinIconDrawable.KEYBOARD_ARROW_DOWN
+                ));
+                icon.setTintList(title.getTextColors());
+                title.setCompoundDrawablesRelativeWithIntrinsicBounds(null, null, icon, null);
+            }
+            title.setOnClickListener(new DebugAccordion(debugCategory));
+            debugCategory.addView(title, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        }
+        LayoutParams debugParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        debugParams.setMargins(0, dp(6), 0, dp(128));
+        view.addView(debugCategory, debugParams);
+
+        Consumer<ApiServerManager.BinaryApiServerStatus> listener = apiServerStatus -> MuiModApi.postToUiThread(
+                () -> {
+                    apiStatusLabel.setText(binaryApiStatusTemplate.replace("{}", I18n.get(apiServerStatus.i18nKey())));
+                    apiVersionLabel.setText(apiServiceVersionTemplate.replace("{}", I18n.get(ApiClient.getVersion())));
+                    updateApiLogLabel(apiLogLabel);
+                }
+        );
+        List<Consumer<ApiServerManager.BinaryApiServerStatus>> apiStatusListeners = apiServerManager.getApiStatusListeners();
+        apiStatusListeners.add(listener);
+        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
+            @Override
+            public void onViewAttachedToWindow(View v) {
+            }
+
+            @Override
+            public void onViewDetachedFromWindow(View v) {
+                apiStatusListeners.remove(listener);
+                Util.ioPool().execute(() -> {
+                    clientConfig.save();
+                    serverConfig.save();
+                });
+            }
+        });
     }
 
     private LinearLayout createPanelCategory(LinearLayout parent, String name) {
         LinearLayout category = PreferencesFragment.createCategoryList(parent, name);
-        panelCategories.add(category);
-        applyPanelBackground(category);
+        PanelStyle.applyDynamically(category, category.dp(12), null,
+                InsetBackgroundFactory.BackdropBlur.NONE);
         return category;
     }
 
     private void refreshPanelStyles() {
-        for (LinearLayout category : panelCategories) {
-            applyPanelBackground(category);
-        }
-        MainFragment.refreshPanelStyle();
-    }
-
-    private static void applyPanelBackground(LinearLayout category) {
-        PanelStyle.factory(category,
-                        clientConfig.getPanelOpacity(), clientConfig.getPanelBrightness(),
-                        category.dp(12), null)
-                .applyBackgroundTo(category);
+        PanelStyle.updateDynamicStyles();
     }
 
     private static void updateApiLogLabel(TextView label) {

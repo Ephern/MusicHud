@@ -20,7 +20,6 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.PanelStyle;
-import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 
 import java.util.function.BiConsumer;
@@ -38,7 +37,6 @@ public class Modal {
     private static final int SCREEN_DIM_COLOR = 0xA0000000;
     private static final int SHOW_DURATION = 200;
     private static final int DISMISS_DURATION = 150;
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     @Getter
     private final PopupWindow popupWindow;
@@ -83,9 +81,8 @@ public class Modal {
             }
         };
 
-        PanelStyle.factory(card, clientConfig.getPanelOpacity(), clientConfig.getPanelBrightness(),
-                        card.dp(CORNER_RADIUS), null)
-                .applyBackgroundTo(card);
+        PanelStyle.applyDynamically(card, card.dp(CORNER_RADIUS), null,
+                InsetBackgroundFactory.BackdropBlur.NONE);
 
         int topPadding = card.dp(CONTENT_PADDING);
         int sidePadding = card.dp(CONTENT_PADDING);
@@ -272,10 +269,9 @@ public class Modal {
 
     public static final class ActionButton {
         @Getter
-        private String text;
-        @Getter
         private final BiConsumer<ActionButton, Modal> onClickListener;
-
+        @Getter
+        private String text;
         @Getter
         private Button button;
         private ViewGroup parent;

@@ -315,7 +315,6 @@ public class WavStreamDecoder implements AudioDecoder {
         } catch (Exception ignored) {}
     }
 
-    // ---------- helper methods ----------
     private void readFully(byte[] b) throws IOException {
         int read = 0;
         while (read < b.length) {

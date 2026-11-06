@@ -17,7 +17,6 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.PanelStyle;
-import indi.etern.musichud.interfaces.ClientConfig;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -35,6 +34,7 @@ import java.util.WeakHashMap;
  * <p>
  * Instances are cached per anchor, so repeated {@link #attach} calls only update the text.
  */
+@SuppressWarnings("UnstableApiUsage")
 public final class Tooltip {
     private static final int SHOW_DURATION = 150;
     private static final int HIDE_DURATION = 100;
@@ -185,15 +185,12 @@ public final class Tooltip {
         tooltip.setGravity(Gravity.CENTER_VERTICAL);
         tooltip.setText(value);
         tooltip.setMaxWidth(Math.min(root.getMeasuredWidth() / 2, tooltip.dp(MAX_WIDTH_DP)));
-        ClientConfig config = ClientConfig.getInstance();
-        PanelStyle.factory(tooltip, config.getPanelOpacity(), config.getPanelBrightness(),
-                        tooltip.dp(CORNER_RADIUS_DP),
-                        new InsetBackgroundFactory.Padding(tooltip.dp(PADDING_HORIZONTAL_DP),
-                                tooltip.dp(PADDING_VERTICAL_DP),
-                                tooltip.dp(PADDING_HORIZONTAL_DP),
-                                tooltip.dp(PADDING_VERTICAL_DP)),
-                        InsetBackgroundFactory.BackdropBlur.UI_LAYER)
-                .applyBackgroundTo(tooltip);
+        PanelStyle.applyDynamically(tooltip, tooltip.dp(CORNER_RADIUS_DP),
+                new InsetBackgroundFactory.Padding(tooltip.dp(PADDING_HORIZONTAL_DP),
+                        tooltip.dp(PADDING_VERTICAL_DP),
+                        tooltip.dp(PADDING_HORIZONTAL_DP),
+                        tooltip.dp(PADDING_VERTICAL_DP)),
+                InsetBackgroundFactory.BackdropBlur.UI_LAYER);
 
         int spec = MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
         tooltip.measure(spec, spec);

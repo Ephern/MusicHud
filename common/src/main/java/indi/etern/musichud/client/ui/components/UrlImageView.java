@@ -7,6 +7,7 @@ import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.RoundedImageDrawable;
 import icyllis.modernui.graphics.drawable.StateListDrawable;
 import icyllis.modernui.mc.MuiModApi;
@@ -45,7 +46,6 @@ public class UrlImageView extends FrameLayout {
     private ImageView imageView;
     private ImageView nextImageView;
     private String currentURLString;
-    @Setter
     private int cornerRadius = -1;
     // 延迟加载相关字段
     private String pendingUrl = null;
@@ -207,6 +207,43 @@ public class UrlImageView extends FrameLayout {
     public void setAspectRatio(float aspectRatio) {
         this.aspectRatio = aspectRatio;
         requestLayout();
+    }
+
+    public void setCornerRadius(int cornerRadius) {
+        if (this.cornerRadius == cornerRadius) {
+            return;
+        }
+        this.cornerRadius = cornerRadius;
+        applyCornerRadius(imageView == null ? null : imageView.getDrawable());
+        applyCornerRadius(nextImageView == null ? null : nextImageView.getDrawable());
+    }
+
+    @Override
+    protected void onSizeChanged(int width, int height, int prevWidth, int prevHeight) {
+        super.onSizeChanged(width, height, prevWidth, prevHeight);
+        applyCornerRadius(imageView == null ? null : imageView.getDrawable());
+        applyCornerRadius(nextImageView == null ? null : nextImageView.getDrawable());
+    }
+
+    /**
+     * The drawable works in image pixels and FIT_CENTER scales it with the view, so the drawable
+     * radius must follow the view size to keep the visible radius constant.
+     */
+    private void applyCornerRadius(Drawable drawable) {
+        if (!(drawable instanceof RoundedImageDrawable rounded) || rounded.isCircular()) {
+            return;
+        }
+        int intrinsicWidth = rounded.getIntrinsicWidth();
+        int intrinsicHeight = rounded.getIntrinsicHeight();
+        int width = getWidth();
+        int height = getHeight();
+        if (intrinsicWidth <= 0 || intrinsicHeight <= 0 || width <= 0 || height <= 0) {
+            return;
+        }
+        float scale = Math.min((float) width / intrinsicWidth, (float) height / intrinsicHeight);
+        if (scale > 0f) {
+            rounded.setCornerRadius(cornerRadius / scale);
+        }
     }
 
     @Override
@@ -462,27 +499,8 @@ public class UrlImageView extends FrameLayout {
             drawable.setCircular(true);
             setImageWithAnimation(drawable);
         } else {
-            // 使用 OnLayoutChangeListener 确保在布局完成后设置圆角
             setImageWithAnimation(drawable);
-            int imageHeight = image.getHeight();
-            int height = getHeight();
-            if (height > 0) {
-                float actualCornerRadius = (float) (cornerRadius * imageHeight) / height;
-                drawable.setCornerRadius(actualCornerRadius);
-            }
-            addOnLayoutChangeListener(new OnLayoutChangeListener() {
-                @Override
-                public void onLayoutChange(View v, int left, int top, int right, int bottom,
-                                           int oldLeft, int oldTop, int oldRight, int oldBottom) {
-                    int height = bottom - top;
-                    if (height > 0) {
-                        float actualCornerRadius = (float) (cornerRadius * imageHeight) / height;
-                        drawable.setCornerRadius(actualCornerRadius);
-                        invalidate();
-                        removeOnLayoutChangeListener(this);
-                    }
-                }
-            });
+            applyCornerRadius(drawable);
         }
     }
 

@@ -65,7 +65,7 @@ public class AccountView extends LinearLayout {
             }
             long id = playlist.getId();
             elementMap.computeIfAbsent(new ElementKey(Playlist.class, id), (key) -> {
-                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY);
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY, dp(160));
                 card.setTag(id);
                 mySubscribedPlaylistCards.addView(card);
                 return card;
@@ -79,7 +79,7 @@ public class AccountView extends LinearLayout {
             }
             long id = album.getId();
             elementMap.computeIfAbsent(new ElementKey(Album.class, id), (key) -> {
-                MusicCollectionCard card = new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY);
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY, dp(160));
                 card.setTag(id);
                 albumCards.addView(card);
                 return card;
@@ -416,7 +416,7 @@ public class AccountView extends LinearLayout {
                 Playlist likeList = categoryPlaylists.getLikeList();
                 if (likeList != null && likeList.getId() != -1) {
                     elementMap.computeIfAbsent(new ElementKey(Playlist.class, likeList.getId()), key -> {
-                        MusicCollectionCard card = new MusicCollectionCard(context, likeList, PusherInfo.EMPTY);
+                        MusicCollectionCard card = new MusicCollectionCard(context, likeList, PusherInfo.EMPTY, dp(160));
                         card.setTag(likeList.getId());
                         myPlaylistCards.addView(card);
                         return card;
@@ -424,7 +424,7 @@ public class AccountView extends LinearLayout {
                 }
                 ObservableSequencedSet<Playlist> createdPlaylist = categoryPlaylists.getCreatedPlaylist();
                 createdPlaylist.forEach(playlist -> elementMap.computeIfAbsent(new ElementKey(Playlist.class, playlist.getId()), key -> {
-                    MusicCollectionCard card = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY);
+                    MusicCollectionCard card = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY, dp(160));
                     card.setTag(playlist.getId());
                     myPlaylistCards.addView(card);
                     return card;

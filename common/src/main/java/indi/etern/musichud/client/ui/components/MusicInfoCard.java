@@ -16,7 +16,9 @@ import icyllis.modernui.text.style.ClickableSpan;
 import icyllis.modernui.text.style.ForegroundColorSpan;
 import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
+import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
+import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.ImageButton;
 import icyllis.modernui.widget.ImageView;
 import icyllis.modernui.widget.LinearLayout;
@@ -36,6 +38,7 @@ import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.server.api.playmode.PlayMode;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.time.LocalTime;
@@ -45,12 +48,24 @@ import java.time.temporal.ChronoUnit;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
+/**
+ * Player header that morphs between the expanded layout (cover above the text) and the compact
+ * one (cover beside three lines). Three independent fractions drive the cover size, the text x
+ * and the text y, so the caller can give each axis its own spring and keep the path a single
+ * continuous curve.
+ */
 @Getter
-public class MusicInfoCard extends LinearLayout {
+public class MusicInfoCard extends ViewGroup {
     private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final DateTimeFormatter timeFormatterWithoutHour = DateTimeFormatter.ofPattern("mm:ss");
+    private static final int COMPACT_COVER_DP = 56;
+    private static final int COMPACT_GAP_DP = 8;
+    private static final int PROGRESS_TOP_GAP_DP = 4;
+    private static final int PROGRESS_HEIGHT_DP = 4;
+    private static final int TIMES_TOP_GAP_DP = 6;
+    private static final int TIMES_HEIGHT_DP = 16;
     private final UrlImageView albumImage;
     private final LinearLayout musicInfo;
     private final MarqueeTextView titleText;
@@ -59,21 +74,26 @@ public class MusicInfoCard extends LinearLayout {
     private final PusherWidget pusherWidget;
     private final ImageButton sourceButton;
     private final ProgressBar progressBar;
+    private final LinearLayout progressTexts;
     private final TextView playedTimeText;
     private final TextView totalTimeText;
     private final LayoutTransition layoutTransition;
+    private float coverFraction;
+    private float xFraction;
+    private float yFraction;
+    private boolean contentTransitionsEnabled = true;
 
-    public MusicInfoCard(Context context, int sideWidth) {
+    // Geometry resolved by onMeasure and reused by onLayout.
+    private int laidOutCoverSize;
+    private int laidOutInfoX;
+    private int laidOutInfoY;
+    private int laidOutInfoWidth;
+    private int laidOutInfoHeight;
+    private int laidOutProgressTop;
+    private int laidOutTimesTop;
+
+    public MusicInfoCard(Context context, int imageSize) {
         super(context);
-        setOrientation(VERTICAL);
-
-        albumImage = new UrlImageView(context);
-        albumImage.loadUrl(MusicHud.ICON_BASE64);
-        albumImage.setCornerRadius(dp(12));
-        //noinspection SuspiciousNameCombination
-        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(sideWidth, sideWidth);
-        imageParams.gravity = Gravity.CENTER;
-        addView(albumImage, imageParams);
 
         musicInfo = new LinearLayout(context);
         musicInfo.setOrientation(LinearLayout.VERTICAL);
@@ -146,17 +166,11 @@ public class MusicInfoCard extends LinearLayout {
 
         progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
         progressBar.setMin(0);
-        progressBar.setMax(sideWidth);
+        progressBar.setMax(imageSize);
         progressBar.setVisibility(View.GONE);
-        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(MATCH_PARENT, dp(4));
-        progressParams.setMargins(0, dp(1), 0, -dp(4));
-        musicInfo.addView(progressBar, progressParams);
 
-        LinearLayout progressTexts = new LinearLayout(context);
+        progressTexts = new LinearLayout(context);
         progressTexts.setOrientation(LinearLayout.HORIZONTAL);
-        LinearLayout.LayoutParams progressTextsParams = new LinearLayout.LayoutParams(MATCH_PARENT, dp(16));
-        progressTextsParams.setMargins(0, dp(6), 0, 0);
-        musicInfo.addView(progressTexts, progressTextsParams);
 
         playedTimeText = new TextView(context);
         playedTimeText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
@@ -170,14 +184,123 @@ public class MusicInfoCard extends LinearLayout {
         totalTimeText.setTextSize(Theme.TEXT_SIZE_NORMAL);
         progressTexts.addView(totalTimeText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
 
-        LinearLayout.LayoutParams musicInfoParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        musicInfoParams.setMargins(dp(4), dp(4), dp(4), 0);
-        addView(musicInfo, musicInfoParams);
+        albumImage = new UrlImageView(context);
+        albumImage.loadUrl(MusicHud.ICON_BASE64);
+        albumImage.setCornerRadius(dp(8));
+
+        // The cover is added last so it is drawn above the text while the two overlap during the
+        // morph; the text then appears to slide out from under the shrinking artwork.
+        addView(musicInfo);
+        addView(progressBar);
+        addView(progressTexts);
+        addView(albumImage);
 
         layoutTransition = new LayoutTransition();
         layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
         layoutTransition.setAnimateParentHierarchy(false);
         musicInfo.setLayoutTransition(layoutTransition);
+    }
+
+    /**
+     * @param coverFraction 0 expanded cover, 1 compact cover
+     * @param xFraction     0 text at the left edge, 1 shifted beside the compact cover
+     * @param yFraction     0 text below the cover, 1 text aligned with the compact cover
+     */
+    public void setMorph(float coverFraction, float xFraction, float yFraction) {
+        float cover = Math.clamp(coverFraction, 0f, 1f);
+        float x = Math.clamp(xFraction, 0f, 1f);
+        float y = Math.clamp(yFraction, 0f, 1f);
+        if (Math.abs(this.coverFraction - cover) < 1e-5f
+                && Math.abs(this.xFraction - x) < 1e-5f
+                && Math.abs(this.yFraction - y) < 1e-5f) {
+            return;
+        }
+        this.coverFraction = cover;
+        this.xFraction = x;
+        this.yFraction = y;
+        requestLayout();
+    }
+
+    /** Per-frame morphs must not fight the child layout transitions. */
+    public void setContentTransitionsEnabled(boolean enabled) {
+        if (contentTransitionsEnabled == enabled) {
+            return;
+        }
+        contentTransitionsEnabled = enabled;
+        musicInfo.setLayoutTransition(enabled ? layoutTransition : null);
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int widthMode = MeasureSpec.getMode(widthMeasureSpec);
+        int width = widthMode == MeasureSpec.UNSPECIFIED
+                ? Math.max(getSuggestedMinimumWidth(), getWidth())
+                : MeasureSpec.getSize(widthMeasureSpec);
+        int contentWidth = Math.max(0, width - getPaddingLeft() - getPaddingRight());
+
+        int gap = dp(COMPACT_GAP_DP);
+        int compactCover = Math.min(dp(COMPACT_COVER_DP), contentWidth);
+
+        int coverSize = Math.round(contentWidth + (compactCover - contentWidth) * coverFraction);
+        int infoX = Math.round((compactCover + gap) * xFraction);
+        int infoWidth = Math.max(1, contentWidth - infoX);
+
+        measureChildWidth(musicInfo, infoWidth, MeasureSpec.UNSPECIFIED);
+        int infoHeight = musicInfo.getMeasuredHeight();
+        int compactInfoY = Math.max(0, (compactCover - infoHeight) / 2);
+        int expandedInfoY = contentWidth + gap;
+        int infoY = Math.round(expandedInfoY + (compactInfoY - expandedInfoY) * yFraction);
+        int headerHeight = Math.max(coverSize, infoY + infoHeight);
+
+        int progressTop = headerHeight + dp(PROGRESS_TOP_GAP_DP);
+        int progressHeight = dp(PROGRESS_HEIGHT_DP);
+        int timesTop = progressTop + progressHeight + dp(TIMES_TOP_GAP_DP);
+        int timesHeight = dp(TIMES_HEIGHT_DP);
+
+        laidOutCoverSize = coverSize;
+        laidOutInfoX = infoX;
+        laidOutInfoY = infoY;
+        laidOutInfoWidth = infoWidth;
+        laidOutInfoHeight = infoHeight;
+        laidOutProgressTop = progressTop;
+        laidOutTimesTop = timesTop;
+
+        measureExact(albumImage, coverSize, coverSize);
+        measureExact(progressBar, contentWidth, progressHeight);
+        measureExact(progressTexts, contentWidth, timesHeight);
+
+        int totalHeight = getPaddingTop() + timesTop + timesHeight + getPaddingBottom();
+        setMeasuredDimension(width, resolveSize(Math.max(totalHeight, getSuggestedMinimumHeight()), heightMeasureSpec));
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        int contentLeft = getPaddingLeft();
+        int contentTop = getPaddingTop();
+        albumImage.layout(contentLeft, contentTop,
+                contentLeft + laidOutCoverSize, contentTop + laidOutCoverSize);
+        musicInfo.layout(contentLeft + laidOutInfoX, contentTop + laidOutInfoY,
+                contentLeft + laidOutInfoX + laidOutInfoWidth, contentTop + laidOutInfoY + laidOutInfoHeight);
+        progressBar.layout(contentLeft, contentTop + laidOutProgressTop,
+                contentLeft + progressBar.getMeasuredWidth(), contentTop + laidOutProgressTop + progressBar.getMeasuredHeight());
+        progressTexts.layout(contentLeft, contentTop + laidOutTimesTop,
+                contentLeft + progressTexts.getMeasuredWidth(), contentTop + laidOutTimesTop + progressTexts.getMeasuredHeight());
+    }
+
+    private void measureChildWidth(View child, int width, int heightMode) {
+        if (child.getVisibility() == GONE) {
+            return;
+        }
+        child.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(0, heightMode));
+    }
+
+    private static void measureExact(View child, int width, int height) {
+        if (child.getVisibility() == GONE) {
+            return;
+        }
+        child.measure(MeasureSpec.makeMeasureSpec(Math.max(0, width), MeasureSpec.EXACTLY),
+                MeasureSpec.makeMeasureSpec(Math.max(0, height), MeasureSpec.EXACTLY));
     }
 
     /**
@@ -203,7 +326,9 @@ public class MusicInfoCard extends LinearLayout {
             playedTimeText.setText("");
             totalTimeText.setText("");
         } finally {
-            musicInfo.setLayoutTransition(layoutTransition);
+            if (contentTransitionsEnabled) {
+                musicInfo.setLayoutTransition(layoutTransition);
+            }
         }
     }
 
@@ -279,7 +404,7 @@ public class MusicInfoCard extends LinearLayout {
             Context context = ModernUI.getInstance();
             SpannableStringBuilder artistsBuilder = new SpannableStringBuilder();
             for (Artist artist : musicDetail.getArtists()) {
-                if (artistsBuilder.length() > 0) {
+                if (!artistsBuilder.isEmpty()) {
                     artistsBuilder.append(" / ");
                 }
                 int start = artistsBuilder.length();
@@ -288,7 +413,7 @@ public class MusicInfoCard extends LinearLayout {
                 if (artist.getId() > 0) {
                     artistsBuilder.setSpan(new ClickableSpan() {
                         @Override
-                        public void onClick(View widget) {
+                        public void onClick(@NotNull View widget) {
                             RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                             if (routerContainer != null) {
                                 routerContainer.pushNavigate(
@@ -298,7 +423,7 @@ public class MusicInfoCard extends LinearLayout {
                         }
 
                         @Override
-                        public void updateDrawState(TextPaint ds) {
+                        public void updateDrawState(@NotNull TextPaint ds) {
                             ds.setColor(Theme.PRIMARY_COLOR);
                             ds.setUnderline(false);
                         }
@@ -315,7 +440,7 @@ public class MusicInfoCard extends LinearLayout {
             if (!albumName.isEmpty() && album.getId() > 0) {
                 albumBuilder.setSpan(new ClickableSpan() {
                     @Override
-                    public void onClick(View widget) {
+                    public void onClick(@NotNull View widget) {
                         RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                         if (routerContainer != null) {
                             routerContainer.pushNavigate(
@@ -325,7 +450,7 @@ public class MusicInfoCard extends LinearLayout {
                     }
 
                     @Override
-                    public void updateDrawState(TextPaint ds) {
+                    public void updateDrawState(@NotNull TextPaint ds) {
                         ds.setColor(Theme.PRIMARY_COLOR);
                         ds.setUnderline(false);
                     }

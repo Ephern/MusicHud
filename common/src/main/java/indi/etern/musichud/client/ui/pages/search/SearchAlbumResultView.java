@@ -48,7 +48,7 @@ public class SearchAlbumResultView extends WaterfallLayout {
     }
 
     private void addItem(Context context, Album album) {
-        MusicCollectionCard child = new MusicCollectionCard(context, album, PusherInfo.EMPTY);
+        MusicCollectionCard child = new MusicCollectionCard(context, album, PusherInfo.EMPTY, dp(160));
         addView(child);
     }
 }

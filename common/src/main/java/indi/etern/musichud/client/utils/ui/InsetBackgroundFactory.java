@@ -47,7 +47,7 @@ public class InsetBackgroundFactory {
     int backdropBlurRadius = 0;
     public record Padding(int left,int top,int right,int bottom) {}
 
-    public void applyBackgroundTo(View view) {
+    public ShapeDrawable applyBackgroundTo(View view) {
         releaseBackdropBlur(view.getBackground());
 
         ShapeDrawable background = newShapeDrawable();
@@ -61,6 +61,7 @@ public class InsetBackgroundFactory {
             attachBackdropBlur(blur, view);
         }
         attachStateTransition(view, background);
+        return background;
     }
 
     private @Nullable Drawable createBackdropBlur() {

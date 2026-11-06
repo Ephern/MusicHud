@@ -13,11 +13,11 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.SearchType;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.components.SegmentedBar;
 import lombok.Getter;
 import lombok.NonNull;
 import lombok.SneakyThrows;
 import net.minecraft.client.resources.language.I18n;
-import org.jetbrains.annotations.NotNull;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -30,6 +30,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class SearchResultTabPage extends FrameLayout {
     @Getter
     private final ViewPager pager;
+    private int contentTopInset;
 
     public SearchResultTabPage(Context context) {
         super(context);
@@ -50,33 +51,8 @@ public class SearchResultTabPage extends FrameLayout {
             });
         }
 
-        TabLayout tabLayout = new TabLayout(context);
-        tabLayout.addOnTabSelectedListener(new TabLayout.OnTabSelectedListener() {
-            @Override
-            public void onTabSelected(@NotNull TabLayout.Tab tab) {
-                MusicHud.EXECUTOR.execute(() -> {
-                    SearchView instance = SearchView.getInstance();
-                    if (instance != null) {
-                        instance.refreshSearch(false);
-                    }
-                });
-            }
-        });
-        tabLayout.setElevation(dp(3));
-        tabLayout.setTabMode(TabLayout.MODE_AUTO);
-        tabLayout.setTabGravity(TabLayout.GRAVITY_CENTER);
-        tabLayout.setupWithViewPager(pager);
-        tabLayout.setBackground(null);
-
-        var lp = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        tabLayout.setLayoutParams(lp);
-        addView(tabLayout);
-
-        // 添加 ViewPager 到剩余空间
         var pagerLp = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
         pagerLp.gravity = Gravity.TOP;
-        pagerLp.topMargin = dp(48);
         addView(pager, pagerLp);
 
         addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
@@ -90,6 +66,44 @@ public class SearchResultTabPage extends FrameLayout {
                     adapter.unregisterAllListeners();
                 }
                 clearResult();
+            }
+        });
+    }
+
+    /**
+     * Keeps every page's content below the floating bar while still drawing it under the bar.
+     */
+    public void setContentTopInset(int inset) {
+        if (contentTopInset == inset) {
+            return;
+        }
+        contentTopInset = inset;
+        for (int i = 0; i < pager.getChildCount(); i++) {
+            if (pager.getChildAt(i) instanceof ClampingScrollView scrollView) {
+                applyContentTopInset(scrollView);
+            }
+        }
+    }
+
+    private void applyContentTopInset(ClampingScrollView scrollView) {
+        if (scrollView.getPaddingTop() != contentTopInset) {
+            scrollView.setPadding(scrollView.getPaddingLeft(), contentTopInset,
+                    scrollView.getPaddingRight(), scrollView.getPaddingBottom());
+        }
+    }
+
+    public void bindBar(SegmentedBar tabBar) {
+        tabBar.setOnItemSelectedListener((key, index) -> pager.setCurrentItem(index, true));
+        pager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                tabBar.setSelectedIndex(position, true);
+                MusicHud.EXECUTOR.execute(() -> {
+                    SearchView instance = SearchView.getInstance();
+                    if (instance != null) {
+                        instance.refreshSearch(false);
+                    }
+                });
             }
         });
     }
@@ -122,6 +136,8 @@ public class SearchResultTabPage extends FrameLayout {
             //noinspection UnstableApiUsage
             ClampingScrollView sv = new ClampingScrollView(context);
             sv.setTag(position);
+            sv.setClipToPadding(false);
+            applyContentTopInset(sv);
 
             ProgressBar loadingMoreProgressBar = new ProgressBar(context);
             loadingMoreProgressBar.setVisibility(GONE);
@@ -203,7 +219,8 @@ public class SearchResultTabPage extends FrameLayout {
                 View child = sv.getChildAt(0);
                 int contentHeight = child.getHeight();
                 int viewHeight = sv.getHeight();
-                int maxScroll = Math.max(0, contentHeight - viewHeight);
+                // The scroll range includes the padding, which holds the floating bar's inset.
+                int maxScroll = Math.max(0, contentHeight + sv.getPaddingTop() + sv.getPaddingBottom() - viewHeight);
                 int threshold = sv.dp(100);
 
                 if (maxScroll - scrollY <= threshold) {
@@ -275,17 +292,6 @@ public class SearchResultTabPage extends FrameLayout {
         @Override
         public boolean isViewFromObject(@NonNull View view, @NonNull Object object) {
             return view == object;
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            return I18n.get(switch (position) {
-                case 0 -> MusicHud.MOD_ID + ".text.page.search.music";
-                case 1 -> MusicHud.MOD_ID + ".text.page.search.playlist";
-                case 2 -> MusicHud.MOD_ID + ".text.page.search.album";
-                case 3 -> MusicHud.MOD_ID + ".text.page.search.artist";
-                default -> "";
-            });
         }
     }
 }

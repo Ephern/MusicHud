@@ -33,7 +33,6 @@ import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.PanelStyle;
-import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.IClientMusicService;
 import net.minecraft.client.resources.language.I18n;
 
@@ -46,7 +45,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class ArtistDetailView extends FrameLayout implements RouterContainer.RouteAware {
     private static final IClientMusicService musicService = MusicService.getInstance();
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final int AVATAR_SIZE = 1024;
     private static final int BAR_TOP_MARGIN = 12;
     private static final int BAR_CORNER_RADIUS = 16;
@@ -235,7 +233,9 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
         progressParams.setMargins(0, dp(32), 0, 0);
         addView(progressBar, progressParams);
 
-        applyTopBarBackground();
+        PanelStyle.applyDynamically(topBar, dp(BAR_CORNER_RADIUS),
+                new InsetBackgroundFactory.Padding(dp(10), dp(8), dp(10), dp(8)),
+                InsetBackgroundFactory.BackdropBlur.UI_LAYER);
         FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBarParams.gravity = Gravity.TOP;
         topBarParams.setMargins(0, dp(BAR_TOP_MARGIN), 0, 0);
@@ -261,17 +261,6 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
             scrollView.setPadding(0, inset, 0, 0);
         }
         super.onLayout(changed, left, top, right, bottom);
-    }
-
-    private void applyTopBarBackground() {
-        PanelStyle.factory(
-                        topBar,
-                        clientConfig.getPanelOpacity(),
-                        clientConfig.getPanelBrightness(),
-                        dp(BAR_CORNER_RADIUS),
-                        new InsetBackgroundFactory.Padding(dp(10), dp(8), dp(10), dp(8)),
-                        InsetBackgroundFactory.BackdropBlur.UI_LAYER
-                ).applyBackgroundTo(topBar);
     }
 
     @Override
