@@ -73,7 +73,8 @@ public final class GlTextureSampling {
     /** Generates the mip chain and switches to trilinear minification. */
     public static void enableTrilinear(@Nullable AbstractTexture texture) {
         GpuTexture gpu = texture == null ? null : texture.getTexture();
-        if (!(gpu instanceof GlTexture gl) || gl.isClosed()) {
+        GpuTexture real = gpu == null ? null : NeoForgeValidationBridge.unwrap(gpu);
+        if (!(real instanceof GlTexture gl) || gl.isClosed()) {
             return;
         }
         if (PREPARED.contains(gpu) || FAILED.contains(gpu)) {

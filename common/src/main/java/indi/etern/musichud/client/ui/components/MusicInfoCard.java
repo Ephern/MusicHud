@@ -4,38 +4,26 @@ import icyllis.modernui.ModernUI;
 import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.InsetDrawable;
-import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.SpannableStringBuilder;
 import icyllis.modernui.text.Spanned;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.text.method.LinkMovementMethod;
 import icyllis.modernui.text.style.ClickableSpan;
 import icyllis.modernui.text.style.ForegroundColorSpan;
-import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
-import icyllis.modernui.widget.ImageButton;
-import icyllis.modernui.widget.ImageView;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.ProgressBar;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
-import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.ui.screen.MainFragment;
-import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
-import indi.etern.musichud.server.api.playmode.PlayMode;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 import org.jetbrains.annotations.NotNull;
@@ -56,7 +44,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
  */
 @Getter
 public class MusicInfoCard extends ViewGroup {
-    private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final DateTimeFormatter timeFormatterWithoutHour = DateTimeFormatter.ofPattern("mm:ss");
@@ -71,8 +58,6 @@ public class MusicInfoCard extends ViewGroup {
     private final MarqueeTextView titleText;
     private final MarqueeTextView artistsText;
     private final MarqueeTextView albumText;
-    private final PusherWidget pusherWidget;
-    private final ImageButton sourceButton;
     private final ProgressBar progressBar;
     private final LinearLayout progressTexts;
     private final TextView playedTimeText;
@@ -98,54 +83,11 @@ public class MusicInfoCard extends ViewGroup {
         musicInfo = new LinearLayout(context);
         musicInfo.setOrientation(LinearLayout.VERTICAL);
 
-        LinearLayout titleRow = new LinearLayout(context);
-        titleRow.setOrientation(LinearLayout.HORIZONTAL);
-        titleRow.setGravity(Gravity.CENTER_VERTICAL);
-
         titleText = new MarqueeTextView(context);
         titleText.setTextSize(Theme.TEXT_SIZE_LARGE);
         titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
         titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
-        titleRow.addView(titleText, new LinearLayout.LayoutParams(0, WRAP_CONTENT, 1));
-
-        sourceButton = new ImageButton(context);
-        sourceButton.setVisibility(View.GONE);
-        sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
-        if (sourceIcon != null) {
-            sourceButton.setImageDrawable(new InsetDrawable(
-                    new ScaledImageDrawable(context.getResources(), sourceIcon, dp(16), dp(16)), dp(1)));
-        }
-        sourceButton.setOnClickListener(view -> {
-            Object tag = sourceButton.getTag();
-            if (tag instanceof SourceMeta sourceMeta) {
-                Class<?> type = sourceMeta.type();
-                if (MusicCollection.class.isAssignableFrom(type)) {
-                    //noinspection unchecked
-                    MusicService.getInstance().loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
-                            .thenAccept((musicCollection) ->
-                                    MuiModApi.postToUiThread(() -> {
-                                        RouterContainer router = MainFragment.getInstance().getRouterContainer();
-                                        if (router != null) {
-                                            router.pushNavigate(new MusicCollectionDetailView(context, musicCollection));
-                                        }
-                                    }));
-                }
-            }
-        });
-        InsetBackgroundFactory.builder()
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .cornerRadius(dp(4)).build().applyBackgroundTo(sourceButton);
-        LinearLayout.LayoutParams sourceParams = new LinearLayout.LayoutParams(dp(18), dp(18));
-        sourceParams.setMargins(dp(4), 0, 0, 0);
-        titleRow.addView(sourceButton, sourceParams);
-
-        pusherWidget = new PusherWidget(context);
-        LinearLayout.LayoutParams pusherParams = new LinearLayout.LayoutParams(dp(18), dp(18));
-        pusherParams.setMargins(dp(4), 0, 0, 0);
-        titleRow.addView(pusherWidget, pusherParams);
-
-        musicInfo.addView(titleRow, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        musicInfo.addView(titleText, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         artistsText = new MarqueeTextView(context);
         artistsText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
@@ -245,7 +187,7 @@ public class MusicInfoCard extends ViewGroup {
         int infoX = Math.round((compactCover + gap) * xFraction);
         int infoWidth = Math.max(1, contentWidth - infoX);
 
-        measureChildWidth(musicInfo, infoWidth, MeasureSpec.UNSPECIFIED);
+        measureChildWidth(musicInfo, infoWidth);
         int infoHeight = musicInfo.getMeasuredHeight();
         int compactInfoY = Math.max(0, (compactCover - infoHeight) / 2);
         int expandedInfoY = contentWidth + gap;
@@ -287,12 +229,12 @@ public class MusicInfoCard extends ViewGroup {
                 contentLeft + progressTexts.getMeasuredWidth(), contentTop + laidOutTimesTop + progressTexts.getMeasuredHeight());
     }
 
-    private void measureChildWidth(View child, int width, int heightMode) {
+    private void measureChildWidth(View child, int width) {
         if (child.getVisibility() == GONE) {
             return;
         }
         child.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
-                MeasureSpec.makeMeasureSpec(0, heightMode));
+                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
     }
 
     private static void measureExact(View child, int width, int height) {
@@ -315,11 +257,6 @@ public class MusicInfoCard extends ViewGroup {
             artistsText.setText("");
             albumText.setText("");
             albumText.setVisibility(View.GONE);
-            pusherWidget.clear();
-            pusherWidget.setVisibility(View.GONE);
-            sourceButton.setVisibility(View.GONE);
-            sourceButton.setTag(null);
-            Tooltip.attach(sourceButton, null);
             progressBar.setIndeterminate(false);
             progressBar.setProgress(0);
             progressBar.setVisibility(View.GONE);
@@ -340,11 +277,6 @@ public class MusicInfoCard extends ViewGroup {
             artistsText.setText("");
             albumText.setText("");
             albumText.setVisibility(View.GONE);
-            pusherWidget.clear();
-            pusherWidget.setVisibility(View.GONE);
-            sourceButton.setVisibility(View.GONE);
-            sourceButton.setTag(null);
-            Tooltip.attach(sourceButton, null);
             progressBar.setVisibility(View.GONE);
             playedTimeText.setText("");
             totalTimeText.setText("");
@@ -354,53 +286,6 @@ public class MusicInfoCard extends ViewGroup {
             Album album = musicDetail.getAlbum();
             albumImage.loadUrl(album.getPicUrl(), sideWidth, sideWidth);
             titleText.setText(musicDetail.getName());
-            PusherInfo pusherInfo = musicDetail.getPusherInfo();
-            if (pusherInfo == null || PusherInfo.EMPTY.equals(pusherInfo)) {
-                pusherWidget.setVisibility(View.GONE);
-                pusherWidget.clear();
-            } else {
-                pusherWidget.setVisibility(View.VISIBLE);
-                pusherWidget.bind(pusherInfo);
-            }
-            SourceMeta source = musicDetailTrace.source();
-            if (source != null) {
-                sourceButton.setTag(source);
-                SpannableString text = new SpannableString("    " + source.name());
-                {
-                    String iconPath;
-                    Class<?> type = source.type();
-                    if (Album.class.isAssignableFrom(type)) {
-                        iconPath = "/assets/music_hud/textures/gui/icons/disc_album.png";
-                    } else {
-                        iconPath = "/assets/music_hud/textures/gui/icons/list_music.png";
-                    }
-                    Image icon = ImageUtils.getImageFromResource(iconPath);
-                    if (icon != null) {
-                        ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
-                        text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    }
-                }
-                {
-                    PlayMode playMode = source.playMode();
-                    String playModeIconPath = switch (playMode) {
-                        case RANDOM -> "/assets/music_hud/textures/gui/icons/shuffle.png";
-                        case SEQUENTIAL -> "/assets/music_hud/textures/gui/icons/repeat.png";
-                        case INTELLIGENT -> "/assets/music_hud/textures/gui/icons/heart_pulse.png";
-                    };
-                    Image icon = ImageUtils.getImageFromResource(playModeIconPath);
-                    if (icon != null) {
-                        ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
-                        text.setSpan(iconSpan, 2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                    }
-                }
-
-                sourceButton.setVisibility(View.VISIBLE);
-                Tooltip.attach(sourceButton, text);
-            } else {
-                sourceButton.setVisibility(View.GONE);
-                sourceButton.setTag(null);
-                Tooltip.attach(sourceButton, null);
-            }
             Context context = ModernUI.getInstance();
             SpannableStringBuilder artistsBuilder = new SpannableStringBuilder();
             for (Artist artist : musicDetail.getArtists()) {

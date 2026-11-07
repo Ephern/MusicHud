@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.render.gpu.blaze3d.gl;
 
 import com.mojang.blaze3d.opengl.GlDevice;
+import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.textures.GpuTexture;
 
@@ -9,11 +10,40 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 
 /** Reflection bridge for NeoForge's validation device wrapper. */
-final class NeoForgeValidationBridge {
+public final class NeoForgeValidationBridge {
     private static final String VALIDATION_DEVICE =
             "net.neoforged.neoforge.client.blaze3d.validation.ValidationGpuDevice";
+    private static final String VALIDATION_TEXTURE =
+            "net.neoforged.neoforge.client.blaze3d.validation.ValidationGpuTexture";
 
     private NeoForgeValidationBridge() {
+    }
+
+    /** Unwraps NeoForge's validation proxy so backend textures can be inspected. */
+    public static GpuTexture unwrap(GpuTexture texture) {
+        GpuTexture current = texture;
+        for (int depth = 0; depth < 4 && !(current instanceof GlTexture); depth++) {
+            GpuTexture real = realTexture(current);
+            if (real == null || real == current) {
+                break;
+            }
+            current = real;
+        }
+        return current;
+    }
+
+    private static GpuTexture realTexture(GpuTexture texture) {
+        try {
+            Class<?> type = Class.forName(VALIDATION_TEXTURE, false,
+                    texture.getClass().getClassLoader());
+            if (!type.isInstance(texture)) {
+                return null;
+            }
+            Object real = type.getMethod("getRealTexture").invoke(texture);
+            return real instanceof GpuTexture result ? result : null;
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
+            return null;
+        }
     }
 
     static boolean isGlDevice(GpuDevice device) {

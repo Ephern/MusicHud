@@ -39,7 +39,6 @@ public class CloudTrackItem extends LinearLayout {
     private final TextView statusText;
     private final ImageButton actionButton;
     private final ImageButton removeButton;
-    private final ImageButton deleteButton;
     private final TextView sizeTextView;
 
     private CloudTrackEntry entry;
@@ -76,7 +75,7 @@ public class CloudTrackItem extends LinearLayout {
                 .cornerRadius(dp(4))
                 .build();
 
-        deleteButton = musicItem.addActionButton(ICON_DELETE,
+        musicItem.addActionButton(ICON_DELETE,
                 I18n.get(MusicHud.MOD_ID + ".button.delete"), v -> {
                     if (entry != null && onDelete != null) {
                         onDelete.accept(entry);

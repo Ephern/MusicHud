@@ -236,6 +236,7 @@ public class SegmentedBar extends FrameLayout {
     }
 
     private void applyOrientation(int orientation) {
+        //noinspection MagicConstant
         buttonGroup.setOrientation(orientation);
         boolean horizontal = orientation == LinearLayout.HORIZONTAL;
         int width = dp(horizontal ? INDICATOR_LENGTH_DP : INDICATOR_THICKNESS_DP);

@@ -64,7 +64,6 @@ public class MainFragment extends Fragment {
     @Setter
     private int defaultSelectedIndex = 0;
     private Button switchServerConnectButton;
-    private LinearLayout navigatorWrapper;
     @Getter
     private RouterContainer routerContainer;
     private Button sidebarButton;
@@ -118,6 +117,10 @@ public class MainFragment extends Fragment {
             MuiModApi.postToUiThread(() -> {
                 if (target.visible && target.sidebar != null) {
                     target.sidebar.updateCoverScale(true);
+                }
+                HomeView homeView = HomeView.getInstance();
+                if (homeView != null) {
+                    homeView.updateCoverScale(true);
                 }
             });
         } catch (IllegalStateException ignored) {
@@ -192,21 +195,28 @@ public class MainFragment extends Fragment {
         try {
             visible = true;
             var context = requireContext();
+
+            var root = new FrameLayout(context);
+            root.setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+            root.addView(new MinecraftBackgroundView(context),
+                    new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
             var base = new FrameLayout(context);
-            int dp24 = base.dp(24);
             int dp12 = base.dp(12);
             base.setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+            root.addView(base, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             // Everything except the floating control bar keeps its original row arrangement.
             contentRow = new LinearLayout(context);
             contentRow.setOrientation(LinearLayout.HORIZONTAL);
-            contentRow.setPadding(0, 0, dp24, 0);
             base.addView(contentRow, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             routerContainer = new RouterContainer(context);
-
             routerContainer.setAnimationStyle(RouterContainer.AnimationStyle.SCALE_FADE_ROOT);
             routerContainer.setAnimationDuration(300);
+            var routerParams = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
+            routerParams.setMargins(routerContainer.dp(32), 0, routerContainer.dp(32), 0);
+            contentRow.addView(routerContainer, routerParams);
 
             sidebar = new SidebarView(context);
             sidebar.setVisibility(View.GONE);
@@ -228,7 +238,7 @@ public class MainFragment extends Fragment {
                 base.addView(controlBar, params);
 
                 {
-                    navigatorWrapper = new LinearLayout(context);
+                    LinearLayout navigatorWrapper = new LinearLayout(context);
                     navigatorWrapper.setOrientation(LinearLayout.HORIZONTAL);
                     int dp2 = navigatorWrapper.dp(2);
                     PanelStyle.applyDynamically(navigatorWrapper, navigatorWrapper.dp(16),
@@ -302,7 +312,7 @@ public class MainFragment extends Fragment {
                     {
                         switchServerConnectButton = new Button(context) {
                             @Override
-                            protected boolean dispatchHoverEvent(MotionEvent event) {
+                            protected boolean dispatchHoverEvent(@NotNull MotionEvent event) {
                                 Tooltip.handleHover(this, event);
                                 return super.dispatchHoverEvent(event);
                             }
@@ -351,7 +361,7 @@ public class MainFragment extends Fragment {
                                 MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
                                 Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
                                 if (!scrollView.isShowing(currentMusic, currentLyrics)) {
-                                    scrollView.switchLyrics(currentMusic == null ? MusicDetail.NONE : currentMusic, currentLyrics);
+                                    scrollView.switchLyrics(currentMusic, currentLyrics);
                                 }
                                 scrollView.reinitialize();
                             }
@@ -380,20 +390,11 @@ public class MainFragment extends Fragment {
                 }
             });
 
-            var params = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
-            params.setMargins(routerContainer.dp(40), 0, 0, 0);
-            contentRow.addView(routerContainer, params);
-
             NowPlayingInfo info = NowPlayingInfo.getInstance();
             applyMusic(info.getCurrentlyPlayingMusic(), info.getNextToPlayMusic(),
                     playingInfo.getLyricLines(), false);
             updateSidebarForPage();
 
-            var root = new FrameLayout(context);
-            root.setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
-            root.addView(new MinecraftBackgroundView(context),
-                    new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
-            root.addView(base, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
             return root;
         } catch (Exception e) {
             visible = false;

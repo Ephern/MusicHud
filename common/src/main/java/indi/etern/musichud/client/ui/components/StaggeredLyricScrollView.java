@@ -12,6 +12,7 @@ import icyllis.modernui.graphics.*;
 import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
+import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
@@ -51,7 +52,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final float MAX_DELAY_MILLIS = 800;
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
     public static final float MAX_BLUR_DP = 8f;
-    private static final float SPACER_HEIGHT_RATIO = 0.7f;
+    private static final float DEFAULT_LYRIC_FOLLOW_RATIO = 0.1f;
     private static final int SWITCH_DURATION = 400;
     private static final int SCROLL_RESPONSE_MILLIS = 550;
     private static final float SCROLL_DAMPING = 1f;
@@ -64,7 +65,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     // amplitude and duration never depend on its distance from the highlighted row. Only the
     // per-row start delay differs, and that delay is scheduled by the scroll view, never the row.
     private static final int ROW_RESPONSE_MILLIS = SCROLL_RESPONSE_MILLIS;
-    private static final float ROW_DAMPING = 0.85f;
+    private static final float ROW_DAMPING = 1f;
     // A very short highlighted line collapses the whole delay wave (see durationFactor) so a fast
     // sequence of short lines never blocks; the per-row delay ratios are preserved.
     private static final int DELAY_SHORTEN_TAU_MILLIS = 200;
@@ -111,15 +112,17 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private final List<RowWave> rows = new ArrayList<>();
     Runnable staggeringEndListener = null;
     boolean scrollFinished = false;
-    @Setter
     @Getter
-    private int lyricFollowOffset = dp(80);
+    private float lyricFollowRatio = DEFAULT_LYRIC_FOLLOW_RATIO;
+    @Getter
+    private int lyricFollowOffset;
     @Getter
     @Setter
     private int mainLyricSize = Theme.MAIN_LYRIC_SIZE;
     @Getter
     @Setter
     private int subLyricSize = Theme.SUB_LYRIC_SIZE;
+    private View topSpacer;
     private View bottomSpacer;
     @Getter
     private volatile ScrollStatus scrollStatus = ScrollStatus.FOLLOW_LYRICS;
@@ -150,9 +153,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     @Getter
     @Setter
     private boolean fadeEdgesEnabled = true;
+    // Fade band inset from the viewport edges while manually scrolling; 0 hides the fade.
     @Getter
-    @Setter
-    private boolean drawFadeEdgesWhenManualScroll = false;
+    private int manualScrollFadeOffset = dp(24);
     @Getter
     @Setter
     private float fadeEdgeMaxStrength = 1.0f;
@@ -212,6 +215,38 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     /**
+     * Sets where the highlighted line's top is parked, as a fraction of the content viewport.
+     * The bottom spacer is recomputed on the next layout pass.
+     */
+    public void setLyricFollowRatio(float ratio) {
+        float clamped = Math.clamp(ratio, 0f, 1f);
+        if (clamped == lyricFollowRatio) {
+            return;
+        }
+        lyricFollowRatio = clamped;
+        requestLayout();
+    }
+
+    /** Extra offset in pixels added to the proportional anchor; may be negative. */
+    public void setLyricFollowOffset(int offset) {
+        if (offset == lyricFollowOffset) {
+            return;
+        }
+        lyricFollowOffset = offset;
+        requestLayout();
+    }
+
+    /** Fade band height in pixels kept at each edge while manually scrolling; 0 hides the fade. */
+    public void setManualScrollFadeOffset(int offset) {
+        int clamped = Math.max(0, offset);
+        if (clamped == manualScrollFadeOffset) {
+            return;
+        }
+        manualScrollFadeOffset = clamped;
+        invalidate();
+    }
+
+    /**
      * Only a highlighted line that lasts tens-to-hundreds of milliseconds visibly shortens the
      * wave; normal lines keep the full delay.
      */
@@ -223,7 +258,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         return 1f - (float) Math.exp(-x * x);
     }
 
-    public void switchLyrics(MusicDetail musicDetail, Collection<LyricLine> lyrics) {
+    public void switchLyrics(@Nullable MusicDetail musicDetail, @Nullable Collection<LyricLine> lyrics) {
         this.musicDetail = musicDetail;
         try {
             stopUpdateLoop();
@@ -278,10 +313,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         lyricLines.clear();
         lyricLineViewList.clear();
         currentLyrics = lyrics;
+        topSpacer = null;
+        bottomSpacer = null;
 
         if (lyrics == null) return;
         Context context = getContext();
-        container.addView(new View(context), new LayoutParams(0, dp(64)));
+        topSpacer = new View(context);
+        container.addView(topSpacer, new LayoutParams(0, 0));
 
         rows.clear();
         for (LyricLine line : lyrics) {
@@ -308,7 +346,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     public void clearLyrics() {
-        switchLyrics(MusicDetail.NONE, null);
+        switchLyrics(null, null);
     }
 
     public void resyncToCurrentLyric() {
@@ -396,6 +434,29 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
     }
 
+    private int contentViewportHeight() {
+        return Math.max(0, getHeight() - getPaddingTop() - getPaddingBottom());
+    }
+
+    /** Distance from the content viewport's top where the highlighted line's top rests. */
+    private int followAnchor() {
+        return followAnchor(contentViewportHeight());
+    }
+
+    private int followAnchor(int viewportHeight) {
+        return Math.round(viewportHeight * lyricFollowRatio) + lyricFollowOffset;
+    }
+
+    /** Same range {@link icyllis.modernui.widget.ScrollView#getScrollRange()} would allow. */
+    @SuppressWarnings("JavadocReference")
+    private int maxScrollY() {
+        return Math.max(0, container.getHeight() - contentViewportHeight());
+    }
+
+    private int followScrollY(LyricLineView target) {
+        return Math.clamp(target.getScrollPosition(this) - followAnchor(), 0, maxScrollY());
+    }
+
     private void jumpToTop() {
         if (scrollSpring == null) return;
         resetStaggerState();
@@ -408,14 +469,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     private void jumpToLyric(LyricLineView target) {
         if (target == null || scrollSpring == null) return;
-        int targetTop = target.getScrollPosition(this);
         int scrollViewHeight = getHeight();
         if (scrollViewHeight <= 0) {
             post(() -> jumpToLyric(target));
             return;
         }
-        int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight - target.getHeight());
-        int targetScrollY = Math.clamp(targetTop - lyricFollowOffset, 0, maxScroll);
+        int targetScrollY = followScrollY(target);
 
         resetStaggerState();
         scrollSpring.jumpTo(targetScrollY);
@@ -428,15 +487,12 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     private void scrollToLyric(LyricLineView target) {
         if (target == null || scrollSpring == null) return;
-        int targetTop = target.getScrollPosition(this);
-
         int scrollViewHeight = getHeight();
         if (scrollViewHeight <= 0) {
             post(() -> scrollToLyric(target));
             return;
         }
-        int maxScroll = Math.max(0, container.getHeight() - scrollViewHeight - target.getHeight());
-        int targetScrollY = Math.clamp(targetTop - lyricFollowOffset, 0, maxScroll);
+        int targetScrollY = followScrollY(target);
         lastTargetScrollPosition = targetScrollY;
 
         long now = MuiModApi.getFrameTimeNanos();
@@ -613,8 +669,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 if (continueUpdate) {
                     if (scrollStatus != ScrollStatus.MANUAL) {
                         float value = scrollSpring.update(frameTimeNanos);
-                        int maxScroll = Math.max(0, container.getHeight() - getHeight());
-                        scrollTo(0, Math.clamp((int) value, 0, maxScroll));
+                        int maxScroll = maxScrollY();
+                        int scroll = Math.clamp((int) value, 0, maxScroll);
+                        scrollTo(0, scroll);
+                        container.setTranslationY((scroll - value) * 0.5f);
                         if (!scrollSpring.isSettled()) {
                             scrollFinished = false;
                         }
@@ -827,7 +885,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             return false;
         }
         int height = getHeight();
-        return getWidth() > 0 && height > 0 && container.getHeight() > height;
+        return getWidth() > 0 && height > 0 && container.getHeight() > height
+                && !fadeBandsHidden();
     }
 
     /**
@@ -916,48 +975,26 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int width = getWidth();
         int height = getHeight();
         if (width <= 0 || height <= 0) return;
-        int containerHeight = container.getHeight();
-        if (containerHeight <= height) return;
+        if (container.getHeight() <= height) return;
 
-        float topFadeEdgeFraction = 0.1f;
-        int topFadeHeight = (int) (height * Math.clamp(topFadeEdgeFraction, 0, 1));
-        float bottomFadeEdgeFraction = 0.85f;
-        int bottomFadeHeight = (int) (height * Math.clamp(bottomFadeEdgeFraction, 0, 1));
-        int maxScroll = containerHeight - height;
+        int anchor = Math.clamp(followAnchor(), 0, height);
+        int manualInset = Math.clamp(manualScrollFadeOffset, 0, height / 2);
+        float weight = fadeAutoWeight();
+        int topFadeHeight = Math.round(manualInset + (anchor - manualInset) * weight);
+        int bottomFadeHeight = Math.round(manualInset + ((height - anchor) - manualInset) * weight);
+        if (topFadeHeight <= 0 && bottomFadeHeight <= 0) return;
+
+        int maxScroll = maxScrollY();
         int scrollY = getScrollY();
 
         updateFadeGradients(topFadeHeight, bottomFadeHeight);
-
-        float edgeFadeExtraAlpha;
-        long elapsedTime = MuiModApi.getElapsedTime();
-        if (drawFadeEdgesWhenManualScroll) {
-            edgeFadeExtraAlpha = 1;
-        } else if (scrollStatus == ScrollStatus.MANUAL) {
-            long timeMillis = elapsedTime - lastUserStartScrollTime;
-            if (timeMillis < 0) {
-                edgeFadeExtraAlpha = 1;
-            } else if (timeMillis <= MANUAL_SCROLL_FADE_DURATION) {
-                edgeFadeExtraAlpha = 1 - Math.clamp((float) timeMillis / MANUAL_SCROLL_FADE_DURATION, 0f, 1f);
-            } else {
-                edgeFadeExtraAlpha = 0;
-            }
-        } else {
-            long timeMillis = elapsedTime - lastUserScrollTime - AUTO_RECENTER_DELAY_MILLIS;
-            if (timeMillis < 0) {
-                edgeFadeExtraAlpha = 0;
-            } else if (timeMillis <= MANUAL_SCROLL_FADE_DURATION) {
-                edgeFadeExtraAlpha = Math.clamp((float) timeMillis / MANUAL_SCROLL_FADE_DURATION, 0f, 1f);
-            } else {
-                edgeFadeExtraAlpha = 1;
-            }
-        }
 
         fadeEdgePaint.setBlendMode(BlendMode.DST_OUT);
 
         if (scrollY > 0 && topFadeHeight > 0) {
             float strength = Math.min(1f, scrollY / (float) topFadeHeight);
             fadeEdgePaint.setShader(topFadeGradient);
-            fadeEdgePaint.setAlpha((int) (255 * strength * edgeFadeExtraAlpha));
+            fadeEdgePaint.setAlpha((int) (255 * strength));
             canvas.save();
             canvas.translate(0, scrollY);
             canvas.drawRect(0, 0, width, topFadeHeight, fadeEdgePaint);
@@ -967,7 +1004,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         if (scrollY < maxScroll && bottomFadeHeight > 0) {
             float strength = Math.min(1f, (maxScroll - scrollY) / (float) bottomFadeHeight);
             fadeEdgePaint.setShader(bottomFadeGradient);
-            fadeEdgePaint.setAlpha((int) (255 * strength * edgeFadeExtraAlpha));
+            fadeEdgePaint.setAlpha((int) (255 * strength));
             canvas.save();
             canvas.translate(0, scrollY + height - bottomFadeHeight);
             canvas.drawRect(0, 0, width, bottomFadeHeight, fadeEdgePaint);
@@ -975,6 +1012,21 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
 
         fadeEdgePaint.setBlendMode(null);
+    }
+
+    /** 1 = anchor-based fade (auto), 0 = manual-scroll fade. */
+    private float fadeAutoWeight() {
+        long elapsed = MuiModApi.getElapsedTime();
+        if (scrollStatus == ScrollStatus.MANUAL) {
+            long sinceStart = elapsed - lastUserStartScrollTime;
+            return 1f - Math.clamp((float) sinceStart / MANUAL_SCROLL_FADE_DURATION, 0f, 1f);
+        }
+        long sinceIdle = elapsed - lastUserScrollTime - AUTO_RECENTER_DELAY_MILLIS;
+        return Math.clamp((float) sinceIdle / MANUAL_SCROLL_FADE_DURATION, 0f, 1f);
+    }
+
+    private boolean fadeBandsHidden() {
+        return manualScrollFadeOffset <= 0 && fadeAutoWeight() <= 0f;
     }
 
     private void updateFadeGradients(int topFadeHeight, int bottomFadeHeight) {
@@ -1007,17 +1059,45 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        // An unspecified height makes the viewport content-sized, so the anchor-driven spacer would feed back into it.
+        if (MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED) {
+            return;
+        }
+        int viewport = Math.max(0, getMeasuredHeight() - getPaddingTop() - getPaddingBottom());
+        // Resolve the spacers before layout so the first follow jump already lands on the anchor.
+        if (viewport > 0 && updateFollowSpacers(viewport)) {
+            container.forceLayout();
+            super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+        }
+    }
+
+    private boolean updateFollowSpacers(int viewport) {
+        if (topSpacer == null || bottomSpacer == null
+                || topSpacer.getParent() != container || bottomSpacer.getParent() != container) {
+            return false;
+        }
+        int anchor = Math.clamp(followAnchor(viewport), 0, viewport);
+        int lastRowHeight = lyricLineViewList.isEmpty() ? 0
+                : lyricLineViewList.getLast().getMeasuredHeight();
+        boolean changed = applySpacerHeight(topSpacer, anchor);
+        changed |= applySpacerHeight(bottomSpacer, Math.max(0, viewport - anchor - lastRowHeight));
+        return changed;
+    }
+
+    private static boolean applySpacerHeight(View spacer, int height) {
+        ViewGroup.LayoutParams lp = spacer.getLayoutParams();
+        if (lp.height == height) {
+            return false;
+        }
+        lp.height = height;
+        return true;
+    }
+
+    @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         super.onLayout(changed, left, top, right, bottom);
-        int viewport = bottom - top;
-        if (viewport > 0 && bottomSpacer != null && bottomSpacer.getParent() == container) {
-            int target = (int) (viewport * SPACER_HEIGHT_RATIO);
-            ViewGroup.LayoutParams lp = bottomSpacer.getLayoutParams();
-            if (lp.height != target) {
-                lp.height = target;
-                bottomSpacer.requestLayout();
-            }
-        }
         if (pendingResyncToCurrent) {
             pendingResyncToCurrent = false;
             post(this::resyncToCurrentLyric);

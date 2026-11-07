@@ -56,12 +56,12 @@ public class MusicTrackItem extends LinearLayout {
     /** Wide enough to keep the arrangement stable when the width sits on the threshold. */
     private static final int COMPACT_EXIT_WIDTH_DP = 416;
     private static final int ACTION_BUTTON_NORMAL_DP = 40;
-    private static final int ACTION_BUTTON_COMPACT_DP = 20;
+    private static final int ACTION_BUTTON_COMPACT_DP = 22;
     private static final int ACTION_NORMAL_INSET_DP = 1;
     private static final int ACTION_NORMAL_CORNER_DP = 4;
-    private static final int ACTION_COMPACT_INSET_DP = 1;
-    private static final int ACTION_COMPACT_CORNER_DP = 2;
-    private static final int ACTION_ICON_DP = 16;
+    private static final int ACTION_COMPACT_INSET_DP = 0;
+    private static final int ACTION_COMPACT_CORNER_DP = 4;
+    private static final int ACTION_ICON_DP = 14;
     private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
     private static final MusicService musicService = MusicService.getInstance();
     private static final DateTimeFormatter PLAY_RECORD_FORMATTER =
@@ -159,13 +159,14 @@ public class MusicTrackItem extends LinearLayout {
         params1.setMargins(0, 0, dp(12), 0);
         infoRow.addView(feeLabel, params1);
 
+        float infoAlpha = 0.44f;
         sourceButton = new ImageButton(context);
         sourceButton.setVisibility(View.GONE);
         sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
         if (sourceIcon != null) {
             ScaledImageDrawable drawable = new ScaledImageDrawable(context.getResources(), sourceIcon, dp(16), dp(16));
-            drawable.setAlpha(0.7f);
+            drawable.setAlpha(infoAlpha);
             sourceButton.setImageDrawable(new InsetDrawable(
                     drawable, dp(1)));
         }
@@ -184,17 +185,20 @@ public class MusicTrackItem extends LinearLayout {
             }
         });
 
+        int dp2 = dp(2);
         InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .padding(new InsetBackgroundFactory.Padding(0, sourceButton.dp(1), 0, sourceButton.dp(1)))
+                .padding(new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2))
                 .cornerRadius(sourceButton.dp(4)).build().applyBackgroundTo(sourceButton);
         LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         params3.setMargins(0, 0, dp(2), 0);
         infoRow.addView(sourceButton, params3);
 
         pusherWidget = new PusherWidget(context);
-        pusherWidget.setVisibility(View.GONE);
-        LayoutParams params2 = new LayoutParams(dp(18), dp(18));
+        pusherWidget.setVisibility(GONE);
+        pusherWidget.setFallbackIconSize(dp(ACTION_ICON_DP));
+        pusherWidget.setFallbackIconAlpha(infoAlpha);
+        LayoutParams params2 = new LayoutParams(dp(16), dp(16));
         params2.setMargins(0, 0, dp(12), 0);
         infoRow.addView(pusherWidget, params2);
 
@@ -222,6 +226,7 @@ public class MusicTrackItem extends LinearLayout {
                 .inset(dp(ACTION_COMPACT_INSET_DP))
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
                 .cornerRadius(dp(ACTION_COMPACT_CORNER_DP))
+                .padding(new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2))
                 .build();
 
         addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
@@ -363,7 +368,7 @@ public class MusicTrackItem extends LinearLayout {
         durationText.setText("");
         row2.setText("");
         pusherWidget.clear();
-        pusherWidget.setVisibility(View.GONE);
+        pusherWidget.setVisibility(GONE);
         playRecordTimeText.setText("");
         playRecordTimeText.setVisibility(GONE);
         addToPlaylistButton.bindMusicDetail(null);
@@ -449,7 +454,7 @@ public class MusicTrackItem extends LinearLayout {
         String albumName = album.getName();
         albumName = albumName == null ? "" : albumName;
         if (!Album.NONE.equals(album) && !albumName.isBlank()) {
-            if (metaBuilder.length() > 0) {
+            if (!metaBuilder.isEmpty()) {
                 metaBuilder.append(" - ");
             }
             int start = metaBuilder.length();

@@ -24,6 +24,8 @@ public final class SceneCoverTransition {
     private boolean blending;
     private boolean fading;
     private float transitionStartSeconds;
+    /** Time of the previous update; a change at or after it landed while this renderer was idle. */
+    private float lastUpdateSeconds;
     private float fadeFrom;
     private float fadeTo;
     private int targetLongEdge;
@@ -75,6 +77,7 @@ public final class SceneCoverTransition {
                 transitionTo(gpu, source, changedAtMillis, timeSeconds);
             }
         }
+        lastUpdateSeconds = timeSeconds;
 
         float opacityScale = 1f;
         boolean animated = blending || fading;
@@ -164,8 +167,22 @@ public final class SceneCoverTransition {
         }
 
         if (activeTexture != null) {
-            // A cover is on screen: start from what is visible now. Page/override changes often
-            // report an older change time, which would skip the fade entirely.
+            float startSeconds = changedAtMillis / 1000f;
+            if (startSeconds >= lastUpdateSeconds && progress(startSeconds, timeSeconds) >= 1f) {
+                // The source changed while this renderer was idle and its crossfade is already over.
+                previousTexture = null;
+                previousSource = null;
+                blending = false;
+                fading = false;
+                fadingTexture = null;
+                fadingSource = null;
+                activeSlot = nextSlot;
+                activeTexture = prepared;
+                activeSource = source;
+                transitionStartSeconds = startSeconds;
+                return;
+            }
+            // A live source switch fades from what is visible now.
             SceneGpuTexture previous = activeTexture;
             SceneCoverSource previousOwner = activeSource;
             if (blending) {
@@ -261,6 +278,7 @@ public final class SceneCoverTransition {
         blending = false;
         fading = false;
         transitionStartSeconds = 0f;
+        lastUpdateSeconds = 0f;
         fadeFrom = 0f;
         fadeTo = 0f;
         targetLongEdge = 0;

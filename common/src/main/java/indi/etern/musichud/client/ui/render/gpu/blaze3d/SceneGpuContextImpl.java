@@ -34,11 +34,15 @@ import java.util.OptionalInt;
 
 @SuppressWarnings("resource")
 public final class SceneGpuContextImpl implements SceneGpuContext {
+    /** Bumped per context; a retirement can close an older context after a newer one exists. */
+    private static int latestGeneration;
+
     private final SceneNativePassRenderer renderer = new SceneNativePassRenderer();
     private final SceneTextureAllocator blazeAllocator;
     private final SceneTextureAllocator halfFloatAllocator;
     private final int maxTextureSize;
     private final boolean rgba16fTargets;
+    private final int generation = ++latestGeneration;
     private final Map<ScenePipelineKey, ScenePipeline> pipelines = new HashMap<>();
     // Uniform storages are ring buffers: a frame's uploads never overwrite the slices the previous
     // frames' in-flight draws still reference. Rewriting a single buffer per uniform (as before)
@@ -334,7 +338,9 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         uniformStorages.clear();
         pipelines.clear();
         renderer.close();
-        SceneInterop.install(null);
+        if (generation == latestGeneration) {
+            SceneInterop.install(null);
+        }
     }
 
     /** Advances the uniform ring buffers; call once per frame after the scene was recorded. */

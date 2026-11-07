@@ -18,7 +18,7 @@ public class Theme {
 
     public static final int EMPHASIZE_TEXT_COLOR = 0xFFFFFFFF;
     public static final int NORMAL_TEXT_COLOR = 0xE0FFFFFF;
-    public static final int SECONDARY_TEXT_COLOR = 0xA0FFFFFF;
+    public static final int SECONDARY_TEXT_COLOR = 0x70FFFFFF;
 
     public static final int ERROR_TEXT_COLOR = 0xFFFF4F4F;
     public static final int WARN_TEXT_COLOR = 0xFFFFB04F;

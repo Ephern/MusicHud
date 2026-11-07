@@ -216,10 +216,8 @@ public class MusicCollectionCard extends LinearLayout {
             } else {
                 PusherWidget pusherWidget = new PusherWidget(context);
                 pusherWidget.bind(pusherInfo);
-
-                LayoutParams pusherParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-                pusherParams.setMargins(dp(4), dp(4), 0, dp(4));
-                content.addView(pusherWidget, pusherParams);
+                buttons.addView(pusherWidget, new LayoutParams(dp(22), dp(22)));
+                backgroundFactory.applyBackgroundTo(pusherWidget);
             }
 
             if (!isPrivatePlaylistToUser) {
@@ -267,6 +265,7 @@ public class MusicCollectionCard extends LinearLayout {
 
     @Override
     public void setOrientation(int orientation) {
+        //noinspection MagicConstant
         super.setOrientation(orientation);
         applyContentMetrics();
     }

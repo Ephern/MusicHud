@@ -5,6 +5,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.presentation.TrackArtworkStore;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
+import indi.etern.musichud.client.ui.render.gpu.SceneRetirement;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneGpuContextImpl;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneWindowEnvironment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
@@ -122,7 +123,9 @@ public final class RenderRuntime {
         if (!gpuRecreatePending) return;
         gpuRecreatePending = false;
         if (gpu != null) {
-            gpu.close();
+            // A UI recording submitted after this frame may still sample the published background,
+            // so the old context's GL names outlive it by the retirement window.
+            SceneRetirement.retire(gpu::close);
             gpu = null;
         }
     }

@@ -100,6 +100,7 @@ public final class Tooltip {
     }
 
     /** Forwards a container's hover event to the tooltip previously attached to {@code anchor}. */
+    @SuppressWarnings("UnusedReturnValue")
     public static boolean handleHover(View anchor, @NotNull MotionEvent event) {
         WeakReference<Tooltip> reference = ATTACHED.get(anchor);
         Tooltip tooltip = reference == null ? null : reference.get();
@@ -108,7 +109,7 @@ public final class Tooltip {
 
     public void setText(@Nullable CharSequence text) {
         this.text = text;
-        if (text == null || text.length() == 0) {
+        if (text == null || text.isEmpty()) {
             anchor.removeCallbacks(hideRunnable);
             hide(false);
         } else if (content != null) {
@@ -167,7 +168,7 @@ public final class Tooltip {
     private void show() {
         pendingShow = false;
         CharSequence value = text;
-        if (detached || content != null || value == null || value.length() == 0) {
+        if (detached || content != null || value == null || value.isEmpty()) {
             return;
         }
         if (!anchor.isAttachedToWindow() || !anchor.isShown()) {

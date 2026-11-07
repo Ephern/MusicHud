@@ -142,8 +142,9 @@ public final class SceneBlur {
         if (current != null && result != null) {
             // A recording made before this call may still sample it (the UI thread records about
             // one frame ahead of the render thread).
-            SceneGpuTexture previous = result;
-            SceneRetirement.retire(() -> current.release(previous));
+//            SceneGpuTexture previous = result;
+//            SceneRetirement.retire(() -> current.release(previous));
+            current.release(result);
         }
         result = null;
         owner = null;

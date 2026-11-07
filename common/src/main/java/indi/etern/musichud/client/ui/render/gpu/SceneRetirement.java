@@ -11,7 +11,7 @@ import java.util.List;
  * the main one have been submitted: the UI thread records about one frame ahead, so a texture retired
  * during frame N can still be sampled by a recording that executes in frame N + 1.
  */
-final class SceneRetirement {
+public final class SceneRetirement {
     private static final int FRAMES = 3;
     private static final List<Entry> ENTRIES = new ArrayList<>();
     private static long frame;
@@ -41,7 +41,7 @@ final class SceneRetirement {
         }
     }
 
-    static void retire(Runnable release) {
+    public static void retire(Runnable release) {
         synchronized (ENTRIES) {
             ENTRIES.add(new Entry(frame, release));
         }

@@ -45,6 +45,7 @@ public class FlexWrapLayout extends ViewGroup {
     private final Set<View> disappearingChildren = new HashSet<>();
     private final Map<View, Animator> runningAnimations = new HashMap<>();
     private final Map<View, Integer> lastLineIndex = new HashMap<>();
+    private final Map<View, Float> wrapThresholdRatios = new HashMap<>();
     private int lineGravity = Gravity.TOP;
     private boolean animationsEnabled = true;
     private boolean firstLayout = true;
@@ -83,6 +84,15 @@ public class FlexWrapLayout extends ViewGroup {
 
     public void setLineGravity(int gravity) {
         lineGravity = gravity;
+        requestLayout();
+    }
+
+    /**
+     * Forces a line break before {@code child} when its outer width exceeds {@code ratio} of the
+     * available width.
+     */
+    public void setWrapThresholdRatio(@NonNull View child, float ratio) {
+        wrapThresholdRatios.put(child, ratio);
         requestLayout();
     }
 
@@ -128,7 +138,10 @@ public class FlexWrapLayout extends ViewGroup {
             int outerWidth = claimedWidth(item) + lp.leftMargin + lp.rightMargin;
             // Append-only: closed lines keep their order, a child never jumps back into one.
             Line line = lines.isEmpty() ? null : lines.getLast();
-            boolean place = line != null && (fitsLine(line, outerWidth, available)
+            Float threshold = wrapThresholdRatios.get(child);
+            boolean forceBreak = threshold != null && available != Integer.MAX_VALUE
+                    && outerWidth > available * threshold;
+            boolean place = !forceBreak && line != null && (fitsLine(line, outerWidth, available)
                     || keepsLastLine(child, line, outerWidth, available, keepTolerance));
             if (!place) {
                 line = new Line();
@@ -426,6 +439,7 @@ public class FlexWrapLayout extends ViewGroup {
         laidOutChildren.remove(view);
         disappearingChildren.remove(view);
         lastLineIndex.remove(view);
+        wrapThresholdRatios.remove(view);
         super.removeView(view);
     }
 
@@ -491,6 +505,7 @@ public class FlexWrapLayout extends ViewGroup {
         finishAllDisappearing();
         laidOutChildren.clear();
         lastLineIndex.clear();
+        wrapThresholdRatios.clear();
         super.removeAllViews();
     }
 

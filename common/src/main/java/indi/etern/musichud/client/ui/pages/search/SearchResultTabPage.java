@@ -79,12 +79,14 @@ public class SearchResultTabPage extends FrameLayout {
         }
         contentTopInset = inset;
         for (int i = 0; i < pager.getChildCount(); i++) {
+            //noinspection UnstableApiUsage
             if (pager.getChildAt(i) instanceof ClampingScrollView scrollView) {
                 applyContentTopInset(scrollView);
             }
         }
     }
 
+    @SuppressWarnings("UnstableApiUsage")
     private void applyContentTopInset(ClampingScrollView scrollView) {
         if (scrollView.getPaddingTop() != contentTopInset) {
             scrollView.setPadding(scrollView.getPaddingLeft(), contentTopInset,
@@ -264,13 +266,6 @@ public class SearchResultTabPage extends FrameLayout {
         public void destroyItem(@NonNull ViewGroup container, int position, @NonNull Object object) {
             if (object instanceof View view) {
                 container.removeView(view);
-                SearchType searchType = switch (position) {
-                    case 0 -> SearchType.MUSIC;
-                    case 1 -> SearchType.PLAYLIST;
-                    case 2 -> SearchType.ALBUM;
-                    case 3 -> SearchType.ARTIST;
-                    default -> SearchType.MUSIC;
-                };
                 SearchView instance = SearchView.getInstance();
                 if (instance != null) {
                     Consumer<SearchView.SearchMeta> listener = registeredListeners.remove(object);

@@ -80,6 +80,7 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
         this.artist = artist;
 
         topBar = new LinearLayout(context);
+        topBar.setClickable(true);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
 
         ImageButton backButton = new ImageButton(context);

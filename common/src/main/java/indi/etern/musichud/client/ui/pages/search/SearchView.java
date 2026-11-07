@@ -89,13 +89,13 @@ public class SearchView extends FrameLayout {
         topBar = new LinearLayout(context);
         topBar.setGravity(Gravity.CENTER);
         topBar.setOrientation(LinearLayout.HORIZONTAL);
-        topBar.setClickable(true);
 
         LinearLayout searchWidget = new LinearLayout(context);
         searchWidget.setOrientation(LinearLayout.HORIZONTAL);
         topBar.addView(searchWidget, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         SegmentedBar tabBar = new SegmentedBar(context);
+        tabBar.setClickable(true);
         int dp2 = dp(2);
         {
             tabBar.addItem(new SegmentedBar.Item("music", null,
@@ -119,6 +119,7 @@ public class SearchView extends FrameLayout {
         }
         {
             LinearLayout searchBar = new LinearLayout(context);
+            searchBar.setClickable(true);
             PanelStyle.applyDynamically(searchBar, dp(16),
                     new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2),
                     InsetBackgroundFactory.BackdropBlur.UI_LAYER);

@@ -5,7 +5,10 @@ import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.MotionEvent;
@@ -28,6 +31,8 @@ import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButt
 import indi.etern.musichud.client.ui.components.buttons.VoteSkipButton;
 import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
+import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
@@ -66,7 +71,7 @@ public class SidebarView extends LinearLayout {
         LIBRARY
     }
 
-    private static final int SIDE_WIDTH_DP = 231;
+    private static final int SIDE_WIDTH_DP = 280;
     private static final int SIDE_MARGIN_DP = 12;
     private static final int PANEL_ANIMATION_DURATION = 300;
     private static final SpringInterpolator PANEL_SWITCH_INTERPOLATOR =
@@ -82,12 +87,13 @@ public class SidebarView extends LinearLayout {
     private static final int NEXT_TO_PLAY_ANIM_DURATION_MS =
             Math.round(NEXT_TO_PLAY_INTERPOLATOR.getDuration() * 1000);
     private static final float NEXT_TO_PLAY_MIN_SCALE = 0.95f;
+    private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
+    private static final int ACTION_ICON_DP = 16;
+    private static final int PUSHER_PADDING_DP = 8;
 
     // Morph springs use normalized positions: 0 = expanded player, 1 = compact library header.
-    private static final float MORPH_TIME_SCALE =
-            debugFloat("music_hud.debug.morphTimeScale", 1f);
-    private static final float MORPH_DAMPING =
-            debugFloat("music_hud.debug.morphDamping", 1f);
+    private static final float MORPH_TIME_SCALE = 1f;
+    private static final float MORPH_DAMPING = 1f;
     private static final float EXPAND_TEXT_X_RESPONSE = 0.32f;
     private static final float EXPAND_TEXT_Y_RESPONSE = 0.28f;
     private static final float EXPAND_COVER_RESPONSE = 0.38f;
@@ -127,10 +133,9 @@ public class SidebarView extends LinearLayout {
     private ValueAnimator headerAnimator;
     private float headerVisibleFraction = 1f;
     private boolean playerVisible = true;
-
+    /** Queued until the sliding-out panel leaves the screen, so the header never reflows mid-move. */
+    private boolean pendingPlayerGone;
     private ScrollView libraryPage;
-
-    // Player header
     private StaggeredLyricScrollView lyricsScrollView;
     private MusicInfoCard activeCard;
     private MusicInfoCard stagedCard;
@@ -138,15 +143,17 @@ public class SidebarView extends LinearLayout {
     private ToggleTrackLikeStateButton likeButton;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
     private VoteSkipButton skipCurrentButton;
+    private PusherWidget pusherWidget;
+    private ImageButton sourceButton;
     private AnimatorSet cardAnimator;
     private AnimatorSet coverScaleAnimator;
     private boolean cardSwitching;
     private Traceable<MusicDetail> pendingSwitch;
     private MusicDetail displayedDetail;
+    private Traceable<MusicDetail> displayedTrace;
     private long progressUpdaterStartTime;
     private long progressTextUpdateCount;
 
-    // Library page
     private record CardKey(boolean local, long id, Class<?> type) {
         static CardKey of(boolean local, IdlePlaySource idlePlaySource) {
             return new CardKey(local, idlePlaySource.getId(), idlePlaySource.getType());
@@ -251,32 +258,55 @@ public class SidebarView extends LinearLayout {
     /**
      * Header visibility is independent from the player/library mode: Home hides the whole player
      * while the lower area stays on the library.
+     *
+     * <p>The header never animates out. With {@code withPanelTransition} it stays intact while the
+     * panel slides away and is dropped once the panel is gone; a reveal animates only when the
+     * panel is already open and stays open, otherwise it is placed before the panel slides in.</p>
      */
-    public void setPlayerVisible(boolean visible, boolean animate) {
-        if (playerVisible == visible && !animate) {
-            cancelHeaderAnimator();
-            applyHeaderVisibleFraction(visible ? 1f : 0f);
-            releaseLowerHold();
-            updateProgressUpdaterForMode();
-            return;
-        }
+    public void setPlayerVisible(boolean visible, boolean withPanelTransition) {
         boolean unchanged = playerVisible == visible;
         playerVisible = visible;
-        float target = visible ? 1f : 0f;
-        if (!animate || getHeight() <= 0) {
+        if (!visible) {
+            updateProgressUpdaterForMode();
+            if (withPanelTransition && (this.visible || panelAnimator != null)) {
+                pendingPlayerGone = true;
+                cancelHeaderAnimator();
+                // Freeze a partially revealed header so it does not reflow while the panel moves.
+                if (headerContainer != null && headerContainer.getVisibility() == VISIBLE) {
+                    applyHeaderVisibleFraction(1f);
+                }
+                releaseLowerHold();
+                return;
+            }
+            pendingPlayerGone = false;
             cancelHeaderAnimator();
-            applyHeaderVisibleFraction(target);
+            hidePlayerHeader();
+            releaseLowerHold();
+            return;
+        }
+        pendingPlayerGone = false;
+        if (headerAnimator != null) {
+            updateProgressUpdaterForMode();
+            return;
+        }
+        boolean animateInPlace = withPanelTransition && this.visible
+                && panelAnimator == null && getHeight() > 0;
+        if (!animateInPlace) {
+            cancelHeaderAnimator();
+            showPlayerHeader();
             releaseLowerHold();
             updateProgressUpdaterForMode();
             return;
         }
-        if (unchanged && Math.abs(headerVisibleFraction - target) < 1e-4f) {
+        if (unchanged && Math.abs(headerVisibleFraction - 1f) < 1e-4f) {
+            updateProgressUpdaterForMode();
             return;
         }
         cancelHeaderAnimator();
         holdLowerSizes();
         updateProgressUpdaterForMode();
-        ValueAnimator animator = ValueAnimator.ofFloat(headerVisibleFraction, target);
+        headerContainer.setVisibility(VISIBLE);
+        ValueAnimator animator = ValueAnimator.ofFloat(headerVisibleFraction, 1f);
         animator.setDuration(PANEL_ANIMATION_DURATION);
         animator.setInterpolator(PANEL_SWITCH_INTERPOLATOR);
         animator.addUpdateListener(a -> applyHeaderVisibleFraction((Float) a.getAnimatedValue()));
@@ -288,12 +318,42 @@ public class SidebarView extends LinearLayout {
                     return;
                 }
                 headerAnimator = null;
-                applyHeaderVisibleFraction(target);
+                applyHeaderVisibleFraction(1f);
                 releaseLowerHold();
                 updateProgressUpdaterForMode();
             }
         });
         animator.start();
+    }
+
+    private void hidePlayerHeader() {
+        if (headerContainer == null) {
+            return;
+        }
+        applyHeaderVisibleFraction(0f);
+        headerContainer.setVisibility(GONE);
+    }
+
+    private void showPlayerHeader() {
+        if (headerContainer == null) {
+            return;
+        }
+        headerContainer.setVisibility(VISIBLE);
+        applyHeaderVisibleFraction(1f);
+    }
+
+    private void applyPendingPlayerGone() {
+        if (!pendingPlayerGone) {
+            return;
+        }
+        pendingPlayerGone = false;
+        // Leaving Home may have revived the player before the panel finished hiding.
+        if (playerVisible) {
+            return;
+        }
+        cancelHeaderAnimator();
+        hidePlayerHeader();
+        releaseLowerHold();
     }
 
     private void holdLowerSizes() {
@@ -337,6 +397,7 @@ public class SidebarView extends LinearLayout {
         if (visible) {
             return;
         }
+        pendingPlayerGone = false;
         visible = true;
         cancelPanelAnimator();
         setVisibility(VISIBLE);
@@ -353,9 +414,19 @@ public class SidebarView extends LinearLayout {
             ObjectAnimator fadeIn = ObjectAnimator.ofFloat(this, View.ALPHA, 0f, 1f);
             fadeIn.setDuration(PANEL_ANIMATION_DURATION);
             fadeIn.setInterpolator(PANEL_SWITCH_INTERPOLATOR);
-            panelAnimator = new AnimatorSet();
-            panelAnimator.playTogether(slideIn, fadeIn);
-            panelAnimator.start();
+            AnimatorSet shown = new AnimatorSet();
+            shown.playTogether(slideIn, fadeIn);
+            shown.addListener(new AnimatorListener() {
+                @Override
+                public void onAnimationEnd(@NonNull Animator animation) {
+                    // A finished slide-in must not keep looking like a still-running panel.
+                    if (panelAnimator == shown) {
+                        panelAnimator = null;
+                    }
+                }
+            });
+            panelAnimator = shown;
+            shown.start();
         }
         if (lyricsScrollView != null && lyricsScrollView.getVisibility() == VISIBLE) {
             lyricsScrollView.reinitialize();
@@ -364,6 +435,9 @@ public class SidebarView extends LinearLayout {
 
     public void hide(boolean animate) {
         if (!visible) {
+            if (panelAnimator == null) {
+                applyPendingPlayerGone();
+            }
             return;
         }
         if (!animate || getWidth() <= 0) {
@@ -397,6 +471,7 @@ public class SidebarView extends LinearLayout {
                 setVisibility(GONE);
                 setTranslationX(0f);
                 setAlpha(1f);
+                applyPendingPlayerGone();
             }
         });
         set.start();
@@ -411,6 +486,7 @@ public class SidebarView extends LinearLayout {
         setTranslationX(0f);
         setAlpha(1f);
         setVisibility(GONE);
+        applyPendingPlayerGone();
     }
 
     private void cancelPanelAnimator() {
@@ -440,11 +516,13 @@ public class SidebarView extends LinearLayout {
         if (lowerViewport == null) {
             return;
         }
-        float target = targetProgress();
-        if (!animate || getHeight() <= 0) {
+        // Morphing is only meaningful in a settled, on-screen panel; anything else settles so the
+        // panel opens straight into its final layout.
+        if (!animate || !visible || panelAnimator != null || getHeight() <= 0) {
             settleMode();
             return;
         }
+        float target = targetProgress();
         if (sameTarget && !morphRunning && springsAt(target)) {
             return;
         }
@@ -669,6 +747,10 @@ public class SidebarView extends LinearLayout {
 
         buttonsLayout = new LinearLayout(context);
         buttonsLayout.setOrientation(HORIZONTAL);
+        LayoutTransition layoutTransition = new LayoutTransition();
+//        layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+        LayoutTransitionReflow.attach(layoutTransition);
+        buttonsLayout.setLayoutTransition(layoutTransition);
         buttonsLayout.setGravity(Gravity.START);
         actionsRow.addView(buttonsLayout, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
         {
@@ -676,6 +758,27 @@ public class SidebarView extends LinearLayout {
                     .backgroundColor(Theme.GHOST_BUTTON_STATES)
                     .cornerRadius(dp(4)).build();
             int buttonSize = dp(36);
+
+            pusherWidget = new PusherWidget(context);
+            pusherWidget.setVisibility(GONE);
+            buttonsBackground.applyBackgroundTo(pusherWidget);
+            int pusherPadding = dp(PUSHER_PADDING_DP);
+            pusherWidget.setPadding(pusherPadding, pusherPadding, pusherPadding, pusherPadding);
+            buttonsLayout.addView(pusherWidget, new LinearLayout.LayoutParams(buttonSize, buttonSize));
+
+            int iconSize = dp(ACTION_ICON_DP);
+            sourceButton = new ImageButton(context);
+            sourceButton.setVisibility(GONE);
+            sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
+            if (sourceIcon != null) {
+                sourceButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(
+                        context.getResources(), sourceIcon, iconSize, iconSize), dp(1)));
+            }
+            sourceButton.setOnClickListener(this::onSourceClick);
+            buttonsBackground.applyBackgroundTo(sourceButton);
+            buttonsLayout.addView(sourceButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
+
             likeButton = new ToggleTrackLikeStateButton(context);
             buttonsBackground.applyBackgroundTo(likeButton);
             buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
@@ -694,8 +797,6 @@ public class SidebarView extends LinearLayout {
         sideContent.setLayoutTransition(sideContentTransition);
 
         lyricsScrollView = new StaggeredLyricScrollView(context);
-        lyricsScrollView.setDrawFadeEdgesWhenManualScroll(true);
-        lyricsScrollView.setLyricFollowOffset(lyricsScrollView.dp(36));
         lyricsScrollView.setMainLyricSize(Theme.SIDEBAR_MAIN_LYRIC_SIZE);
         lyricsScrollView.setSubLyricSize(Theme.SIDEBAR_SUB_LYRIC_SIZE);
 
@@ -713,6 +814,7 @@ public class SidebarView extends LinearLayout {
             if (activeCard != null) {
                 activeCard.bind(musicDetailTrace, sideWidth);
                 displayedDetail = musicDetail;
+                displayedTrace = musicDetailTrace;
                 updateCoverScale(false);
             }
         } else if (cardSwitching) {
@@ -722,6 +824,7 @@ public class SidebarView extends LinearLayout {
             // Same track re-synced (startAt / reconnect / config refresh): refresh contents in place.
             activeCard.bind(musicDetailTrace, sideWidth);
             displayedDetail = musicDetail;
+            displayedTrace = musicDetailTrace;
         } else {
             startCardSwitch(musicDetailTrace);
         }
@@ -746,12 +849,81 @@ public class SidebarView extends LinearLayout {
             buttonsLayout.setVisibility(GONE);
             likeButton.bindMusicList(null);
             addToPlaylistButton.bindMusicDetail(null);
+            bindPusher(null);
+            bindSource(null);
             return;
         }
         skipCurrentButton.reset();
         likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(detail).currentUsersLikeList());
         addToPlaylistButton.bindMusicDetail(detail);
+        bindPusher(detail);
+        bindSource(displayedTrace == null ? null : displayedTrace.source());
         buttonsLayout.setVisibility(VISIBLE);
+    }
+
+    private void bindPusher(MusicDetail detail) {
+        PusherInfo pusherInfo = detail == null ? null : detail.getPusherInfo();
+        if (pusherInfo == null || PusherInfo.EMPTY.equals(pusherInfo)) {
+            pusherWidget.clear();
+            pusherWidget.setVisibility(GONE);
+        } else {
+            pusherWidget.bind(pusherInfo);
+            pusherWidget.setVisibility(VISIBLE);
+        }
+    }
+
+    private void bindSource(SourceMeta source) {
+        if (source == null) {
+            sourceButton.setTag(null);
+            sourceButton.setVisibility(GONE);
+            Tooltip.attach(sourceButton, null);
+            return;
+        }
+        sourceButton.setTag(source);
+        sourceButton.setVisibility(VISIBLE);
+        Tooltip.attach(sourceButton, buildSourceLabel(source));
+    }
+
+    private void onSourceClick(View view) {
+        Object tag = sourceButton.getTag();
+        if (!(tag instanceof SourceMeta sourceMeta)) {
+            return;
+        }
+        Class<?> type = sourceMeta.type();
+        if (!MusicCollection.class.isAssignableFrom(type)) {
+            return;
+        }
+        Context context = getContext();
+        //noinspection unchecked
+        MusicService.getInstance()
+                .loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
+                .thenAccept(collection -> MuiModApi.postToUiThread(() -> {
+                    RouterContainer router = MainFragment.getInstance().getRouterContainer();
+                    if (router != null) {
+                        router.pushNavigate(new MusicCollectionDetailView(context, collection));
+                    }
+                }));
+    }
+
+    private static SpannableString buildSourceLabel(SourceMeta source) {
+        SpannableString text = new SpannableString("    " + source.name());
+        String iconPath = Album.class.isAssignableFrom(source.type())
+                ? "/assets/music_hud/textures/gui/icons/disc_album.png"
+                : "/assets/music_hud/textures/gui/icons/list_music.png";
+        Image icon = ImageUtils.getImageFromResource(iconPath);
+        if (icon != null) {
+            text.setSpan(ImageUtils.getIconSpan(icon), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        String playModeIconPath = switch (source.playMode()) {
+            case RANDOM -> "/assets/music_hud/textures/gui/icons/shuffle.png";
+            case SEQUENTIAL -> "/assets/music_hud/textures/gui/icons/repeat.png";
+            case INTELLIGENT -> "/assets/music_hud/textures/gui/icons/heart_pulse.png";
+        };
+        Image modeIcon = ImageUtils.getImageFromResource(playModeIconPath);
+        if (modeIcon != null) {
+            text.setSpan(ImageUtils.getIconSpan(modeIcon), 2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return text;
     }
 
     private static boolean isSameMusic(MusicDetail a, MusicDetail b) {
@@ -805,7 +977,7 @@ public class SidebarView extends LinearLayout {
 
         AnimatorSet set = new AnimatorSet();
         set.playTogether(outX, outA, outSx, outSy, inX, inA, inSx, inSy);
-        final MusicDetail newDetail = musicDetailTrace == null ? null : musicDetailTrace.value();
+        final Traceable<MusicDetail> newTrace = musicDetailTrace;
         final AnimatorSet thisAnimator = set;
         cardAnimator = set;
         set.addListener(new AnimatorListener() {
@@ -815,14 +987,15 @@ public class SidebarView extends LinearLayout {
                 if (cardAnimator != thisAnimator) {
                     return;
                 }
-                settleCardSwitch(newDetail);
+                settleCardSwitch(newTrace);
             }
         });
         set.start();
     }
 
-    private void settleCardSwitch(MusicDetail newDetail) {
+    private void settleCardSwitch(Traceable<MusicDetail> newTrace) {
         cardAnimator = null;
+        MusicDetail newDetail = newTrace == null ? null : newTrace.value();
 
         MusicInfoCard oldCard = activeCard;
         oldCard.setVisibility(INVISIBLE);
@@ -837,6 +1010,7 @@ public class SidebarView extends LinearLayout {
         activeCard.setAlpha(1f);
         activeCard.setVisibility(VISIBLE);
         displayedDetail = newDetail;
+        displayedTrace = newTrace;
         cardSwitching = false;
         // Recycle the outgoing card immediately so no stale content leaks into its next slide-in.
         stagedCard.clear();
@@ -850,6 +1024,7 @@ public class SidebarView extends LinearLayout {
             if (isSameMusic(displayedDetail, pendingDetail)) {
                 activeCard.bind(pending, sideWidth);
                 displayedDetail = pendingDetail;
+                displayedTrace = pending;
             } else {
                 startCardSwitch(pending);
             }
@@ -1490,6 +1665,7 @@ public class SidebarView extends LinearLayout {
         }
         cardSwitching = false;
         pendingSwitch = null;
+        pendingPlayerGone = false;
         // Stop the progress loop; its callback also bails when the token changes.
         progressUpdaterToken.incrementAndGet();
         super.onDetachedFromWindow();
@@ -1505,19 +1681,6 @@ public class SidebarView extends LinearLayout {
 
     private static float morphResponse(float seconds) {
         return seconds * MORPH_TIME_SCALE;
-    }
-
-    private static float debugFloat(String key, float fallback) {
-        String value = System.getProperty(key);
-        if (value == null) {
-            return fallback;
-        }
-        try {
-            float parsed = Float.parseFloat(value);
-            return Float.isFinite(parsed) ? parsed : fallback;
-        } catch (NumberFormatException e) {
-            return fallback;
-        }
     }
 
     /**
