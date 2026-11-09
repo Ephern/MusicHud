@@ -117,7 +117,7 @@ public final class LayerBackdropBlurDrawable extends Drawable {
             if (!sourceTarget.isReady()) {
                 return;
             }
-            Image snapshot = layer.makeImageSnapshot(new Rect2i(left, top, right, bottom));
+            Image snapshot = SceneCanvasLayer.snapshot(layer, left, top, right, bottom);
             if (snapshot == null) {
                 return;
             }

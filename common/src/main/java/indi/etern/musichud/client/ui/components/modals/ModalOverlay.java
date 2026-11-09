@@ -154,8 +154,8 @@ public final class ModalOverlay extends FrameLayout {
             // same recording, so the backdrop must be captured before it.
             backdropTarget.ensure(snapWidth, snapHeight);
             if (backdropTarget.isReady()) {
-                Image snapshot = layer.makeImageSnapshot(
-                        new Rect2i(snapLeft, snapTop, snapRight, snapBottom));
+                Image snapshot = SceneCanvasLayer.snapshot(layer,
+                        snapLeft, snapTop, snapRight, snapBottom);
                 if (snapshot != null) {
                     try {
                         backdropTarget.renderImage(snapshot, snapWidth, snapHeight);
