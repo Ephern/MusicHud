@@ -529,8 +529,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         staggerStartNanos = new long[n];
         for (int i = 0; i < n; i++) {
             float delay = delayMillis[Math.min(i, delayMillis.length - 1)];
-            long candidate = now + (long) (delay * 1_000_000L);
-            long start = candidate;
+            long start = now + (long) (delay * 1_000_000L);
             // Keep a still-future deadline from the previous wave if it is earlier, so a burst of
             // highlights can never starve a row. The directional sweep below enforces the order.
             if (previousStartNanos != null && i < previousStartNanos.length
@@ -579,7 +578,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int totalLines = lyricLineViewList.size();
         delayMillis = new float[totalLines];
         backwardWave = false;
-        if (totalLines == 0 || targetIndex < 0 || targetIndex >= totalLines) {
+        if (targetIndex < 0 || targetIndex >= totalLines) {
             return;
         }
         backwardWave = targetScrollY - Math.round(scrollSpring.getValue())
