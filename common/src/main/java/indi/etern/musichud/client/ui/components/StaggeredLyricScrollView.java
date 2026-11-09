@@ -49,6 +49,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 @SuppressWarnings("UnstableApiUsage")
 public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final int AUTO_RECENTER_DELAY_MILLIS = 1000;
+    // Upper bound for rows far below the viewport, so a wave never runs indefinitely.
     public static final float MAX_DELAY_MILLIS = 800;
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
     public static final float MAX_BLUR_DP = 8f;
@@ -56,6 +57,14 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private static final int SWITCH_DURATION = 400;
     private static final int SCROLL_RESPONSE_MILLIS = 550;
     private static final float SCROLL_DAMPING = 1f;
+    // The wave is scheduled in whole rows so its timing is independent of the font size. The head
+    // delay reaches zero STAGGER_LEAD / STAGGER_HEAD_STEP rows above the highlighted row (~3 rows at
+    // the defaults), which keeps that implicit origin above the viewport for typical line counts.
+    private static final float STAGGER_LEAD_MILLIS = 220;
+    private static final float STAGGER_HEAD_STEP_MILLIS = 80;
+    private static final float STAGGER_TAIL_STEP_MILLIS = 45;
+    // Backward scrolls smaller than this stay on the forward (top-origin) wave.
+    private static final int SCROLL_DIRECTION_SAFETY_DP = 64;
     // The parent scroll delta is scaled by this before it is fed into each row's live decoupling.
     // It must stay 0.5: icyllis.modernui.graphics.RenderProperties.computeTransform applies the
     // view's x/y translation twice (preTranslate + postTranslate both carry it), so a rendered
@@ -67,8 +76,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private static final int ROW_RESPONSE_MILLIS = SCROLL_RESPONSE_MILLIS;
     private static final float ROW_DAMPING = 1f;
     // A very short highlighted line collapses the whole delay wave (see durationFactor) so a fast
-    // sequence of short lines never blocks; the per-row delay ratios are preserved.
+    // sequence of short lines never blocks; the per-row delay ratios are preserved. The floor keeps
+    // some stagger during fast passages instead of flattening every row onto the same instant.
     private static final int DELAY_SHORTEN_TAU_MILLIS = 200;
+    private static final float MIN_DURATION_FACTOR = 0.05f;
     private static final SpringInterpolator SWITCH_INTERPOLATOR =
             new SpringInterpolator((float) SWITCH_DURATION / 1000, 0.9f);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
@@ -138,12 +149,13 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private float[] delayMillis;
     private boolean[] staggerStarted;
     private long[] staggerStartNanos;
+    // True when this wave was triggered by a backward scroll beyond the safety zone.
+    private boolean backwardWave;
     // Per-frame scroll delta used to decouple every row from the container scroll during auto-scroll.
     private float prevScrollValue;
     private boolean prevScrollInitialized;
-    // Parent-scroll compensation accumulated over the whole wave, relative to the wave start. A
-    // single shared scalar; each row releases its own share with its own progress, so this never
-    // pins or freezes a row that is still animating.
+    // Parent-scroll compensation accumulated since the wave start. A single shared scalar; each row
+    // releases its own share with its own progress, so this never freezes a row that is animating.
     private float cumulativeBaseOffset;
     private float baseOffsetAtRedirect;
     private boolean continueUpdate = false;
@@ -247,15 +259,16 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     /**
-     * Only a highlighted line that lasts tens-to-hundreds of milliseconds visibly shortens the
-     * wave; normal lines keep the full delay.
+     * Only a highlighted line that lasts tens-to-hundreds of milliseconds noticeably shortens the
+     * wave; normal lines keep the full delay, very short ones bottom out at {@link
+     * #MIN_DURATION_FACTOR} instead of flattening it.
      */
     private static float durationFactor(@Nullable LyricLine highlighted) {
         if (highlighted == null) return 1f;
         Duration duration = highlighted.getDuration();
         if (duration == null) return 1f;
         float x = (float) duration.toMillis() / DELAY_SHORTEN_TAU_MILLIS;
-        return 1f - (float) Math.exp(-x * x);
+        return Math.max(MIN_DURATION_FACTOR, 1f - (float) Math.exp(-x * x));
     }
 
     public void switchLyrics(@Nullable MusicDetail musicDetail, @Nullable Collection<LyricLine> lyrics) {
@@ -312,6 +325,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private void buildLyricRows(Collection<LyricLine> lyrics) {
         lyricLines.clear();
         lyricLineViewList.clear();
+        rows.clear();
         currentLyrics = lyrics;
         topSpacer = null;
         bottomSpacer = null;
@@ -321,7 +335,6 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         topSpacer = new View(context);
         container.addView(topSpacer, new LayoutParams(0, 0));
 
-        rows.clear();
         for (LyricLine line : lyrics) {
             LyricLineView row = new LyricLineView(context, line, mainLyricSize, subLyricSize);
             container.addView(row);
@@ -499,43 +512,54 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int targetIndex = lyricLineViewList.indexOf(target);
         int n = rows.size();
 
-        calcLoggedDelay(targetIndex, justHighlightedLyricLine);
+        calcDelays(targetIndex, justHighlightedLyricLine, targetScrollY);
 
         if (scrollStatus == ScrollStatus.IDLE || scrollStatus == ScrollStatus.RECENTER) {
             scrollStatus = ScrollStatus.FOLLOW_LYRICS;
         }
-        // Rebase the live compensation for this wave while keeping every running spring continuous:
-        // the old compensation is shifted into the base spring via translate() (value, velocity and
-        // the running segment are preserved), so a rapid highlight never freezes a row.
+        // Rebase the live compensation for this wave: the unreleased part is shifted into the base
+        // spring together with its velocity, so position and velocity stay continuous even though the
+        // progress spring is reset for the new wave.
         long[] previousStartNanos = staggerStartNanos;
         float cumulativeBeforeRebase = cumulativeBaseOffset;
         float previousBase = baseOffsetAtRedirect;
+        float compensationRate = scrollSpring.getVelocity() * SCROLL_DECOUPLE_FACTOR;
 
         staggerStarted = new boolean[n];
         staggerStartNanos = new long[n];
         for (int i = 0; i < n; i++) {
             float delay = delayMillis[Math.min(i, delayMillis.length - 1)];
-            if (scrollStatus == ScrollStatus.RECENTER) {
-                delay /= 2;
-            }
-            long newStart = now + (long) (delay * 1_000_000L);
-            // Only carry over the previous deadline while that row is still waiting (its deadline is
-            // still in the future): it may move earlier but never later, so it cannot be starved. A
-            // row whose previous deadline already passed has started, and gets a fresh delay so
-            // rapid highlights keep respecting the per-row stagger instead of moving in lockstep.
+            long candidate = now + (long) (delay * 1_000_000L);
+            long start = candidate;
+            // Keep a still-future deadline from the previous wave if it is earlier, so a burst of
+            // highlights can never starve a row. The directional sweep below enforces the order.
             if (previousStartNanos != null && i < previousStartNanos.length
-                    && previousStartNanos[i] > now
-                    && previousStartNanos[i] < newStart) {
-                newStart = previousStartNanos[i];
+                    && previousStartNanos[i] > now && previousStartNanos[i] < start) {
+                start = previousStartNanos[i];
             }
-            staggerStartNanos[i] = newStart;
-
+            staggerStartNanos[i] = Math.max(start, now);
+        }
+        // A forward wave releases top-down, a backward wave bottom-up.
+        if (backwardWave) {
+            for (int i = n - 2; i >= 0; i--) {
+                if (staggerStartNanos[i] < staggerStartNanos[i + 1]) {
+                    staggerStartNanos[i] = staggerStartNanos[i + 1];
+                }
+            }
+        } else {
+            for (int i = 1; i < n; i++) {
+                if (staggerStartNanos[i] < staggerStartNanos[i - 1]) {
+                    staggerStartNanos[i] = staggerStartNanos[i - 1];
+                }
+            }
+        }
+        for (int i = 0; i < n; i++) {
             RowWave row = rows.get(i);
             float progress = Math.clamp(row.getProgress(), 0f, 1f);
-            row.translate((cumulativeBeforeRebase - previousBase) * (1f - progress));
-            // Re-decouple immediately from the very first frame instead of fading the factor in:
-            // the compensation was just rebased to zero, so this snap keeps position/velocity
-            // continuous and leaves the running base spring untouched.
+            float unreleased = cumulativeBeforeRebase - previousBase;
+            row.rebase(unreleased * (1f - progress),
+                    -compensationRate * progress - unreleased * row.getProgressVelocity(),
+                    now);
             row.snapProgress(0f);
         }
         baseOffsetAtRedirect = cumulativeBaseOffset;
@@ -544,16 +568,28 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         scrollSpring.setTarget(targetScrollY, now);
     }
 
-    private void calcLoggedDelay(int targetIndex, LyricLine highlighted) {
+    /**
+     * Row-indexed wave: the highlighted row keeps a fixed lead, head rows step by {@link
+     * #STAGGER_HEAD_STEP_MILLIS} and tail rows by {@link #STAGGER_TAIL_STEP_MILLIS}, so the timing
+     * does not depend on the font size. The wave follows the scroll direction: forward keeps the
+     * implicit origin above the highlight, a backward scroll mirrors it below. The offset retarget
+     * shares each row's release instant, exactly like the original implementation.
+     */
+    private void calcDelays(int targetIndex, LyricLine highlighted, int targetScrollY) {
         int totalLines = lyricLineViewList.size();
         delayMillis = new float[totalLines];
-        double max = Math.max(5, Math.log(1 + totalLines));
+        backwardWave = false;
+        if (totalLines == 0 || targetIndex < 0 || targetIndex >= totalLines) {
+            return;
+        }
+        backwardWave = targetScrollY - Math.round(scrollSpring.getValue())
+                < -dp(SCROLL_DIRECTION_SAFETY_DP);
         boolean inRecenter = scrollStatus == ScrollStatus.RECENTER;
-        float factor = durationFactor(highlighted) * (inRecenter ? 0.5f : 1);
+        float lead = STAGGER_LEAD_MILLIS * durationFactor(highlighted) * (inRecenter ? 0.8f : 1f);
         for (int i = 0; i < totalLines; i++) {
-            int distance = Math.abs(i - targetIndex + (inRecenter ? 0 : 1));
-            float delayFactor = (float) Math.clamp(Math.log(1 + distance) / max, 0, 1);
-            delayMillis[i] = delayFactor * MAX_DELAY_MILLIS * (i < targetIndex ? 0.5f : 1) * factor;
+            int along = backwardWave ? targetIndex - i : i - targetIndex;
+            float step = along < 0 ? STAGGER_HEAD_STEP_MILLIS : STAGGER_TAIL_STEP_MILLIS;
+            delayMillis[i] = Math.clamp(lead + along * step, 0f, MAX_DELAY_MILLIS);
         }
     }
 
@@ -577,6 +613,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         delayMillis = null;
         staggerStarted = null;
         staggerStartNanos = null;
+        backwardWave = false;
         cumulativeBaseOffset = 0f;
         baseOffsetAtRedirect = 0f;
         prevScrollValue = 0f;
@@ -749,8 +786,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         prevScrollInitialized = true;
 
         // Accumulate the parent-scroll compensation for the whole wave (until the scroll settles).
-        // This is a single shared scalar; rows release their own share with their own progress, so it
-        // never freezes a row that is still animating.
+        // This is a single shared scalar; rows release their own share with their own progress.
         boolean scrollSettled = scrollSpring.isSettled();
         if (!scrollSettled) {
             cumulativeBaseOffset += decouple;
@@ -769,8 +805,8 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                 // compensation; its running spring is never interrupted.
                 anyActive = true;
             } else if (i < staggerStarted.length && !staggerStarted[i]) {
-                // Its turn: move toward the target offset and release this row's decoupling. Both
-                // retargets preserve the current value/velocity, so a rapid switch stays continuous.
+                // Its turn: retarget the offset and release this row's decoupling at the same
+                // instant. Both retargets preserve the current value/velocity.
                 row.retarget(view.getTargetOffset(justHighlightedLyricLine), currentTimeNanos);
                 row.retargetProgress(1f, currentTimeNanos);
                 staggerStarted[i] = true;
@@ -1148,10 +1184,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     /**
      * One lyric row's animation state: an absolute {@link SpringValue} driving the rendered
-     * translationY (minus the live decoupling), plus a normalized progress {@link SpringValue} that
-     * releases that decoupling. Both are retargeted with {@link SpringValue#setTarget}, so a rapid
-     * switch keeps the running value and velocity instead of resetting the animation. The row knows
-     * nothing about delays or scroll - the scroll view schedules every retarget.
+     * translationY (offset plus any baked scroll residual), and a normalized progress spring that
+     * releases the current wave's decoupling. Both are retargeted with
+     * {@link SpringValue#setTarget}, so a rapid switch keeps the running value and velocity instead
+     * of resetting the animation. The row knows nothing about delays - the scroll view schedules
+     * every retarget.
      */
     private static final class RowWave {
         final LyricLineView view;
@@ -1173,18 +1210,21 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         }
 
         /**
-         * Snap the release factor. Safe at a wave start because the compensation has just been
-         * rebased to zero, so the factor does not affect the rendered value or its velocity.
+         * Snap the release factor. Callers must pass the matching velocity correction to {@link
+         * #rebase} first, otherwise the rendered velocity would jump.
          */
         void snapProgress(float value) {
             progress.jumpTo(value);
         }
 
         /**
-         * Shift the running base spring by {@code delta} without interrupting it (keeps velocity).
+         * Bake an unreleased displacement (and the velocity carried by the progress term) into the
+         * base spring, preserving the rendered position and its velocity across a wave rebase.
          */
-        void translate(float delta) {
-            spring.translate(delta);
+        void rebase(float displacement, float velocityDelta, long nowNanos) {
+            spring.set(spring.getValue() + displacement,
+                    spring.getVelocity() + velocityDelta,
+                    spring.getTarget() + displacement, nowNanos);
         }
 
         void update(long nowNanos) {
@@ -1211,6 +1251,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
         float getProgress() {
             return progress.getValue();
+        }
+
+        float getProgressVelocity() {
+            return progress.getVelocity();
         }
     }
 }

@@ -37,8 +37,8 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class LyricLineView extends LinearLayout {
     private static final float LYRIC_EMPHASIZE_SCALE = 1.02f;
     private static final float RHYTHM_EMPHASIZE_ANIMATION_SCALE = 0.85f;
-    private static final int SCALE_ANIMATION_DELAY = 200;
-    private static final int SCALE_ANIMATION_DURATION = 600;
+    private static final int SCALE_ANIMATION_DELAY = 500;
+    private static final int SCALE_ANIMATION_DURATION = 800;
     private static final SpringInterpolator INTERPOLATOR = new SpringInterpolator(SCALE_ANIMATION_DURATION * 0.001f, 1);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static Logger logger;
