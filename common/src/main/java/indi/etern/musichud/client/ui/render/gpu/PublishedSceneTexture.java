@@ -40,7 +40,7 @@ public final class PublishedSceneTexture {
 
     public synchronized @Nullable Image image() {
         SceneGpuTexture current = texture;
-        if (current == null) {
+        if (current == null || current.isClosed()) {
             return null;
         }
         if (target != null && wrappedSource == current) {

@@ -30,6 +30,7 @@ import icyllis.modernui.widget.EditText;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import net.minecraft.client.resources.language.I18n;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -53,8 +54,8 @@ final class OptionRow {
         final int dp6 = layout.dp(6);
         final int dp8 = layout.dp(8);
 
+        var title = new TextView(context);
         {
-            var title = new TextView(context);
             title.setText(I18n.get(name));
             title.setTextAlignment(View.TEXT_ALIGNMENT_VIEW_START);
             title.setTextSize(14);
@@ -87,7 +88,7 @@ final class OptionRow {
 
         String tooltip = name + ".tooltip";
         if (I18n.exists(tooltip)) {
-            layout.setTooltipText(I18n.get(tooltip));
+            Tooltip.attach(title, I18n.get(tooltip));
         }
         layout.setMinimumHeight(layout.dp(44));
 

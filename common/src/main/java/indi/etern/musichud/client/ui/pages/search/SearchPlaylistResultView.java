@@ -48,7 +48,7 @@ public class SearchPlaylistResultView extends WaterfallLayout {
     }
 
     private void addItem(Context context, Playlist playlist) {
-        MusicCollectionCard child = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY);
+        MusicCollectionCard child = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY, dp(160));
         addView(child);
     }
 }

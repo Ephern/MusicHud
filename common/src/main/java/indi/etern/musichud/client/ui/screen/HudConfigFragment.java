@@ -23,6 +23,7 @@ import indi.etern.musichud.client.ui.hud.HudEditOverlayView;
 import indi.etern.musichud.client.ui.hud.scene.HudScene;
 import indi.etern.musichud.client.ui.render.HorizontalAlign;
 import indi.etern.musichud.client.ui.render.VerticalAlign;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.NonNull;
@@ -150,7 +151,7 @@ public class HudConfigFragment extends Fragment implements ScreenCallback {
         panel.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
 
         PanelStyle.factory(panel, 0.7, 0.1,
-                        panel.dp(12), null, true)
+                        panel.dp(12), null, InsetBackgroundFactory.BackdropBlur.SCREEN)
                 .applyBackgroundTo(panel);
 
         LinearLayout content = new LinearLayout(context);

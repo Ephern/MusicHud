@@ -27,9 +27,9 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 /**
- * Single-pass flow layout: children are measured naturally, allocated into lines first-fit, then
- * width/weight resolved per line. Reflow animates the actual layout frames, so the drawn position
- * has one source of truth.
+ * Single-pass flow layout: children are measured at their declared width (natural otherwise) and
+ * appended into lines, then width/weight resolved per line. Reflow animates the actual layout
+ * frames, so the drawn position has one source of truth.
  */
 public class FlexWrapLayout extends ViewGroup {
     private static final SpringInterpolator SPRING = new SpringInterpolator(0.27f, 1f);
@@ -45,6 +45,7 @@ public class FlexWrapLayout extends ViewGroup {
     private final Set<View> disappearingChildren = new HashSet<>();
     private final Map<View, Animator> runningAnimations = new HashMap<>();
     private final Map<View, Integer> lastLineIndex = new HashMap<>();
+    private final Map<View, Float> wrapThresholdRatios = new HashMap<>();
     private int lineGravity = Gravity.TOP;
     private boolean animationsEnabled = true;
     private boolean firstLayout = true;
@@ -53,14 +54,15 @@ public class FlexWrapLayout extends ViewGroup {
     private static final class Item {
         final View child;
         final ViewGroup.MarginLayoutParams lp;
-        final int naturalWidth;
+        /** Width the child was measured at before line resolution. */
+        final int baseWidth;
         int width;
         int height;
 
         Item(View child, ViewGroup.MarginLayoutParams lp, int width, int height) {
             this.child = child;
             this.lp = lp;
-            this.naturalWidth = width;
+            this.baseWidth = width;
             this.width = width;
             this.height = height;
         }
@@ -82,6 +84,15 @@ public class FlexWrapLayout extends ViewGroup {
 
     public void setLineGravity(int gravity) {
         lineGravity = gravity;
+        requestLayout();
+    }
+
+    /**
+     * Forces a line break before {@code child} when its outer width exceeds {@code ratio} of the
+     * available width.
+     */
+    public void setWrapThresholdRatio(@NonNull View child, float ratio) {
+        wrapThresholdRatios.put(child, ratio);
         requestLayout();
     }
 
@@ -121,34 +132,23 @@ public class FlexWrapLayout extends ViewGroup {
             if (child.getVisibility() == GONE || disappearingChildren.contains(child)) {
                 continue;
             }
-            measureNatural(child);
             ViewGroup.MarginLayoutParams lp = (ViewGroup.MarginLayoutParams) child.getLayoutParams();
+            measureForPacking(child, lp);
             Item item = new Item(child, lp, child.getMeasuredWidth(), child.getMeasuredHeight());
-            int outerWidth = item.width + lp.leftMargin + lp.rightMargin;
-            // First-fit, but a child keeps its previous line while it overflows only within
-            // keepTolerance, so wrapping does not flap around the fit boundary.
-            Line target = null;
-            for (Line line : lines) {
-                if (line.fitWidth == 0 || available - line.fitWidth >= outerWidth) {
-                    target = line;
-                    break;
-                }
+            int outerWidth = claimedWidth(item) + lp.leftMargin + lp.rightMargin;
+            // Append-only: closed lines keep their order, a child never jumps back into one.
+            Line line = lines.isEmpty() ? null : lines.getLast();
+            Float threshold = wrapThresholdRatios.get(child);
+            boolean forceBreak = threshold != null && available != Integer.MAX_VALUE
+                    && outerWidth > available * threshold;
+            boolean place = !forceBreak && line != null && (fitsLine(line, outerWidth, available)
+                    || keepsLastLine(child, line, outerWidth, available, keepTolerance));
+            if (!place) {
+                line = new Line();
+                lines.add(line);
             }
-            if (target == null) {
-                Integer previous = lastLineIndex.get(child);
-                if (previous != null && previous >= 0 && previous < lines.size()) {
-                    Line line = lines.get(previous);
-                    if (line.fitWidth == 0 || available - line.fitWidth >= outerWidth - keepTolerance) {
-                        target = line;
-                    }
-                }
-            }
-            if (target == null) {
-                target = new Line();
-                lines.add(target);
-            }
-            target.items.add(item);
-            target.fitWidth += outerWidth;
+            line.items.add(item);
+            line.fitWidth += outerWidth;
         }
 
         int maxLineWidth = 0;
@@ -175,17 +175,44 @@ public class FlexWrapLayout extends ViewGroup {
         );
     }
 
-    private static void measureNatural(View child) {
-        child.measure(
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED),
-                MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED)
-        );
+    /**
+     * Measures a child at the width it will keep: a declared width is also the final width, which
+     * keeps nested weights and wrap logic consistent with the resolved line.
+     */
+    private static void measureForPacking(View child, ViewGroup.MarginLayoutParams lp) {
+        int widthSpec = lp.width >= 0
+                ? MeasureSpec.makeMeasureSpec(lp.width, MeasureSpec.EXACTLY)
+                : MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
+        child.measure(widthSpec, MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+    }
+
+    /**
+     * Width a child claims while lines are packed. Weighted children only consume the leftover
+     * space, so they claim nothing here.
+     */
+    private static int claimedWidth(Item item) {
+        if (item.lp.width >= 0) {
+            return item.lp.width;
+        }
+        return isWeighted(item.lp) ? 0 : item.baseWidth;
+    }
+
+    /** An empty line always accepts its first item. */
+    private static boolean fitsLine(Line line, int outerWidth, int available) {
+        return line.items.isEmpty() || available - line.fitWidth >= outerWidth;
+    }
+
+    /** Keeps a child on the last line while it overflows only within the tolerance, so wrapping does not flap. */
+    private boolean keepsLastLine(View child, Line line, int outerWidth, int available, int tolerance) {
+        Integer previous = lastLineIndex.get(child);
+        return previous != null && previous == lines.size() - 1
+                && available - line.fitWidth >= outerWidth - tolerance;
     }
 
     /**
      * Resolves final widths for one line: non-weighted children keep fixed/natural width
      * (MATCH_PARENT fills the remainder), then the leftover is split among weighted children.
-     * Children whose final width differs from their natural width are re-measured so their
+     * Children whose final width differs from their measured width are re-measured so their
      * height reflects the constraint.
      */
     private static void resolveLine(Line line, int available) {
@@ -221,7 +248,7 @@ public class FlexWrapLayout extends ViewGroup {
         }
 
         for (Item item : line.items) {
-            if (item.width != item.naturalWidth) {
+            if (item.width != item.baseWidth) {
                 int heightSpec = item.lp.height >= 0
                         ? MeasureSpec.makeMeasureSpec(item.lp.height, MeasureSpec.EXACTLY)
                         : MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED);
@@ -412,6 +439,7 @@ public class FlexWrapLayout extends ViewGroup {
         laidOutChildren.remove(view);
         disappearingChildren.remove(view);
         lastLineIndex.remove(view);
+        wrapThresholdRatios.remove(view);
         super.removeView(view);
     }
 
@@ -477,6 +505,7 @@ public class FlexWrapLayout extends ViewGroup {
         finishAllDisappearing();
         laidOutChildren.clear();
         lastLineIndex.clear();
+        wrapThresholdRatios.clear();
         super.removeAllViews();
     }
 

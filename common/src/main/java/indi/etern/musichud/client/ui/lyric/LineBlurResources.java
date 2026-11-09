@@ -12,7 +12,7 @@ public final class LineBlurResources {
     /** The pipeline must keep producing results at radius zero so losing focus is seamless. */
     private static final float MIN_SIGMA = 0.2f;
 
-    private final SceneOffscreen target = new SceneOffscreen("musichud-line-blur-src");
+    private final SceneOffscreen target = new SceneOffscreen("musichud-line-blur-src", true);
     private int padding;
 
     /** Signature of the rendered content; {@link Long#MIN_VALUE} forces a re-render. */
@@ -62,6 +62,12 @@ public final class LineBlurResources {
 
     public int padding() {
         return padding;
+    }
+
+    /** Forces the next prepare() to re-render the source and re-request the blur. */
+    public void invalidate() {
+        cachedContentStamp = Long.MIN_VALUE;
+        cachedRadius = Float.NaN;
     }
 
     public int width() {

@@ -27,7 +27,23 @@ public class MusicHudMixinPlugin implements IMixinConfigPlugin {
                 return false;
             }
         }
+        if (mixinClassName.contains("ScreenMixin") || mixinClassName.contains("UIManagerMixin")) {
+            return modernUiAvailable();
+        }
         return true;
+    }
+
+    private static boolean modernUiAvailable() {
+        if (Boolean.getBoolean("music_hud.debug.forceModernUiMissing")) {
+            return false;
+        }
+        try {
+            Class.forName("icyllis.arc3d.engine.ImageProxy", false,
+                    MusicHudMixinPlugin.class.getClassLoader());
+            return true;
+        } catch (Throwable ignored) {
+            return false;
+        }
     }
 
     @Override

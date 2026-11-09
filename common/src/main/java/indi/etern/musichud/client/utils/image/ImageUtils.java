@@ -11,6 +11,7 @@ import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
+import icyllis.modernui.graphics.Canvas;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.ImageDrawable;
@@ -751,6 +752,9 @@ public class ImageUtils {
     }
 
     public static @NotNull ImageSpan getIconSpan(Image image) {
+        return getIconSpan(image, 1f);
+    }
+    public static @NotNull ImageSpan getIconSpan(Image image, float alpha) {
         //noinspection UnstableApiUsage
         Context context = UIManager.getInstance().getDecorView().getContext();
         ImageSpan imageSpan = new ImageSpan(context, image, DynamicDrawableSpan.ALIGN_CENTER) {
@@ -774,6 +778,16 @@ public class ImageUtils {
                     fm.descent = 0;
                 }
                 return newWidth;
+            }
+
+            @Override
+            public void draw(@NotNull Canvas c, CharSequence text, int start, int end,
+                             float x, int top, int y, int bottom, @NotNull TextPaint paint) {
+                if (getDrawable() instanceof ImageDrawable d) {
+                    // base * textAlpha; never read getAlpha() back, or it compounds every frame
+                    d.setAlpha(alpha * paint.getAlphaF());
+                }
+                super.draw(c, text, start, end, x, top, y, bottom, paint);
             }
         };
         if (imageSpan.getDrawable() instanceof ImageDrawable imageDrawable) {

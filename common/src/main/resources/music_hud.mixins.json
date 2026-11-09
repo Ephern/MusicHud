@@ -6,11 +6,13 @@
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
     "Blaze3DAudioLibraryInitMixin",
+    "ModernUiGuardMixin",
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
-    "SpanSetMixin"
+    "SpanSetMixin",
+    "UIManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

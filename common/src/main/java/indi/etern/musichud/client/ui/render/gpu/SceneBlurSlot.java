@@ -21,26 +21,17 @@ import java.util.List;
  * Per-consumer blur pipeline. The UI thread records the blur source into an arc3d surface and hands
  * its image over; the render thread crops and blurs it with {@link SceneBlur}, then publishes the
  * result so the recording that samples it sees the fresh content.
+ * <p>
+ * Requests carry the batch of the partial recording that must be executed before they can run; the
+ * consumer commits its source right after requesting it, so the source is always on the GPU by then.
  */
 public final class SceneBlurSlot {
     private static final Logger LOGGER = MusicHud.getLogger(SceneBlurSlot.class);
-    private static final int RETIRE_FRAMES = 2;
     private static final Object ACTIVE_LOCK = new Object();
     private static final List<SceneBlurSlot> ACTIVE = new ArrayList<>();
-    private static final List<Retired> RETIRED = new ArrayList<>();
-    private static long frame;
 
     private final Object requestLock = new Object();
-
-    private icyllis.arc3d.engine.Image pendingSource;
-    private float u0;
-    private float v0;
-    private float u1 = 1f;
-    private float v1 = 1f;
-    private int outWidth;
-    private int outHeight;
-    private float sigma;
-    private boolean pending;
+    private final List<Request> requests = new ArrayList<>();
 
     private Pipeline pipeline;
     private InteropSource source;
@@ -91,18 +82,15 @@ public final class SceneBlurSlot {
             return;
         }
         synchronized (requestLock) {
-            if (pendingSource != null) {
-                pendingSource.unref();
+            int batch = MidFrameCommit.currentBatch();
+            int last = requests.size() - 1;
+            Request created = new Request(image, u0, v0, u1, v1, outWidth, outHeight, sigma, batch);
+            if (last >= 0 && requests.get(last).batch == batch) {
+                requests.get(last).image.unref();
+                requests.set(last, created);
+            } else {
+                requests.add(created);
             }
-            pendingSource = image;
-            this.u0 = u0;
-            this.v0 = v0;
-            this.u1 = u1;
-            this.v1 = v1;
-            this.outWidth = outWidth;
-            this.outHeight = outHeight;
-            this.sigma = sigma;
-            pending = true;
         }
     }
 
@@ -115,7 +103,7 @@ public final class SceneBlurSlot {
         synchronized (ACTIVE_LOCK) {
             for (SceneBlurSlot slot : ACTIVE) {
                 synchronized (slot.requestLock) {
-                    if (slot.pending) {
+                    if (!slot.requests.isEmpty()) {
                         return true;
                     }
                 }
@@ -124,76 +112,71 @@ public final class SceneBlurSlot {
         return false;
     }
 
+    /** Defers a release to a later render frame, when no in-flight recording can still use it. */
+    public static void retire(Runnable release) {
+        SceneRetirement.retire(release);
+    }
+
     private void discardPending() {
         synchronized (requestLock) {
-            if (pendingSource != null) {
-                pendingSource.unref();
-                pendingSource = null;
+            for (Request request : requests) {
+                request.image.unref();
             }
-            pending = false;
+            requests.clear();
         }
     }
 
-    /** Render thread: executes every pending blur. */
-    public static void runAll(SceneGpuContext gpu) {
+    /** Render thread: advances the retirement clock once the frame's recordings are all submitted. */
+    public static void endFrame() {
+        SceneRetirement.endFrame();
+    }
+
+    /** Render thread: executes the blurs requested up to and including {@code maxBatch}. */
+    public static void runAll(SceneGpuContext gpu, int maxBatch) {
         List<SceneBlurSlot> slots;
         synchronized (ACTIVE_LOCK) {
-            frame++;
-            purgeRetired();
             if (ACTIVE.isEmpty()) {
                 return;
             }
             slots = new ArrayList<>(ACTIVE);
         }
         for (SceneBlurSlot slot : slots) {
-            slot.run(gpu);
+            slot.run(gpu, maxBatch);
         }
     }
 
-    private static void purgeRetired() {
-        for (Iterator<Retired> iterator = RETIRED.iterator(); iterator.hasNext(); ) {
-            Retired entry = iterator.next();
-            if (frame - entry.frame >= RETIRE_FRAMES) {
-                entry.release.run();
-                iterator.remove();
-            }
-        }
-    }
-
-    private static void scheduleRelease(Runnable release) {
-        synchronized (ACTIVE_LOCK) {
-            RETIRED.add(new Retired(frame, release));
-        }
-    }
-
-    private void run(SceneGpuContext gpu) {
+    private void run(SceneGpuContext gpu, int maxBatch) {
         if (disabled) {
             discardPending();
             return;
         }
-        icyllis.arc3d.engine.Image image;
-        float u0;
-        float v0;
-        float u1;
-        float v1;
-        int outWidth;
-        int outHeight;
-        float sigma;
+        Request request = null;
         synchronized (requestLock) {
-            if (!pending || pendingSource == null) {
-                return;
+            for (Iterator<Request> iterator = requests.iterator(); iterator.hasNext(); ) {
+                Request candidate = iterator.next();
+                if (candidate.batch > maxBatch) {
+                    continue;
+                }
+                // Keep only the newest runnable request: it carries the current sigma, and the
+                // source texture already holds this frame's content.
+                if (request != null) {
+                    request.image.unref();
+                }
+                request = candidate;
+                iterator.remove();
             }
-            image = pendingSource;
-            pendingSource = null;
-            pending = false;
-            u0 = this.u0;
-            v0 = this.v0;
-            u1 = this.u1;
-            v1 = this.v1;
-            outWidth = this.outWidth;
-            outHeight = this.outHeight;
-            sigma = this.sigma;
         }
+        if (request == null) {
+            return;
+        }
+        icyllis.arc3d.engine.Image image = request.image;
+        float u0 = request.u0;
+        float v0 = request.v0;
+        float u1 = request.u1;
+        float v1 = request.v1;
+        int outWidth = request.outWidth;
+        int outHeight = request.outHeight;
+        float sigma = request.sigma;
         InteropSource input = null;
         try {
             input = useSource(image);
@@ -221,9 +204,7 @@ public final class SceneBlurSlot {
             if (pendingBlur == null || !pendingBlur.apply(gpu, blurSource, blurWidth, blurHeight)) {
                 return;
             }
-            SceneGpuTexture target = pendingBlur.target();
-            current.result = target;
-            published.publish(target);
+            published.publish(pendingBlur.target());
         } catch (Throwable failure) {
             // A broken slot must not take the whole UI down; the consumer falls back to a sharp draw.
             LOGGER.error("Disabling backdrop blur after an error", failure);
@@ -248,22 +229,23 @@ public final class SceneBlurSlot {
         source = wrapped;
         sourceKey = image;
         if (previous != null) {
-            scheduleRelease(previous::close);
+            SceneRetirement.retire(previous::close);
         }
         return wrapped;
     }
 
     private Pipeline usePipeline(SceneGpuContext gpu, int width, int height, float sigma) {
-        int level = SceneBlur.levelFor(width, height, sigma);
+        // The pipeline survives level changes: SceneBlur keeps its published result and only
+        // rebuilds the pyramid, so the image consumers hold stays valid.
         Pipeline current = pipeline;
-        if (current != null && current.width == width && current.height == height
-                && current.level == level && current.gpu == gpu) {
+        if (current != null && current.width == width && current.height == height && current.gpu == gpu) {
+            current.level = SceneBlur.levelFor(width, height, sigma);
             return current;
         }
-        Pipeline created = new Pipeline(gpu, width, height, level);
+        Pipeline created = new Pipeline(gpu, width, height, SceneBlur.levelFor(width, height, sigma));
         pipeline = created;
         if (current != null) {
-            scheduleRelease(current::release);
+            SceneRetirement.retire(current::release);
         }
         return created;
     }
@@ -274,12 +256,12 @@ public final class SceneBlurSlot {
         source = null;
         sourceKey = null;
         if (previousSource != null) {
-            scheduleRelease(previousSource::close);
+            SceneRetirement.retire(previousSource::close);
         }
         Pipeline previousPipeline = pipeline;
         pipeline = null;
         if (previousPipeline != null) {
-            scheduleRelease(previousPipeline::release);
+            SceneRetirement.retire(previousPipeline::release);
         }
         published.publish(null);
         published.release();
@@ -289,10 +271,9 @@ public final class SceneBlurSlot {
         final SceneGpuContext gpu;
         final int width;
         final int height;
-        final int level;
+        int level;
         final SceneBlur blur = new SceneBlur(SceneTextureFormat.RGBA8);
         final SceneBlurCrop crop = new SceneBlurCrop(SceneTextureFormat.RGBA8);
-        SceneGpuTexture result;
 
         Pipeline(SceneGpuContext gpu, int width, int height, int level) {
             this.gpu = gpu;
@@ -307,6 +288,8 @@ public final class SceneBlurSlot {
         }
     }
 
-    private record Retired(long frame, Runnable release) {
+    private record Request(icyllis.arc3d.engine.Image image,
+                           float u0, float v0, float u1, float v1,
+                           int outWidth, int outHeight, float sigma, int batch) {
     }
 }

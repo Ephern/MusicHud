@@ -37,8 +37,8 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class LyricLineView extends LinearLayout {
     private static final float LYRIC_EMPHASIZE_SCALE = 1.02f;
     private static final float RHYTHM_EMPHASIZE_ANIMATION_SCALE = 0.85f;
-    private static final int SCALE_ANIMATION_DELAY = 200;
-    private static final int SCALE_ANIMATION_DURATION = 600;
+    private static final int SCALE_ANIMATION_DELAY = 500;
+    private static final int SCALE_ANIMATION_DURATION = 800;
     private static final SpringInterpolator INTERPOLATOR = new SpringInterpolator(SCALE_ANIMATION_DURATION * 0.001f, 1);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static Logger logger;
@@ -103,6 +103,7 @@ public class LyricLineView extends LinearLayout {
                     for (int i = 0; i < 3; i++) {
                         TextView dot = new TextView(getContext());
                         dot.setText("●");
+                        dot.setTextSize(subLyricSize);
                         LinearLayout.LayoutParams dotParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
                         dotParams.setMargins(dp(2), 0, dp(2), 0);
                         dot.setLayoutParams(dotParams);
@@ -127,12 +128,12 @@ public class LyricLineView extends LinearLayout {
                         refreshSubLyricLine();
                     }
                 }
-                LayoutParams params = new LayoutParams(0, WRAP_CONTENT, 0.9f);
+                LayoutParams params = new LayoutParams(0, WRAP_CONTENT, 1f);
                 row.addView(mainLine, params);
             }
 
             View blank = new View(getContext());
-            LayoutParams blankParams = new LayoutParams(0, MATCH_PARENT, 0.1f);
+            LayoutParams blankParams = new LayoutParams(0, MATCH_PARENT, 0.02f);
             row.addView(blank, blankParams);
 
             FrameLayout topBlank = new FrameLayout(context);
@@ -167,7 +168,7 @@ public class LyricLineView extends LinearLayout {
                     subText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
                     subText.setAlpha(Theme.FADE_LYRIC_ALPHA);
                     LayoutParams subParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-                    subParams.setMargins(0, dp(6), dp(32), 0);
+                    subParams.setMargins(0, dp(6), dp(24), 0);
                     mainLine.addView(subText, subParams);
                 }
             }
@@ -209,9 +210,7 @@ public class LyricLineView extends LinearLayout {
                     highlightTextView.emphasize();
                     highlightTextView.setOnFade(this::fadeNormalLine);
                 }
-                row.setPivotX(0f);
-                int height = row.getHeight();
-                row.setPivotY(Math.max(height, dp(24)));
+                updatePivot();
 
                 int playTime = Math.clamp(delta.toMillis() - SCALE_ANIMATION_DELAY, 0, SCALE_ANIMATION_DURATION);
                 if (playTime != SCALE_ANIMATION_DURATION) {
@@ -237,8 +236,7 @@ public class LyricLineView extends LinearLayout {
                     return;
                 }
 
-                row.setPivotX(Math.max((float) mainText.getWidth() / 2, dp(30)));
-                row.setPivotY(Math.max(row.getHeight() / 2, dp(12)));
+                updatePivot();
                 rhythmAnim.start();
                 emphasizeAnim = rhythmAnim;
 
@@ -261,6 +259,30 @@ public class LyricLineView extends LinearLayout {
         } else {
             post(this::fade);
         }
+    }
+
+    private void updatePivot() {
+        if (row == null) {
+            return;
+        }
+        switch (lyricLine.getType()) {
+            case NORMAL -> {
+                row.setPivotX(0f);
+                row.setPivotY(Math.max(row.getHeight(), dp(24)));
+            }
+            case RHYTHM -> {
+                row.setPivotX(mainText == null ? 0f : mainText.getWidth() / 2f);
+                row.setPivotY(row.getHeight() / 2f);
+            }
+            default -> {
+            }
+        }
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int l, int t, int r, int b) {
+        super.onLayout(changed, l, t, r, b);
+        updatePivot();
     }
 
     private void fadeNormalLine() {
@@ -335,6 +357,16 @@ public class LyricLineView extends LinearLayout {
         frameImage = null;
     }
 
+    /**
+     * Drops the cached blur source and result. Used when the row becomes visible again: the last
+     * published texture may predate the current layout, and nothing else would re-request it.
+     */
+    public void invalidateBlur() {
+        frameImage = null;
+        blurResources.invalidate();
+        blurInitialized = false;
+    }
+
     /** Releases the offscreen render targets but keeps the row blur-capable (e.g. temporary hide). */
     public void releaseBlurSurfaces() {
         blurResources.release();
@@ -375,6 +407,9 @@ public class LyricLineView extends LinearLayout {
             }
             if (image.getWidth() != blurResources.width()
                     || image.getHeight() != blurResources.height()) {
+                // The published result belongs to an older target size (e.g. the row was just laid
+                // out). Without a forced re-request it would stay unusable until the radius changes.
+                blurResources.invalidate();
                 return;
             }
             frameImage = image;

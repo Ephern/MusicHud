@@ -4,7 +4,7 @@ public final class FluidBackgroundSettings {
     public static final int GUI_FLUID_BLUR_RADIUS = 512;
     public static final int HUD_FLUID_BLUR_RADIUS = 96;
     public static final float BACKGROUND_OVERALL_BRIGHTNESS = 0.65f;
-    public static final float BACKGROUND_NATURAL_SATURATION = 1.75f;
+    public static final float BACKGROUND_NATURAL_SATURATION = 2f;
     public static final float COVER_TARGET_LONG_EDGE_SCALE = 0.5f;
     public static final int COVER_TARGET_MIN_LONG_EDGE = 64;
     // The fluid canvas is upsampled to the panel and the layer composite is blurred with a

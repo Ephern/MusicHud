@@ -1,10 +1,7 @@
 package indi.etern.musichud.client.ui.components.modals;
 
 import icyllis.modernui.R;
-import icyllis.modernui.animation.Animator;
-import icyllis.modernui.animation.AnimatorListener;
-import icyllis.modernui.animation.AnimatorSet;
-import icyllis.modernui.animation.ObjectAnimator;
+import icyllis.modernui.animation.*;
 import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.ColorDrawable;
@@ -20,8 +17,8 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.PanelStyle;
-import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.function.BiConsumer;
 
@@ -38,7 +35,6 @@ public class Modal {
     private static final int SCREEN_DIM_COLOR = 0xA0000000;
     private static final int SHOW_DURATION = 200;
     private static final int DISMISS_DURATION = 150;
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
 
     @Getter
     private final PopupWindow popupWindow;
@@ -82,10 +78,8 @@ public class Modal {
                 return true;
             }
         };
-
-        PanelStyle.factory(card, clientConfig.getPanelOpacity(), clientConfig.getPanelBrightness(),
-                        card.dp(CORNER_RADIUS), null)
-                .applyBackgroundTo(card);
+        PanelStyle.applyDynamically(card, card.dp(CORNER_RADIUS), null,
+                InsetBackgroundFactory.BackdropBlur.NONE);
 
         int topPadding = card.dp(CONTENT_PADDING);
         int sidePadding = card.dp(CONTENT_PADDING);
@@ -160,7 +154,7 @@ public class Modal {
             }
             buttonRow.addView(button, btnParams);
 
-            buttonMeta.injectView(button, buttonRow, btnParams);
+            buttonMeta.injectView(button, buttonRow);
         }
 
         FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
@@ -223,6 +217,14 @@ public class Modal {
             currentAnimation.setDuration(SHOW_DURATION);
             currentAnimation.setInterpolator(Easing.EASE_OUT_QUAD);
             currentAnimation.start();
+            currentAnimation.addListener(new AnimatorListener() {
+                @Override
+                public void onAnimationEnd(@NotNull Animator animation) {
+                    LayoutTransition layoutTransition = new LayoutTransition();
+                    layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+                    card.setLayoutTransition(layoutTransition);
+                }
+            });
         });
     }
 
@@ -272,10 +274,9 @@ public class Modal {
 
     public static final class ActionButton {
         @Getter
-        private String text;
-        @Getter
         private final BiConsumer<ActionButton, Modal> onClickListener;
-
+        @Getter
+        private String text;
         @Getter
         private Button button;
         private ViewGroup parent;
@@ -285,7 +286,7 @@ public class Modal {
             this.onClickListener = onClickListener;
         }
 
-        void injectView(Button button, ViewGroup parent, ViewGroup.LayoutParams params) {
+        void injectView(Button button, ViewGroup parent) {
             this.button = button;
             this.parent = parent;
         }

@@ -97,8 +97,8 @@ public class HudConfigScreen extends Screen implements MuiScreen {
             RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
             return;
         }
-        // The UI recording of this frame already happened before renderBackground, so the panel
-        // samples the previous frame's result; the capture itself is this frame's world.
+        // renderBackground runs before render, so this frame's result is written before the UI
+        // recording that samples it executes.
         try {
             RenderRuntime runtime = RenderRuntime.getInstance();
             SceneGpuContext gpu = runtime.gpu();

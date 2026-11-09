@@ -45,6 +45,9 @@ public class PlayerHeadView extends FrameLayout {
     @Getter
     private ResourceLocation skin;
     private ResourceLocation lastRenderedSkin;
+    @Getter
+    private boolean avatarReady;
+    private @Nullable Runnable onAvatarStateChanged;
     private String pendingDownloadUrl;
     private CompletableFuture<?> pendingDownload;
 
@@ -111,12 +114,45 @@ public class PlayerHeadView extends FrameLayout {
     public void setPlayerSkinSupplier(@Nullable Supplier<ResourceLocation> playerSkinSupplier) {
         this.playerSkinSupplier = playerSkinSupplier;
         if (playerSkinSupplier == null) {
-            skin = null;
+            resetSkin();
+        } else {
+            updateHeadImage();
         }
-        updateHeadImage();
+    }
+
+    public void setOnAvatarStateChangedListener(@Nullable Runnable listener) {
+        onAvatarStateChanged = listener;
+    }
+
+    /**
+     * Drops the latched skin; a transient lookup failure must keep the current head on screen.
+     */
+    public void resetSkin() {
+        skin = null;
+        lastRenderedSkin = null;
+        faceView.setImageDrawable(null);
+        hatView.setImageDrawable(null);
+        updateAvatarReady();
+    }
+
+    private void updateAvatarReady() {
+        boolean ready = faceView.getDrawable() != null;
+        if (ready == avatarReady) return;
+        avatarReady = ready;
+        if (onAvatarStateChanged != null) {
+            onAvatarStateChanged.run();
+        }
     }
 
     private void updateHeadImage() {
+        try {
+            refreshHeadImage();
+        } finally {
+            updateAvatarReady();
+        }
+    }
+
+    private void refreshHeadImage() {
         if (playerSkinSupplier != null) {
             var skin1 = playerSkinSupplier.get();
             if (skin1 != null) {

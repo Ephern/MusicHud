@@ -48,7 +48,7 @@ public class ApiServerFetcher {
     private static final String LATEST_DOWNLOAD_URL = LATEST_RELEASE_URL + "/download/";
     private static final String TAG_DOWNLOAD_URL = BASE + "/releases/download/";
 
-    // ---- Atom feed regex patterns ----
+    // Atom feed regex patterns
     private static final Pattern ENTRY_PATTERN = Pattern.compile("<entry>\\s*(.*?)\\s*</entry>", Pattern.DOTALL);
     private static final Pattern TITLE_PATTERN = Pattern.compile("<title[^>]*>\\s*(.*?)\\s*</title>", Pattern.DOTALL);
     private static final Pattern LINK_HREF_PATTERN = Pattern.compile("<link[^>]+href=\"([^\"]+)\"");
@@ -64,8 +64,6 @@ public class ApiServerFetcher {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .executor(MusicHud.EXECUTOR)
             .build();
-
-    // ---- data models ----
 
     /** Lightweight release summary from Atom feed — zero API quota consumed. */
     public record ReleaseSummary(String tag, String title, String htmlUrl, String publishedAt) {}
@@ -137,8 +135,6 @@ public class ApiServerFetcher {
             return proxyBase + originalUrl;
         }
     }
-
-    // ---- public API ----
 
     /**
      * (Optional) Set a GitHub personal access token to raise the REST API
@@ -320,8 +316,6 @@ public class ApiServerFetcher {
     public static CompletableFuture<Void> downloadAsset(Asset asset, Path target, Consumer<Double> progress) {
         return downloadFromUrl(asset.getBrowserDownloadUrl(), target, progress);
     }
-
-    // ---- internal ----
 
     private static CompletableFuture<Void> downloadFromUrl(String url, Path target, Consumer<Double> progress) {
         return downloadFromUrl(url, target, progress != null ? (downloaded, total) -> {

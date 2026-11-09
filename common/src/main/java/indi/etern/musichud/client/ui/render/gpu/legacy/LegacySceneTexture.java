@@ -1,16 +1,24 @@
 package indi.etern.musichud.client.ui.render.gpu.legacy;
 
 import com.mojang.blaze3d.pipeline.TextureTarget;
+import com.mojang.blaze3d.platform.GlStateManager;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
 import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
+import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 
 final class LegacySceneTexture implements SceneGpuTexture, AutoCloseable {
     private final TextureTarget target;
     private final SceneTextureFormat requestedFormat;
+    private boolean closed;
 
     LegacySceneTexture(int width, int height, SceneTextureFormat format) {
         this.target = new TextureTarget(width, height, false, false);
-        this.target.setFilterMode(org.lwjgl.opengl.GL11.GL_LINEAR);
+        this.target.setFilterMode(GL11.GL_LINEAR);
+        // Matches the blaze3d allocator: no mip chain, so clamp instead of the TextureTarget default.
+        GlStateManager._bindTexture(this.target.getColorTextureId());
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
         this.requestedFormat = format;
     }
 
@@ -51,7 +59,14 @@ final class LegacySceneTexture implements SceneGpuTexture, AutoCloseable {
     }
 
     @Override
+    public boolean isClosed() {
+        return closed;
+    }
+
+    @Override
     public void close() {
+        if (closed) return;
+        closed = true;
         target.destroyBuffers();
     }
 }

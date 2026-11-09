@@ -26,7 +26,8 @@ Multi-loader Minecraft mod (Fabric + NeoForge + Paper), specific Minecraft versi
 - **`core` module is a plain `java-library` (NO Loom)** — excluded by `build.gradle:16`: `configure(subprojects.findAll { it.name != 'core' })`.
   - Platform modules (`fabric`/`neoforge`) add `core` via a dedicated `coreLib` configuration that extends `compileClasspath` + `runtimeClasspath` but **NOT** `developmentFabric`/`developmentNeoForge` — this prevents Architectury Transformer from applying unnecessary transforms (`GenerateFakeFabricMod`, `RemapInjectables`).
 - **`-Dfabric.dli.config` must be overridden in Fabric `loom.runs`** — Architectury Loom 1.17.487 generates DLI config at `.gradle/loom-cache/projects/<subproject>/launch.cfg` but the injector property points to `<subproject>/.gradle/loom-cache/launch.cfg`. Without the override, `dev-launch-injector` enters pass-through mode → mods and Minecraft assets won't load.
-- **Mixin count: 6** — `SoundEngineMixin`, `SoundEngineSppCompatMixin`, `GuiRendererHudMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin` `MusicHudMixinPlugin` (plugin class).
+- **Mixin count: 8** — `SoundEngineMixin`, `SoundEngineSppCompatMixin`, `Blaze3DAudioLibraryInitMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin`, `ModernUiGuardMixin`, `UIManagerMixin` + `MusicHudMixinPlugin` (plugin class). The plugin skips the ModernUI-dependent mixins when the runtime probe fails.
+- **ModernUI 3.13+ is required for the client UI** — this branch resolves the official Maven artifacts (`dev.icyllis:modernui-core` + `icyllis.modernui:ModernUI-NeoForge:1.21.1-3.13.0.+`). Branches covering 1.21.9+ have no official build and must use the Lumen fork (`github.com/MOPELotus/ModernUI-MC-Lumen`, not published to Maven; place its jar in `libs/`). Fabric declares the dependency under `recommends` because the same jar runs on servers; the client probes `icyllis.arc3d.engine.ImageProxy` at runtime and falls back to a vanilla `ModernUiRequiredScreen` with the HUD left unregistered.
 
 ## Architecture
 
@@ -51,15 +52,15 @@ The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradl
 - **Auto-Registration**: `RegistrationManager` loads classes by string array, instantiates `Register` implementors. `@RegisterMark` annotation marks registered classes. Called via `performCommonAutoRegistration()` / `performSideAutoRegistration()`.
 - **Custom Network Protocol**: 30+ `CustomPacketPayload` classes in `network/payloads/`. Request/response cycle (`requestResponseCycle/`) + push messages (`pushMessages/`). Register via `INetworkRegister`.
 - **Virtual Threads**: `MusicHud.EXECUTOR` = `Executors.newVirtualThreadPerTaskExecutor()`. Used for audio decoding, API server management, network I/O.
-- **Mixin**: Config `music_hud.mixins.json`. 6 classes: `SoundEngineMixin`, `GuiRendererHudMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin` + `MusicHudMixinPlugin`.
+- **Mixin**: Config `music_hud.mixins.json`. 8 classes: `SoundEngineMixin`, `SoundEngineSppCompatMixin`, `Blaze3DAudioLibraryInitMixin`, `ScreenMixin`, `SpanSetMixin`, `ReactiveMusicCompatMixin`, `ModernUiGuardMixin`, `UIManagerMixin` + `MusicHudMixinPlugin`.
 - **Config**: Forge Config API Port (Fabric, shared with NeoForge) / native NeoForge `ModConfig` / Paper `config.yml`.
 
 ## Render Backend Boundary
 
-- `common/.../client/ui/render/gpu/` is the version-neutral scene layer. It must not import `com.mojang.blaze3d.*`, `com.mojang.renderpearl.*`, `org.lwjgl.*`, `net.neoforged.*`, or `net.minecraft.*`.
-- `gpu/blaze3d/` is the 1.21.6-1.21.8 blaze3d command adapter. `gpu/blaze3d/gl/` is the only place allowed to use raw OpenGL and NeoForge `ValidationGpuDevice` reflection.
+- `common/.../client/ui/render/gpu/` (excluding `gpu/legacy/`) is the version-neutral scene layer. It must not import `com.mojang.blaze3d.*`, `com.mojang.renderpearl.*`, `org.lwjgl.*`, `net.neoforged.*`, or `net.minecraft.*`.
+- `gpu/legacy/` is the 1.21.1 raw-OpenGL adapter (`LegacySceneGpuContext` + `LegacyInteropBackend`); it is the only place allowed to use raw OpenGL. Branches for 1.21.6+ replace it with `gpu/blaze3d/`.
 - Effects use `SceneGpuContext` plus `SceneTextureFormat`/`SceneSamplerBinding`/`SceneUniform`; they must not cast to backend types or probe GL directly. Filtering/address mode live on the texture (set at allocation), not on the binding.
-- `SceneGpuContext` has no generic readback API. Add readback only with a backend capability and a real implementation; the native RGBA16F shim advertises RGBA8 metadata and must never be used for CPU transfer.
+- `SceneGpuContext` has no generic readback API. Add readback only with a backend capability and a real implementation.
 
 ## Frameworks & Dependencies
 
@@ -75,20 +76,20 @@ The `configure(subprojects.findAll { it.name != 'core' })` block in `build.gradl
 ### Path stability rules
 
 - Hash directories in `Gradle home\caches\modules-2\files-2.1` are content SHA-1s: stable as long as the dependency version is unchanged; they change only when a version is upgraded.
-- `-c1c451a1` / `-b5e3e3a6` remap hashes under the project `.gradle\loom-cache` are computed by Loom from MC version + mappings + dependency versions — they can change after a re-build or upgrade. If a path below fails, re-locate with the command at the bottom of this section.
+- `-b9d2d3ba` / `-7920a9e3` remap hashes under the project `.gradle\loom-cache` are computed by Loom from MC version + mappings + dependency versions — they can change after a re-build or upgrade. If a path below fails, re-locate with the command at the bottom of this section.
 - Path variables below: `{projectRoot}` = this repository root (where this AGENTS.md lives); `{gradleHome}` = `H:\Dev\.gradle` on this machine (default `~/.gradle` elsewhere). Substitute them before calling `read_file` — it needs an absolute path.
 
-Fabric module uses the Loom-remapped jars (`-c1c451a1` / `-b5e3e3a6` suffixes) under the project `.gradle\loom-cache`; NeoForge module uses the plain jars under `{gradleHome}\caches`.
+Fabric module uses the Loom-remapped jars (`-b9d2d3ba` / `-7920a9e3` suffixes) under the project `.gradle\loom-cache`; NeoForge module uses the plain jars under `{gradleHome}\caches`.
 
-1.21.8 example
+1.21.1 example
 
 | Library | Sources JAR path template (use with `read_file --file_path "…!/path/to/Class.java"`) |
 |---|---|
-| modernui-core 3.13.0 (remapped, fabric) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\dev\icyllis\modernui-core-b5e3e3a6\3.13.0\modernui-core-b5e3e3a6-3.13.0-sources.jar` |
+| modernui-core 3.13.0 (remapped, fabric) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\dev\icyllis\modernui-core-7920a9e3\3.13.0\modernui-core-7920a9e3-3.13.0-sources.jar` |
 | modernui-core 3.13.0 (plain) | `{gradleHome}\caches\modules-2\files-2.1\dev.icyllis\modernui-core\3.13.0\bced1daf870a3ede277593ea26a72e70e571c052\modernui-core-3.13.0-sources.jar` |
-| ModernUI-Fabric 1.21.8-3.13.0.3 (remapped, used by fabric) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Fabric-c1c451a1\1.21.8-3.13.0.3\ModernUI-Fabric-c1c451a1-1.21.8-3.13.0.3-sources.jar` |
-| ModernUI-NeoForge 1.21.8-3.13.0.3 (used by neoforge) | `{gradleHome}\caches\modules-2\files-2.1\icyllis.modernui\ModernUI-NeoForge\1.21.8-3.13.0.3\7a6e28682e8e33552076d37e3177ed513b22d309\ModernUI-NeoForge-1.21.8-3.13.0.3-sources.jar` |
-| ModernUI-Markflow 3.13.0 (remapped) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Markflow-b5e3e3a6\3.13.0\ModernUI-Markflow-b5e3e3a6-3.13.0-sources.jar` |
+| ModernUI-Fabric 1.21.1-3.13.0.1 (remapped, used by fabric) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Fabric-b9d2d3ba\1.21.1-3.13.0.1\ModernUI-Fabric-b9d2d3ba-1.21.1-3.13.0.1-sources.jar` |
+| ModernUI-NeoForge 1.21.1-3.13.0.1 (used by neoforge) | `{gradleHome}\caches\modules-2\files-2.1\icyllis.modernui\ModernUI-NeoForge\1.21.1-3.13.0.1\e26632dde34a39d033caf8dbc792d99cf7f12822\ModernUI-NeoForge-1.21.1-3.13.0.1-sources.jar` |
+| ModernUI-Markflow 3.13.0 (remapped) | `{projectRoot}\.gradle\loom-cache\remapped_mods\remapped\icyllis\modernui\ModernUI-Markflow-7920a9e3\3.13.0\ModernUI-Markflow-7920a9e3-3.13.0-sources.jar` |
 | arc3d-* 2026.2.0 (compiler/core/engine/granite/opengl/sketch/vulkan) | Pattern: `{gradleHome}\caches\modules-2\files-2.1\dev.icyllis\arc3d-<artifact>\2026.2.0\<hash>\arc3d-<artifact>-2026.2.0-sources.jar` — locate `<hash>` with `Get-ChildItem -Recurse "{gradleHome}\caches\modules-2\files-2.1\dev.icyllis" -Filter "arc3d-*-sources.jar"` |
 
 Fallback if a path is missing (e.g. after re-build, upgrade, or in another working tree): locate the JAR first, then pass the full path to `read_file`. Do NOT extract JARs with PowerShell — `read_file` reads JAR entries directly.
@@ -107,6 +108,7 @@ Get-ChildItem -Recurse "{gradleHome}\caches","{projectRoot}\.gradle\loom-cache" 
 - Single test class: `common/src/test/java/indi/etern/musichud/MainTest.java`.
 - Tests call live NCM API (network-dependent, may fail offline).
 - **Must enable manually** before running tests.
+- Debug switch `-Dmusic_hud.debug.forceModernUiMissing=true` forces the client into the ModernUI-missing fallback (warning screen, HUD unregistered, ModernUI mixins skipped) without uninstalling MODERNUI.
 
 ## Misc
 

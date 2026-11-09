@@ -157,9 +157,6 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         // Without this call the fluid background is skipped and hudOccluded never updates.
         renderBackground(gr, mouseX, mouseY, deltaTick);
         mHost.render(gr, mouseX, mouseY, deltaTick);
-        // Runs after the UI layer is submitted, so both backends finish their own pass before the
-        // other touches GL; the blur result is sampled by the next frame.
-        RenderRuntime.getInstance().flushPendingSceneWork();
     }
 
     @Override

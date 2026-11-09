@@ -88,7 +88,7 @@ public class AccountBaseView extends LinearLayout {
                 } else {
                     LoginView loginView = new LoginView(context);
                     LayoutParams loginParams = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
-                    loginParams.setMargins(0, loginView.dp(120), 0, 0);
+                    loginParams.setMargins(0, loginView.dp(12), 0, 0);
                     loginView.setLayoutParams(loginParams);
                     if (loginView.getParent() == null) {
                         view.addView(loginView);

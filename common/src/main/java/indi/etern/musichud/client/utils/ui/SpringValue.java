@@ -129,7 +129,23 @@ public class SpringValue {
     }
 
     public boolean isSettled() {
-        return Math.abs(value - target) < SETTLE_EPSILON && Math.abs(velocity) < SETTLE_EPSILON;
+        return isSettled(SETTLE_EPSILON);
+    }
+
+    /**
+     * @param epsilon tolerance for both the remaining displacement and the velocity
+     */
+    public boolean isSettled(float epsilon) {
+        return isSettled(epsilon, epsilon);
+    }
+
+    /**
+     * @param valueEpsilon    tolerance for the remaining displacement
+     * @param velocityEpsilon tolerance for the velocity
+     */
+    public boolean isSettled(float valueEpsilon, float velocityEpsilon) {
+        return Math.abs(value - target) < valueEpsilon
+                && Math.abs(velocity) < velocityEpsilon;
     }
 
 }
