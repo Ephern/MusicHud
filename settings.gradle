@@ -17,7 +17,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'music_hud'
+rootProject.name = 'music_hud.' + properties.get("minecraft_version_range")
 
 include 'processor'
 include 'core'
