@@ -63,12 +63,10 @@ public interface IIdlePlaySourceLayerState {
     Unregister onLoadErrorCleared(Consumer<IdlePlaySource> listener);
 
     /**
-     * Attempts to re-sync a load-errored local entry: pushes the pre-error mode first,
-     * then falls back to {@link PlayMode#RANDOM}. Atomic: fails when another recovery
-     * for the same collection is already running.
+     * Re-syncs a load-errored local entry: pushes the pre-error mode first, then falls back to
+     * {@link PlayMode#RANDOM}. Atomic, so a second recovery for the same collection fails.
      *
-     * @return {@code false} when the collection is not load-errored or a recovery is
-     *         already in flight ({@code ui} is not invoked then).
+     * @return {@code false} when the collection is not load-errored or a recovery is already running
      */
     boolean requestRecovery(Class<?> type, long id, RecoveryUi ui);
 }

@@ -1,8 +1,9 @@
 package indi.etern.musichud.neoforge;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
+import indi.etern.musichud.client.ui.hud.scene.HudScene;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.platform.Environment;
@@ -47,11 +48,11 @@ public final class CommonInitializer {
         MusicHud.init();
     }
 
-    public static HudRendererManager hudRendererManager;
+    public static HudScene hudScene;
 
     public static void onRenderGui(RenderGuiEvent.Pre event) {
-        if (hudRendererManager != null) {
-            hudRendererManager.renderFrame(new VanillaHudGraphics(event.getGuiGraphics()));
+        if (hudScene != null) {
+            RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(event.getGuiGraphics()), hudScene);
         }
     }
 
@@ -62,7 +63,7 @@ public final class CommonInitializer {
             NeoForgeClientEventService.getInstance();
         } else if (config.getSpec() == ClientConfigDefinition.configure.getRight()) {
             clientConfig.setConfigured(true);
-            hudRendererManager = HudRendererManager.getInstance();
+            hudScene = HudScene.getInstance();
             NeoForge.EVENT_BUS.addListener(CommonInitializer::onRenderGui);
         }
         NeoForgeCommonEventService.getInstance();

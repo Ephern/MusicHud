@@ -8,15 +8,9 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 
 /**
- * Notifies subscribers of playlist/album data updates by id.
- * Subscribers are decoupled from bean instance identity: a UI holding a brief
- * (not fully loaded) collection object can still refresh itself by re-resolving
- * the latest cached instance after being notified.
- * <p>
- * The {@code self} flag marks updates caused by the local client's own
- * optimistic operations (already reflected locally before the request
- * completes); subscribers may skip re-syncing those to avoid redundant
- * add/remove churn during rapid toggling.
+ * Notifies subscribers of playlist/album updates by id, so a UI holding a stale instance can
+ * re-resolve the latest one. The {@code self} flag marks updates caused by the local client's own
+ * optimistic operations, which subscribers may skip to avoid redundant churn.
  */
 public final class CollectionUpdateNotifier {
     private static final ConcurrentHashMap<Long, CopyOnWriteArraySet<Consumer<Boolean>>> PLAYLIST_LISTENERS = new ConcurrentHashMap<>();

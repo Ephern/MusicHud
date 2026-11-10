@@ -52,14 +52,9 @@ public class LoginService implements IClientLoginService {
     @Getter
     NetworkReceiver<LoginResultMessage> loginResultReceiver = (loginResult, player) -> {
         if (loginResult.success()) {
-            // Must run synchronously inside the receiver: it arms the local layer's !loaded
-            // guard BEFORE the snapshot pushes that follow a login can be processed
-            // (deferring it to the executor re-opens the stale-guard wipe window). Every
-            // successful login starts a new server session; the local idle play sources are
-            // re-synced so they are pushed to whichever server-side component is active
-            // (network channel when connected, local loopback in isolated mode). This must
-            // not depend on the login state listeners, which are deduplicated and may not
-            // fire when the state is unchanged across a connection switch.
+            // Must run synchronously inside the receiver: it arms the local layer's !loaded guard
+            // before the snapshot pushes that follow a login are processed. It must not rely on the
+            // login state listeners, which are deduplicated and may not fire on a connection switch.
             IIdlePlaySourceLayerState localState = MusicService.getInstance().getIdlePlaySourceState().local();
             localState.reset();
             localState.loadFromConfig();

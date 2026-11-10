@@ -2,16 +2,16 @@ package indi.etern.musichud.client.ui.hud.metadata;
 
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
-import indi.etern.musichud.client.ui.hud.pipelines.HudUniform;
-import indi.etern.musichud.client.ui.hud.pipelines.Std140Sizes;
-import indi.etern.musichud.client.ui.hud.pipelines.Std140Writer;
+import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
+import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;
+import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
 import indi.etern.musichud.client.utils.ui.Transitionable;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.Setter;
 
 @EqualsAndHashCode
-public class DynamicStatusUniform implements HudUniform {
+public class DynamicStatusUniform implements SceneUniform {
     private static volatile DynamicStatusUniform instance;
     @Getter
     @Setter
@@ -52,7 +52,7 @@ public class DynamicStatusUniform implements HudUniform {
     }
 
     @Override
-    public boolean shouldUseBuffer(HudUniform lastBuffered) {
+    public boolean shouldUseBuffer(SceneUniform lastBuffered) {
         return false;//always update
     }
 }

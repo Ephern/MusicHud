@@ -3,12 +3,15 @@ package indi.etern.musichud.client.utils.ui;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.animation.StateListAnimator;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
+import icyllis.modernui.graphics.drawable.LayerDrawable;
 import icyllis.modernui.graphics.drawable.RippleDrawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
+import icyllis.modernui.graphics.Color;
 import icyllis.modernui.util.ColorStateList;
 import icyllis.modernui.util.IntProperty;
 import icyllis.modernui.view.View;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.drawable.BackdropBlurDrawable;
 import lombok.Builder;
 
 @Builder
@@ -22,21 +25,37 @@ public class InsetBackgroundFactory {
     @Builder.Default
     ColorStateList backgroundColor = Theme.GHOST_CHECK_BUTTON_STATES;
     @Builder.Default
+    int strokeWidth = 0;
+    @Builder.Default
+    int strokeColor = 0;
+    @Builder.Default
     long transitionDuration = 100;
+    @Builder.Default
+    boolean backdropBlur = false;
+    @Builder.Default
+    int backdropBlurRadius = 0;
     public record Padding(int left,int top,int right,int bottom) {}
-
-/*
-    public Drawable newBackgroundDrawable() {
-        ShapeDrawable background = newShapeDrawable();
-        RippleDrawable ripple = new RippleDrawable(Theme.ITEM_RIPPLE_COLOR_STATES, background, null);
-        return new InsetDrawable(ripple, inset);
-    }
-*/
 
     public void applyBackgroundTo(View view) {
         ShapeDrawable background = newShapeDrawable();
         RippleDrawable ripple = new RippleDrawable(Theme.ITEM_RIPPLE_COLOR_STATES, background, null);
-        view.setBackground(new InsetDrawable(ripple, inset));
+        InsetDrawable tint = new InsetDrawable(ripple, inset);
+        if (backdropBlur && backdropBlurRadius > 0) {
+            BackdropBlurDrawable blur = new BackdropBlurDrawable(cornerRadius, backdropBlurRadius);
+            view.setBackground(new LayerDrawable(new InsetDrawable(blur, inset), tint));
+            view.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                @Override
+                public void onViewAttachedToWindow(View v) {
+                }
+
+                @Override
+                public void onViewDetachedFromWindow(View v) {
+                    blur.release();
+                }
+            });
+        } else {
+            view.setBackground(tint);
+        }
         attachStateTransition(view, background);
     }
 
@@ -47,6 +66,9 @@ public class InsetBackgroundFactory {
         }
         background.setCornerRadius(cornerRadius);
         background.setColor(backgroundColor);
+        if (strokeWidth > 0) {
+            background.setStroke(strokeWidth, strokeColor);
+        }
         return background;
     }
 
@@ -60,16 +82,16 @@ public class InsetBackgroundFactory {
             @Override
             public Integer get(View target) {
                 ColorStateList color = background.getColor();
-                return color == null ? 0x0000000 : color.getDefaultColor();
+                return color == null ? 0x00000000 : Color.toArgb(color.getDefaultColor());
             }
         };
         StateListAnimator stateListAnimator = new StateListAnimator();
         //noinspection UnstableApiUsage
         int[][] states = backgroundColor.getStates();
         //noinspection UnstableApiUsage
-        int[] colors = backgroundColor.getColors();
+        long[] colors = backgroundColor.getColors();
         for (int i = 0; i < states.length; i++) {
-            ObjectAnimator animator = ObjectAnimator.ofArgb(null, colorProperty, colors[i])
+            ObjectAnimator animator = ObjectAnimator.ofArgb(null, colorProperty, Color.toArgb(colors[i]))
                     .setDuration(transitionDuration);
             stateListAnimator.addState(states[i], animator);
         }

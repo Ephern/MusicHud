@@ -1,69 +1,127 @@
 package indi.etern.musichud.client.ui.hud.renderer;
 
+import com.mojang.blaze3d.platform.NativeImage;
+import com.mojang.blaze3d.platform.Window;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
+import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
-import indi.etern.musichud.client.ui.hud.metadata.HudRenderData;
-import indi.etern.musichud.client.ui.hud.metadata.HudStyle;
-import indi.etern.musichud.client.ui.hud.pipelines.GpuTextureViewRef;
-import indi.etern.musichud.client.ui.hud.pipelines.HudRenderPipelines;
-import indi.etern.musichud.client.ui.hud.pipelines.HudRenderState;
-import indi.etern.musichud.client.ui.hud.pipelines.HudTextureSetup;
+import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
+import indi.etern.musichud.client.ui.render.RenderLayer;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.SceneElementRenderState;
+import indi.etern.musichud.client.ui.render.SceneRenderContext;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.gpu.ArtworkDownsampleCache;
+import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
+import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.BlazeTextureRefs;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlTextureSampling;
+import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
+import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-public class AlbumImageRenderer implements HudRenderer {
-    private HudRenderData currentData;
+public class AlbumImageRenderer implements RenderLayer {
+    private final ArtworkDownsampleCache artworkCache = new ArtworkDownsampleCache();
+    private SceneRenderData currentData;
     private ImageTextureData icon;
 
-    public void configure(HudRenderData data) {
+    public void configure(SceneRenderData data) {
         this.currentData = data;
     }
 
     @Override
-    public void render(HudRenderContext context) {
+    public void render(SceneRenderContext context) {
         if (currentData == null) return;
 
-        HudTextureSetup textureSetup = getMixedTextureSetup();
-        HudStyle hudStyle = currentData.getHudStyle();
-
-        HudRenderState hudRenderState = new HudRenderState(
-                HudRenderPipelines.ROUNDED_ALBUM,
+        SceneStyle hudStyle = currentData.getHudStyle();
+        SceneTextureSetup textureSetup = getTextureSetup(hudStyle);
+        if (textureSetup == null) {
+            return;
+        }
+        SceneElementRenderState hudRenderState = new SceneElementRenderState(
+                SceneRenderPipelines.ROUNDED_ALBUM,
                 textureSetup,
                 context.currentPose(),
                 hudStyle,
-                "album",
                 hudStyle,
                 DynamicStatusUniform.getInstance()
         );
-        context.submitHudRenderState(hudRenderState);
+        context.submit(this, hudRenderState);
     }
 
-    private @NotNull HudTextureSetup getMixedTextureSetup() {
-        var background = currentData.getTransitionableBackground();
-        BackgroundData next = background.getNext();
-        BackgroundData current = background.getCurrent();
-        DynamicTexture currentTexture = current == null || current.image() == null || current.image().current == null ? getIconTexture() : current.image().current.getTexture();
-        DynamicTexture nextTexture = next == null || next.image() == null || next.image().current == null ? getIconTexture() : next.image().current.getTexture();
-        DynamicTexture transitionTexture = background.isTransitioning() ? nextTexture : currentTexture;
-        if (currentTexture == null) {
-            return HudTextureSetup.NONE;
+    private @Nullable SceneTextureSetup getTextureSetup(SceneStyle hudStyle) {
+        SceneGpuContext gpu;
+        try {
+            gpu = RenderRuntime.getInstance().gpu();
+        } catch (RuntimeException unavailable) {
+            return null;
         }
-        if (transitionTexture != null) {
-            return HudTextureSetup.doubleTexture(
-                    new GpuTextureViewRef(currentTexture.getTextureView()),
-                    new GpuTextureViewRef(transitionTexture.getTextureView())
-            );
+        var transition = currentData.getTransitionableBackground();
+        SceneGpuTexture current = resample(gpu, transition.getCurrent(), hudStyle);
+        if (current == null) {
+            return null;
         }
-        return HudTextureSetup.single(new GpuTextureViewRef(currentTexture.getTextureView()));
+        // The album pipeline always samples Sampler1, so it needs a second binding even without a
+        // crossfade.
+        SceneGpuTexture next = transition.isTransitioning()
+                ? resample(gpu, transition.getNext(), hudStyle) : null;
+        return SceneTextureSetup.doubleTexture(current, next != null ? next : current);
     }
 
-    private DynamicTexture getIconTexture() {
+    /** Resamples the artwork to the display size. */
+    private @Nullable SceneGpuTexture resample(SceneGpuContext gpu, @Nullable BackgroundData data,
+                                               SceneStyle hudStyle) {
+        ImageTextureData source = sourceOf(data);
+        if (source == null) {
+            return null;
+        }
+        DynamicTexture texture = source.getTexture();
+        if (texture == null) {
+            return null;
+        }
+        NativeImage pixels = texture.getPixels();
+        if (pixels == null) {
+            return null;
+        }
+        GlTextureSampling.ensureLinear(texture);
+        float guiScale = guiScale();
+        return artworkCache.get(gpu, source, BlazeTextureRefs.of(texture),
+                pixels.getWidth(), pixels.getHeight(),
+                hudStyle.getWidth() * guiScale, hudStyle.getHeight() * guiScale);
+    }
+
+    private @Nullable ImageTextureData sourceOf(@Nullable BackgroundData data) {
+        if (data != null && data.image() != null) {
+            BackgroundImages images = data.image();
+            if (images.source != null) {
+                return images.source;
+            }
+            if (images.original != null) {
+                return images.original;
+            }
+            if (images.current != null) {
+                return images.current;
+            }
+        }
+        return getIcon();
+    }
+
+    private @NotNull ImageTextureData getIcon() {
         if (icon == null) {
             icon = ImageUtils.loadBase64(MusicHud.ICON_BASE64);
         }
-        return icon.getTexture();
+        return icon;
+    }
+
+    private static float guiScale() {
+        Window window = Minecraft.getInstance().getWindow();
+        //noinspection ConstantValue
+        return window == null ? 1f : (float) window.getGuiScale();
     }
 }

@@ -7,16 +7,10 @@ import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Consumer;
 
 /**
- * Single source of truth for the client's connection state.
- *
- * <p>The fine-grained {@link ConnectionState} drives behavior (distinguishes "waiting for a
- * ConnectResponse" from "isolated mode" even though both surface as {@code NOT_CONNECTED}).
- * How the last attempt ended (denied/incompatible, timeout) is NOT a state: it is recorded
- * as a {@link ConnectAttemptResult} and surfaced to the UI through the derived coarse
- * {@link ConnectStatus}.
- *
- * <p>Transitions are guarded: invalid ones are rejected and reported via the boolean return
- * value so the caller can skip its side effects.
+ * Single source of truth for the client's connection state. The fine-grained {@link ConnectionState}
+ * drives behavior; how the last attempt ended is recorded as a {@link ConnectAttemptResult} and
+ * surfaced as the derived coarse {@link ConnectStatus}. Invalid transitions are rejected and
+ * reported through the boolean return value.
  */
 public final class ConnectionStateMachine {
     private static final Map<ConnectionState, EnumSet<ConnectionState>> ALLOWED = new EnumMap<>(ConnectionState.class);

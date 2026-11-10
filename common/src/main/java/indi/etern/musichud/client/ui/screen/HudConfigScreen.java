@@ -26,8 +26,12 @@ import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.mc.MuiScreen;
 import icyllis.modernui.mc.ScreenCallback;
 import icyllis.modernui.mc.UIManager;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
+import indi.etern.musichud.client.ui.hud.scene.HudScene;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
+import indi.etern.musichud.client.ui.render.gpu.HudPanelBackdrop;
+import indi.etern.musichud.client.ui.render.gpu.PanelBlurRenderer;
+import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import lombok.Getter;
 import lombok.NonNull;
 import net.minecraft.client.Minecraft;
@@ -54,6 +58,7 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     private final Fragment mFragment;
     @Nullable
     private final ScreenCallback mCallback;
+    private final PanelBlurRenderer panelBlur = new PanelBlurRenderer();
     @Getter
     private static volatile boolean visible = false;
 
@@ -94,7 +99,16 @@ public class HudConfigScreen extends Screen implements MuiScreen {
         if (minecraft != null && minecraft.level == null) {
             this.renderPanorama(guiGraphics, deltaTick);
             guiGraphics.nextStratum();
-            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
+            RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
+            return;
+        }
+        // The UI recording of this frame already happened before renderBackground, so the panel
+        // samples the previous frame's result; the capture itself is this frame's world.
+        try {
+            RenderRuntime runtime = RenderRuntime.getInstance();
+            SceneGpuContext gpu = runtime.gpu();
+            panelBlur.render(gpu, gpu.mainColorSource());
+        } catch (RuntimeException | LinkageError ignored) {
         }
     }
 
@@ -107,6 +121,8 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     public void removed() {
         super.removed();
         visible = false;
+        HudPanelBackdrop.clear();
+        panelBlur.release();
         mHost.removed(this);
     }
 

@@ -23,12 +23,20 @@ package indi.etern.musichud.client.ui.screen;
  */
 
 import icyllis.modernui.fragment.Fragment;
-import icyllis.modernui.graphics.Color;
 import icyllis.modernui.mc.*;
+import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
+import indi.etern.musichud.client.ui.hud.renderer.BackgroundRenderer;
+import indi.etern.musichud.client.ui.hud.renderer.BackgroundTarget;
+import indi.etern.musichud.client.ui.render.HorizontalAlign;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.gpu.MinecraftBackgroundTexture;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
+import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
@@ -37,6 +45,7 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,26 +57,22 @@ import java.util.Objects;
  */
 @SuppressWarnings("UnstableApiUsage")
 public class MusicHudScreen extends Screen implements MuiScreen {
-    static {
-        MuiModApi.addOnScreenChangeListener((oldScreen, newScreen) -> {
-            if (newScreen instanceof MusicHudScreen || newScreen instanceof HudConfigScreen) {
-                BlurHandler.INSTANCE.blur(null);
-                BlurHandler.INSTANCE.blur(newScreen);
-            }
-        });
-    }
-
+    private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
+    private static final Logger LOGGER = MusicHud.getLogger(MusicHudScreen.class);
+    private static final BackgroundRenderer BACKGROUND_RENDERER =
+            new BackgroundRenderer(BackgroundTarget.GUI);
+    @Getter
+    private static volatile boolean hudOccluded;
     private final UIManager mHost;
     @Nullable
     private final Screen mPrevious;
     private final Fragment mFragment;
     @Nullable
     private final ScreenCallback mCallback;
+    private final SceneStyle backgroundStyle = new SceneStyle(
+            0, 0, 0, 0, 0, HorizontalAlign.CENTER, VerticalAlign.CENTER);
 
     private final static int FADE_IN_DURATION_MILLIS = 200;
-    @Getter
-    @Setter
-    private static double darken = ClientConfig.getInstance().getMainScreenAdditionalBackgroundDarken();
 
     MusicHudScreen(UIManager host, Fragment fragment,
                    @Nullable ScreenCallback callback, @Nullable Screen previous,
@@ -93,6 +98,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Override
     protected void init() {
         super.init();
+        hudOccluded = false;
         mHost.initScreen(this);
     }
 
@@ -104,26 +110,75 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Override
     public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
-        if (callback == null || callback.hasDefaultBackground()) {
-            if (minecraft != null && minecraft.level == null) {
-                super.renderBackground(gr, mouseX, mouseY, deltaTick);
-            } else {
-                BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
-            }
-            float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
-            gr.fill(0, 0, this.width, this.height, Color.argb((int) (progress * darken * 255), 0, 0, 0));//additional darken
+        if (callback != null && !callback.hasDefaultBackground()) {
+            MinecraftBackgroundTexture.clear();
+            hudOccluded = true;
+            return;
         }
+        if (minecraft != null && minecraft.level == null) {
+            renderPanorama(gr, deltaTick);
+        }
+        float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
+        hudOccluded = progress >= 1f;
+        renderBlurredBackground(gr, progress);
+    }
+
+    private void renderBlurredBackground(GuiGraphics gr, float progress) {
+        try {
+            backgroundStyle.setAlpha(progress);
+            backgroundStyle.setBounds(0, 0, this.width, this.height);
+            gr.nextStratum();
+            RenderRuntime.getInstance().renderFrame(
+                    new VanillaSceneGraphics(gr),
+                    context -> {
+                        if (!BACKGROUND_RENDERER.renderFluidBackground(context, backgroundStyle)) {
+                            MinecraftBackgroundTexture.clear();
+                            renderSolidBackground(gr, progress);
+                        }
+                    }
+            );
+        } catch (Exception e) {
+            LOGGER.error("While rendering main GUI background", e);
+        }
+    }
+
+    private void renderSolidBackground(GuiGraphics gr, float progress) {
+        float alpha = (float) CLIENT_CONFIG.getGuiBackgroundSamplingBlackOverlay() * progress;
+        if (alpha <= 1e-4f) {
+            return;
+        }
+        fillBlack(gr, alpha);
+    }
+
+    private void fillBlack(GuiGraphics gr, float alpha) {
+        int alphaByte = Math.clamp((int) (alpha * 255), 0, 255);
+        gr.fill(0, 0, this.width, this.height, (alphaByte << 24));
     }
 
     @Override
     public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
         mHost.render(gr, mouseX, mouseY, deltaTick);
+        // Runs after the UI layer is submitted, so both backends finish their own pass before the
+        // other touches GL; the blur result is sampled by the next frame.
+        RenderRuntime.getInstance().flushPendingSceneWork();
     }
 
     @Override
     public void removed() {
         super.removed();
+        hudOccluded = false;
         mHost.removed(this);
+        BackgroundState.getInstance().getOverrides().clear();
+        // Only the sampling path (fluid opacity < 1) allocates the full-screen capture and the
+        // blur pyramid sized from it; releasing those is worth a lazy rebuild. The default
+        // fluid-only background holds ~2-3 MiB, which is cheaper to keep than to rebuild (~11 ms).
+        if (CLIENT_CONFIG.getGuiBackgroundFluidOpacity() < 0.999) {
+            BACKGROUND_RENDERER.release();
+        } else {
+            // Keeping the targets is cheap, but the stale cover source would block the artwork
+            // release (and be sampled again after a long pause), so drop just the cover state.
+            BACKGROUND_RENDERER.releaseCoverState();
+        }
     }
 
     @Override

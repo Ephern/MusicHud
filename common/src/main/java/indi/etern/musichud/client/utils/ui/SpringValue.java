@@ -3,18 +3,8 @@ package indi.etern.musichud.client.utils.ui;
 import lombok.Getter;
 
 /**
- * Stateful one-dimensional damped-spring value with closed-form evaluation.
- * <p>
- * Value and velocity are first-class state, so a running animation can be retargeted
- * without losing its velocity (interruptible animation): {@link #setTarget} captures the
- * current {@link #getValue() value}/{@link #getVelocity() velocity} as the new initial
- * conditions and only changes the target. Evaluation is closed-form in the elapsed time
- * (under-damped, critical and over-damped regimes), so it is exact regardless of frame
- * pacing - no per-frame integration drift, no dt noise, and it settles correctly even
- * after a long pause (e.g. the window losing focus).
- * <p>
- * Units are arbitrary (normalized progress, pixels, ...); {@code responseTime} is in
- * seconds and velocity is in value-units per second.
+ * Damped-spring value with closed-form evaluation in elapsed time, so retargeting keeps the current
+ * velocity and the result is exact regardless of frame pacing. {@code responseTime} is in seconds.
  */
 public class SpringValue {
     private static final float SETTLE_EPSILON = 0.01f;

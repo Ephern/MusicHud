@@ -4,13 +4,10 @@ import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.EXTMCFormats;
 
 /**
- * Maps (channel count, bits per sample) to discrete multichannel OpenAL
- * buffer formats ({@code AL_EXT_MCFORMATS}).
- * <p>
- * Only 8-bit and 16-bit variants are used: the extension exposes no float32
- * multichannel formats, so 24/32-bit sources must be resampled to 16-bit
- * before taking the discrete path. Channel counts without a standard layout
- * (3, 5, &gt;8) have no mapping and must go through the stereo downmix path.
+ * Maps (channel count, bits per sample) to discrete multichannel OpenAL buffer formats
+ * ({@code AL_EXT_MCFORMATS}). The extension has no float32 multichannel formats, so 24/32-bit
+ * sources are resampled to 16-bit first; channel counts without a standard layout fall back to the
+ * stereo downmix.
  */
 public final class MultichannelFormats {
     private MultichannelFormats() {
