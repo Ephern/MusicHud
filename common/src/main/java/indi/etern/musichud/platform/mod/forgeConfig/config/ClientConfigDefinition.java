@@ -1,6 +1,7 @@
 package indi.etern.musichud.platform.mod.forgeConfig.config;
 
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.RuntimeFlags;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
@@ -47,7 +48,6 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Double> hudBackgroundSamplingBlackOverlay;
     private final ModConfigSpec.ConfigValue<Double> panelOpacity;
     private final ModConfigSpec.ConfigValue<Double> panelBrightness;
-    private final ModConfigSpec.ConfigValue<Boolean> enableSidebarBackground;
     private final ModConfigSpec.ConfigValue<Boolean> mixWithVanillaSoundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolume;
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
@@ -152,10 +152,6 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Panel background brightness (0 = black, 1 = neutral gray)")
                 .translation(MusicHud.MOD_ID + ".config.common.panelBrightness")
                 .defineInRange("panelBrightness", 0.25, 0, 1);
-        enableSidebarBackground = builder
-                .comment("Show background on the main GUI sidebar")
-                .translation(MusicHud.MOD_ID + ".config.common.enableSidebarBackground")
-                .define("enableSidebarBackground", true);
         hideHudWhenNotPlaying = builder
                 .comment("Hide hud when not playing music")
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
@@ -336,11 +332,15 @@ public class ClientConfigDefinition implements ClientConfig {
 
     @Override
     public boolean getEnable() {
-        return enable.get();
+        return RuntimeFlags.isClientUiAvailable() && enable.get();
     }
 
     @Override
     public void setEnable(boolean enable) {
+        if (!RuntimeFlags.isClientUiAvailable()) {
+            // The effective value is forced off; writing it back would overwrite the user's choice.
+            return;
+        }
         this.enable.set(enable);
     }
 
@@ -581,7 +581,7 @@ public class ClientConfigDefinition implements ClientConfig {
 
     @Override
     public boolean getEnabledInIntegratedServer() {
-        return enabledInIntegratedServer.get();
+        return RuntimeFlags.isClientUiAvailable() && enabledInIntegratedServer.get();
     }
 
     @Override
@@ -591,6 +591,9 @@ public class ClientConfigDefinition implements ClientConfig {
 
     @Override
     public void setEnabledInIntegratedServer(boolean enabledInIntegratedServer) {
+        if (!RuntimeFlags.isClientUiAvailable()) {
+            return;
+        }
         this.enabledInIntegratedServer.set(enabledInIntegratedServer);
     }
 
@@ -888,20 +891,5 @@ public class ClientConfigDefinition implements ClientConfig {
     @Override
     public void setPanelBrightness(double brightness) {
         panelBrightness.set(Math.clamp(brightness, 0, 1));
-    }
-
-    @Override
-    public boolean getEnableSidebarBackground() {
-        return enableSidebarBackground.get();
-    }
-
-    @Override
-    public boolean getDefaultEnableSidebarBackground() {
-        return enableSidebarBackground.getDefault();
-    }
-
-    @Override
-    public void setEnableSidebarBackground(boolean enable) {
-        enableSidebarBackground.set(enable);
     }
 }

@@ -10,4 +10,9 @@ public interface SceneGpuTexture extends SceneTextureRef {
     SceneTextureFormat format();
 
     SceneTextureFormat actualFormat();
+
+    /** True once the backing GPU texture has been destroyed. */
+    default boolean isClosed() {
+        return false;
+    }
 }

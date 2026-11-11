@@ -138,6 +138,21 @@ public final class SceneCover {
                                 rect.u0(), rect.v0(), rect.u1(), rect.v1(), downsample)))));
     }
 
+    /** Copies a cover-sized texture 1:1 into {@code target}; used to freeze a blended cover. */
+    public static boolean copy(SceneGpuContext gpu, SceneTextureRef source,
+                               int width, int height, SceneGpuTexture target) {
+        if (gpu == null || source == null || target == null || width < 1 || height < 1) {
+            return false;
+        }
+        try {
+            resolvePass(gpu, source, width, height, new Rect(0f, 0f, 1f, 1f), target, false);
+            return true;
+        } catch (RuntimeException failure) {
+            LOGGER.debug("While copying the resolved cover", failure);
+            return false;
+        }
+    }
+
     private void releaseIntermediates(SceneGpuContext gpu) {
         for (SceneGpuTexture intermediate : intermediates) {
             if (intermediate != null && owner == gpu) {

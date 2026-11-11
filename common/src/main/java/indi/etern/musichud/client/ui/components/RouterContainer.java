@@ -17,9 +17,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
 @SuppressWarnings("unused")
 public class RouterContainer extends FrameLayout {
-    @Getter
-    private static RouterContainer instance;
-
     private final Map<String, View> pageCache = new HashMap<>();
     private final Map<String, Function<Context, View>> pageFactories = new HashMap<>();
     private String currentPageKey = null;
@@ -77,7 +74,7 @@ public class RouterContainer extends FrameLayout {
             public List<Animator> createAnimators(View fromPage, View toPage,
                                                   int duration, TimeInterpolator interpolator) {
                 List<Animator> animators = new ArrayList<>();
-                int width = instance.getWidth();
+                int width = toPage.getWidth();
 
                 if (fromPage != null) {
                     ObjectAnimator slideOut = ObjectAnimator.ofFloat(fromPage, View.TRANSLATION_X,
@@ -113,7 +110,7 @@ public class RouterContainer extends FrameLayout {
             public List<Animator> createAnimators(View fromPage, View toPage,
                                                   int duration, TimeInterpolator interpolator) {
                 List<Animator> animators = new ArrayList<>();
-                int width = instance.getWidth();
+                int width = toPage.getWidth();
 
                 if (fromPage != null) {
                     ObjectAnimator slideOut = ObjectAnimator.ofFloat(fromPage, View.TRANSLATION_X,
@@ -361,18 +358,6 @@ public class RouterContainer extends FrameLayout {
 
     public RouterContainer(Context context) {
         super(context);
-        RouterContainer thisInstance = this;
-        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View v) {
-                instance = thisInstance;
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View v) {
-                instance = null;
-            }
-        });
     }
 
     public void registerPage(@NonNull String key, @NonNull Function<Context, View> factory) {
@@ -397,16 +382,27 @@ public class RouterContainer extends FrameLayout {
             return;
         }
 
+        // Keep the visible sub-page as the exit page so the outgoing animation has something to
+        // animate; the deeper ones are not visible and can go right away. finishTransition removes it.
+        boolean animateExit = !isTransitioning;
+        View exitPage = null;
         while (!routeStack.empty()) {
             String popKey = routeStack.pop();
             View view = dynamicViews.get(popKey);
             if (view != null) {
                 notifyRoutePopped(view);
-                removeView(view);
+                if (animateExit && exitPage == null) {
+                    exitPage = view;
+                } else {
+                    removeView(view);
+                }
             }
         }
 
         if (isTransitioning) {
+            if (exitPage != null) {
+                removeView(exitPage);
+            }
             pendingNavigationKey = key;
             transitionTargetKey = key;
             if (currentAnimation != null && currentAnimation.isRunning()) {
@@ -424,7 +420,8 @@ public class RouterContainer extends FrameLayout {
         }
 
         View targetPage = getOrCreatePage(key);
-        View currentPage = currentPageKey != null ? pageCache.get(currentPageKey) : null;
+        View currentPage = exitPage != null ? exitPage
+                : currentPageKey != null ? pageCache.get(currentPageKey) : null;
 
         routeStack.push(key);
 

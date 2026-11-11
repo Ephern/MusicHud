@@ -261,12 +261,6 @@ public interface ClientConfig {
 
     void setPanelBrightness(double brightness);
 
-    boolean getEnableSidebarBackground();
-
-    boolean getDefaultEnableSidebarBackground();
-
-    void setEnableSidebarBackground(boolean enable);
-
     void save();
 
     boolean isConfigured();

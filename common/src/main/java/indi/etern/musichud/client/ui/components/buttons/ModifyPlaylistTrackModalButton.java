@@ -11,6 +11,7 @@ import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.util.ColorStateList;
 import icyllis.modernui.view.Gravity;
+import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.ImageButton;
@@ -43,6 +44,7 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -58,7 +60,7 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
         super(context);
         setScaleType(ScaleType.CENTER);
         normalTooltip = I18n.get(MusicHud.MOD_ID + ".button.modifyMusicTrackPlaylist");
-        setTooltipText(normalTooltip);
+        Tooltip.attach(this, normalTooltip);
         Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_plus.png");
         if (icon != null) {
             var resources = getContext().getResources();
@@ -77,10 +79,10 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
     private void updateLoginState(boolean loggedIn) {
         if (loggedIn) {
             setEnabled(true);
-            setTooltipText(normalTooltip);
+            Tooltip.attach(this, normalTooltip);
         } else {
             setEnabled(false);
-            setTooltipText(I18n.get(MusicHud.MOD_ID + ".text.loginRequired"));
+            Tooltip.attach(this, I18n.get(MusicHud.MOD_ID + ".text.loginRequired"));
         }
     }
 
@@ -91,6 +93,13 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
             loginStateUnregister.unregister();
             loginStateUnregister = null;
         }
+    }
+
+    /** Disabled buttons must still show their tooltip, which the listener path skips. */
+    @Override
+    protected boolean dispatchHoverEvent(MotionEvent event) {
+        Tooltip.handleHover(this, event);
+        return super.dispatchHoverEvent(event);
     }
 
     public void bindMusicDetail(MusicDetail musicDetail) {

@@ -7,6 +7,8 @@ import java.util.Objects;
 
 public final class SceneCoverTransition {
     private static final float TRANSITION_SECONDS = FluidBackgroundSettings.COVER_TRANSITION_SECONDS;
+    /** Below this progress a running crossfade is still visually the outgoing cover. */
+    private static final float FROZEN_MIN_PROGRESS = 0.05f;
 
     private final SceneCover[] covers = {new SceneCover(), new SceneCover()};
     private final SceneCoverBlend blend = new SceneCoverBlend();
@@ -22,6 +24,8 @@ public final class SceneCoverTransition {
     private boolean blending;
     private boolean fading;
     private float transitionStartSeconds;
+    /** Time of the previous update; a change at or after it landed while this renderer was idle. */
+    private float lastUpdateSeconds;
     private float fadeFrom;
     private float fadeTo;
     private int targetLongEdge;
@@ -67,8 +71,13 @@ public final class SceneCoverTransition {
             reResolve(gpu);
         }
         if (!Objects.equals(source, activeSource)) {
-            transitionTo(gpu, source, changedAtMillis, timeSeconds);
+            if (fading && source != null && activeTexture != null) {
+                retargetActive(gpu, source);
+            } else {
+                transitionTo(gpu, source, changedAtMillis, timeSeconds);
+            }
         }
+        lastUpdateSeconds = timeSeconds;
 
         float opacityScale = 1f;
         boolean animated = blending || fading;
@@ -101,6 +110,20 @@ public final class SceneCoverTransition {
             }
         }
         return new Frame(cover, opacityScale, animated);
+    }
+
+    /**
+     * Re-resolves the pixels of the cover that is still fading in, keeping the opacity timeline.
+     * Republishing the same artwork at a higher resolution must not restart the fade.
+     */
+    private void retargetActive(SceneGpuContext gpu, SceneCoverSource source) {
+        SceneGpuTexture prepared = covers[activeSlot].prepare(gpu, source, targetLongEdge);
+        if (prepared == null) {
+            // Leave the state untouched so the next frame retries with this source.
+            return;
+        }
+        activeTexture = prepared;
+        activeSource = source;
     }
 
     private void transitionTo(SceneGpuContext gpu, @Nullable SceneCoverSource source,
@@ -143,36 +166,65 @@ public final class SceneCoverTransition {
             return;
         }
 
-        float startSeconds = changedAtMillis / 1000f;
-        float t = progress(startSeconds, timeSeconds);
         if (activeTexture != null) {
-            if (t < 1f) {
-                previousTexture = activeTexture;
-                previousSource = activeSource;
-                blending = true;
-            } else {
+            float startSeconds = changedAtMillis / 1000f;
+            if (startSeconds >= lastUpdateSeconds && progress(startSeconds, timeSeconds) >= 1f) {
+                // The source changed while this renderer was idle and its crossfade is already over.
                 previousTexture = null;
                 previousSource = null;
                 blending = false;
+                fading = false;
+                fadingTexture = null;
+                fadingSource = null;
+                activeSlot = nextSlot;
+                activeTexture = prepared;
+                activeSource = source;
+                transitionStartSeconds = startSeconds;
+                return;
             }
+            // A live source switch fades from what is visible now.
+            SceneGpuTexture previous = activeTexture;
+            SceneCoverSource previousOwner = activeSource;
+            if (blending) {
+                float current = progress(timeSeconds);
+                SceneGpuTexture frozen = current > FROZEN_MIN_PROGRESS ? blend.freeze(gpu) : null;
+                if (frozen != null) {
+                    previous = frozen;
+                    previousOwner = null;
+                } else if (current <= FROZEN_MIN_PROGRESS) {
+                    // The fade just started, so the outgoing cover is still what is on screen.
+                    previous = previousTexture;
+                    previousOwner = previousSource;
+                }
+            }
+            previousTexture = previous;
+            previousSource = previousOwner;
+            blending = true;
             fading = false;
             fadingTexture = null;
             fadingSource = null;
+            activeSlot = nextSlot;
+            activeTexture = prepared;
+            activeSource = source;
+            transitionStartSeconds = timeSeconds;
+            return;
+        }
+
+        float startSeconds = changedAtMillis / 1000f;
+        float t = progress(startSeconds, timeSeconds);
+        previousTexture = null;
+        previousSource = null;
+        blending = false;
+        if (t < 1f) {
+            fading = true;
+            fadingTexture = null;
+            fadingSource = null;
+            fadeFrom = 0f;
+            fadeTo = 1f;
         } else {
-            previousTexture = null;
-            previousSource = null;
-            blending = false;
-            if (t < 1f) {
-                fading = true;
-                fadingTexture = null;
-                fadingSource = null;
-                fadeFrom = 0f;
-                fadeTo = 1f;
-            } else {
-                fading = false;
-                fadeFrom = 1f;
-                fadeTo = 1f;
-            }
+            fading = false;
+            fadeFrom = 1f;
+            fadeTo = 1f;
         }
         activeSlot = nextSlot;
         activeTexture = prepared;
@@ -226,6 +278,7 @@ public final class SceneCoverTransition {
         blending = false;
         fading = false;
         transitionStartSeconds = 0f;
+        lastUpdateSeconds = 0f;
         fadeFrom = 0f;
         fadeTo = 0f;
         targetLongEdge = 0;

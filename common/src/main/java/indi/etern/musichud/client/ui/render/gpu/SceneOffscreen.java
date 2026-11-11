@@ -7,6 +7,7 @@ import icyllis.arc3d.core.Rect2f;
 import icyllis.arc3d.core.SamplingOptions;
 import icyllis.arc3d.engine.Engine;
 import icyllis.arc3d.granite.GraniteSurface;
+import icyllis.arc3d.granite.RecordingContext;
 import icyllis.arc3d.sketch.Image;
 import icyllis.arc3d.sketch.Surface;
 import icyllis.modernui.core.Core;
@@ -27,12 +28,18 @@ public final class SceneOffscreen {
     }
 
     private final String label;
+    private final boolean blurSource;
     private Surface surface;
     private int width;
     private int height;
 
     public SceneOffscreen(@NotNull String label) {
+        this(label, false);
+    }
+
+    public SceneOffscreen(@NotNull String label, boolean blurSource) {
         this.label = label;
+        this.blurSource = blurSource;
     }
 
     public @Nullable Surface surface() {
@@ -63,7 +70,8 @@ public final class SceneOffscreen {
             return false;
         }
         try {
-            surface = GraniteSurface.makeRenderTarget(Core.requireUiRecordingContext(),
+            var context = recordingContext();
+            surface = GraniteSurface.makeRenderTarget(context,
                     ImageInfo.make(width, height,
                             ColorInfo.CT_RGBA_8888, ColorInfo.AT_PREMUL, ColorSpaces.SRGB),
                     false, Engine.SurfaceOrigin.kUpperLeft, label);
@@ -74,6 +82,17 @@ public final class SceneOffscreen {
             release();
             return false;
         }
+    }
+
+    private RecordingContext recordingContext() {
+        if (blurSource) {
+            RecordingContext context = BlurRecordingContext.get();
+            if (context != null) {
+                return context;
+            }
+            BlurRecordingContext.markFallback();
+        }
+        return Core.requireUiRecordingContext();
     }
 
     /** Draws the content into the target, translated by {@code (dx, dy)}. Does not snapshot. */

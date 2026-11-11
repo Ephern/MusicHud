@@ -7,13 +7,15 @@
   "client": [
     "GuiRendererSceneMixin",
     "ModernUiBitmapMixin",
+    "ModernUiGuardMixin",
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
     "SpanSetMixin",
     "ToastManagerMixin",
-    "ToastRecordAccessor"
+    "ToastRecordAccessor",
+    "UIManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

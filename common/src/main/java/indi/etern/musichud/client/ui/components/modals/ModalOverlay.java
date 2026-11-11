@@ -15,8 +15,10 @@ import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.FrameLayout;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.gpu.MidFrameCommit;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurPainter;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
+import indi.etern.musichud.client.ui.render.gpu.SceneCanvasLayer;
 import indi.etern.musichud.client.ui.render.gpu.SceneOffscreen;
 import org.apache.logging.log4j.Logger;
 
@@ -81,7 +83,7 @@ public final class ModalOverlay extends FrameLayout {
             super.dispatchDraw(canvas);
             return;
         }
-        Surface layer = arc.getCanvas().getSurface();
+        Surface layer = SceneCanvasLayer.resolve(arc.getCanvas());
         if (!(layer instanceof GraniteSurface)) {
             super.dispatchDraw(canvas);
             return;
@@ -149,11 +151,11 @@ public final class ModalOverlay extends FrameLayout {
         int snapHeight = snapBottom - snapTop;
         if (snapWidth > 0 && snapHeight > 0) {
             // Copy the layer below the card into our own target: the card is composited later in this
-            // same recording, and the deferred blur runs after the recording has executed.
+            // same recording, so the backdrop must be captured before it.
             backdropTarget.ensure(snapWidth, snapHeight);
             if (backdropTarget.isReady()) {
-                Image snapshot = layer.makeImageSnapshot(
-                        new Rect2i(snapLeft, snapTop, snapRight, snapBottom));
+                Image snapshot = SceneCanvasLayer.snapshot(layer,
+                        snapLeft, snapTop, snapRight, snapBottom);
                 if (snapshot != null) {
                     try {
                         backdropTarget.renderImage(snapshot, snapWidth, snapHeight);
@@ -167,6 +169,9 @@ public final class ModalOverlay extends FrameLayout {
                     }
                 }
             }
+            // The blur runs between the partial and main submissions, so the composite below sees
+            // this frame's result.
+            MidFrameCommit.commitIfPending();
             Image blurred = blurSlot.image();
             if (blurred != null) {
                 // The backdrop is part of the card, so it has to fade with it; otherwise it pops in

@@ -48,9 +48,10 @@ dependencies {
 
     modImplementation "com.terraformersmc:modmenu:$rootProject.modmenu_version"
 
-    // ModernUI Fabric (replaced by fork JAR in run/client/mods/)
-    compileOnly("icyllis.modernui:ModernUI-Fabric:1.21.8-${rootProject.modernui_version}.+")
-    // modImplementation("icyllis.modernui:ModernUI-Fabric:1.21.8-${rootProject.modernui_version}.+")
+    // Same jar the dev run loads; keeping it on the runtime classpath is what lets Architectury
+    // Transformer resolve ModernUI classes (e.g. TextView superclasses) while transforming.
+    modImplementation files(modernUiLumenJar('Fabric'))
+    implementation files(modernUiLumenLibraries('Fabric'))
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"
@@ -61,8 +62,6 @@ dependencies {
     implementation "net.jthink:jaudiotagger:$rootProject.jaudiotagger_version"
     shadowBundle "net.jthink:jaudiotagger:$rootProject.jaudiotagger_version"
 
-//    implementation "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
-//    shadowBundle "io.github.selemba1000:JavaMediaTransportControls:$rootProject.jmtc_version"
     implementation "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
     shadowBundle "com.github.hypfvieh:dbus-java-core:$rootProject.dbus_version"
     implementation "com.github.hypfvieh:dbus-java-transport-native-unixsocket:$rootProject.dbus_version"

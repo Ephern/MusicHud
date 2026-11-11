@@ -16,6 +16,11 @@ public final class SceneCoverBlend {
     private int width;
     private int height;
     private SceneGpuTexture target;
+    /** Copy of {@link #target} from the previous frame, so a running fade can be restarted mid-way. */
+    private SceneGpuTexture frozen;
+    private SceneGpuContext frozenOwner;
+    private int frozenWidth;
+    private int frozenHeight;
 
     public @Nullable SceneGpuTexture apply(SceneGpuContext gpu, SceneGpuTexture previous,
                                            SceneGpuTexture current, float mix) {
@@ -54,12 +59,53 @@ public final class SceneCoverBlend {
         }
     }
 
+    /**
+     * Copies the mix produced by the previous frame into a separate texture. A crossfade that is
+     * interrupted mid-way by another cover change restarts from exactly what is on screen, which is
+     * what keeps the switch free of a visible jump.
+     */
+    public @Nullable SceneGpuTexture freeze(SceneGpuContext gpu) {
+        if (gpu == null || target == null || owner != gpu || width < 1 || height < 1) {
+            return null;
+        }
+        if (frozen == null || frozenOwner != gpu || frozenWidth != width || frozenHeight != height) {
+            releaseFrozen();
+            try {
+                frozen = gpu.createRenderTarget("MusicHud cover mix", width, height,
+                        SceneTextureFormat.RGBA16F);
+                frozenOwner = gpu;
+                frozenWidth = width;
+                frozenHeight = height;
+            } catch (RuntimeException failure) {
+                LOGGER.debug("While creating the frozen cover mix", failure);
+                releaseFrozen();
+                return null;
+            }
+        }
+        if (!SceneCover.copy(gpu, target, width, height, frozen)) {
+            releaseFrozen();
+            return null;
+        }
+        return frozen;
+    }
+
     /** Releases the blend target; it is re-created lazily on the next blend. */
     public void release() {
         SceneGpuContext current = owner;
         if (current != null) {
             release(current);
         }
+        releaseFrozen();
+    }
+
+    private void releaseFrozen() {
+        if (frozen != null && frozenOwner != null) {
+            frozenOwner.release(frozen);
+        }
+        frozen = null;
+        frozenOwner = null;
+        frozenWidth = 0;
+        frozenHeight = 0;
     }
 
     private void release(SceneGpuContext gpu) {

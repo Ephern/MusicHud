@@ -35,7 +35,7 @@ public final class SceneBlur {
 
     /**
      * Pyramid level a blur of this size and sigma will use. Consumers key their target cache on it,
-     * because a level change makes {@link #targets} release the previous result texture.
+     * because a level change rebuilds the pyramid; the result texture is preserved.
      */
     public static int levelFor(int width, int height, float sigma) {
         if (width < 1 || height < 1 || !(sigma > 0f) || !Float.isFinite(sigma)) {
@@ -70,14 +70,19 @@ public final class SceneBlur {
     }
 
     private boolean targets(SceneGpuContext gpu, int width, int height, int level) {
-        if (owner == gpu && sourceWidth == width && sourceHeight == height && this.level == level
-                && result != null && scratch != null) {
+        boolean sameTarget = owner == gpu && sourceWidth == width && sourceHeight == height;
+        if (sameTarget && this.level == level && result != null && scratch != null) {
             return true;
         }
-        release();
-        owner = gpu;
-        sourceWidth = width;
-        sourceHeight = height;
+        if (!sameTarget) {
+            releaseForResize();
+            owner = gpu;
+            sourceWidth = width;
+            sourceHeight = height;
+        } else {
+            // The published result is what consumers hold across frames; only the pyramid changes.
+            releaseLevelTargets();
+        }
         this.level = level;
         try {
             downsamples = new SceneGpuTexture[level + 1];
@@ -89,7 +94,9 @@ public final class SceneBlur {
                 downsamples[i] = target(gpu, w, h);
             }
             scratch = target(gpu, w, h);
-            result = target(gpu, width, height);
+            if (result == null) {
+                result = target(gpu, width, height);
+            }
             return true;
         } catch (RuntimeException failure) {
             LOGGER.debug("While creating scene blur targets", failure);
@@ -98,22 +105,47 @@ public final class SceneBlur {
         }
     }
 
-    private SceneGpuTexture target(SceneGpuContext gpu, int width, int height) {
-        return gpu.createRenderTarget("MusicHud scene blur", width, height,
-                format);
+    /**
+     * Releases everything but the result: a recording made before this call may still sample it, so
+     * it is retired instead of destroyed.
+     */
+    private void releaseForResize() {
+        SceneGpuContext current = owner;
+        releaseLevelTargets();
+        if (current != null && result != null) {
+            SceneGpuTexture previous = result;
+            SceneRetirement.retire(() -> current.release(previous));
+        }
+        result = null;
     }
 
-    public void release() {
+    private void releaseLevelTargets() {
         SceneGpuContext current = owner;
         if (current != null) {
             for (int i = 1; i < downsamples.length; i++) {
                 if (downsamples[i] != null) current.release(downsamples[i]);
             }
             if (scratch != null) current.release(scratch);
-            if (result != null) current.release(result);
         }
         downsamples = new SceneGpuTexture[1];
         scratch = null;
+    }
+
+    private SceneGpuTexture target(SceneGpuContext gpu, int width, int height) {
+        return gpu.createRenderTarget("MusicHud scene blur", width, height,
+                format);
+    }
+
+    public void release() {
+        releaseLevelTargets();
+        SceneGpuContext current = owner;
+        if (current != null && result != null) {
+            // A recording made before this call may still sample it (the UI thread records about
+            // one frame ahead of the render thread).
+//            SceneGpuTexture previous = result;
+//            SceneRetirement.retire(() -> current.release(previous));
+            current.release(result);
+        }
         result = null;
         owner = null;
     }

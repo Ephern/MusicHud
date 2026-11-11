@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.pages.account;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
+import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.view.Gravity;
@@ -19,18 +20,17 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.MusicListFactory;
 import indi.etern.musichud.client.ui.components.MusicTrackItem;
 import indi.etern.musichud.client.ui.components.RouterContainer;
+import indi.etern.musichud.client.ui.components.SegmentedBar;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.layouts.WaterfallLayout;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.network.RequestResponseManager;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentAlbumRecordRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentAlbumRecordResponse;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentPlaylistRecordRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentPlaylistRecordResponse;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentTrackRecordRequest;
-import indi.etern.musichud.network.payloads.requestResponseCycle.GetUserRecentTrackRecordResponse;
+import indi.etern.musichud.network.payloads.requestResponseCycle.*;
 import lombok.NonNull;
 import net.minecraft.client.resources.language.I18n;
 
@@ -46,61 +46,54 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
  * Full-screen account play-history page with three tabs (songs / albums / playlists).
  * Opened from {@link AccountView} through {@link RouterContainer#pushNavigate(View)}.
  */
-public class PlayHistoryView extends LinearLayout {
+public class PlayHistoryView extends FrameLayout {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
+    private final LinearLayout topBar;
     private ViewPager pager;
 
     public PlayHistoryView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
 
-        LinearLayout topBar = new LinearLayout(context);
-        topBar.setOrientation(HORIZONTAL);
+        topBar = new LinearLayout(context);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
         topBar.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        topBarParams.setMargins(0, dp(24), 0, dp(16));
-        addView(topBar, topBarParams);
+        topBar.setClickable(true);
+        int dp2 = dp(2);
+        PanelStyle.applyDynamically(topBar, dp(16),
+                new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2),
+                InsetBackgroundFactory.BackdropBlur.UI_LAYER);
 
         ImageButton backButton = new ImageButton(context);
-        backButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.back"));
+        Tooltip.attach(backButton, I18n.get(MusicHud.MOD_ID + ".button.back"));
         Image backIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
         if (backIcon != null) {
             backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), backIcon, dp(16), dp(16)));
         }
         backButton.setOnClickListener(view -> {
-            RouterContainer routerContainer = RouterContainer.getInstance();
+            RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
             if (routerContainer != null) {
                 routerContainer.popNavigate();
             }
         });
-        InsetBackgroundFactory.builder()
-                .inset(0)
-                .cornerRadius(dp(4))
-                .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
-                .build()
-                .applyBackgroundTo(backButton);
-        LayoutParams backButtonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
-        backButtonParams.setMargins(0, 0, dp(4), 0);
-        topBar.addView(backButton, backButtonParams);
+        InsetBackgroundFactory buttonBackgroundFactory = InsetBackgroundFactory.builder()
+                .inset(dp(1))
+                .cornerRadius(dp(14))
+                .build();
+        buttonBackgroundFactory.applyBackgroundTo(backButton);
+        topBar.addView(backButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
         TextView title = new TextView(context);
         title.setTextSize(Theme.TEXT_SIZE_LARGER);
         title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         title.setText(I18n.get(MusicHud.MOD_ID + ".button.history"));
-        LayoutParams titleParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        titleParams.setMargins(dp(12), 0, dp(4), 0);
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        titleParams.setMargins(dp(4), 0, dp(4), 0);
         topBar.addView(title, titleParams);
 
-        InsetBackgroundFactory refreshBackgroundFactory = InsetBackgroundFactory.builder()
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .inset(dp(1))
-                .cornerRadius(dp(4))
-                .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4)))
-                .build();
         ImageButton refreshButton = new ImageButton(context);
-        refreshBackgroundFactory.applyBackgroundTo(refreshButton);
-        refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+        buttonBackgroundFactory.applyBackgroundTo(refreshButton);
+        Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
         refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         Image refreshIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
         if (refreshIcon != null) {
@@ -115,27 +108,77 @@ public class PlayHistoryView extends LinearLayout {
                 }
             }
         });
-        topBar.addView(refreshButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        topBar.addView(refreshButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
-        TabLayout tabLayout = new TabLayout(context);
-        tabLayout.setElevation(dp(3));
-        tabLayout.setTabMode(TabLayout.MODE_AUTO);
-        tabLayout.setTabGravity(TabLayout.GRAVITY_CENTER);
-        tabLayout.setBackground(null);
-        LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params.setMargins(dp(16), 0, 0, 0);
-        topBar.addView(tabLayout, params);
+        {
+            View divider = new View(context);
+            ShapeDrawable dividerBg = new ShapeDrawable();
+            dividerBg.setShape(ShapeDrawable.VLINE);
+            dividerBg.setSize(divider.dp(1), divider.dp(1));
+            dividerBg.setColor(Theme.GHOST_BUTTON_BACKGROUND_HOVERED);
+            divider.setBackground(dividerBg);
+            LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(divider.dp(1), MATCH_PARENT);
+            dividerParams.setMargins(divider.dp(2), divider.dp(8), divider.dp(2), divider.dp(8));
+            topBar.addView(divider, dividerParams);
+        }
+
+        SegmentedBar tabBar = new SegmentedBar(context);
+        tabBar.addItem(new SegmentedBar.Item("track", null,
+                "/assets/music_hud/textures/gui/icons/eighth_note.png",
+                I18n.get(MusicHud.MOD_ID + ".text.history.track")));
+        tabBar.addItem(new SegmentedBar.Item("album", null,
+                "/assets/music_hud/textures/gui/icons/disc_album.png",
+                I18n.get(MusicHud.MOD_ID + ".text.history.album")));
+        tabBar.addItem(new SegmentedBar.Item("playlist", null,
+                "/assets/music_hud/textures/gui/icons/list_music.png",
+                I18n.get(MusicHud.MOD_ID + ".text.history.playlist")));
+        topBar.addView(tabBar, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         pager = new ViewPager(context);
         pager.setAdapter(new HistoryPagerAdapter());
         pager.setFocusableInTouchMode(true);
         pager.setKeyboardNavigationCluster(true);
-        tabLayout.setupWithViewPager(pager);
-        addView(pager, new LayoutParams(MATCH_PARENT, 0, 1));
+        tabBar.setOnItemSelectedListener((key, index) -> pager.setCurrentItem(index, true));
+        pager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                tabBar.setSelectedIndex(position, true);
+            }
+        });
+        addView(pager, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
+        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        topBarParams.gravity = Gravity.TOP;
+        topBarParams.setMargins(0, dp(12), 0, 0);
+        // Added last so its backdrop blur samples the pager painted underneath.
+        addView(topBar, topBarParams);
+    }
+
+    /**
+     * The page inset equals the space the floating bar occupies, which is only known after measure.
+     * It goes to each page's own scroll view so their content scrolls underneath the bar.
+     */
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
+        int inset = lp.topMargin + topBar.getMeasuredHeight();
+        if (pager != null && pager.getAdapter() instanceof HistoryPagerAdapter adapter) {
+            adapter.setContentInsetTop(inset);
+        }
+        super.onLayout(changed, left, top, right, bottom);
     }
 
     private static class HistoryPagerAdapter extends PagerAdapter {
         private final Map<Integer, HistoryPage> pages = new HashMap<>();
+        private int contentInsetTop;
+
+        void setContentInsetTop(int inset) {
+            if (contentInsetTop == inset) {
+                return;
+            }
+            contentInsetTop = inset;
+            pages.values().forEach(page -> page.setContentInsetTop(inset));
+        }
 
         @Override
         public int getCount() {
@@ -146,6 +189,7 @@ public class PlayHistoryView extends LinearLayout {
         @Override
         public Object instantiateItem(@NonNull ViewGroup container, int position) {
             HistoryPage page = new HistoryPage(container.getContext(), position);
+            page.setContentInsetTop(contentInsetTop);
             pages.put(position, page);
             container.addView(page, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
             return page;
@@ -167,16 +211,6 @@ public class PlayHistoryView extends LinearLayout {
         public boolean isViewFromObject(@NonNull View view, @NonNull Object object) {
             return view == object;
         }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            return I18n.get(switch (position) {
-                case 0 -> MusicHud.MOD_ID + ".text.history.track";
-                case 1 -> MusicHud.MOD_ID + ".text.history.album";
-                case 2 -> MusicHud.MOD_ID + ".text.history.playlist";
-                default -> "";
-            });
-        }
     }
 
     /**
@@ -185,6 +219,7 @@ public class PlayHistoryView extends LinearLayout {
      */
     private static class HistoryPage extends FrameLayout {
         private final int position;
+        private final ScrollView scrollView;
         private final LinearLayout content;
         private final ProgressBar progressBar;
         private final TextView emptyText;
@@ -195,12 +230,13 @@ public class PlayHistoryView extends LinearLayout {
             this.position = position;
 
             //noinspection UnstableApiUsage
-            ClampingScrollView scrollView = new ClampingScrollView(context);
+            scrollView = new ClampingScrollView(context);
             scrollView.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+            scrollView.setClipToPadding(false);
             addView(scrollView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             content = new LinearLayout(context);
-            content.setOrientation(VERTICAL);
+            content.setOrientation(LinearLayout.VERTICAL);
             scrollView.addView(content, new ScrollView.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
             progressBar = new ProgressBar(context);
@@ -232,6 +268,12 @@ public class PlayHistoryView extends LinearLayout {
                 public void onViewDetachedFromWindow(View v) {
                 }
             });
+        }
+
+        void setContentInsetTop(int inset) {
+            if (scrollView.getPaddingTop() != inset) {
+                scrollView.setPadding(0, inset, 0, 0);
+            }
         }
 
         void reload() {
@@ -312,7 +354,7 @@ public class PlayHistoryView extends LinearLayout {
                 if (!(data instanceof Album album)) {
                     continue;
                 }
-                waterfall.addView(new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY));
+                waterfall.addView(new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY, dp(160)));
                 count++;
             }
             if (count > 0) {
@@ -334,7 +376,7 @@ public class PlayHistoryView extends LinearLayout {
                 if (!(data instanceof Playlist playlist)) {
                     continue;
                 }
-                waterfall.addView(new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY));
+                waterfall.addView(new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY, dp(160)));
                 count++;
             }
             if (count > 0) {

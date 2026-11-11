@@ -49,6 +49,8 @@ public final class HudScene implements RenderScene {
     private Logger logger;
     private Supplier<String> appliedSkinSupplier;
     private int appliedStatusRevision = -1;
+    /** True once the hidden HUD has released its cover state. */
+    private boolean backgroundPaused;
 
     private HudScene() {
         presenter.setLyricSink(new HudPresenter.LyricSink() {
@@ -105,8 +107,14 @@ public final class HudScene implements RenderScene {
             updateFrameState();
             if (MusicHudScreen.isHudOccluded()
                     || presenter.getModel().getHudAlpha() <= 1e-4f) {
+                if (!backgroundPaused) {
+                    backgroundPaused = true;
+                    // Release the artwork and cover targets the paused background no longer shows.
+                    BACKGROUND_RENDERER.releaseCoverState();
+                }
                 return;
             }
+            backgroundPaused = false;
             drawFrame(context);
         } catch (Exception e) {
             logger().error("While rendering HUD frame", e);
