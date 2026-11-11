@@ -199,7 +199,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         // Reserve room for the blurred lines' horizontal bleed, otherwise the tail is clipped by the
         // scroll view's bounds and a hard edge appears at the left/right of every line.
-        int blurMargin = Math.max(dp(1), LineBlurRenderer.maxPaddingFor(dp(MAX_BLUR_DP)));
+        int blurMargin = Math.max(dp(1), Math.max(
+                LineBlurRenderer.maxPaddingFor(dp(MAX_BLUR_DP)),
+                LineBlurRenderer.maxPaddingFor(dp(LyricLineView.BLOOM_DP))));
         params.setMargins(blurMargin, 0, blurMargin, 0);
         addView(container, params);
 
@@ -862,6 +864,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             boolean blurred = visible && blurEnabled && !manual && referenceIndex >= 0
                     && view.isBlurEligible();
             view.setBlurPipelineEnabled(blurred);
+            boolean bloom = visible && referenceIndex >= 0 && i == referenceIndex
+                    && view.isBloomEligible();
+            view.setBloomPipelineEnabled(bloom);
             if (blurred) {
                 float target = LineBlurRenderer.radiusForDistance(Math.abs(i - referenceIndex), maxRadius);
                 view.setBlurTarget(target, nowNanos);
@@ -988,6 +993,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int padding = blurPaddingPx();
         for (LyricLineView lyricLineView : lyricLineViewList) {
             lyricLineView.prepareBlurSource(padding);
+            lyricLineView.prepareBloomSource(padding);
         }
         MidFrameCommit.commitIfPending(BlurRecordingContext.get());
         super.dispatchDraw(canvas);
@@ -995,7 +1001,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     private int blurPaddingPx() {
-        return Math.max(dp(1), LineBlurRenderer.maxPaddingFor(dp(MAX_BLUR_DP)));
+        return Math.max(dp(1), Math.max(
+                LineBlurRenderer.maxPaddingFor(dp(MAX_BLUR_DP)),
+                LineBlurRenderer.maxPaddingFor(dp(LyricLineView.BLOOM_DP))));
     }
 
     @Override

@@ -11,6 +11,17 @@ architectury {
 allprojects {
     group = rootProject.maven_group
     version = rootProject.mod_version + "+" + rootProject.minecraft_version_range
+
+    // Fabric (0.18.x) ships ASM 9.9 while NeoForge 21.9 ships 9.8; a dev run whose classpath
+    // combines both modules trips Fabric Loader's duplicate-ASM check.
+    configurations.configureEach {
+        resolutionStrategy.force(
+                'org.ow2.asm:asm:9.9',
+                'org.ow2.asm:asm-tree:9.9',
+                'org.ow2.asm:asm-analysis:9.9',
+                'org.ow2.asm:asm-commons:9.9',
+                'org.ow2.asm:asm-util:9.9')
+    }
 }
 
 configure(subprojects.findAll { it.name != 'core' && it.name != 'processor' }) {

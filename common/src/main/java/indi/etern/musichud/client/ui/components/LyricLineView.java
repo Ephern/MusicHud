@@ -5,7 +5,9 @@ import icyllis.modernui.animation.Animator;
 import icyllis.modernui.animation.AnimatorSet;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.graphics.BlendMode;
 import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.Paint;
 import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.view.View;
@@ -16,9 +18,11 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.lyric.LineBloomResources;
 import indi.etern.musichud.client.ui.lyric.LineBlurRenderer;
 import indi.etern.musichud.client.ui.lyric.LineBlurResources;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
+import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
 import indi.etern.musichud.client.utils.ui.RhythmAnimator;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.client.utils.ui.SpringValue;
@@ -35,6 +39,8 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class LyricLineView extends LinearLayout {
+    public static final float BLOOM_DP = 8f;
+    private static final long BLOOM_RELEASE_NANOS = 220_000_000L;
     private static final float LYRIC_EMPHASIZE_SCALE = 1.02f;
     private static final float RHYTHM_EMPHASIZE_ANIMATION_SCALE = 0.85f;
     private static final int SCALE_ANIMATION_DELAY = 500;
@@ -59,10 +65,17 @@ public class LyricLineView extends LinearLayout {
     private final SpringValue blurSpring = new SpringValue(BLUR_SPRING_RESPONSE_SECONDS, 1f);
     private final LineBlurResources blurResources = new LineBlurResources();
     private final SceneBlurSlot blurSlot = new SceneBlurSlot();
+    private final LineBloomResources bloomResources = new LineBloomResources();
+    private final SceneBlurSlot bloomSlot = new SceneBlurSlot(SceneTextureFormat.RGBA16F, true);
+    private final Paint bloomPaint = new Paint();
     private Image frameImage;
     private int frameSurfaceWidth;
     private int frameSurfaceHeight;
     private int framePadding;
+    private Image bloomFrameImage;
+    private int bloomSurfaceWidth;
+    private int bloomSurfaceHeight;
+    private int bloomPadding;
     private float blurRadius = 0f;
     private float blurTarget = 0f;
     /**
@@ -73,12 +86,16 @@ public class LyricLineView extends LinearLayout {
      */
     @Setter
     private boolean blurPipelineEnabled;
+    private boolean bloomPipelineEnabled;
+    private boolean bloomFading;
+    private long bloomFadeStartNanos;
     private boolean blurDisabled = false;
     @Getter
     private boolean blurInitialized = false;
 
     public LyricLineView(Context context, LyricLine lyricLine, int mainLyricSize, int subLyricSize) {
         super(context);
+        bloomPaint.setBlendMode(BlendMode.PLUS);
         this.lyricLine = lyricLine;
         this.mainLyricSize = mainLyricSize;
         this.subLyricSize = subLyricSize;
@@ -354,7 +371,11 @@ public class LyricLineView extends LinearLayout {
         blurDisabled = true;
         blurResources.close();
         blurSlot.unregister();
+        bloomResources.close();
+        bloomSlot.unregister();
         frameImage = null;
+        bloomFrameImage = null;
+        bloomFading = false;
     }
 
     /**
@@ -364,6 +385,9 @@ public class LyricLineView extends LinearLayout {
     public void invalidateBlur() {
         frameImage = null;
         blurResources.invalidate();
+        bloomFrameImage = null;
+        bloomResources.invalidate();
+        bloomFading = false;
         blurInitialized = false;
     }
 
@@ -371,6 +395,9 @@ public class LyricLineView extends LinearLayout {
     public void releaseBlurSurfaces() {
         blurResources.release();
         frameImage = null;
+        bloomResources.release();
+        bloomFrameImage = null;
+        bloomFading = false;
     }
 
     private boolean canPrepareBlur() {
@@ -428,8 +455,147 @@ public class LyricLineView extends LinearLayout {
         }
     }
 
+    private boolean canPrepareBloom() {
+        return bloomPipelineEnabled
+                && !bloomSlot.isDisabled()
+                && isBloomEligible()
+                && getWidth() > 0
+                && getHeight() > 0;
+    }
+
+    public boolean isBloomEligible() {
+        return lyricLine != null
+                && lyricLine.getType() == LyricLine.Type.NORMAL
+                && mainText instanceof LyricHighlightTextView highlight
+                && highlight.getStatus() == LyricHighlightTextView.HighlightStatus.PERFORMING
+                && highlight.hasDurablePhrase();
+    }
+
+    public void setBloomPipelineEnabled(boolean enabled) {
+        if (bloomPipelineEnabled == enabled) {
+            return;
+        }
+        bloomPipelineEnabled = enabled;
+        if (enabled) {
+            bloomFading = false;
+        } else if (bloomFrameImage != null && !bloomFading) {
+            bloomFading = true;
+            bloomFadeStartNanos = System.nanoTime();
+        }
+    }
+
+    private float bloomAlpha() {
+        if (!bloomFading) {
+            return 1f;
+        }
+        float t = Math.clamp(
+                (System.nanoTime() - bloomFadeStartNanos) / (float) BLOOM_RELEASE_NANOS,
+                0f, 1f);
+        return 1f - t * t * (3f - 2f * t);
+    }
+
+    /**
+     * Parent phase 1 for the long-note bloom: renders only the durable-phrase mask offscreen and
+     * asks the render thread to blur it. The visible text is not part of this mask.
+     */
+    public void prepareBloomSource(int padding) {
+        if (bloomFading) {
+            if (bloomAlpha() <= 0f) {
+                bloomFrameImage = null;
+                bloomFading = false;
+            }
+            return;
+        }
+        if (!canPrepareBloom()) {
+            if (bloomFrameImage != null) {
+                bloomFading = true;
+                bloomFadeStartNanos = System.nanoTime();
+            }
+            return;
+        }
+        bloomFrameImage = null;
+        try {
+            float sigma = LineBlurRenderer.sigmaFor(dp(BLOOM_DP));
+            if (!bloomResources.prepare(getWidth(), getHeight(), padding, sigma,
+                    computeBloomContentStamp(), this::drawBloomMaskAtMainText, bloomSlot)) {
+                return;
+            }
+            Image image = bloomSlot.image();
+            if (image == null) {
+                return;
+            }
+            if (image.getWidth() != bloomResources.width()
+                    || image.getHeight() != bloomResources.height()) {
+                bloomResources.invalidate();
+                return;
+            }
+            bloomFrameImage = image;
+            bloomSurfaceWidth = bloomResources.width();
+            bloomSurfaceHeight = bloomResources.height();
+            bloomPadding = bloomResources.padding();
+        } catch (Throwable failure) {
+            bloomResources.release();
+            bloomSlot.shutdown();
+            bloomFrameImage = null;
+            if (logger == null) {
+                logger = MusicHud.getLogger(LyricLineView.class);
+            }
+            logger.error("Disabling lyric bloom after an error", failure);
+        }
+    }
+
+    /**
+     * Draws only the bloom mask's source text, at the position the row's normal child draw would
+     * use. The row's scale is baked into the mask, so the bloom image can be drawn unbaked at the
+     * row level and still align with the sharp text.
+     */
+    private void drawBloomMaskAtMainText(Canvas canvas) {
+        if (!(mainText instanceof LyricHighlightTextView highlight)) {
+            return;
+        }
+        canvas.save();
+        if (row != null) {
+            canvas.translate(row.getLeft() + row.getTranslationX(),
+                    row.getTop() + row.getTranslationY());
+            canvas.scale(row.getScaleX(), row.getScaleY(), row.getPivotX(), row.getPivotY());
+        }
+        if (mainLine != null) {
+            canvas.translate(mainLine.getLeft() + mainLine.getTranslationX(),
+                    mainLine.getTop() + mainLine.getTranslationY());
+        }
+        canvas.translate(mainText.getLeft() + mainText.getTranslationX(),
+                mainText.getTop() + mainText.getTranslationY());
+        highlight.drawBloomMask(canvas);
+        canvas.restore();
+    }
+
+    private long computeBloomContentStamp() {
+        long stamp = 17L;
+        if (mainText instanceof LyricHighlightTextView highlight) {
+            stamp = stamp * 31 + highlight.getStatus().ordinal();
+            stamp = stamp * 31 + nowPlayingInfo.getPlayedDuration().toMillis();
+            if (highlight.isVisuallyAnimating()) {
+                stamp = stamp * 31 + System.nanoTime();
+            }
+        }
+        if (row != null) {
+            stamp = stamp * 31 + Float.floatToIntBits(row.getScaleX());
+            stamp = stamp * 31 + Float.floatToIntBits(row.getScaleY());
+        }
+        return stamp;
+    }
+
     @Override
     protected void dispatchDraw(@NotNull Canvas canvas) {
+        //noinspection UnstableApiUsage
+        if (bloomFrameImage != null && canvas instanceof ArcCanvas arcCanvas) {
+            float bloomAlpha = bloomAlpha();
+            if (bloomAlpha > 0.001f) {
+                bloomPaint.setAlphaF(bloomAlpha);
+                LineBlurRenderer.drawResult(arcCanvas, bloomFrameImage, bloomSurfaceWidth,
+                        bloomSurfaceHeight, bloomPadding, bloomPaint);
+            }
+        }
         //noinspection UnstableApiUsage
         if (frameImage != null && canvas instanceof ArcCanvas arcCanvas) {
             LineBlurRenderer.drawResult(arcCanvas, frameImage, frameSurfaceWidth, frameSurfaceHeight,
@@ -470,6 +636,7 @@ public class LyricLineView extends LinearLayout {
     protected void onAttachedToWindow() {
         super.onAttachedToWindow();
         blurSlot.register();
+        bloomSlot.register();
     }
 
     @Override
