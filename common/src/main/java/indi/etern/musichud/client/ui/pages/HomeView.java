@@ -39,6 +39,8 @@ import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.shadow.BlurShadowDrawable;
+import indi.etern.musichud.client.ui.shadow.BlurShadowSpec;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
@@ -108,6 +110,8 @@ public class HomeView extends ViewGroup {
     private View notificationView;
     private InfoColumn infoColumn;
     private UrlImageView albumImage;
+    private FrameLayout coverContainer;
+    private BlurShadowDrawable coverShadow;
     private MarqueeTextView name;
     private MarqueeTextView artistsAndAlbum;
     private ImageButton sourceButton;
@@ -187,6 +191,12 @@ public class HomeView extends ViewGroup {
         notificationView = null;
         infoColumn = null;
         albumImage = null;
+        coverContainer = null;
+        if (coverShadow != null) {
+            setBackground(null);
+            coverShadow.close();
+            coverShadow = null;
+        }
         name = null;
         artistsAndAlbum = null;
         sourceButton = null;
@@ -313,7 +323,15 @@ public class HomeView extends ViewGroup {
         albumImage.setCornerRadius(dp(8));
         albumImage.loadUrl(MusicHud.ICON_BASE64);
 
-        infoColumn = new InfoColumn(context, albumImage, infoView);
+        coverContainer = new FrameLayout(context);
+        coverContainer.addView(albumImage, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        coverShadow = new BlurShadowDrawable(new BlurShadowSpec(
+                new BlurShadowSpec.Shape.RoundedRect(8f),
+                32f, 0f, 8f, 0x70000000, 1f,
+                BlurShadowSpec.CacheMode.STATIC), coverContainer);
+        setBackground(coverShadow);
+
+        infoColumn = new InfoColumn(context, coverContainer, infoView);
         addView(infoColumn, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
     }
 
@@ -679,18 +697,19 @@ public class HomeView extends ViewGroup {
 
     /** Matches the sidebar card: the artwork shrinks while muted or not playing. */
     public void updateCoverScale(boolean animate) {
-        if (albumImage == null) {
+        View cover = coverContainer != null ? coverContainer : albumImage;
+        if (cover == null) {
             return;
         }
         float target = isCoverExpanded() ? 1f : COVER_MIN_SCALE;
         cancelCoverScaleAnimator();
         if (!animate) {
-            albumImage.setScaleX(target);
-            albumImage.setScaleY(target);
+            cover.setScaleX(target);
+            cover.setScaleY(target);
             return;
         }
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(albumImage, View.SCALE_X, target);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(albumImage, View.SCALE_Y, target);
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(cover, View.SCALE_X, target);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(cover, View.SCALE_Y, target);
         for (ObjectAnimator animator : new ObjectAnimator[]{scaleX, scaleY}) {
             animator.setInterpolator(COVER_SCALE_INTERPOLATOR);
             animator.setDuration(COVER_SCALE_DURATION_MS);
@@ -769,10 +788,10 @@ public class HomeView extends ViewGroup {
      * that width; the content height depends on it too, hence the small settling loop.
      */
     private static final class InfoColumn extends ViewGroup {
-        private final UrlImageView cover;
+        private final View cover;
         private final LinearLayout content;
 
-        InfoColumn(Context context, UrlImageView cover, LinearLayout content) {
+        InfoColumn(Context context, View cover, LinearLayout content) {
             super(context);
             this.cover = cover;
             this.content = content;
