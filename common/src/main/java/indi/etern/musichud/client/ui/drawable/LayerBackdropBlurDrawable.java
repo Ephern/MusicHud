@@ -33,6 +33,9 @@ public final class LayerBackdropBlurDrawable extends Drawable {
     private final SceneBlurSlot blurSlot = new SceneBlurSlot();
     private final SceneOffscreen sourceTarget = new SceneOffscreen("musichud-layer-blur-source");
     private final SceneBlurPainter painter = new SceneBlurPainter();
+    /** Device-pixel blur region; only grows, so animated bounds do not rebuild the pyramid. */
+    private int regionWidth;
+    private int regionHeight;
     private View view;
     private View.OnAttachStateChangeListener attachListener;
     private float alpha = 1f;
@@ -98,6 +101,17 @@ public final class LayerBackdropBlurDrawable extends Drawable {
     }
 
     @Override
+    public boolean setVisible(boolean visible, boolean restart) {
+        boolean changed = super.setVisible(visible, restart);
+        if (!visible) {
+            // Hidden panels keep their slot registered, so the result of the last visible frame
+            // would otherwise be drawn again before a fresh one is ready.
+            blurSlot.discardPublished();
+        }
+        return changed;
+    }
+
+    @Override
     public void draw(@NotNull Canvas canvas) {
         if (released || failed || blurRadius <= 0 || alpha <= 0.001f) {
             return;
@@ -117,17 +131,29 @@ public final class LayerBackdropBlurDrawable extends Drawable {
         }
         // The blur bleeds outside the bounds, so capture a padded region when the layer allows it.
         int padding = blurRadius + 2;
-        int left = Math.max(0, device.left() - padding);
-        int top = Math.max(0, device.top() - padding);
-        int right = Math.min(layer.getWidth(), device.right() + padding);
-        int bottom = Math.min(layer.getHeight(), device.bottom() + padding);
-        int width = right - left;
-        int height = bottom - top;
-        if (width <= 0 || height <= 0) {
+        int layerWidth = layer.getWidth();
+        int layerHeight = layer.getHeight();
+        int needWidth = Math.min(layerWidth, device.right() - device.left() + padding * 2);
+        int needHeight = Math.min(layerHeight, device.bottom() - device.top() + padding * 2);
+        // Grow-only: the blur pyramid is rebuilt for every distinct size, and an animated view
+        // changes it every few frames, which churns hundreds of MB/s of render targets.
+        if (regionWidth < needWidth || regionHeight < needHeight) {
+            regionWidth = quantize(Math.max(regionWidth, needWidth));
+            regionHeight = quantize(Math.max(regionHeight, needHeight));
+        }
+        regionWidth = Math.min(regionWidth, layerWidth);
+        regionHeight = Math.min(regionHeight, layerHeight);
+        if (regionWidth <= 0 || regionHeight <= 0) {
             return;
         }
+        // The region keeps its size and only moves with the view, so the source target, the blur
+        // pyramid and the snapshot image are allocated once. The painter maps it 1:1 from here.
+        int left = Math.clamp(device.left() - padding, 0, layerWidth - regionWidth);
+        int top = Math.clamp(device.top() - padding, 0, layerHeight - regionHeight);
+        int right = left + regionWidth;
+        int bottom = top + regionHeight;
         try {
-            sourceTarget.ensure(width, height);
+            sourceTarget.ensure(regionWidth, regionHeight);
             if (!sourceTarget.isReady()) {
                 return;
             }
@@ -136,13 +162,14 @@ public final class LayerBackdropBlurDrawable extends Drawable {
                 return;
             }
             try {
-                sourceTarget.renderImage(snapshot, width, height);
+                sourceTarget.renderImage(snapshot, regionWidth, regionHeight);
             } finally {
                 snapshot.unref();
             }
             var source = SceneBlurSlot.imageOf(sourceTarget.surface());
             if (source != null) {
-                blurSlot.request(source, 0f, 0f, 1f, 1f, width, height, blurRadius / 3f);
+                blurSlot.request(source, 0f, 0f, 1f, 1f, regionWidth, regionHeight,
+                        blurRadius / 3f);
             }
             MidFrameCommit.commitIfPending();
             Image blurred = blurSlot.image();
@@ -156,5 +183,9 @@ public final class LayerBackdropBlurDrawable extends Drawable {
             LOGGER.error("Disabling layer backdrop blur after an error", failure);
             blurSlot.shutdown();
         }
+    }
+
+    private static int quantize(int size) {
+        return Math.max(64, ((size + 63) / 64) * 64);
     }
 }

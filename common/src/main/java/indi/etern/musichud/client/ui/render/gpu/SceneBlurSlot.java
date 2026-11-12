@@ -35,6 +35,8 @@ public final class SceneBlurSlot {
 
     private final Object requestLock = new Object();
     private final List<Request> requests = new ArrayList<>();
+    /** Bumped when the consumer hides; results requested before that must not be published. */
+    private int generation;
     private final SceneTextureFormat blurFormat;
     private final boolean bloomComposite;
 
@@ -112,6 +114,19 @@ public final class SceneBlurSlot {
         return disabled ? null : published.image();
     }
 
+    /**
+     * UI thread: drops the queued and published results. A consumer that becomes visible again must
+     * not draw the frame from before it was hidden, and the requests recorded in that frame would
+     * otherwise publish it back after this call.
+     */
+    public void discardPublished() {
+        synchronized (requestLock) {
+            generation++;
+            clearRequestsLocked();
+        }
+        published.discard();
+    }
+
     /** True when at least one registered slot has a queued blur. */
     public static boolean hasPending() {
         synchronized (ACTIVE_LOCK) {
@@ -133,11 +148,15 @@ public final class SceneBlurSlot {
 
     private void discardPending() {
         synchronized (requestLock) {
-            for (Request request : requests) {
-                request.image.unref();
-            }
-            requests.clear();
+            clearRequestsLocked();
         }
+    }
+
+    private void clearRequestsLocked() {
+        for (Request request : requests) {
+            request.image.unref();
+        }
+        requests.clear();
     }
 
     /** Render thread: advances the retirement clock once the frame's recordings are all submitted. */
@@ -165,7 +184,9 @@ public final class SceneBlurSlot {
             return;
         }
         Request request = null;
+        int requestGeneration;
         synchronized (requestLock) {
+            requestGeneration = generation;
             for (Iterator<Request> iterator = requests.iterator(); iterator.hasNext(); ) {
                 Request candidate = iterator.next();
                 if (candidate.batch > maxBatch) {
@@ -218,14 +239,19 @@ public final class SceneBlurSlot {
             if (pendingBlur == null || !pendingBlur.apply(gpu, blurSource, blurWidth, blurHeight)) {
                 return;
             }
+            SceneGpuTexture result = pendingBlur.target();
             if (bloomComposite) {
                 SceneGpuTexture bloom = current.ensureBloomTarget(gpu, blurWidth, blurHeight);
                 if (bloom == null || !passBloom(gpu, pendingBlur.target(), bloom)) {
                     return;
                 }
-                published.publish(bloom);
-            } else {
-                published.publish(pendingBlur.target());
+                result = bloom;
+            }
+            // Reject a result whose consumer was hidden while the blur was running.
+            synchronized (requestLock) {
+                if (requestGeneration == generation) {
+                    published.publish(result);
+                }
             }
         } catch (Throwable failure) {
             // A broken slot must not take the whole UI down; the consumer falls back to a sharp draw.
