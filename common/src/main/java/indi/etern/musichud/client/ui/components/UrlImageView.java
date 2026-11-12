@@ -163,7 +163,7 @@ public class UrlImageView extends FrameLayout {
 
         progressRing = new ProgressBar(context);
         progressRing.setIndeterminate(true);
-        progressRing.setIndeterminateTintList(ColorStateList.valueOf(Theme.PRIMARY_COLOR));
+        progressRing.setIndeterminateTintList(ColorStateList.valueOf(Theme.EMPHASIZE_TEXT_COLOR));
         progressRing.setVisibility(GONE);
 
         var params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);

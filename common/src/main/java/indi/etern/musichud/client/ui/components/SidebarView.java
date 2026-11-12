@@ -729,8 +729,8 @@ public class SidebarView extends LinearLayout {
         sideContent.addView(new View(context), new LinearLayout.LayoutParams(MATCH_PARENT, margin));
 
         FrameLayout cardWrapper = new FrameLayout(context);
-        activeCard = new MusicInfoCard(context, availableWidth);
-        stagedCard = new MusicInfoCard(context, availableWidth);
+        activeCard = new MusicInfoCard(context);
+        stagedCard = new MusicInfoCard(context);
         cardWrapper.addView(activeCard, new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         cardWrapper.addView(stagedCard, new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         stagedCard.setVisibility(INVISIBLE);
@@ -1099,8 +1099,7 @@ public class SidebarView extends LinearLayout {
                     String playedTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()));
                     card.getPlayedTimeText().setText(playedTimeString);
                 }
-                card.getProgressBar().setProgress((int) (nowPlayingInfo.getProgressRate()
-                        * card.getProgressBar().getMax()));
+                card.getProgressBar().setProgressFraction(nowPlayingInfo.getProgressRate());
                 if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())
                         && nowPlayingInfo.getProgressRate() < 1
                         && System.currentTimeMillis() < deadline) {

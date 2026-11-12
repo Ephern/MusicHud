@@ -35,6 +35,7 @@ public final class LayerBackdropBlurDrawable extends Drawable {
     private final SceneBlurPainter painter = new SceneBlurPainter();
     private View view;
     private View.OnAttachStateChangeListener attachListener;
+    private float alpha = 1f;
     private boolean failed;
     private boolean released;
 
@@ -84,8 +85,21 @@ public final class LayerBackdropBlurDrawable extends Drawable {
     }
 
     @Override
+    public void setAlpha(float alpha) {
+        if (this.alpha != alpha) {
+            this.alpha = alpha;
+            invalidateSelf();
+        }
+    }
+
+    @Override
+    public float getAlpha() {
+        return alpha;
+    }
+
+    @Override
     public void draw(@NotNull Canvas canvas) {
-        if (released || failed || blurRadius <= 0) {
+        if (released || failed || blurRadius <= 0 || alpha <= 0.001f) {
             return;
         }
         var bounds = getBounds();
@@ -135,7 +149,7 @@ public final class LayerBackdropBlurDrawable extends Drawable {
             if (blurred != null) {
                 painter.draw(arc, blurred, left, top,
                         device.left(), device.top(), device.right(), device.bottom(),
-                        cornerRadius, Math.clamp(getAlpha(), 0f, 1f));
+                        cornerRadius, Math.clamp(alpha, 0f, 1f));
             }
         } catch (Throwable failure) {
             failed = true;

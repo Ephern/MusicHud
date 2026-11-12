@@ -76,7 +76,7 @@ public class SegmentedBar extends FrameLayout {
         indicator = new View(context);
         indicatorShape = new ShapeDrawable();
         indicatorShape.setCornerRadius(1000);
-        indicatorShape.setColor(Theme.PRIMARY_COLOR);
+        indicatorShape.setColor(Theme.EMPHASIZE_TEXT_COLOR);
         indicator.setBackground(indicatorShape);
         applyOrientation(LinearLayout.HORIZONTAL);
 

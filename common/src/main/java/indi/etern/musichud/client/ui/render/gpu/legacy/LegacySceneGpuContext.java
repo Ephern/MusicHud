@@ -86,6 +86,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
             case SCENE_BLUR_DOWNSAMPLE, SCENE_BLUR_GAUSSIAN, SCENE_BLUR_UPSAMPLE,
                  SCENE_BLUR_COPY -> List.of("MHBlur");
             case SCENE_BLUR_CROP -> List.of("MHCrop");
+            case SCENE_BLOOM_COMPOSITE -> List.of("MHBloom");
             case SCENE_COVER_RESOLVE -> List.of("MHCoverResolve");
             case SCENE_COVER_WARP_PROCEDURAL -> List.of("MHWarp");
             case SCENE_COVER_LAYERS -> List.of("MHCover");

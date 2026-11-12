@@ -1,7 +1,6 @@
 package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.ModernUI;
-import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.text.SpannableStringBuilder;
@@ -15,7 +14,6 @@ import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.LinearLayout;
-import icyllis.modernui.widget.ProgressBar;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
@@ -58,7 +56,7 @@ public class MusicInfoCard extends ViewGroup {
     private final MarqueeTextView titleText;
     private final MarqueeTextView artistsText;
     private final MarqueeTextView albumText;
-    private final ProgressBar progressBar;
+    private final LinearProgressBar progressBar;
     private final LinearLayout progressTexts;
     private final TextView playedTimeText;
     private final TextView totalTimeText;
@@ -77,7 +75,7 @@ public class MusicInfoCard extends ViewGroup {
     private int laidOutProgressTop;
     private int laidOutTimesTop;
 
-    public MusicInfoCard(Context context, int imageSize) {
+    public MusicInfoCard(Context context) {
         super(context);
 
         musicInfo = new LinearLayout(context);
@@ -95,20 +93,17 @@ public class MusicInfoCard extends ViewGroup {
         artistsText.setGravity(Gravity.CENTER_VERTICAL);
         artistsText.setMinimumHeight(artistsText.dp(16));
         artistsText.setMovementMethod(LinkMovementMethod.getInstance());
-        artistsText.setHighlightColor(0x33FFFFFF);
         musicInfo.addView(artistsText);
 
         albumText = new MarqueeTextView(context);
         albumText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         albumText.setTextSize(Theme.TEXT_SIZE_NORMAL);
         albumText.setMovementMethod(LinkMovementMethod.getInstance());
-        albumText.setHighlightColor(0x33FFFFFF);
         albumText.setVisibility(View.GONE);
         musicInfo.addView(albumText);
 
-        progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
-        progressBar.setMin(0);
-        progressBar.setMax(imageSize);
+        progressBar = new LinearProgressBar(context, Theme.mediaProgressStyle());
+        progressBar.setProgressFraction(0f);
         progressBar.setVisibility(View.GONE);
 
         progressTexts = new LinearLayout(context);
@@ -258,7 +253,7 @@ public class MusicInfoCard extends ViewGroup {
             albumText.setText("");
             albumText.setVisibility(View.GONE);
             progressBar.setIndeterminate(false);
-            progressBar.setProgress(0);
+            progressBar.setProgressFraction(0f);
             progressBar.setVisibility(View.GONE);
             playedTimeText.setText("");
             totalTimeText.setText("");
@@ -309,12 +304,12 @@ public class MusicInfoCard extends ViewGroup {
 
                         @Override
                         public void updateDrawState(@NotNull TextPaint ds) {
-                            ds.setColor(Theme.PRIMARY_COLOR);
+                            ds.setColor(Theme.SECONDARY_TEXT_COLOR);
                             ds.setUnderline(false);
                         }
                     }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 } else {
-                    artistsBuilder.setSpan(new ForegroundColorSpan(Theme.SECONDARY_TEXT_COLOR),
+                    artistsBuilder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
                             start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
             }
@@ -336,7 +331,7 @@ public class MusicInfoCard extends ViewGroup {
 
                     @Override
                     public void updateDrawState(@NotNull TextPaint ds) {
-                        ds.setColor(Theme.PRIMARY_COLOR);
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
                         ds.setUnderline(false);
                     }
                 }, 0, albumBuilder.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);

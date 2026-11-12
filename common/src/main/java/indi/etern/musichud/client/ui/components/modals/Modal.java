@@ -107,13 +107,7 @@ public class Modal {
         ShapeDrawable dividerBg = new ShapeDrawable();
         dividerBg.setShape(ShapeDrawable.HLINE);
         dividerBg.setSize(card.dp(DIVIDER_HEIGHT), card.dp(DIVIDER_HEIGHT));
-        TypedValue dividerTv = new TypedValue();
-        var theme = context.getTheme();
-        if (theme.resolveAttribute(R.ns, R.attr.colorOutlineVariant, dividerTv, true)) {
-            dividerBg.setColor(theme.getResources().loadColorStateList(dividerTv, null, theme));
-        } else {
-            dividerBg.setColor(0xFF3E3E42);
-        }
+        dividerBg.setColor(Theme.DIVIDER_COLOR);
         divider.setBackground(dividerBg);
         LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
                 MATCH_PARENT, card.dp(DIVIDER_HEIGHT));
