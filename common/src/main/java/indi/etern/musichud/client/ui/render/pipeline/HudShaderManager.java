@@ -43,6 +43,11 @@ public class HudShaderManager {
         return boundPoints.get(name);
     }
 
+    public static HudShaderProgram getOrCreate(HudPipelineSpec spec) {
+        return getOrCreate(spec.name(), spec.vertexShader(), spec.fragmentShader(),
+                spec.uniformBlocks());
+    }
+
     public static HudShaderProgram getOrCreate(
             String name,
             ResourceLocation vertexShaderLocation,

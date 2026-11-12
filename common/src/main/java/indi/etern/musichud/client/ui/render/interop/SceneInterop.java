@@ -54,4 +54,8 @@ public final class SceneInterop {
     public static void restoreArc3d() {
         backend.restoreArc3d();
     }
+
+    public static boolean supportsMidFrameBlur() {
+        return backend.supportsMidFrameBlur();
+    }
 }

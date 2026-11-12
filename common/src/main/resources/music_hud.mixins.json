@@ -12,7 +12,8 @@
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
     "SpanSetMixin",
-    "UIManagerMixin"
+    "UIManagerMixin",
+    "VulkanSampledCopyMixin"
   ],
   "injectors": {
     "defaultRequire": 1

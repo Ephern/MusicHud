@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.render.gpu;
 
 import icyllis.arc3d.sketch.Image;
+import icyllis.modernui.core.Core;
 import indi.etern.musichud.client.ui.render.interop.InteropTarget;
 import indi.etern.musichud.client.ui.render.interop.InteropUsage;
 import indi.etern.musichud.client.ui.render.interop.SceneInterop;
@@ -45,6 +46,10 @@ public final class PublishedSceneTexture {
         }
         if (target != null && wrappedSource == current) {
             return target.arcImage();
+        }
+        if (!Core.isOnUiThread()) {
+            // Exporting needs the UI recording context; the UI thread will wrap it on its next draw.
+            return null;
         }
         release();
         InteropTarget created = SceneInterop.exportTexture(current, InteropUsage.SAMPLE);

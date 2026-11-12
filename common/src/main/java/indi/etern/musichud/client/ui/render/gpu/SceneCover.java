@@ -156,7 +156,7 @@ public final class SceneCover {
     private void releaseIntermediates(SceneGpuContext gpu) {
         for (SceneGpuTexture intermediate : intermediates) {
             if (intermediate != null && owner == gpu) {
-                gpu.release(intermediate);
+                SceneRetirement.retire(() -> gpu.release(intermediate));
             }
         }
         intermediates = new SceneGpuTexture[0];
@@ -173,7 +173,8 @@ public final class SceneCover {
 
     private void release(SceneGpuContext gpu) {
         if (target != null && owner == gpu) {
-            gpu.release(target);
+            SceneGpuTexture previous = target;
+            SceneRetirement.retire(() -> gpu.release(previous));
         }
         releaseIntermediates(gpu);
         target = null;

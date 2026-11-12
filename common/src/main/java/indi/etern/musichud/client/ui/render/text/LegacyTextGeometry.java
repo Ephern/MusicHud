@@ -13,6 +13,7 @@ import icyllis.modernui.mc.text.TextLayout;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import icyllis.modernui.mc.text.TextLayoutProcessor;
 import icyllis.modernui.mc.text.TextRenderType;
+import indi.etern.musichud.client.ui.render.SceneBackendRegistry;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -389,6 +390,10 @@ public final class LegacyTextGeometry {
     }
 
     private static void bindLinearSampler() {
+        // Non-GL backends have no GL sampler objects; the atlas keeps its own filtering there.
+        if (SceneBackendRegistry.isOverridden()) {
+            return;
+        }
         if (linearSampler == 0) {
             linearSampler = glGenSamplers();
             glSamplerParameteri(linearSampler, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -400,6 +405,9 @@ public final class LegacyTextGeometry {
     }
 
     private static void unbindLinearSampler() {
+        if (SceneBackendRegistry.isOverridden()) {
+            return;
+        }
         glBindSampler(0, 0);
     }
 

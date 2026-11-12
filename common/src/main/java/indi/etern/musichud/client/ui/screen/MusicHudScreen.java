@@ -127,8 +127,15 @@ public class MusicHudScreen extends Screen implements MuiScreen {
                     new VanillaSceneGraphics(gr),
                     context -> {
                         if (!BACKGROUND_RENDERER.renderFluidBackground(context, backgroundStyle)) {
-                            MinecraftBackgroundTexture.clear();
-                            renderSolidBackground(gr, progress);
+                            // Once the fade-in is over, keep the last baked background: a single
+                            // failed frame must not flash black. The published target is read
+                            // without wrapping it, since wrapping requires the UI thread.
+                            boolean keepLast = progress >= 1f
+                                    && MinecraftBackgroundTexture.published() != null;
+                            if (!keepLast) {
+                                MinecraftBackgroundTexture.clear();
+                                renderSolidBackground(gr, progress);
+                            }
                         }
                     }
             );

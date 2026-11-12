@@ -69,7 +69,8 @@ public final class SceneCoverOverlay {
 
     private void release(SceneGpuContext gpu) {
         if (target != null && owner == gpu) {
-            gpu.release(target);
+            SceneGpuTexture previous = target;
+            SceneRetirement.retire(() -> gpu.release(previous));
         }
         target = null;
         owner = null;

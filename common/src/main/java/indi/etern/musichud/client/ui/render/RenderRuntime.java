@@ -5,8 +5,6 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.presentation.TrackArtworkStore;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
-import indi.etern.musichud.client.ui.render.gpu.SceneRetirement;
-import indi.etern.musichud.client.ui.render.gpu.legacy.LegacySceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.legacy.SceneWindowEnvironment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -26,7 +24,7 @@ public final class RenderRuntime {
 
     private static volatile RenderRuntime instance;
     private final SceneRenderContextImpl context = new SceneRenderContextImpl();
-    private SceneGpuContext gpu;
+    private SceneBackend backend;
     private boolean lifecycleHookRegistered;
     private boolean debugOptionsInitialized;
     private boolean lastForceGL32Path;
@@ -78,14 +76,37 @@ public final class RenderRuntime {
 
     public SceneGpuContext gpu() {
         RenderSystem.assertOnRenderThread();
-        if (gpu == null) {
-            gpu = new LegacySceneGpuContext();
+        return backend().gpu();
+    }
+
+    public ScenePipelineRenderer pipelineRenderer() {
+        return backend().pipelineRenderer();
+    }
+
+    private SceneBackend backend() {
+        if (backend == null) {
+            backend = createBackend();
             if (!lifecycleHookRegistered) {
                 lifecycleHookRegistered = true;
                 ICommonEventService.getInstance().registerCommonLifecycleStopping(this::close);
             }
         }
-        return gpu;
+        return backend;
+    }
+
+    private static SceneBackend createBackend() {
+        SceneBackendFactory factory = SceneBackendRegistry.factory();
+        if (factory == null) {
+            return new GlSceneBackend();
+        }
+        try {
+            SceneBackend created = factory.create();
+            return created != null ? created : new DisabledSceneBackend();
+        } catch (Throwable failure) {
+            LOGGER.error("Failed to create the registered scene backend; scene effects are disabled",
+                    failure);
+            return new DisabledSceneBackend();
+        }
     }
 
     private void pollDebugTargetOptions() {
@@ -122,18 +143,15 @@ public final class RenderRuntime {
     void processPendingGpuRecreate() {
         if (!gpuRecreatePending) return;
         gpuRecreatePending = false;
-        if (gpu != null) {
-            // A UI recording submitted after this frame may still sample the published background,
-            // so the old context's GL names outlive it by the retirement window.
-            SceneRetirement.retire(gpu::close);
-            gpu = null;
+        if (backend != null) {
+            backend.recreateGpu();
         }
     }
 
     /** Advances the offscreen uniform rings once per recorded scene frame. */
     void endSceneFrame() {
-        if (gpu != null) {
-            gpu.endFrame();
+        if (backend != null) {
+            backend.endFrame();
         }
     }
 
@@ -152,13 +170,12 @@ public final class RenderRuntime {
             return;
         }
 
-        SceneGpuContext context = gpu;
-        if (context == null) {
-            try {
-                context = gpu();
-            } catch (RuntimeException | LinkageError notInitialised) {
-                // The render device does not exist yet: a startup race, not a failure.
-            }
+        SceneGpuContext context;
+        try {
+            context = gpu();
+        } catch (RuntimeException | LinkageError notInitialised) {
+            // The render device does not exist yet: a startup race, not a failure.
+            context = null;
         }
 
         SceneGpuContext.PrecompileResult result;
@@ -248,9 +265,9 @@ public final class RenderRuntime {
     }
 
     public void close() {
-        if (gpu != null) {
-            gpu.close();
-            gpu = null;
+        if (backend != null) {
+            backend.close();
+            backend = null;
         }
     }
 }

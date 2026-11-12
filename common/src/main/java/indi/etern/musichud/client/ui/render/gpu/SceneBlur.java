@@ -122,13 +122,21 @@ public final class SceneBlur {
     private void releaseLevelTargets() {
         SceneGpuContext current = owner;
         if (current != null) {
+            // The GPU may still be reading these from a frame that is already submitted, and the
+            // published result can be sampled by the UI recording, so never destroy them in place.
             for (int i = 1; i < downsamples.length; i++) {
-                if (downsamples[i] != null) current.release(downsamples[i]);
+                retire(current, downsamples[i]);
             }
-            if (scratch != null) current.release(scratch);
+            retire(current, scratch);
         }
         downsamples = new SceneGpuTexture[1];
         scratch = null;
+    }
+
+    private static void retire(SceneGpuContext gpu, @Nullable SceneGpuTexture texture) {
+        if (texture != null) {
+            SceneRetirement.retire(() -> gpu.release(texture));
+        }
     }
 
     private SceneGpuTexture target(SceneGpuContext gpu, int width, int height) {
@@ -142,9 +150,7 @@ public final class SceneBlur {
         if (current != null && result != null) {
             // A recording made before this call may still sample it (the UI thread records about
             // one frame ahead of the render thread).
-//            SceneGpuTexture previous = result;
-//            SceneRetirement.retire(() -> current.release(previous));
-            current.release(result);
+            retire(current, result);
         }
         result = null;
         owner = null;

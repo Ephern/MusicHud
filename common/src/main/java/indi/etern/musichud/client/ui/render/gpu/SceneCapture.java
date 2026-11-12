@@ -54,7 +54,9 @@ public final class SceneCapture {
      */
     public void release() {
         if (target != null && owner != null) {
-            owner.release(target);
+            SceneGpuTexture previous = target;
+            SceneGpuContext current = owner;
+            SceneRetirement.retire(() -> current.release(previous));
         }
         target = null;
         owner = null;
@@ -67,7 +69,10 @@ public final class SceneCapture {
             return target;
         }
         if (target != null) {
-            if (owner == gpu) gpu.release(target);
+            if (owner == gpu) {
+                SceneGpuTexture previous = target;
+                SceneRetirement.retire(() -> gpu.release(previous));
+            }
             target = null;
             owner = null;
             targetWidth = 0;
@@ -81,7 +86,7 @@ public final class SceneCapture {
             targetHeight = height;
             return target;
         } catch (RuntimeException failure) {
-            LOGGER.debug("While creating a scene capture target of " + width + "x" + height, failure);
+            LOGGER.warn("While creating a scene capture target of " + width + "x" + height, failure);
             target = null;
             owner = null;
             targetWidth = 0;
@@ -118,7 +123,7 @@ public final class SceneCapture {
                 filled = true;
                 return true;
             } catch (RuntimeException failure) {
-                LOGGER.debug("While capturing the scene color target", failure);
+                LOGGER.warn("While capturing the scene color target", failure);
                 try {
                     gpu.clear(target, 0);
                 } catch (RuntimeException ignored) {

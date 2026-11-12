@@ -27,7 +27,8 @@ public class MusicHudMixinPlugin implements IMixinConfigPlugin {
                 return false;
             }
         }
-        if (mixinClassName.contains("ScreenMixin") || mixinClassName.contains("UIManagerMixin")) {
+        if (mixinClassName.contains("ScreenMixin") || mixinClassName.contains("UIManagerMixin")
+                || mixinClassName.contains("VulkanSampledCopyMixin")) {
             return modernUiAvailable();
         }
         return true;

@@ -35,6 +35,7 @@ import indi.etern.musichud.client.ui.render.gpu.SceneCoverWarpProcedural;
 import indi.etern.musichud.client.ui.render.gpu.legacy.LegacySceneCoverSources;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
+import indi.etern.musichud.client.ui.render.gpu.SceneRetirement;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
 import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
@@ -97,6 +98,25 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         sceneCoverWarpProcedural.reset();
         sceneCoverLayers.release();
         sceneCoverOverlay.release();
+        releaseBakes();
+    }
+
+    private void releaseBakes() {
+        SceneGpuContext current = bakeOwner;
+        if (current != null) {
+            if (backgroundBake != null) {
+                SceneGpuTexture previous = backgroundBake;
+                SceneRetirement.retire(() -> current.release(previous));
+            }
+            for (SceneGpuTexture retired : retiredBakes) {
+                SceneRetirement.retire(() -> current.release(retired));
+            }
+        }
+        retiredBakes.clear();
+        backgroundBake = null;
+        bakeOwner = null;
+        backgroundBakeWidth = 0;
+        backgroundBakeHeight = 0;
     }
 
     /** Drops the cover crossfade state, so a paused renderer does not keep the artwork alive. */
@@ -395,7 +415,8 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             // Keep the previous target alive for one more frame: a UI recording may still sample it.
             retiredBakes.add(backgroundBake);
             if (retiredBakes.size() > 2) {
-                gpu.release(retiredBakes.removeFirst());
+                SceneGpuTexture retired = retiredBakes.removeFirst();
+                SceneRetirement.retire(() -> gpu.release(retired));
             }
         } else if (bakeOwner != null && bakeOwner != gpu) {
             retiredBakes.clear();

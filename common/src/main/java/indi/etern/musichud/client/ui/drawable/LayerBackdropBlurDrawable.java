@@ -14,6 +14,7 @@ import indi.etern.musichud.client.ui.render.gpu.SceneBlurPainter;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import indi.etern.musichud.client.ui.render.gpu.SceneCanvasLayer;
 import indi.etern.musichud.client.ui.render.gpu.SceneOffscreen;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 
@@ -171,7 +172,9 @@ public final class LayerBackdropBlurDrawable extends Drawable {
                 blurSlot.request(source, 0f, 0f, 1f, 1f, regionWidth, regionHeight,
                         blurRadius / 3f);
             }
-            MidFrameCommit.commitIfPending();
+            if (SceneInterop.supportsMidFrameBlur()) {
+                MidFrameCommit.commitIfPending();
+            }
             Image blurred = blurSlot.image();
             if (blurred != null) {
                 painter.draw(arc, blurred, left, top,

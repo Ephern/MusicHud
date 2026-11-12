@@ -18,6 +18,15 @@ public interface SceneInteropBackend {
     }
 
     /**
+     * Whether the UI recording can be split into segments to refresh a backdrop blur within the
+     * same frame. Backends whose layer submission cannot be interleaved with foreign draws must
+     * return false; the blur is then resolved once per frame.
+     */
+    default boolean supportsMidFrameBlur() {
+        return true;
+    }
+
+    /**
      * Borrows an arc3d engine image for our pipelines. Takes ownership of the passed reference.
      */
     default @Nullable InteropSource importImage(@Nullable icyllis.arc3d.engine.Image image,

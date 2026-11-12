@@ -32,4 +32,9 @@ public final class MinecraftBackgroundTexture {
     public static @Nullable Image image() {
         return TEXTURE.image();
     }
+
+    /** The published target without wrapping it; safe from any thread. */
+    public static @Nullable SceneGpuTexture published() {
+        return TEXTURE.texture();
+    }
 }

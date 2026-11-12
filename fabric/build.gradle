@@ -48,8 +48,14 @@ dependencies {
 
     modImplementation "com.terraformersmc:modmenu:$rootProject.modmenu_version"
 
-    // ModernUI Fabric
-    modImplementation("icyllis.modernui:ModernUI-Fabric:1.21.1-${rootProject.modernui_version}.+")
+    // Same jar the dev run loads; keeping it on the runtime classpath is what lets Architectury
+    // Transformer resolve ModernUI classes (e.g. TextView superclasses) while transforming.
+    modImplementation files(modernUiLumenJar('Fabric'))
+    implementation files(modernUiLumenLibraries('Fabric'))
+
+    // Compile-only: the VulkanMod backend is optional at runtime and isolated behind a guarded entry.
+    modCompileOnly files(rootProject.file("libs/VulkanMod-0.6.7+1.21.1.jar"))
+    compileOnly "org.lwjgl:lwjgl-vulkan:3.3.3"
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     shadowBundle "com.github.umjammer:jlayer:$rootProject.jlayer_version"
