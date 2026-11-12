@@ -264,6 +264,10 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                     .withSampler("Sampler0")
                     .withUniform("MHCrop", UniformType.UNIFORM_BUFFER)
                     .build();
+            case SCENE_BLOOM_COMPOSITE -> SceneNativePassRenderer.pipeline("scene_bloom_composite")
+                    .withSampler("Sampler0")
+                    .withUniform("MHBloom", UniformType.UNIFORM_BUFFER)
+                    .build();
             case SCENE_COVER_RESOLVE -> SceneNativePassRenderer.pipeline("scene_cover_resolve")
                     .withSampler("Sampler0")
                     .withUniform("MHCoverResolve", UniformType.UNIFORM_BUFFER)

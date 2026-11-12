@@ -9,6 +9,9 @@ import indi.etern.musichud.client.ui.render.interop.InteropSource;
 import indi.etern.musichud.client.ui.render.interop.InteropUsage;
 import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import indi.etern.musichud.client.ui.render.pipeline.SceneTextureRef;
+import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
+import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;
+import indi.etern.musichud.client.ui.render.pipeline.Std140Writer;
 import lombok.Getter;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
@@ -32,8 +35,19 @@ public final class SceneBlurSlot {
 
     private final Object requestLock = new Object();
     private final List<Request> requests = new ArrayList<>();
+    private final SceneTextureFormat blurFormat;
+    private final boolean bloomComposite;
 
     private Pipeline pipeline;
+
+    public SceneBlurSlot() {
+        this(SceneTextureFormat.RGBA8, false);
+    }
+
+    public SceneBlurSlot(SceneTextureFormat blurFormat, boolean bloomComposite) {
+        this.blurFormat = blurFormat;
+        this.bloomComposite = bloomComposite;
+    }
     private InteropSource source;
     private icyllis.arc3d.engine.Image sourceKey;
     private final PublishedSceneTexture published = new PublishedSceneTexture();
@@ -204,7 +218,15 @@ public final class SceneBlurSlot {
             if (pendingBlur == null || !pendingBlur.apply(gpu, blurSource, blurWidth, blurHeight)) {
                 return;
             }
-            published.publish(pendingBlur.target());
+            if (bloomComposite) {
+                SceneGpuTexture bloom = current.ensureBloomTarget(gpu, blurWidth, blurHeight);
+                if (bloom == null || !passBloom(gpu, pendingBlur.target(), bloom)) {
+                    return;
+                }
+                published.publish(bloom);
+            } else {
+                published.publish(pendingBlur.target());
+            }
         } catch (Throwable failure) {
             // A broken slot must not take the whole UI down; the consumer falls back to a sharp draw.
             LOGGER.error("Disabling backdrop blur after an error", failure);
@@ -213,6 +235,19 @@ public final class SceneBlurSlot {
             if (input != null) {
                 SceneInterop.endRead(input);
             }
+        }
+    }
+
+    private boolean passBloom(SceneGpuContext gpu, SceneTextureRef source, SceneGpuTexture target) {
+        try {
+            gpu.draw(new SceneDraw(target,
+                    gpu.pipeline(ScenePipelineKey.SCENE_BLOOM_COMPOSITE, target.actualFormat()),
+                    List.of(new SceneSamplerBinding("Sampler0", source)),
+                    List.of(new SceneUniformBinding(BloomUniform.UBO_NAME, BloomUniform.DEFAULT))));
+            return true;
+        } catch (RuntimeException failure) {
+            LOGGER.debug("While running the lyric bloom composite", failure);
+            return false;
         }
     }
 
@@ -242,7 +277,8 @@ public final class SceneBlurSlot {
             current.level = SceneBlur.levelFor(width, height, sigma);
             return current;
         }
-        Pipeline created = new Pipeline(gpu, width, height, SceneBlur.levelFor(width, height, sigma));
+        Pipeline created = new Pipeline(gpu, width, height, SceneBlur.levelFor(width, height, sigma),
+                blurFormat);
         pipeline = created;
         if (current != null) {
             SceneRetirement.retire(current::release);
@@ -272,19 +308,82 @@ public final class SceneBlurSlot {
         final int width;
         final int height;
         int level;
-        final SceneBlur blur = new SceneBlur(SceneTextureFormat.RGBA8);
-        final SceneBlurCrop crop = new SceneBlurCrop(SceneTextureFormat.RGBA8);
+        final SceneBlur blur;
+        final SceneBlurCrop crop;
+        SceneGpuTexture bloomTarget;
+        int bloomWidth;
+        int bloomHeight;
 
-        Pipeline(SceneGpuContext gpu, int width, int height, int level) {
+        Pipeline(SceneGpuContext gpu, int width, int height, int level,
+                 SceneTextureFormat blurFormat) {
             this.gpu = gpu;
             this.width = width;
             this.height = height;
             this.level = level;
+            this.blur = new SceneBlur(blurFormat);
+            this.crop = new SceneBlurCrop(blurFormat);
+        }
+
+        @Nullable
+        SceneGpuTexture ensureBloomTarget(SceneGpuContext gpu, int width, int height) {
+            if (bloomTarget != null && bloomWidth == width && bloomHeight == height) {
+                return bloomTarget;
+            }
+            if (bloomTarget != null) {
+                gpu.release(bloomTarget);
+                bloomTarget = null;
+            }
+            try {
+                bloomTarget = gpu.createRenderTarget("MusicHud lyric bloom", width, height,
+                        SceneTextureFormat.RGBA8);
+                bloomWidth = width;
+                bloomHeight = height;
+                return bloomTarget;
+            } catch (RuntimeException failure) {
+                LOGGER.debug("While creating the lyric bloom target", failure);
+                bloomWidth = 0;
+                bloomHeight = 0;
+                return null;
+            }
         }
 
         void release() {
             blur.release();
             crop.release();
+            if (bloomTarget != null) {
+                gpu.release(bloomTarget);
+                bloomTarget = null;
+            }
+            bloomWidth = 0;
+            bloomHeight = 0;
+        }
+    }
+
+    private static final class BloomUniform implements SceneUniform {
+        private static final String UBO_NAME = "MHBloom";
+        private static final int UBO_SIZE = Std140Sizes.calc().putVec4().putVec4().get();
+        private static final BloomUniform DEFAULT = new BloomUniform();
+
+        @Override
+        public String getUBOName() {
+            return UBO_NAME;
+        }
+
+        @Override
+        public int getUBOSize() {
+            return UBO_SIZE;
+        }
+
+        @Override
+        public void write(Std140Writer writer) {
+            // strength, curve, unused, unused
+            writer.putVec4(0.3f, 0.8f, 0f, 0f);
+            writer.putVec4(1f, 1f, 1f, 1f);
+        }
+
+        @Override
+        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
+            return false;
         }
     }
 

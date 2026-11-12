@@ -4,8 +4,10 @@ import icyllis.arc3d.core.Rect2f;
 import icyllis.arc3d.core.SamplingOptions;
 import icyllis.arc3d.sketch.Image;
 import icyllis.modernui.graphics.Canvas;
+import icyllis.modernui.graphics.Paint;
 import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Offscreen source and composite of a single lyric row. The Gaussian itself is deferred to the
@@ -61,10 +63,17 @@ public final class LineBlurRenderer {
     /** Draws the blurred row back, mapped to the row's local coordinates. */
     public static void drawResult(@NotNull ArcCanvas main, @NotNull Image image,
                                   int surfaceWidth, int surfaceHeight, int padding) {
+        drawResult(main, image, surfaceWidth, surfaceHeight, padding, null);
+    }
+
+    /** Same as {@link #drawResult(ArcCanvas, Image, int, int, int)}, with an optional paint. */
+    public static void drawResult(@NotNull ArcCanvas main, @NotNull Image image,
+                                  int surfaceWidth, int surfaceHeight, int padding,
+                                  @Nullable Paint paint) {
         main.getCanvas().drawImageRect(image,
                 new Rect2f(0, 0, surfaceWidth, surfaceHeight),
                 new Rect2f(-padding, -padding, surfaceWidth - padding, surfaceHeight - padding),
-                SamplingOptions.LINEAR, null,
+                SamplingOptions.LINEAR, paint != null ? paint.getNativePaint() : null,
                 icyllis.arc3d.sketch.Canvas.SRC_RECT_CONSTRAINT_FAST);
     }
 

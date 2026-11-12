@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.pages;
 
-import icyllis.modernui.R;
 import icyllis.modernui.animation.AnimatorSet;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.animation.ObjectAnimator;
@@ -39,6 +38,8 @@ import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.shadow.BlurShadowDrawable;
+import indi.etern.musichud.client.ui.shadow.BlurShadowSpec;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
@@ -95,6 +96,9 @@ public class HomeView extends ViewGroup {
     private static final float BUTTONS_WRAP_RATIO = 0.4f;
     private static final float COVER_MIN_SCALE = 0.8f;
     private static final int COVER_SCALE_DURATION_MS = 350;
+    private static final int LAYOUT_TRANSITION_DURATION = 350;
+    private static final SpringInterpolator LAYOUT_TRANSITION_INTERPOLATOR =
+            new SpringInterpolator((float) LAYOUT_TRANSITION_DURATION / 1000, 1);
     private static final SpringInterpolator COVER_SCALE_INTERPOLATOR =
             new SpringInterpolator((float) COVER_SCALE_DURATION_MS / 1000, 1);
 
@@ -108,11 +112,13 @@ public class HomeView extends ViewGroup {
     private View notificationView;
     private InfoColumn infoColumn;
     private UrlImageView albumImage;
+    private FrameLayout coverContainer;
+    private BlurShadowDrawable coverShadow;
     private MarqueeTextView name;
     private MarqueeTextView artistsAndAlbum;
     private ImageButton sourceButton;
     private PusherWidget pusherWidget;
-    private ProgressBar progressBar;
+    private LinearProgressBar progressBar;
     private TextView played;
     private TextView total;
     private LinearLayout buttonsLayout;
@@ -174,7 +180,12 @@ public class HomeView extends ViewGroup {
         LayoutTransitionReflow.attach(layoutTransition);
 //        layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
         layoutTransition.setAnimateParentHierarchy(false);
-        layoutTransition.setDuration(350);
+        layoutTransition.setInterpolator(LayoutTransition.CHANGING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setInterpolator(LayoutTransition.APPEARING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setInterpolator(LayoutTransition.DISAPPEARING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setInterpolator(LayoutTransition.CHANGE_APPEARING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setInterpolator(LayoutTransition.CHANGE_DISAPPEARING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setDuration(LAYOUT_TRANSITION_DURATION);
         // Start the reflow together with the lyric fade instead of waiting a whole default cycle.
         layoutTransition.setStartDelay(LayoutTransition.CHANGE_DISAPPEARING, 0);
         // Attached only after the initial children exist so building the page does not animate.
@@ -187,6 +198,12 @@ public class HomeView extends ViewGroup {
         notificationView = null;
         infoColumn = null;
         albumImage = null;
+        coverContainer = null;
+        if (coverShadow != null) {
+            setBackground(null);
+            coverShadow.close();
+            coverShadow = null;
+        }
         name = null;
         artistsAndAlbum = null;
         sourceButton = null;
@@ -224,7 +241,6 @@ public class HomeView extends ViewGroup {
             artistsAndAlbum.setTextSize(Theme.TEXT_SIZE_LARGE);
             artistsAndAlbum.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             artistsAndAlbum.setMovementMethod(LinkMovementMethod.getInstance());
-            artistsAndAlbum.setHighlightColor(0x33FFFFFF);
             texts.addView(artistsAndAlbum, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         }
 
@@ -273,11 +289,10 @@ public class HomeView extends ViewGroup {
         row1.addView(buttonsLayout, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
         row1.setWrapThresholdRatio(buttonsLayout, BUTTONS_WRAP_RATIO);
 
-        progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
-        progressBar.setMin(0);
-        progressBar.setMax(dp(INFO_MAX_WIDTH_DP));
+        progressBar = new LinearProgressBar(context, Theme.mediaProgressStyle());
+        progressBar.setProgressFraction(0f);
         progressBar.setVisibility(GONE);
-        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(MATCH_PARENT, dp(6));
         progressParams.setMargins(0, dp(12), 0, 0);
         infoView.addView(progressBar, progressParams);
 
@@ -287,7 +302,7 @@ public class HomeView extends ViewGroup {
         {
             played = new TextView(context);
             played.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            played.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            played.setTextColor(Theme.THIRDERY_TEXT_COLOR);
             LinearLayout.LayoutParams playedParams =
                     new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             playedParams.setMargins(0, dp(8), 0, 0);
@@ -297,7 +312,7 @@ public class HomeView extends ViewGroup {
         {
             total = new TextView(context);
             total.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            total.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            total.setTextColor(Theme.THIRDERY_TEXT_COLOR);
             LinearLayout.LayoutParams totalParams =
                     new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             totalParams.setMargins(0, dp(8), 0, 0);
@@ -313,7 +328,15 @@ public class HomeView extends ViewGroup {
         albumImage.setCornerRadius(dp(8));
         albumImage.loadUrl(MusicHud.ICON_BASE64);
 
-        infoColumn = new InfoColumn(context, albumImage, infoView);
+        coverContainer = new FrameLayout(context);
+        coverContainer.addView(albumImage, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        coverShadow = new BlurShadowDrawable(new BlurShadowSpec(
+                new BlurShadowSpec.Shape.RoundedRect(8f),
+                32f, 0f, 8f, 0x70000000, 1f,
+                BlurShadowSpec.CacheMode.STATIC), coverContainer);
+        setBackground(coverShadow);
+
+        infoColumn = new InfoColumn(context, coverContainer, infoView);
         addView(infoColumn, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
     }
 
@@ -495,7 +518,7 @@ public class HomeView extends ViewGroup {
         total.setText(formatter.format(LocalTime.MIDNIGHT.plusSeconds(duration.toSeconds())));
 
         progressBar.setVisibility(VISIBLE);
-        progressBar.setProgress((int) (nowPlayingInfo.getProgressRate() * progressBar.getMax()));
+        progressBar.setProgressFraction(nowPlayingInfo.getProgressRate());
         applyAudioStatus(StreamAudioPlayer.getInstance().getStatus());
 
         updateActionButtons(detail);
@@ -514,7 +537,7 @@ public class HomeView extends ViewGroup {
         sourceButton.setVisibility(GONE);
         Tooltip.attach(sourceButton, null);
         progressBar.setIndeterminate(false);
-        progressBar.setProgress(0);
+        progressBar.setProgressFraction(0f);
         progressBar.setVisibility(GONE);
         played.setText("");
         total.setText("");
@@ -548,12 +571,12 @@ public class HomeView extends ViewGroup {
 
                     @Override
                     public void updateDrawState(@NotNull TextPaint ds) {
-                        ds.setColor(Theme.PRIMARY_COLOR);
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
                         ds.setUnderline(false);
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                builder.setSpan(new ForegroundColorSpan(Theme.SECONDARY_TEXT_COLOR),
+                builder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
@@ -579,12 +602,12 @@ public class HomeView extends ViewGroup {
 
                     @Override
                     public void updateDrawState(@NotNull TextPaint ds) {
-                        ds.setColor(Theme.PRIMARY_COLOR);
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
                         ds.setUnderline(false);
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                builder.setSpan(new ForegroundColorSpan(Theme.SECONDARY_TEXT_COLOR),
+                builder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
@@ -652,7 +675,7 @@ public class HomeView extends ViewGroup {
                 Duration playedDuration = nowPlayingInfo.getPlayedDuration();
                 played.setText(formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds())));
             }
-            progressBar.setProgress((int) (nowPlayingInfo.getProgressRate() * progressBar.getMax()));
+            progressBar.setProgressFraction(nowPlayingInfo.getProgressRate());
             if (detail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())
                     && nowPlayingInfo.getProgressRate() < 1
                     && System.currentTimeMillis() < deadline) {
@@ -677,20 +700,20 @@ public class HomeView extends ViewGroup {
         return StreamAudioPlayer.getInstance().getStatus() == StreamAudioPlayer.Status.PLAYING;
     }
 
-    /** Matches the sidebar card: the artwork shrinks while muted or not playing. */
     public void updateCoverScale(boolean animate) {
-        if (albumImage == null) {
+        View cover = coverContainer != null ? coverContainer : albumImage;
+        if (cover == null) {
             return;
         }
         float target = isCoverExpanded() ? 1f : COVER_MIN_SCALE;
         cancelCoverScaleAnimator();
         if (!animate) {
-            albumImage.setScaleX(target);
-            albumImage.setScaleY(target);
+            cover.setScaleX(target);
+            cover.setScaleY(target);
             return;
         }
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(albumImage, View.SCALE_X, target);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(albumImage, View.SCALE_Y, target);
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(cover, View.SCALE_X, target);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(cover, View.SCALE_Y, target);
         for (ObjectAnimator animator : new ObjectAnimator[]{scaleX, scaleY}) {
             animator.setInterpolator(COVER_SCALE_INTERPOLATOR);
             animator.setDuration(COVER_SCALE_DURATION_MS);
@@ -769,10 +792,10 @@ public class HomeView extends ViewGroup {
      * that width; the content height depends on it too, hence the small settling loop.
      */
     private static final class InfoColumn extends ViewGroup {
-        private final UrlImageView cover;
+        private final View cover;
         private final LinearLayout content;
 
-        InfoColumn(Context context, UrlImageView cover, LinearLayout content) {
+        InfoColumn(Context context, View cover, LinearLayout content) {
             super(context);
             this.cover = cover;
             this.content = content;

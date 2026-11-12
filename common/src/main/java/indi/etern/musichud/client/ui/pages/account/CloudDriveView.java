@@ -199,7 +199,7 @@ public class CloudDriveView extends FrameLayout {
             ShapeDrawable dividerBg = new ShapeDrawable();
             dividerBg.setShape(ShapeDrawable.VLINE);
             dividerBg.setSize(usageDivider.dp(1), usageDivider.dp(1));
-            dividerBg.setColor(Theme.GHOST_BUTTON_BACKGROUND_HOVERED);
+            dividerBg.setColor(Theme.DIVIDER_COLOR);
             usageDivider.setBackground(dividerBg);
             LinearLayout.LayoutParams dividerParams =
                     new LinearLayout.LayoutParams(usageDivider.dp(1), MATCH_PARENT);

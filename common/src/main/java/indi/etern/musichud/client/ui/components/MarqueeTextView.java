@@ -13,7 +13,9 @@ import icyllis.modernui.graphics.Paint;
 import icyllis.modernui.graphics.Shader;
 import icyllis.modernui.graphics.pipeline.ArcCanvas;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableStringBuilder;
 import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.text.method.MovementMethod;
 import icyllis.modernui.text.style.ClickableSpan;
 import icyllis.modernui.view.MeasureSpec;
@@ -29,12 +31,18 @@ import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.interfaces.ClientConfig;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 
 /**
  * Single-line marquee built from two real text copies: the leading one scrolls out while the
  * trailing one follows after a gap, so the wrap is seamless and every segment keeps its own
- * click, hover and press-highlight behaviour. The text is one {@link TextView} per copy, so spans
- * such as {@code ClickableSpan} keep working.
+ * click and hover behaviour. The text is one {@link TextView} per copy, so spans such as
+ * {@code ClickableSpan} keep working; they dim while hovered or pressed.
  * <p>
  * Scrolling is an integer {@link #scrollTo(int, int)} on this container (what the framework's hit
  * testing reads) plus a fractional shift during the offscreen render, which gives sub-pixel
@@ -55,6 +63,11 @@ public class MarqueeTextView extends ViewGroup {
     private static final float GAP_VIEWPORT_RATIO = 0.4f;
     private static final float FADE_HEIGHT_RATIO = 0.9f;
     private static final float FADE_WIDTH_RATIO = 0.4f;
+    /** Opacity of a clickable span under the pointer, and while the button is held down. */
+    private static final float HOVER_ALPHA = 0.5f;
+    private static final float PRESSED_ALPHA = 0.3f;
+    /** Dim transition duration; a short cross-fade keeps hover feedback calm. */
+    private static final long DIM_MILLIS = 100;
     // Near-identity projective matrix (persp0 = 1e-8) so arc3d takes the transformed-mask glyph
     // path: it keeps fractional glyph positions and bilinear atlas filtering, unlike the
     // direct-mask path, which floors them to device pixels. The epsilon must be in m14, not m44:
@@ -70,6 +83,7 @@ public class MarqueeTextView extends ViewGroup {
     private final SceneOffscreen fadeTarget = new SceneOffscreen("musichud-marquee-fade");
     private final Paint fadePaint = new Paint();
     private final Choreographer.FrameCallback frameCallback = this::onFrame;
+    private final Choreographer.FrameCallback dimFrameCallback = this::onDimFrame;
 
     private Image fadeSnapshot;
     private LinearGradient leftGradient;
@@ -89,6 +103,13 @@ public class MarqueeTextView extends ViewGroup {
     private boolean running;
     private long phaseStart;
     private long pausedAt = -1;
+    /** The wrapper currently under the pointer, dimmed until the pointer leaves it. */
+    private InteractiveClickableSpan hoveredSpan;
+    private InteractiveClickableSpan pressedSpan;
+    /** Spans whose dim transition is still running. */
+    private final Set<InteractiveClickableSpan> dimmingSpans =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+    private boolean dimFramePosted;
 
     public MarqueeTextView(Context context) {
         super(context);
@@ -102,15 +123,45 @@ public class MarqueeTextView extends ViewGroup {
             copy.setSingleLine();
             copy.setHorizontalScrollBarEnabled(false);
             copy.setVerticalScrollBarEnabled(false);
+            // Pressed links dim instead of drawing the selection highlight behind the text.
+            copy.setHighlightColor(0);
             addView(copy, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }
         phaseStart = MuiModApi.getElapsedTime();
     }
 
     public void setText(CharSequence text) {
-        leading.setText(text);
-        trailing.setText(text);
+        clearInteraction();
+        CharSequence prepared = wrapClickableSpans(text);
+        leading.setText(prepared);
+        trailing.setText(prepared);
         resetPhase();
+    }
+
+    /**
+     * Replaces clickable spans with wrappers that carry the hover and pressed state, since the
+     * caller's spans report their draw state but cannot be told to dim.
+     */
+    private static CharSequence wrapClickableSpans(CharSequence text) {
+        if (!(text instanceof Spanned spanned)) {
+            return text;
+        }
+        List<ClickableSpan> spans = spanned.getSpans(0, spanned.length(), ClickableSpan.class);
+        if (spans.isEmpty()) {
+            return text;
+        }
+        SpannableStringBuilder builder = new SpannableStringBuilder(text);
+        Set<ClickableSpan> wrapped = Collections.newSetFromMap(new IdentityHashMap<>());
+        for (ClickableSpan span : spans) {
+            // Ranges are looked up by instance, so a span attached twice can only be wrapped once.
+            if (!wrapped.add(span)) {
+                continue;
+            }
+            builder.removeSpan(span);
+            builder.setSpan(new InteractiveClickableSpan(span), spanned.getSpanStart(span),
+                    spanned.getSpanEnd(span), spanned.getSpanFlags(span));
+        }
+        return builder;
     }
 
     public void setTextColor(int color) {
@@ -131,11 +182,6 @@ public class MarqueeTextView extends ViewGroup {
     public void setMovementMethod(MovementMethod movement) {
         leading.setMovementMethod(movement);
         trailing.setMovementMethod(movement);
-    }
-
-    public void setHighlightColor(int color) {
-        leading.setHighlightColor(color);
-        trailing.setHighlightColor(color);
     }
 
     @Override
@@ -307,17 +353,38 @@ public class MarqueeTextView extends ViewGroup {
     @Override
     public boolean dispatchHoverEvent(MotionEvent event) {
         switch (event.getAction()) {
-            case MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE ->
-                    setHoverPause(isOverClickableSpan(event));
-            case MotionEvent.ACTION_HOVER_EXIT -> setHoverPause(false);
+            case MotionEvent.ACTION_HOVER_ENTER, MotionEvent.ACTION_HOVER_MOVE -> {
+                ClickableSpan span = findClickableSpan(event);
+                setHoverPause(span != null);
+                setHoveredSpan(span instanceof InteractiveClickableSpan hover ? hover : null);
+            }
+            case MotionEvent.ACTION_HOVER_EXIT -> {
+                setHoverPause(false);
+                setHoveredSpan(null);
+            }
             default -> {
             }
         }
         return super.dispatchHoverEvent(event);
     }
 
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent event) {
+        switch (event.getActionMasked()) {
+            case MotionEvent.ACTION_DOWN -> {
+                ClickableSpan span = findClickableSpan(event);
+                setPressedSpan(span instanceof InteractiveClickableSpan pressed ? pressed : null);
+            }
+            case MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> setPressedSpan(null);
+            default -> {
+            }
+        }
+        return super.dispatchTouchEvent(event);
+    }
+
     /** Text that can be clicked while it moves is hard to hit; stop the loop while pointing at it. */
-    private boolean isOverClickableSpan(MotionEvent event) {
+    @Nullable
+    private ClickableSpan findClickableSpan(MotionEvent event) {
         float x = event.getX() + getScrollX();
         float y = event.getY();
         for (TextView copy : new TextView[]{leading, trailing}) {
@@ -331,11 +398,93 @@ public class MarqueeTextView extends ViewGroup {
                 continue;
             }
             int offset = copy.getOffsetForPosition(localX, localY);
-            if (offset >= 0 && !spanned.getSpans(offset, offset, ClickableSpan.class).isEmpty()) {
-                return true;
+            if (offset >= 0) {
+                List<ClickableSpan> spans = spanned.getSpans(offset, offset, ClickableSpan.class);
+                if (!spans.isEmpty()) {
+                    return spans.getFirst();
+                }
             }
         }
-        return false;
+        return null;
+    }
+
+    private void setHoveredSpan(@Nullable InteractiveClickableSpan span) {
+        if (hoveredSpan == span) {
+            return;
+        }
+        InteractiveClickableSpan previous = hoveredSpan;
+        hoveredSpan = span;
+        if (previous != null) {
+            previous.hovered = false;
+            animateDim(previous);
+        }
+        if (span != null) {
+            span.hovered = true;
+            animateDim(span);
+        }
+    }
+
+    private void setPressedSpan(@Nullable InteractiveClickableSpan span) {
+        if (pressedSpan == span) {
+            return;
+        }
+        InteractiveClickableSpan previous = pressedSpan;
+        pressedSpan = span;
+        if (previous != null) {
+            previous.pressed = false;
+            animateDim(previous);
+        }
+        if (span != null) {
+            span.pressed = true;
+            animateDim(span);
+        }
+    }
+
+    private void animateDim(InteractiveClickableSpan span) {
+        if (span.startTransition(MuiModApi.getElapsedTime())) {
+            dimmingSpans.add(span);
+            if (!dimFramePosted) {
+                dimFramePosted = true;
+                Choreographer.getInstance().postFrameCallback(dimFrameCallback);
+            }
+        }
+        // Span draw states are re-applied on every draw, so only a repaint is needed.
+        invalidate();
+    }
+
+    private void onDimFrame(Choreographer choreographer, long frameTimeNanos) {
+        dimFramePosted = false;
+        if (dimmingSpans.isEmpty()) {
+            return;
+        }
+        long now = MuiModApi.getElapsedTime();
+        dimmingSpans.removeIf(span -> !span.tick(now));
+        invalidate();
+        if (!dimmingSpans.isEmpty()) {
+            dimFramePosted = true;
+            choreographer.postFrameCallback(dimFrameCallback);
+        }
+    }
+
+    /** Snaps every dimmed span back to opaque, e.g. when the text or visibility is gone. */
+    private void clearInteraction() {
+        if (hoveredSpan != null) {
+            hoveredSpan.reset();
+            hoveredSpan = null;
+        }
+        if (pressedSpan != null) {
+            pressedSpan.reset();
+            pressedSpan = null;
+        }
+        for (InteractiveClickableSpan span : dimmingSpans) {
+            span.reset();
+        }
+        dimmingSpans.clear();
+        if (dimFramePosted) {
+            dimFramePosted = false;
+            Choreographer.getInstance().removeFrameCallback(dimFrameCallback);
+        }
+        invalidate();
     }
 
     @Override
@@ -345,6 +494,7 @@ public class MarqueeTextView extends ViewGroup {
             resetPhase();
             updateLoopState();
         } else {
+            clearInteraction();
             stopLoop();
         }
     }
@@ -374,6 +524,7 @@ public class MarqueeTextView extends ViewGroup {
     @Override
     protected void onDetachedFromWindow() {
         super.onDetachedFromWindow();
+        clearInteraction();
         stopLoop();
         releaseIsolation();
     }
@@ -500,6 +651,81 @@ public class MarqueeTextView extends ViewGroup {
         @Override
         public PointerIcon onResolvePointerIcon(@NotNull MotionEvent event) {
             return null;
+        }
+    }
+
+    /** Delegates to the caller's span and dims it while hovered, or further while pressed. */
+    private static final class InteractiveClickableSpan extends ClickableSpan {
+        private final ClickableSpan delegate;
+        private boolean hovered;
+        private boolean pressed;
+        /** Current opacity multiplier, eased towards the state target. */
+        private float alpha = 1f;
+        private float alphaFrom = 1f;
+        private float alphaTo = 1f;
+        private long alphaStart;
+        private boolean animating;
+
+        InteractiveClickableSpan(ClickableSpan delegate) {
+            this.delegate = delegate;
+        }
+
+        private float targetAlpha() {
+            return pressed ? PRESSED_ALPHA : hovered ? HOVER_ALPHA : 1f;
+        }
+
+        /** Restarts the eased transition from the current value; returns whether one is running. */
+        private boolean startTransition(long now) {
+            float target = targetAlpha();
+            if (target == alphaTo) {
+                return animating;
+            }
+            alphaFrom = alpha;
+            alphaTo = target;
+            alphaStart = now;
+            animating = alphaFrom != alphaTo;
+            if (!animating) {
+                alpha = alphaTo;
+            }
+            return animating;
+        }
+
+        /** Advances one frame; returns false once the transition has settled. */
+        private boolean tick(long now) {
+            if (!animating) {
+                return false;
+            }
+            float progress = (now - alphaStart) / (float) DIM_MILLIS;
+            if (progress >= 1f) {
+                alpha = alphaTo;
+                animating = false;
+                return false;
+            }
+            alpha = alphaFrom
+                    + (alphaTo - alphaFrom) * Easing.EASE_IN_OUT_SINE.getInterpolation(progress);
+            return true;
+        }
+
+        private void reset() {
+            hovered = false;
+            pressed = false;
+            alpha = 1f;
+            alphaFrom = 1f;
+            alphaTo = 1f;
+            animating = false;
+        }
+
+        @Override
+        public void onClick(@NotNull View widget) {
+            delegate.onClick(widget);
+        }
+
+        @Override
+        public void updateDrawState(@NotNull TextPaint ds) {
+            delegate.updateDrawState(ds);
+            if (alpha < 1f) {
+                ds.setAlphaF(ds.getAlphaF() * alpha);
+            }
         }
     }
 }
