@@ -115,7 +115,7 @@ public class PlayHistoryView extends FrameLayout {
             ShapeDrawable dividerBg = new ShapeDrawable();
             dividerBg.setShape(ShapeDrawable.VLINE);
             dividerBg.setSize(divider.dp(1), divider.dp(1));
-            dividerBg.setColor(Theme.GHOST_BUTTON_BACKGROUND_HOVERED);
+            dividerBg.setColor(Theme.DIVIDER_COLOR);
             divider.setBackground(dividerBg);
             LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(divider.dp(1), MATCH_PARENT);
             dividerParams.setMargins(divider.dp(2), divider.dp(8), divider.dp(2), divider.dp(8));

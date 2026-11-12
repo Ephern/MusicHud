@@ -1,23 +1,14 @@
 package indi.etern.musichud.client.ui.components.buttons;
 
-import icyllis.modernui.animation.ColorEvaluator;
-import icyllis.modernui.animation.ValueAnimator;
+import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.Color;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.InsetDrawable;
-import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.util.ColorStateList;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.MotionEvent;
-import icyllis.modernui.widget.Button;
-import icyllis.modernui.widget.FrameLayout;
-import icyllis.modernui.widget.ImageButton;
-import icyllis.modernui.widget.LinearLayout;
-import icyllis.modernui.widget.ProgressBar;
-import icyllis.modernui.widget.TextView;
+import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
@@ -28,23 +19,23 @@ import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.components.modals.Modal;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.components.modals.Modal;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
-import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.*;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
-import indi.etern.musichud.client.ui.components.Tooltip;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -97,7 +88,7 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
 
     /** Disabled buttons must still show their tooltip, which the listener path skips. */
     @Override
-    protected boolean dispatchHoverEvent(MotionEvent event) {
+    protected boolean dispatchHoverEvent(@NotNull MotionEvent event) {
         Tooltip.handleHover(this, event);
         return super.dispatchHoverEvent(event);
     }
@@ -131,7 +122,7 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
 
         ProgressBar progressRing = new ProgressBar(ctx);
         progressRing.setIndeterminate(true);
-        progressRing.setIndeterminateTintList(ColorStateList.valueOf(Theme.PRIMARY_COLOR));
+        progressRing.setIndeterminateTintList(ColorStateList.valueOf(Theme.EMPHASIZE_TEXT_COLOR));
         int dp160 = dp(160);
         FrameLayout.LayoutParams ringParams = new FrameLayout.LayoutParams(WRAP_CONTENT, dp160);
         ringParams.gravity = Gravity.CENTER;
@@ -153,7 +144,7 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
         Button retryButton = new Button(ctx);
         retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
         retryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        retryButton.setTextColor(Theme.PRIMARY_COLOR);
+        retryButton.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
                 .padding(new InsetBackgroundFactory.Padding(retryButton.dp(2), retryButton.dp(1), retryButton.dp(2), retryButton.dp(1)))
                 .cornerRadius(retryButton.dp(4)).inset(dp(1)).build();
@@ -271,22 +262,11 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
 
     private static class PlaylistToggleRow extends LinearLayout {
         private static final int COVER_SIZE_DP = 48;
-        private static final int ANIM_DURATION = 200;
+        private static final int BG_INSET_DP = 2;
+        private static final int BG_CORNER_RADIUS_DP = 6;
+        private static final int[] CHECKED_STATE = {R.attr.state_checked};
 
-        private static final int TEXT_COLOR_CHECKED = 0xFF000000;
-        private static final int TEXT_COLOR_UNCHECKED = Theme.NORMAL_TEXT_COLOR;
-        private static final int COUNT_COLOR_CHECKED = 0xFF333333;
-        private static final int COUNT_COLOR_UNCHECKED = Theme.SECONDARY_TEXT_COLOR;
-
-        private static final int BG_COLOR_BLANK = 0x00000000;
-        private static final int BG_COLOR_HIGHLIGHT = 0xD9E0BFB7;
-
-        private final ShapeDrawable bgDrawable;
-        private final TextView nameText;
-        private final TextView countText;
-        private int currentBgColor = BG_COLOR_BLANK;
         private boolean checked;
-        private ValueAnimator currentAnimation;
 
         PlaylistToggleRow(Context context, Playlist playlist, Consumer<Boolean> onChange) {
             super(context);
@@ -296,11 +276,14 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
             setMinimumHeight(dp(COVER_SIZE_DP) + dp(12));
             int p = dp(8);
             setPadding(p, p, p, p);
+            setClickable(true);
 
-            bgDrawable = new ShapeDrawable();
-            bgDrawable.setCornerRadius(dp(6));
-            bgDrawable.setColor(ColorStateList.valueOf(BG_COLOR_BLANK));
-            setBackground(new InsetDrawable(bgDrawable, dp(2)));
+            InsetBackgroundFactory.builder()
+                    .cornerRadius(dp(BG_CORNER_RADIUS_DP))
+                    .inset(dp(BG_INSET_DP))
+                    .backgroundColor(Theme.GHOST_CHECK_BUTTON_STATES)
+                    .build()
+                    .applyBackgroundTo(this);
 
             UrlImageView coverView = new UrlImageView(context);
             coverView.loadUrl(playlist.getImageThumbnailUrl(dp(COVER_SIZE_DP)));
@@ -314,17 +297,17 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
                     && !playlist.getCreator().equals(ProfileConfigData.getInstance().getProfile())) {
                 displayName = I18n.get(MusicHud.MOD_ID + ".text.privatePlaylist");
             }
-            nameText = new TextView(context);
+            TextView nameText = new TextView(context);
             nameText.setText(displayName);
             nameText.setSingleLine(false);
             nameText.setMaxLines(2);
-            nameText.setTextColor(TEXT_COLOR_UNCHECKED);
+            nameText.setTextColor(Theme.NORMAL_TEXT_COLOR);
             nameText.setTextSize(Theme.TEXT_SIZE_LARGE);
 
-            countText = new TextView(context);
+            TextView countText = new TextView(context);
             countText.setText(I18n.get(MusicHud.MOD_ID + ".text.totalCount")
                     .replace("{}", String.valueOf(playlist.getMusicTrackCount())));
-            countText.setTextColor(COUNT_COLOR_UNCHECKED);
+            countText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             countText.setTextSize(Theme.TEXT_SIZE_NORMAL);
 
             textColumn.addView(nameText);
@@ -337,45 +320,24 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
             addView(textColumn, new LinearLayout.LayoutParams(0, WRAP_CONTENT, 1));
 
             setOnClickListener(v -> {
-                boolean newState = !this.checked;
-                animateToState(newState);
-                this.checked = newState;
-                if (onChange != null) onChange.accept(newState);
+                setChecked(!this.checked);
+                if (onChange != null) onChange.accept(this.checked);
             });
+        }
+
+        @Override
+        protected int @NotNull [] onCreateDrawableState(int extraSpace) {
+            int[] state = super.onCreateDrawableState(extraSpace + 1);
+            if (checked) {
+                mergeDrawableStates(state, CHECKED_STATE);
+            }
+            return state;
         }
 
         void setChecked(boolean checked) {
             if (this.checked == checked) return;
             this.checked = checked;
-            animateToState(checked);
-        }
-
-        private void animateToState(boolean checked) {
-            if (currentAnimation != null) {
-                currentAnimation.cancel();
-            }
-
-            int targetBg = checked ? BG_COLOR_HIGHLIGHT : BG_COLOR_BLANK;
-            int targetName = checked ? TEXT_COLOR_CHECKED : TEXT_COLOR_UNCHECKED;
-            int targetCount = checked ? COUNT_COLOR_CHECKED : COUNT_COLOR_UNCHECKED;
-
-            int startBg = currentBgColor;
-            int startName = Color.toArgb(nameText.getCurrentTextColor());
-            int startCount = Color.toArgb(countText.getCurrentTextColor());
-            currentBgColor = targetBg;
-
-            ValueAnimator anim = ValueAnimator.ofFloat(0f, 1f);
-            anim.addUpdateListener(a -> {
-                float t = a.getAnimatedFraction();
-                bgDrawable.setColor(ColorStateList.valueOf(ColorEvaluator.evaluate(t, startBg, targetBg)));
-                nameText.setTextColor(ColorEvaluator.evaluate(t, startName, targetName));
-                countText.setTextColor(ColorEvaluator.evaluate(t, startCount, targetCount));
-                invalidate();
-            });
-            anim.setDuration(ANIM_DURATION);
-            anim.setInterpolator(Easing.EASE_OUT_QUAD);
-            currentAnimation = anim;
-            anim.start();
+            refreshDrawableState();
         }
     }
 }

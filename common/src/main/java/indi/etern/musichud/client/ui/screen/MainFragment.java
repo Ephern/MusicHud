@@ -1,8 +1,10 @@
 package indi.etern.musichud.client.ui.screen;
 
 import icyllis.modernui.annotation.Nullable;
+import icyllis.modernui.animation.ValueAnimator;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
@@ -25,6 +27,7 @@ import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
 import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.utils.image.ImageUtils;
+import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
@@ -49,6 +52,7 @@ public class MainFragment extends Fragment {
     private static final String PAGE_HOME = "Home";
     private static final String ICON_LIBRARY = "/assets/music_hud/textures/gui/icons/square_library.png";
     private static final String ICON_TURNTABLE = "/assets/music_hud/textures/gui/icons/turntable.png";
+    private static final int NAVIGATOR_BACKGROUND_ANIMATION_DURATION = 300;
     private static volatile MainFragment instance = null;
 
     static {
@@ -69,6 +73,8 @@ public class MainFragment extends Fragment {
     private Button sidebarButton;
     private SidebarView sidebar;
     private LinearLayout contentRow;
+    private LinearLayout navigatorWrapper;
+    private ValueAnimator navigatorBackgroundAnimator;
     /**
      * Mode remembered for non-Home pages; Home always shows the library.
      */
@@ -238,12 +244,24 @@ public class MainFragment extends Fragment {
                 base.addView(controlBar, params);
 
                 {
-                    LinearLayout navigatorWrapper = new LinearLayout(context);
+                    navigatorWrapper = new LinearLayout(context);
                     navigatorWrapper.setOrientation(LinearLayout.HORIZONTAL);
                     int dp2 = navigatorWrapper.dp(2);
                     PanelStyle.applyDynamically(navigatorWrapper, navigatorWrapper.dp(16),
                             new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2),
                             InsetBackgroundFactory.BackdropBlur.UI_LAYER);
+                    // Runs after PanelStyle's attach listener, which rebuilds the background on re-attach.
+                    navigatorWrapper.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                        @Override
+                        public void onViewAttachedToWindow(View v) {
+                            updateNavigatorBackground(false);
+                        }
+
+                        @Override
+                        public void onViewDetachedFromWindow(View v) {
+                            cancelNavigatorBackgroundAnimator();
+                        }
+                    });
                     controlBar.addView(navigatorWrapper, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
                     InsetBackgroundFactory factory = InsetBackgroundFactory.builder()
                             .padding(new InsetBackgroundFactory.Padding(controlBar.dp(2), controlBar.dp(1), controlBar.dp(2), controlBar.dp(1)))
@@ -272,7 +290,7 @@ public class MainFragment extends Fragment {
                         ShapeDrawable dividerBg = new ShapeDrawable();
                         dividerBg.setShape(ShapeDrawable.VLINE);
                         dividerBg.setSize(divider.dp(1), divider.dp(1));
-                        dividerBg.setColor(Theme.GHOST_BUTTON_BACKGROUND_HOVERED);
+                        dividerBg.setColor(Theme.DIVIDER_COLOR);
                         divider.setBackground(dividerBg);
                         LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(divider.dp(1), MATCH_PARENT);
                         dividerParams.setMargins(divider.dp(2), divider.dp(8), divider.dp(2), divider.dp(8));
@@ -303,7 +321,7 @@ public class MainFragment extends Fragment {
                         ShapeDrawable dividerBg = new ShapeDrawable();
                         dividerBg.setShape(ShapeDrawable.VLINE);
                         dividerBg.setSize(divider.dp(1), divider.dp(1));
-                        dividerBg.setColor(Theme.GHOST_BUTTON_BACKGROUND_HOVERED);
+                        dividerBg.setColor(Theme.DIVIDER_COLOR);
                         divider.setBackground(dividerBg);
                         LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(divider.dp(1), MATCH_PARENT);
                         dividerParams.setMargins(divider.dp(2), divider.dp(8), divider.dp(2), divider.dp(8));
@@ -344,12 +362,15 @@ public class MainFragment extends Fragment {
                 public void onPageChangeEnd(@NonNull String pageKey) {
                     // Late safety net: the panel may have been built after the initial navigation.
                     updateSidebarForPage();
+                    updateNavigatorBackground(false);
                     refreshSidebarStatus();
                 }
 
                 @Override
                 public void onTransitionStart(@Nullable String fromKey, @NonNull String toKey,
                                               @NonNull RouterContainer.TransitionType type) {
+                    // transitionTargetKey is already set, so isHomePage() resolves the incoming page.
+                    updateNavigatorBackground(true);
                     if ("Home".equals(toKey)) {
                         HomeView homeView = HomeView.getInstance();
                         if (homeView != null) {
@@ -394,6 +415,7 @@ public class MainFragment extends Fragment {
             applyMusic(info.getCurrentlyPlayingMusic(), info.getNextToPlayMusic(),
                     playingInfo.getLyricLines(), false);
             updateSidebarForPage();
+            updateNavigatorBackground(false);
 
             return root;
         } catch (Exception e) {
@@ -461,6 +483,47 @@ public class MainFragment extends Fragment {
     private void setContentLeftPadding(int left) {
         if (contentRow != null && contentRow.getPaddingLeft() != left) {
             contentRow.setPadding(left, 0, contentRow.getPaddingRight(), 0);
+        }
+    }
+
+    /**
+     * Home hides the navigator panel so its icons float over the content; other pages always show it.
+     */
+    private void updateNavigatorBackground(boolean animate) {
+        if (navigatorWrapper == null) {
+            return;
+        }
+        cancelNavigatorBackgroundAnimator();
+        float target = isHomePage() ? 0f : 1f;
+        float current = getNavigatorBackgroundAlpha();
+        if (!animate || Math.abs(current - target) < 0.001f) {
+            setNavigatorBackgroundAlpha(target);
+            return;
+        }
+        ValueAnimator animator = ValueAnimator.ofFloat(current, target);
+        animator.setDuration(NAVIGATOR_BACKGROUND_ANIMATION_DURATION);
+        animator.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
+        animator.addUpdateListener(a -> setNavigatorBackgroundAlpha((Float) a.getAnimatedValue()));
+        navigatorBackgroundAnimator = animator;
+        animator.start();
+    }
+
+    private void cancelNavigatorBackgroundAnimator() {
+        if (navigatorBackgroundAnimator != null) {
+            navigatorBackgroundAnimator.cancel();
+            navigatorBackgroundAnimator = null;
+        }
+    }
+
+    private float getNavigatorBackgroundAlpha() {
+        Drawable background = navigatorWrapper != null ? navigatorWrapper.getBackground() : null;
+        return background != null ? background.getAlpha() : 1f;
+    }
+
+    private void setNavigatorBackgroundAlpha(float alpha) {
+        Drawable background = navigatorWrapper != null ? navigatorWrapper.getBackground() : null;
+        if (background != null) {
+            background.setAlpha(alpha);
         }
     }
 
@@ -572,6 +635,8 @@ public class MainFragment extends Fragment {
     @Override
     public void onDestroyView() {
         super.onDestroyView();
+        cancelNavigatorBackgroundAnimator();
+        navigatorWrapper = null;
         sidebar = null;
         contentRow = null;
         routerContainer = null;

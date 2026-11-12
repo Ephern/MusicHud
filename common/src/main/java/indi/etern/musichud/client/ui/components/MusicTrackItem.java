@@ -133,7 +133,6 @@ public class MusicTrackItem extends LinearLayout {
         row2.setGravity(Gravity.CENTER_VERTICAL);
         row2.setMinimumHeight(dp(16));
         row2.setMovementMethod(LinkMovementMethod.getInstance());
-        row2.setHighlightColor(0x33FFFFFF);
         musicTexts.addView(row2, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         infoRow = new LinearLayout(context);
@@ -442,12 +441,12 @@ public class MusicTrackItem extends LinearLayout {
 
                     @Override
                     public void updateDrawState(@NotNull TextPaint ds) {
-                        ds.setColor(Theme.PRIMARY_COLOR);
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
                         ds.setUnderline(false);
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                metaBuilder.setSpan(new ForegroundColorSpan(Theme.SECONDARY_TEXT_COLOR),
+                metaBuilder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
@@ -472,12 +471,12 @@ public class MusicTrackItem extends LinearLayout {
 
                     @Override
                     public void updateDrawState(@NotNull TextPaint ds) {
-                        ds.setColor(Theme.PRIMARY_COLOR);
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
                         ds.setUnderline(false);
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                metaBuilder.setSpan(new ForegroundColorSpan(Theme.SECONDARY_TEXT_COLOR),
+                metaBuilder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }

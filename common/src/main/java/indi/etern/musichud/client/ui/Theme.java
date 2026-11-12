@@ -7,6 +7,7 @@ import icyllis.modernui.util.StateSet;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.drawable.LinearProgressStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import net.minecraft.client.resources.language.I18n;
@@ -19,6 +20,7 @@ public class Theme {
     public static final int EMPHASIZE_TEXT_COLOR = 0xFFFFFFFF;
     public static final int NORMAL_TEXT_COLOR = 0xE0FFFFFF;
     public static final int SECONDARY_TEXT_COLOR = 0x70FFFFFF;
+    public static final int THIRDERY_TEXT_COLOR = 0x40FFFFFF;
 
     public static final int ERROR_TEXT_COLOR = 0xFFFF4F4F;
     public static final int WARN_TEXT_COLOR = 0xFFFFB04F;
@@ -27,6 +29,8 @@ public class Theme {
     public static final int GHOST_BUTTON_BACKGROUND_PRESSED = 0x0BFFFFFF;
     public static final int GHOST_BUTTON_BACKGROUND_HOVERED = 0x12FFFFFF;
     public static final int GHOST_BUTTON_BACKGROUND_CHECKED = 0x10FFFFFF;
+
+    public static final int DIVIDER_COLOR = 0x12FFFFFF;
 
     public static final ColorStateList GHOST_CHECK_BUTTON_STATES = new ColorStateList(
             new int[][]{
@@ -91,6 +95,10 @@ public class Theme {
     public static final int HUD_PROGRESS_CURRENT = 0x48FFFFFF;
     public static final int HUD_PROGRESS_BACKGROUND = 0x2AFFFFFF;
 
+    public static final int PROGRESS_TRACK_COLOR = 0x24FFFFFF;
+    public static final int PROGRESS_TAIL_COLOR = PROGRESS_TRACK_COLOR;
+    public static final int PROGRESS_HEAD_COLOR = 0x50FFFFFF;
+
     public static final ColorStateList HUD_HANDLE_STATES = new ColorStateList(
             new int[][]{
                     new int[]{R.attr.state_pressed},
@@ -105,6 +113,17 @@ public class Theme {
     );
 
     public static final int HUD_EDIT_BORDER_COLOR = 0x52FFFFFF;
+
+    public static LinearProgressStyle mediaProgressStyle() {
+        return LinearProgressStyle.builder()
+                .trackColor(PROGRESS_TRACK_COLOR)
+                .fillColors(PROGRESS_TAIL_COLOR, PROGRESS_HEAD_COLOR)
+                .trackFillsHeight()
+                .heightDp(4)
+                .gradientLengthDp(24)
+                .alphaFadeIn(0.01f)
+                .build();
+    }
 
     public static TextView getNotificationTextView(Context context, boolean enabled) {
         TextView textView = new TextView(context);
