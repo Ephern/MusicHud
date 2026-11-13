@@ -11,6 +11,7 @@ import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import net.minecraft.client.gui.GuiGraphics;
 import org.apache.logging.log4j.Logger;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -25,9 +26,11 @@ import java.util.List;
  * than the render thread, and displaying a partially recorded frame leaves most of the layer missing
  * or showing the previous frame.
  */
+@SuppressWarnings("UnstableApiUsage")
 @Mixin(UIManager.class)
 public abstract class UIManagerMixin {
-    private static final Logger LOGGER = MusicHud.getLogger(UIManagerMixin.class);
+    @Unique
+    private static final Logger music_hud$LOGGER = MusicHud.getLogger(UIManagerMixin.class);
 
     @Inject(method = "render",
             at = @At(value = "INVOKE",
@@ -46,11 +49,11 @@ public abstract class UIManagerMixin {
             if (!added) {
                 // A failed segment leaves its region cleared but undrawn, and the rest of the
                 // frame's commands were already recorded, so the loss is visible for one frame.
-                LOGGER.error("Failed to add a partial UI recording, batch={}", commit.batch());
+                music_hud$LOGGER.error("Failed to add a partial UI recording, batch={}", commit.batch());
             }
             ((GLDevice) context.getDevice()).flushRenderCalls();
             if (!context.submit()) {
-                LOGGER.error("Failed to submit a partial UI recording, batch={}", commit.batch());
+                music_hud$LOGGER.error("Failed to submit a partial UI recording, batch={}", commit.batch());
             }
             SceneInterop.prepareGameGraphics();
             try {
@@ -59,12 +62,5 @@ public abstract class UIManagerMixin {
                 SceneInterop.restoreArc3d();
             }
         }
-    }
-
-    /** Retired textures are released only after this frame's recordings have been submitted. */
-    @Inject(method = "render", at = @At("RETURN"))
-    private void music_hud$endFrame(GuiGraphics graphics, int mouseX, int mouseY,
-                                    float deltaTick, CallbackInfo ci) {
-        SceneBlurSlot.endFrame();
     }
 }

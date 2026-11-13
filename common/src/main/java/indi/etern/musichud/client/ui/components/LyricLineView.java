@@ -90,6 +90,9 @@ public class LyricLineView extends LinearLayout {
     private boolean bloomFading;
     private long bloomFadeStartNanos;
     private boolean blurDisabled = false;
+    /** Set once the row has been out of view long enough that its blur targets are worth freeing. */
+    private boolean blurTargetsReleased;
+    private long blurIdleSinceNanos;
     @Getter
     private boolean blurInitialized = false;
 
@@ -366,6 +369,10 @@ public class LyricLineView extends LinearLayout {
         blurInitialized = true;
     }
 
+    private static int ceilDiv(int value, int divisor) {
+        return Math.max(1, (value + divisor - 1) / divisor);
+    }
+
     /** Releases the offscreen GPU resources; the row falls back to a sharp draw afterward. */
     public void releaseBlurResources() {
         blurDisabled = true;
@@ -410,14 +417,45 @@ public class LyricLineView extends LinearLayout {
     }
 
     /**
-     * Parent phase 1: renders the row content offscreen and asks the render thread to blur it. The
-     * composite happens later in {@link #dispatchDraw}; the blur result is already filled by then.
+     * Frees the blur and bloom targets of a row that scrolled far out of view. Unlike
+     * {@link #releaseBlurResources()}, this is reversible: the next request rebuilds them, so a
+     * whole song never keeps one pipeline set per line.
      */
+    public void releaseBlurTargetsWhenIdle(long nowNanos, long idleNanos) {
+        if (blurTargetsReleased || blurDisabled || blurResources.width() <= 0) {
+            return;
+        }
+        if (blurIdleSinceNanos == 0L) {
+            blurIdleSinceNanos = Math.max(1L, nowNanos);
+            return;
+        }
+        if (nowNanos - blurIdleSinceNanos < idleNanos) {
+            return;
+        }
+        blurTargetsReleased = true;
+        blurInitialized = false;
+        frameImage = null;
+        bloomFrameImage = null;
+        bloomFading = false;
+        blurResources.release();
+        bloomResources.release();
+        blurSlot.unregister();
+        bloomSlot.unregister();
+    }
+
+    /** The row is back within range: cancel a pending idle release. */
+    public void clearBlurIdleClock() {
+        blurIdleSinceNanos = 0L;
+    }
+
     public void prepareBlurSource(int padding) {
         frameImage = null;
         if (!canPrepareBlur()) {
             return;
         }
+        blurSlot.register();
+        blurTargetsReleased = false;
+        blurIdleSinceNanos = 0L;
         try {
             if (!blurResources.prepare(getWidth(), getHeight(), padding, blurRadius,
                     computeBlurContentStamp(), super::dispatchDraw, blurSlot)) {
@@ -432,8 +470,9 @@ public class LyricLineView extends LinearLayout {
             if (image == null) {
                 return;
             }
-            if (image.getWidth() != blurResources.width()
-                    || image.getHeight() != blurResources.height()) {
+            int scale = Math.max(1, blurSlot.publishedScale());
+            if (image.getWidth() != ceilDiv(blurResources.width(), scale)
+                    || image.getHeight() != ceilDiv(blurResources.height(), scale)) {
                 // The published result belongs to an older target size (e.g. the row was just laid
                 // out). Without a forced re-request it would stay unusable until the radius changes.
                 blurResources.invalidate();
@@ -513,6 +552,9 @@ public class LyricLineView extends LinearLayout {
             }
             return;
         }
+        bloomSlot.register();
+        blurTargetsReleased = false;
+        blurIdleSinceNanos = 0L;
         bloomFrameImage = null;
         try {
             float sigma = LineBlurRenderer.sigmaFor(dp(BLOOM_DP));
@@ -524,8 +566,9 @@ public class LyricLineView extends LinearLayout {
             if (image == null) {
                 return;
             }
-            if (image.getWidth() != bloomResources.width()
-                    || image.getHeight() != bloomResources.height()) {
+            int scale = Math.max(1, bloomSlot.publishedScale());
+            if (image.getWidth() != ceilDiv(bloomResources.width(), scale)
+                    || image.getHeight() != ceilDiv(bloomResources.height(), scale)) {
                 bloomResources.invalidate();
                 return;
             }

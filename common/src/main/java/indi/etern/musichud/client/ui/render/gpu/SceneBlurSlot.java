@@ -55,6 +55,15 @@ public final class SceneBlurSlot {
     private final PublishedSceneTexture published = new PublishedSceneTexture();
     @Getter
     private volatile boolean disabled;
+    /** Scale of the published result: 1, 2 or 4. Consumers use it to map the image to the row. */
+    private volatile int publishedScale = 1;
+    /** Hysteretic scale of the work resolution, kept across frames so it does not toggle. */
+    private int blurScale = 1;
+
+    /** Scale of the texture returned by {@link #image()}; 1 unless the blur ran at lower resolution. */
+    public int publishedScale() {
+        return publishedScale;
+    }
 
     /** UI thread: references the backing image of an arc3d render target. */
     public static @Nullable icyllis.arc3d.engine.Image imageOf(@Nullable Surface surface) {
@@ -91,6 +100,16 @@ public final class SceneBlurSlot {
     public void request(@Nullable icyllis.arc3d.engine.Image image,
                         float u0, float v0, float u1, float v1,
                         int outWidth, int outHeight, float sigma) {
+        request(image, u0, v0, u1, v1, outWidth, outHeight, sigma, false);
+    }
+
+    /**
+     * @param downscaleToSigma run a wide blur at a fraction of the output size; the consumer must
+     *                         draw the result scaled up (see {@link #publishedScale()})
+     */
+    public void request(@Nullable icyllis.arc3d.engine.Image image,
+                        float u0, float v0, float u1, float v1,
+                        int outWidth, int outHeight, float sigma, boolean downscaleToSigma) {
         if (image == null || disabled || outWidth < 1 || outHeight < 1 || !(sigma > 0f)) {
             if (image != null) {
                 image.unref();
@@ -100,7 +119,8 @@ public final class SceneBlurSlot {
         synchronized (requestLock) {
             int batch = MidFrameCommit.currentBatch();
             int last = requests.size() - 1;
-            Request created = new Request(image, u0, v0, u1, v1, outWidth, outHeight, sigma, batch);
+            Request created = new Request(image, u0, v0, u1, v1, outWidth, outHeight, sigma, batch,
+                    downscaleToSigma);
             if (last >= 0 && requests.get(last).batch == batch) {
                 requests.get(last).image.unref();
                 requests.set(last, created);
@@ -157,11 +177,6 @@ public final class SceneBlurSlot {
             request.image.unref();
         }
         requests.clear();
-    }
-
-    /** Render thread: advances the retirement clock once the frame's recordings are all submitted. */
-    public static void endFrame() {
-        SceneRetirement.endFrame();
     }
 
     /** Render thread: executes the blurs requested up to and including {@code maxBatch}. */
@@ -234,8 +249,9 @@ public final class SceneBlurSlot {
                 blurWidth = outWidth;
                 blurHeight = outHeight;
             }
+            int resultScale = request.downscaleToSigma ? scaleFor(sigma) : 1;
             SceneBlur.PendingBlur pendingBlur = current.blur.prepare(gpu,
-                    blurWidth, blurHeight, sigma);
+                    blurWidth, blurHeight, sigma, resultScale);
             if (pendingBlur == null || !pendingBlur.apply(gpu, blurSource, blurWidth, blurHeight)) {
                 return;
             }
@@ -246,10 +262,12 @@ public final class SceneBlurSlot {
                     return;
                 }
                 result = bloom;
+                resultScale = 1;
             }
             // Reject a result whose consumer was hidden while the blur was running.
             synchronized (requestLock) {
                 if (requestGeneration == generation) {
+                    publishedScale = resultScale;
                     published.publish(result);
                 }
             }
@@ -295,6 +313,24 @@ public final class SceneBlurSlot {
         return wrapped;
     }
 
+    /**
+     * Work-resolution scale for a sigma given in source pixels: wide blurs only need a fraction of
+     * the pixels. The thresholds are hysteretic so an animating radius cannot flip the size.
+     */
+    private int scaleFor(float sigma) {
+        int current = blurScale;
+        int next;
+        if (current <= 1) {
+            next = sigma >= 8f ? 4 : sigma >= 3f ? 2 : 1;
+        } else if (current == 2) {
+            next = sigma >= 8f ? 4 : sigma < 2.4f ? 1 : 2;
+        } else {
+            next = sigma < 6f ? (sigma >= 3f ? 2 : 1) : 4;
+        }
+        blurScale = next;
+        return next;
+    }
+
     private Pipeline usePipeline(SceneGpuContext gpu, int width, int height, float sigma) {
         // The pipeline survives level changes: SceneBlur keeps its published result and only
         // rebuilds the pyramid, so the image consumers hold stays valid.
@@ -314,6 +350,8 @@ public final class SceneBlurSlot {
 
     private void releaseNow() {
         discardPending();
+        blurScale = 1;
+        publishedScale = 1;
         InteropSource previousSource = source;
         source = null;
         sourceKey = null;
@@ -415,6 +453,7 @@ public final class SceneBlurSlot {
 
     private record Request(icyllis.arc3d.engine.Image image,
                            float u0, float v0, float u1, float v1,
-                           int outWidth, int outHeight, float sigma, int batch) {
+                           int outWidth, int outHeight, float sigma, int batch,
+                           boolean downscaleToSigma) {
     }
 }

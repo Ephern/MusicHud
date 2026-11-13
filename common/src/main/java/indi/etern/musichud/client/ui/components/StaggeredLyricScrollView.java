@@ -53,6 +53,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     public static final float MAX_DELAY_MILLIS = 800;
     public static final int MANUAL_SCROLL_FADE_DURATION = 250;
     public static final float MAX_BLUR_DP = 8f;
+    /**
+     * How long a row has to stay out of the viewport before its blur targets are freed. A song builds
+     * one row per line, so without this every line ever scrolled past keeps its own pipeline.
+     */
+    private static final long BLUR_IDLE_RELEASE_NANOS = 1_500_000_000L;
     private static final float DEFAULT_LYRIC_FOLLOW_RATIO = 0.1f;
     private static final int SWITCH_DURATION = 400;
     private static final int SCROLL_RESPONSE_MILLIS = 550;
@@ -861,6 +866,11 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             boolean visible = view.getHeight() > 0
                     && bottom >= scrollY - margin
                     && top <= viewportBottom + margin;
+            if (visible) {
+                view.clearBlurIdleClock();
+            } else {
+                view.releaseBlurTargetsWhenIdle(nowNanos, BLUR_IDLE_RELEASE_NANOS);
+            }
             boolean blurred = visible && blurEnabled && !manual && referenceIndex >= 0
                     && view.isBlurEligible();
             view.setBlurPipelineEnabled(blurred);
