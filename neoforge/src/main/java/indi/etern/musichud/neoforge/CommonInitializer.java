@@ -37,12 +37,12 @@ public final class CommonInitializer {
 
         if (FMLEnvironment.getDist().isClient()) {
             MusicHud.setCurrentEnvironment(Environment.of(Environment.Side.CLIENT, Environment.Platform.NEOFORGE));
-            container.registerConfig(ModConfig.Type.COMMON, ServerConfigDefinition.configure.getRight());
+            container.registerConfig(ModConfig.Type.LOCAL, ServerConfigDefinition.configure.getRight());
             container.registerConfig(ModConfig.Type.CLIENT, ClientConfigDefinition.configure.getRight());
             container.registerExtensionPoint(IConfigScreenFactory.class, new ConfigScreenFactory());
         } else {
             MusicHud.setCurrentEnvironment(Environment.of(Environment.Side.SERVER, Environment.Platform.NEOFORGE));
-            container.registerConfig(ModConfig.Type.SERVER, ServerConfigDefinition.configure.getRight());
+            container.registerConfig(ModConfig.Type.SYNCED, ServerConfigDefinition.configure.getRight());
         }
         MusicHud.init();
     }

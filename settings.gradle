@@ -16,7 +16,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'music_hud'
+rootProject.name = 'music_hud.' + properties.get("minecraft_version_range")
 
 def active = providers.gradleProperty('activePlatform').getOrElse('all')
 def profiles = active.split(',').collect { it.trim().toLowerCase() } as Set
