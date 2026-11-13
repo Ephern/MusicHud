@@ -35,6 +35,7 @@ public class SceneRenderPipelines {
             .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
             .withUniform("Projection", UniformType.UNIFORM_BUFFER)
             .withBlend(BlendFunction.TRANSLUCENT)
+            .withVertexFormat(DefaultVertexFormat.POSITION_COLOR_TEX_LIGHTMAP, VertexFormat.Mode.QUADS)
             .build();
 
     static {
