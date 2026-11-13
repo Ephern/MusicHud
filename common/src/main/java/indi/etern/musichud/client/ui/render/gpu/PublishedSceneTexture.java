@@ -56,6 +56,20 @@ public final class PublishedSceneTexture {
         return target.arcImage();
     }
 
+    /**
+     * Drops the published image. The wrapper goes through the retirement queue because a recording
+     * made before the drop may still sample it.
+     */
+    public synchronized void discard() {
+        texture = null;
+        InteropTarget previous = target;
+        target = null;
+        wrappedSource = null;
+        if (previous != null) {
+            SceneRetirement.retire(previous::close);
+        }
+    }
+
     public synchronized void release() {
         if (target != null) {
             target.close();
