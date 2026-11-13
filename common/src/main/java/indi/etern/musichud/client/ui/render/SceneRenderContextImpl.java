@@ -5,9 +5,11 @@ import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneSamplers;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneTextureAdapters;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.VanillaScenePipeline;
 import indi.etern.musichud.client.ui.render.pipeline.*;
@@ -141,7 +143,9 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     private TextureSetup toVanillaTextureSetup(SceneTextureSetup setup, RenderLayer owner) {
         GpuTextureView primary = setup.primary() == null ? null : SceneTextureAdapters.view(setup.primary());
         GpuTextureView secondary = setup.secondary() == null ? null : SceneTextureAdapters.view(setup.secondary());
-        return new TextureSetup(primary, secondary, discriminatorView(owner));
+        GpuSampler sampler = SceneSamplers.linearClamp();
+        return new TextureSetup(primary, secondary, discriminatorView(owner),
+                sampler, sampler, sampler);
     }
 
     @SuppressWarnings("resource")

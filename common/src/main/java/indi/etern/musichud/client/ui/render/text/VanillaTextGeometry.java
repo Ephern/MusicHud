@@ -1,8 +1,10 @@
 package indi.etern.musichud.client.ui.render.text;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneSamplers;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -29,13 +31,13 @@ public final class VanillaTextGeometry {
                                                       TextEdgeFade fade,
                                                       @Nullable ScreenRectangle scissor, Matrix3x2f pose) {
         FormattedCharSequence sequence = Language.getInstance().getVisualOrder(FormattedText.of(text));
-        Font.PreparedText prepared = font.prepareText(sequence, x, y, 0xFFFFFFFF, false, 0);
+        Font.PreparedText prepared = font.prepareText(text, x, y, 0xFFFFFFFF, false, 0);
 
         List<TextRenderable> textRenderables = new ArrayList<>();
         prepared.visit(new Font.GlyphVisitor() {
             @Override
-            public void acceptGlyph(@NotNull TextRenderable textRenderable) {
-                textRenderables.add(textRenderable);
+            public void acceptGlyph(@NotNull TextRenderable.Styled styled) {
+                textRenderables.add(styled);
             }
 
             @Override
@@ -91,6 +93,12 @@ public final class VanillaTextGeometry {
         @Override
         public GpuTextureView texture() {
             return texture;
+        }
+
+        @Override
+        public GpuSampler sampler() {
+            // the vanilla font atlas is pixel art drawn one-to-one
+            return SceneSamplers.nearestClamp();
         }
 
         @Override

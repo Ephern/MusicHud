@@ -52,7 +52,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
             new HashMap<>();
     private final List<SceneGpuTextureImpl> textures = new ArrayList<>();
     private final List<SceneGpuMeshImpl> meshes = new ArrayList<>();
-    private final Map<String, GpuTextureView> samplerScratch = new HashMap<>();
+    private final Map<String, SceneNativePassRenderer.BoundTexture> samplerScratch = new HashMap<>();
     private final Map<String, GpuBufferSlice> uniformScratch = new HashMap<>();
     private boolean closed;
 
@@ -188,7 +188,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
             pass.setPipeline(requirePipeline(draw.draw().pipeline()));
             pass.setVertexBuffer(0, mesh.vertices());
             pass.setIndexBuffer(mesh.indices(), VertexFormat.IndexType.SHORT);
-            samplers.forEach(pass::bindSampler);
+            samplers.forEach((name, bound) -> pass.bindTexture(name, bound.view(), bound.sampler()));
             uniforms.forEach(pass::setUniform);
             pass.drawIndexed(0, 0, mesh.indexCount(), 1);
         }
@@ -234,12 +234,13 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                 guiScale, !openGl);
     }
 
-    private Map<String, GpuTextureView> samplers(SceneDraw draw) {
+    private Map<String, SceneNativePassRenderer.BoundTexture> samplers(SceneDraw draw) {
         // Reused across passes: the map is consumed synchronously by the render pass, and the
         // context only ever draws on the render thread.
         samplerScratch.clear();
         for (SceneSamplerBinding binding : draw.samplers()) {
-            samplerScratch.put(binding.name(), SceneTextureAdapters.view(binding.texture()));
+            samplerScratch.put(binding.name(), new SceneNativePassRenderer.BoundTexture(
+                    SceneTextureAdapters.view(binding.texture()), SceneSamplers.linearClampSingleLevel()));
         }
         return samplerScratch;
     }

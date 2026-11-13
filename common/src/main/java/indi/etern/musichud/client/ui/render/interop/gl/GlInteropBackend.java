@@ -77,8 +77,6 @@ public final class GlInteropBackend implements SceneInteropBackend {
         GlTexture_Wrapped wrapped = null;
         try {
             wrapped = new GlTexture_Wrapped(texture);
-            // The blur pyramid relies on bilinear taps.
-            wrapped.setTextureFilter(FilterMode.LINEAR, false);
             GpuTextureView view = MuiModApi.get().getRealGpuDevice().createTextureView(wrapped);
             return new Source(wrapped, view, texture.getWidth(), texture.getHeight());
         } catch (Throwable failure) {

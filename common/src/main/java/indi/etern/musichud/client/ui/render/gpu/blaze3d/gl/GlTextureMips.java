@@ -57,8 +57,6 @@ public final class GlTextureMips {
                     Math.max(1, Math.max(gl.getWidth(0), gl.getHeight(0))));
             GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL12.GL_TEXTURE_MAX_LEVEL,
                     Math.max(0, levels - 1));
-            texture.setFilter(true, true);
-            gl.flushModeChanges(GL11.GL_TEXTURE_2D);
             PREPARED.add(gpu);
             LOGGER.debug("Trilinear sampling enabled for texture {} ({}x{})",
                     id, gl.getWidth(0), gl.getHeight(0));

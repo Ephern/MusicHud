@@ -2,12 +2,9 @@ package indi.etern.musichud.client.ui.render.gpu.blaze3d.gl;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.TextureFormat;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL12;
-import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL30;
 
 /** Half-float storage exposed through an RGBA8 texture descriptor. */
@@ -37,33 +34,5 @@ final class SceneNativeTexture extends GlTexture {
         } finally {
             GlStateManager._bindTexture(previousBinding);
         }
-    }
-
-    @Override
-    public void flushModeChanges(int target) {
-        if (!modesDirty) return;
-        int previousBinding = GL11.glGetInteger(GL11.GL_TEXTURE_BINDING_2D);
-        GlStateManager._bindTexture(id);
-        try {
-            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, toGl(addressModeU));
-            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, toGl(addressModeV));
-            int min = minFilter == FilterMode.LINEAR ? GL11.GL_LINEAR : GL11.GL_NEAREST;
-            int mag = magFilter == FilterMode.LINEAR ? GL11.GL_LINEAR : GL11.GL_NEAREST;
-            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, min);
-            GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, mag);
-            modesDirty = false;
-        } finally {
-            GlStateManager._bindTexture(previousBinding);
-        }
-    }
-
-    private static int toGl(AddressMode mode) {
-        return mode == AddressMode.REPEAT ? GL11.GL_REPEAT : GL13.GL_CLAMP_TO_EDGE;
-    }
-
-    @Override
-    public void setUseMipmaps(boolean enabled) {
-        if (enabled) throw new UnsupportedOperationException("Scene targets have one mip level");
-        super.setUseMipmaps(false);
     }
 }

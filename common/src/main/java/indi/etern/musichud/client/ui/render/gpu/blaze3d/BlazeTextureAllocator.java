@@ -1,8 +1,6 @@
 package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 
 import com.mojang.blaze3d.systems.GpuDevice;
-import com.mojang.blaze3d.textures.AddressMode;
-import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
@@ -22,8 +20,6 @@ final class BlazeTextureAllocator implements SceneTextureAllocator {
         GpuTexture texture = device.createTexture(label, USAGE, TextureFormat.RGBA8,
                 width, height, 1, 1);
         try {
-            texture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
-            texture.setTextureFilter(FilterMode.LINEAR, false);
             return new SceneAllocatedTexture(texture, device.createTextureView(texture),
                     SceneTextureFormat.RGBA8);
         } catch (RuntimeException | Error failure) {

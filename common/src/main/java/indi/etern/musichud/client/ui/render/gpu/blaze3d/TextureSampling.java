@@ -8,14 +8,8 @@ import net.minecraft.client.renderer.texture.AbstractTexture;
 import net.minecraft.resources.Identifier;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.Set;
-import java.util.WeakHashMap;
-
 /** Texture filtering helpers shared by both render backends. */
 public final class TextureSampling {
-    private static final Set<GpuTexture> LINEAR =
-            Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     private static final float MINIFY_THRESHOLD = 1.25f;
 
     private TextureSampling() {
@@ -52,13 +46,7 @@ public final class TextureSampling {
         }
     }
 
-    /** Switches the texture to bilinear filtering with clamped addressing. */
+    /** Kept for callers that want bilinear sampling; 1.21.11 picks the sampler at the bind site. */
     public static void ensureLinear(@Nullable AbstractTexture texture) {
-        GpuTexture gpu = texture == null ? null : texture.getTexture();
-        if (gpu == null || !LINEAR.add(gpu)) {
-            return;
-        }
-        texture.setFilter(true, false);
-        texture.setClamp(true);
     }
 }

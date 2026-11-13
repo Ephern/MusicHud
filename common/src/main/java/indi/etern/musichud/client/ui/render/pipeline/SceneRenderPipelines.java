@@ -24,6 +24,19 @@ public class SceneRenderPipelines {
 
     public static final ScenePipeline PROGRESS_BAR;
 
+    /** Direct-mask gradient text: vanilla's intensity text vertex shader with our fragment shader. */
+    public static final RenderPipeline GRADIENT_TEXT = RenderPipeline.builder()
+            .withLocation(Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/gradient_text"))
+            .withVertexShader(Identifier.withDefaultNamespace("core/rendertype_text_intensity"))
+            .withFragmentShader(Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "core/gradient_text"))
+            .withSampler("Sampler0")
+            .withSampler("Sampler2")
+            .withUniform("Fog", UniformType.UNIFORM_BUFFER)
+            .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
+            .withUniform("Projection", UniformType.UNIFORM_BUFFER)
+            .withBlend(BlendFunction.TRANSLUCENT)
+            .build();
+
     static {
         FLUID_BACKGROUND = wrap("fluid_background", RenderPipeline.builder(MATRICES_PROJECTION_SNIPPET)
                 .withLocation(Identifier.fromNamespaceAndPath(MusicHud.MOD_ID, "pipeline/fluid_background"))

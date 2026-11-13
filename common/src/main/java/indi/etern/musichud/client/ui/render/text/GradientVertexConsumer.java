@@ -2,7 +2,7 @@ package indi.etern.musichud.client.ui.render.text;
 
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.jetbrains.annotations.NotNull;
-import org.joml.Matrix4f;
+import org.joml.Matrix4fc;
 
 /** Replaces text vertex colors with a gradient sampled from local x. */
 final class GradientVertexConsumer implements VertexConsumer {
@@ -27,7 +27,7 @@ final class GradientVertexConsumer implements VertexConsumer {
     }
 
     @Override
-    public @NotNull VertexConsumer addVertex(@NotNull Matrix4f matrix, float x, float y, float z) {
+    public @NotNull VertexConsumer addVertex(@NotNull Matrix4fc matrix, float x, float y, float z) {
         this.localX = x;
         this.hasLocalX = true;
         this.delegate.addVertex(matrix, x, y, z);
@@ -82,6 +82,12 @@ final class GradientVertexConsumer implements VertexConsumer {
     @Override
     public @NotNull VertexConsumer setNormal(float x, float y, float z) {
         this.delegate.setNormal(x, y, z);
+        return this;
+    }
+
+    @Override
+    public @NotNull VertexConsumer setLineWidth(float width) {
+        this.delegate.setLineWidth(width);
         return this;
     }
 

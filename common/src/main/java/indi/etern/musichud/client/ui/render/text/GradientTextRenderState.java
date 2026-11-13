@@ -44,7 +44,7 @@ public final class GradientTextRenderState implements GuiElementRenderState {
     @Override
     public @NotNull TextureSetup textureSetup() {
         if (textureSetup == null) {
-            textureSetup = TextureSetup.singleTextureWithLightmap(run.texture());
+            textureSetup = TextureSetup.singleTextureWithLightmap(run.texture(), run.sampler());
         }
         return textureSetup;
     }

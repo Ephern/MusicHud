@@ -6,6 +6,7 @@ import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.VertexFormat;
@@ -17,6 +18,10 @@ import java.util.OptionalInt;
 
 /** Does not own input textures or returned views. */
 final class SceneNativePassRenderer implements AutoCloseable {
+    /** A texture to sample with the sampler the backend needs for it. */
+    record BoundTexture(GpuTextureView view, GpuSampler sampler) {
+    }
+
     private final boolean flipVertexV;
     private GpuBuffer fullscreenVertices;
 
@@ -53,10 +58,10 @@ final class SceneNativePassRenderer implements AutoCloseable {
     }
 
     public void draw(RenderPipeline pipeline, GpuTextureView destination,
-                     Map<String, GpuTextureView> textures, Map<String, GpuBufferSlice> uniforms) {
+                     Map<String, BoundTexture> textures, Map<String, GpuBufferSlice> uniforms) {
         RenderSystem.assertOnRenderThread();
-        for (GpuTextureView source : textures.values()) {
-            if (source == destination || source.texture() == destination.texture()) {
+        for (BoundTexture source : textures.values()) {
+            if (source.view() == destination || source.view().texture() == destination.texture()) {
                 throw new IllegalArgumentException("Scene pass cannot sample its own attachment");
             }
         }
@@ -69,7 +74,7 @@ final class SceneNativePassRenderer implements AutoCloseable {
                 .createRenderPass(() -> "MusicHud scene pass", destination, OptionalInt.empty())) {
             pass.setPipeline(pipeline);
             pass.setVertexBuffer(0, fullscreenVertices);
-            textures.forEach(pass::bindSampler);
+            textures.forEach((name, bound) -> pass.bindTexture(name, bound.view(), bound.sampler()));
             uniforms.forEach(pass::setUniform);
             pass.draw(0, 3);
         }

@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.render.text;
 
 import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.textures.GpuSampler;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import icyllis.modernui.mc.text.BitmapFont;
@@ -12,6 +13,7 @@ import icyllis.modernui.mc.text.TextLayout;
 import icyllis.modernui.mc.text.TextLayoutEngine;
 import icyllis.modernui.mc.text.TextLayoutProcessor;
 import icyllis.modernui.mc.text.TextRenderType;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneSamplers;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -230,6 +232,12 @@ public final class ModernTextGeometry {
                 case EMOJI -> manager.getEmojiTexture().getTextureView();
                 case BITMAP -> manager.getCurrentTexture(bitmapFont).getTextureView();
             };
+        }
+
+        @Override
+        public GpuSampler sampler() {
+            // the Modern UI atlas is minified when rows animate scale, so sample it linearly with mips
+            return SceneSamplers.linearClamp();
         }
 
         @Override
