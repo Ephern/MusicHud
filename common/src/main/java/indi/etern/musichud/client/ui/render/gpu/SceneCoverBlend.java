@@ -100,7 +100,7 @@ public final class SceneCoverBlend {
 
     private void releaseFrozen() {
         if (frozen != null && frozenOwner != null) {
-            frozenOwner.release(frozen);
+            SceneRetirement.retire(frozenOwner, frozen);
         }
         frozen = null;
         frozenOwner = null;
@@ -110,7 +110,7 @@ public final class SceneCoverBlend {
 
     private void release(SceneGpuContext gpu) {
         if (target != null && owner == gpu) {
-            gpu.release(target);
+            SceneRetirement.retire(gpu, target);
         }
         target = null;
         owner = null;

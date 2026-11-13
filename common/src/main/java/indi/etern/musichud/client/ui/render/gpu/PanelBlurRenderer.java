@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.render.gpu;
 
 import icyllis.arc3d.core.Rect2i;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import org.apache.logging.log4j.Logger;
 
 import java.util.ArrayList;
@@ -11,9 +12,9 @@ import java.util.List;
 /**
  * Blurs the main render target under the HUD config side panel.
  * <p>
- * The panel is published here, before the UI recording that samples it is submitted, so the content
- * shown this frame is current. A replaced result is retired rather than released: a recording made
- * before the replacement may still sample it.
+ * The panel is published before the UI recording that samples it is submitted. Backends that delay
+ * exported textures serve the previous frame's result instead. A replaced result is retired rather
+ * than released: a recording made before the replacement may still sample it.
  */
 public final class PanelBlurRenderer {
     private static final Logger LOGGER = MusicHud.getLogger(PanelBlurRenderer.class);
@@ -25,7 +26,8 @@ public final class PanelBlurRenderer {
 
     public void render(SceneGpuContext gpu, SceneGpuContext.MainColorSource source) {
         HudPanelBackdrop.Region region = HudPanelBackdrop.request();
-        if (gpu == null || source == null || region == null) {
+        if (gpu == null || source == null || region == null
+                || !SceneInterop.capabilities().canExport()) {
             return;
         }
         frame++;

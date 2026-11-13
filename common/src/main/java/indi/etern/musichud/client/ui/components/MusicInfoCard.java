@@ -22,6 +22,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import lombok.Getter;
 import net.minecraft.client.resources.language.I18n;
 import org.jetbrains.annotations.NotNull;
@@ -122,7 +123,7 @@ public class MusicInfoCard extends ViewGroup {
         progressTexts.addView(totalTimeText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
 
         albumImage = new UrlImageView(context);
-        albumImage.loadUrl(MusicHud.ICON_BASE64);
+        albumImage.loadUrl(ImageUtils.coverPlaceholder());
         albumImage.setCornerRadius(dp(8));
 
         // The cover is added last so it is drawn above the text while the two overlap during the
@@ -266,7 +267,7 @@ public class MusicInfoCard extends ViewGroup {
 
     public void bind(Traceable<MusicDetail> musicDetailTrace, int sideWidth) {
         if (musicDetailTrace == null || musicDetailTrace.value() == null || musicDetailTrace.value().equals(MusicDetail.NONE)) {
-            albumImage.loadUrl(MusicHud.ICON_BASE64);
+            albumImage.loadUrl(ImageUtils.coverPlaceholder());
             titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
             titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             artistsText.setText("");

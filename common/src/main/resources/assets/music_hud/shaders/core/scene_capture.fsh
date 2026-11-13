@@ -1,7 +1,7 @@
 #version 150
 
 // u_SourceRect: (left, top, width, height) in source pixels, top-left origin
-// u_SourceSize: (sourceWidth, sourceHeight, downscale, 0)
+// u_SourceSize: (sourceWidth, sourceHeight, downscale, flipY)
 layout(std140) uniform MHCapture {
     vec4 u_SourceRect;
     vec4 u_SourceSize;
@@ -27,13 +27,15 @@ void main() {
     }
 
     float downscale = max(u_SourceSize.z, 1.0);
+    float flipY = u_SourceSize.w;
 
     if (downscale < 1.5) {
         // Exact 1:1 copy: the destination pixel maps onto exactly one source texel.
         ivec2 size = ivec2(u_SourceSize.xy);
+        int row = int(floor(srcY));
         ivec2 texel = ivec2(
             clamp(int(floor(srcX)), 0, size.x - 1),
-            clamp(size.y - 1 - int(floor(srcY)), 0, size.y - 1)
+            clamp(flipY != 0.0 ? size.y - 1 - row : row, 0, size.y - 1)
         );
         fragColor = vec4(texelFetch(Sampler0, texel, 0).rgb, 1.0);
         return;
@@ -45,8 +47,9 @@ void main() {
     vec2 texelSize = vec2(1.0) / size;
     vec2 center = vec2(srcX, srcY) + 0.5 * downscale;
     vec2 offset = 0.25 * downscale * texelSize;
-    // Source textures are addressed bottom-up, while srcY is a top-down screen coordinate.
-    vec2 uv = vec2(center.x / size.x, 1.0 - center.y / size.y);
+    // flipY converts the main target's row order into the one the rest of the chain expects.
+    float centerV = flipY != 0.0 ? 1.0 - center.y / size.y : center.y / size.y;
+    vec2 uv = vec2(center.x / size.x, centerV);
     vec3 color = texture(Sampler0, clampUv(uv + vec2(offset.x, -offset.y))).rgb
                + texture(Sampler0, clampUv(uv - offset)).rgb
                + texture(Sampler0, clampUv(uv + offset)).rgb

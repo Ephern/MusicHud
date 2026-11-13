@@ -5,7 +5,7 @@ import com.google.common.cache.CacheBuilder;
 import com.google.common.cache.Weigher;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
-import icyllis.arc3d.core.ColorSpace;
+import icyllis.arc3d.core.ColorSpaces;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.core.Core;
 import icyllis.modernui.graphics.Bitmap;
@@ -51,6 +51,7 @@ import static indi.etern.musichud.MusicHud.getLogger;
 
 public class ImageUtils {
     private static final Logger LOGGER = getLogger(ImageUtils.class);
+    private static volatile String coverPlaceholder;
 
     private static final int DEFAULT_MAX_CONCURRENT_DOWNLOADS = 40;
     public static final int CANONICAL_MAX = 2048;
@@ -605,7 +606,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpace.get(ColorSpace.Named.SRGB))
+                ColorSpaces.SRGB)
         ) {
             wrap.setPixels(bitmap, 0, 0, 0, 0, width, height);
         }
@@ -623,7 +624,7 @@ public class ImageUtils {
                 height,
                 Bitmap.Format.RGBA_8888,
                 false,
-                ColorSpace.get(ColorSpace.Named.SRGB));
+                ColorSpaces.SRGB);
     }
 
     @SuppressWarnings("unused")
@@ -664,6 +665,29 @@ public class ImageUtils {
         byte[] imageBytes = Base64.getDecoder().decode(base64Data);
         try (Bitmap source = BitmapFactory.decodeByteArray(imageBytes, 0, imageBytes.length)) {
             return getImageTextureData(data, source);
+        }
+    }
+
+    /**
+     * Data URI of the bundled large icon, for placeholders drawn at cover size; the 16x16
+     * {@link MusicHud#ICON_BASE64} is unreadable once scaled up.
+     */
+    public static String coverPlaceholder() {
+        String cached = coverPlaceholder;
+        if (cached != null) {
+            return cached;
+        }
+        try (InputStream stream = MusicHud.getResourceAsStream("/assets/music_hud/icon.png")) {
+            if (stream == null) {
+                return MusicHud.ICON_BASE64;
+            }
+            String uri = "data:image/png;base64,"
+                    + Base64.getEncoder().encodeToString(stream.readAllBytes());
+            coverPlaceholder = uri;
+            return uri;
+        } catch (IOException failure) {
+            LOGGER.debug("While reading the cover placeholder icon", failure);
+            return MusicHud.ICON_BASE64;
         }
     }
 

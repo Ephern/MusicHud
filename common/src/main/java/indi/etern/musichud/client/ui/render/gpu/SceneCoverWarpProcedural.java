@@ -195,22 +195,24 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
         gpu.drawIndexed(new SceneIndexedDraw(new SceneDraw(target, pipeline,
                 List.of(new SceneSamplerBinding("Sampler0", cover)),
                 List.of(new SceneUniformBinding(WarpUniform.UBO_NAME,
-                        new WarpUniform(gate)))), mesh));
+                        new WarpUniform(gate, gpu.passOutputMirrored() ? 1f : 0f)))), mesh));
     }
 
     private void releaseMesh() {
         if (mesh != null && owner != null) {
-            owner.release(mesh);
+            SceneRetirement.retire(owner, mesh);
         }
         mesh = null;
         targetMesh = null;
     }
 
     private void releaseTarget(SceneGpuContext gpu) {
-        if (target != null && owner == gpu) {
-            gpu.release(target);
+        if (target != null) {
+            if (owner == gpu) {
+                SceneRetirement.retire(gpu, target);
+            }
+            target = null;
         }
-        target = null;
         owner = null;
         width = 0;
         height = 0;
@@ -225,10 +227,12 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
         generation++;
         prepared = null;
         releaseMesh();
-        if (target != null && owner != null) {
-            owner.release(target);
+        if (target != null) {
+            if (owner != null) {
+                SceneRetirement.retire(owner, target);
+            }
+            target = null;
         }
-        target = null;
         owner = null;
         width = 0;
         height = 0;
@@ -245,7 +249,7 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
     }
 
     /** Deformation amount of the running cycle; 0 is the undeformed mesh, 1 the cycle target. */
-    private record WarpUniform(float gate) implements SceneUniform {
+    private record WarpUniform(float gate, float flipY) implements SceneUniform {
         private static final String UBO_NAME = "MHWarp";
         private static final int UBO_SIZE = Std140Sizes.calc().putVec4().get();
 
@@ -261,7 +265,7 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
 
         @Override
         public void write(Std140Writer writer) {
-            writer.putVec4(gate, 0f, 0f, 0f);
+            writer.putVec4(gate, flipY, 0f, 0f);
         }
 
         @Override

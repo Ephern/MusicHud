@@ -43,8 +43,11 @@ public final class SceneCapture {
         if (output == null) return null;
         // No pre-clear: the capture shader writes every fragment (out-of-range samples become
         // transparent black), so clearing first would only cost an extra full-target write.
+        // VulkanMod emulates GL's viewport (negative height), so the source is bottom-up on both
+        // backends and the shader always flips.
         CaptureUniform uniform = new CaptureUniform(region.left(), region.top(),
-                region.width(), region.height(), source.width(), source.height(), scale);
+                region.width(), region.height(), source.width(), source.height(), scale,
+                source.topDown() ? 0f : 1f);
         return new PendingCapture(gpu, output, source.texture(), uniform);
     }
 
@@ -54,7 +57,7 @@ public final class SceneCapture {
      */
     public void release() {
         if (target != null && owner != null) {
-            owner.release(target);
+            SceneRetirement.retire(owner, target);
         }
         target = null;
         owner = null;
@@ -67,7 +70,7 @@ public final class SceneCapture {
             return target;
         }
         if (target != null) {
-            if (owner == gpu) gpu.release(target);
+            if (owner == gpu) SceneRetirement.retire(gpu, target);
             target = null;
             owner = null;
             targetWidth = 0;
@@ -130,7 +133,7 @@ public final class SceneCapture {
 
     private record CaptureUniform(float left, float top, float width, float height,
                                   int sourceWidth, int sourceHeight,
-                                  int downscale) implements SceneUniform {
+                                  int downscale, float flipY) implements SceneUniform {
         private static final String UBO_NAME = "MHCapture";
         private static final int UBO_SIZE = Std140Sizes.calc().putVec4().putVec4().get();
 
@@ -147,7 +150,7 @@ public final class SceneCapture {
         @Override
         public void write(Std140Writer writer) {
             writer.putVec4(left, top, width, height);
-            writer.putVec4(sourceWidth, sourceHeight, downscale, 0f);
+            writer.putVec4(sourceWidth, sourceHeight, downscale, flipY);
         }
 
         @Override

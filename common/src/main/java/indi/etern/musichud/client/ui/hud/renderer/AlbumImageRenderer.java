@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.hud.renderer;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.platform.Window;
-import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
@@ -16,7 +15,7 @@ import indi.etern.musichud.client.ui.render.gpu.ArtworkDownsampleCache;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.BlazeTextureRefs;
-import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlTextureSampling;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.TextureSampling;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
 import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
 import indi.etern.musichud.client.utils.image.ImageTextureData;
@@ -89,7 +88,7 @@ public class AlbumImageRenderer implements RenderLayer {
         if (pixels == null) {
             return null;
         }
-        GlTextureSampling.ensureLinear(texture);
+        TextureSampling.ensureLinear(texture);
         float guiScale = guiScale();
         return artworkCache.get(gpu, source, BlazeTextureRefs.of(texture),
                 pixels.getWidth(), pixels.getHeight(),
@@ -114,7 +113,7 @@ public class AlbumImageRenderer implements RenderLayer {
 
     private @NotNull ImageTextureData getIcon() {
         if (icon == null) {
-            icon = ImageUtils.loadBase64(MusicHud.ICON_BASE64);
+            icon = ImageUtils.loadBase64(ImageUtils.coverPlaceholder());
         }
         return icon;
     }

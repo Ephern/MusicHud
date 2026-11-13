@@ -14,7 +14,7 @@ import indi.etern.musichud.client.ui.render.RenderStats;
 import indi.etern.musichud.client.ui.render.gpu.*;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlHalfFloatAllocator;
 import indi.etern.musichud.client.ui.render.interop.SceneInterop;
-import indi.etern.musichud.client.ui.render.interop.gl.GlInteropBackend;
+import indi.etern.musichud.client.ui.render.interop.SceneInteropBackends;
 import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -37,10 +37,11 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     /** Bumped per context; a retirement can close an older context after a newer one exists. */
     private static int latestGeneration;
 
-    private final SceneNativePassRenderer renderer = new SceneNativePassRenderer();
+    private final SceneNativePassRenderer renderer;
     private final SceneTextureAllocator blazeAllocator;
     private final SceneTextureAllocator halfFloatAllocator;
     private final int maxTextureSize;
+    private final boolean openGl;
     private final boolean rgba16fTargets;
     private final int generation = ++latestGeneration;
     private final Map<ScenePipelineKey, ScenePipeline> pipelines = new HashMap<>();
@@ -58,11 +59,15 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     public SceneGpuContextImpl() {
         RenderSystem.assertOnRenderThread();
         var device = RenderSystem.getDevice();
+        this.openGl = Blaze3dBackends.isOpenGl(device);
+        this.renderer = new SceneNativePassRenderer(!openGl);
         this.blazeAllocator = new BlazeTextureAllocator(device);
-        this.halfFloatAllocator = new GlHalfFloatAllocator(device);
+        this.halfFloatAllocator = openGl
+                ? new GlHalfFloatAllocator(device)
+                : blazeAllocator;
         this.maxTextureSize = device.getMaxTextureSize();
-        this.rgba16fTargets = halfFloatAllocator.supportsHalfFloat();
-        SceneInterop.install(GlInteropBackend.INSTANCE);
+        this.rgba16fTargets = openGl && halfFloatAllocator.supportsHalfFloat();
+        SceneInterop.install(SceneInteropBackends.create(device));
     }
 
     @Override
@@ -76,7 +81,8 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         boolean halfFloat = format == SceneTextureFormat.RGBA16F
                 && rgba16fTargets
                 && !ClientConfig.getInstance().getForceRgba8Fallback();
-        boolean nativePath = halfFloat || ClientConfig.getInstance().getForceGL32Path();
+        boolean nativePath = openGl
+                && (halfFloat || ClientConfig.getInstance().getForceGL32Path());
         SceneTextureAllocator.SceneAllocatedTexture allocated;
         try {
             allocated = (nativePath ? halfFloatAllocator : blazeAllocator)
@@ -103,9 +109,13 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                 && rgba16fTargets
                 && !ClientConfig.getInstance().getForceRgba8Fallback();
         SceneTextureAllocator.SceneAllocatedTexture allocated;
-        try {
-            allocated = halfFloatAllocator.allocate(label, width, height, halfFloat);
-        } catch (RuntimeException | LinkageError failure) {
+        if (openGl) {
+            try {
+                allocated = halfFloatAllocator.allocate(label, width, height, halfFloat);
+            } catch (RuntimeException | LinkageError failure) {
+                allocated = blazeAllocator.allocate(label, width, height, false);
+            }
+        } else {
             allocated = blazeAllocator.allocate(label, width, height, false);
         }
         var texture = new SceneGpuTextureImpl(format, allocated, maxTextureSize);
@@ -207,6 +217,11 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     }
 
     @Override
+    public boolean passOutputMirrored() {
+        return !openGl;
+    }
+
+    @Override
     public @Nullable MainColorSource mainColorSource() {
         assertOpen();
         var minecraft = Minecraft.getInstance();
@@ -215,7 +230,8 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         if (view == null) return null;
         Window window = minecraft.getWindow();
         int guiScale = window.getGuiScale();
-        return new MainColorSource(SceneTextureAdapters.wrap(view), target.width, target.height, guiScale);
+        return new MainColorSource(SceneTextureAdapters.wrap(view), target.width, target.height,
+                guiScale, !openGl);
     }
 
     private Map<String, GpuTextureView> samplers(SceneDraw draw) {
@@ -248,11 +264,11 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
 
     private RenderPipeline createPipeline(ScenePipelineKey key) {
         return switch (key) {
-            case SCENE_CAPTURE -> SceneNativePassRenderer.pipeline("scene_capture")
+            case SCENE_CAPTURE -> renderer.pipeline("scene_capture")
                     .withSampler("Sampler0")
                     .withUniform("MHCapture", UniformType.UNIFORM_BUFFER)
                     .build();
-            case SCENE_BACKGROUND_BAKE -> SceneNativePassRenderer.pipeline("scene_background_bake")
+            case SCENE_BACKGROUND_BAKE -> renderer.pipeline("scene_background_bake")
                     .withSampler("Sampler0")
                     .withUniform("MHBackgroundBake", UniformType.UNIFORM_BUFFER)
                     .build();
@@ -260,15 +276,15 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
             case SCENE_BLUR_GAUSSIAN -> blurPipeline("scene_blur_gaussian");
             case SCENE_BLUR_UPSAMPLE -> blurPipeline("scene_blur_upsample");
             case SCENE_BLUR_COPY -> blurPipeline("scene_blur_copy");
-            case SCENE_BLUR_CROP -> SceneNativePassRenderer.pipeline("scene_blur_crop")
+            case SCENE_BLUR_CROP -> renderer.pipeline("scene_blur_crop")
                     .withSampler("Sampler0")
                     .withUniform("MHCrop", UniformType.UNIFORM_BUFFER)
                     .build();
-            case SCENE_BLOOM_COMPOSITE -> SceneNativePassRenderer.pipeline("scene_bloom_composite")
+            case SCENE_BLOOM_COMPOSITE -> renderer.pipeline("scene_bloom_composite")
                     .withSampler("Sampler0")
                     .withUniform("MHBloom", UniformType.UNIFORM_BUFFER)
                     .build();
-            case SCENE_COVER_RESOLVE -> SceneNativePassRenderer.pipeline("scene_cover_resolve")
+            case SCENE_COVER_RESOLVE -> renderer.pipeline("scene_cover_resolve")
                     .withSampler("Sampler0")
                     .withUniform("MHCoverResolve", UniformType.UNIFORM_BUFFER)
                     .build();
@@ -277,30 +293,30 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                     .withSampler("Sampler0")
                     .withUniform("MHWarp", UniformType.UNIFORM_BUFFER)
                     .build();
-            case SCENE_COVER_LAYERS -> SceneNativePassRenderer.pipeline("scene_cover_layers")
+            case SCENE_COVER_LAYERS -> renderer.pipeline("scene_cover_layers")
                     .withSampler("Sampler0")
                     .withUniform("MHCover", UniformType.UNIFORM_BUFFER)
                     .build();
-            case SCENE_COVER_OVERLAY -> SceneNativePassRenderer.pipeline("scene_cover_overlay")
+            case SCENE_COVER_OVERLAY -> renderer.pipeline("scene_cover_overlay")
                     .withSampler("Sampler0")
                     .withSampler("Sampler1")
                     .withUniform("MHOverlay", UniformType.UNIFORM_BUFFER)
                     .withUniform("MHBackgroundAdjust", UniformType.UNIFORM_BUFFER)
                     .build();
-            case SCENE_COVER_BLEND -> SceneNativePassRenderer.pipeline("scene_cover_blend")
+            case SCENE_COVER_BLEND -> renderer.pipeline("scene_cover_blend")
                     .withSampler("Sampler0")
                     .withSampler("Sampler1")
                     .withUniform("MHCoverBlend", UniformType.UNIFORM_BUFFER)
                     .build();
-            case SCENE_ARTWORK_DOWNSAMPLE -> SceneNativePassRenderer.pipeline("scene_artwork_downsample")
+            case SCENE_ARTWORK_DOWNSAMPLE -> renderer.pipeline("scene_artwork_downsample")
                     .withSampler("Sampler0")
                     .withUniform("MHArtworkDownsample", UniformType.UNIFORM_BUFFER)
                     .build();
         };
     }
 
-    private static RenderPipeline blurPipeline(String fragment) {
-        return SceneNativePassRenderer.pipeline(fragment)
+    private RenderPipeline blurPipeline(String fragment) {
+        return renderer.pipeline(fragment)
                 .withSampler("Sampler0")
                 .withUniform("MHBlur", UniformType.UNIFORM_BUFFER)
                 .build();
@@ -331,6 +347,8 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         RenderSystem.assertOnRenderThread();
         if (closed) return;
         closed = true;
+        MinecraftBackgroundTexture.clear();
+        HudPanelBackdrop.clear();
         for (SceneGpuTextureImpl texture : new ArrayList<>(textures)) {
             RenderStats.targetReleased(texture.byteSize());
             texture.close();
@@ -371,7 +389,13 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
             ScenePipeline pipeline = pipelines.computeIfAbsent(key,
                     ignored -> new VanillaScenePipeline(key.name(), createPipeline(key)));
             if (pipeline instanceof VanillaScenePipeline vanilla) {
-                allValid &= device.precompilePipeline(vanilla.renderPipeline()).isValid();
+                try {
+                    allValid &= device.precompilePipeline(vanilla.renderPipeline()).isValid();
+                } catch (RuntimeException | LinkageError failure) {
+                    MusicHud.getLogger(SceneGpuContextImpl.class)
+                            .debug("While precompiling scene pipeline " + key, failure);
+                    allValid = false;
+                }
             }
         }
         return allValid ? PrecompileResult.DONE : PrecompileResult.FAILED;

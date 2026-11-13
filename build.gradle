@@ -1,3 +1,5 @@
+import java.util.zip.ZipFile
+
 plugins {
     id 'dev.architectury.loom' version '1.17.487' apply false
     id 'architectury-plugin' version '3.5.169'
@@ -35,6 +37,17 @@ allprojects {
         return jars.toList().sort { it.name }.last()
     }
 
+    // VulkanMod is not on Maven and is Fabric-only; the jar is version/platform specific and only
+    // needed for compilation. The dev runtime loads the mod from run/*/mods.
+    ext.vulkanModJar = {
+        def jars = rootProject.fileTree(dir: rootProject.file('libs'),
+                include: 'VulkanMod_*.jar').files
+        if (jars.isEmpty()) {
+            throw new GradleException("Missing VulkanMod jar in " + rootProject.file('libs'))
+        }
+        return jars.toList().sort { it.name }.last()
+    }
+
     // The Lumen fork is a universal jar: the arc3d compiler (and commonmark for Markflow) live in
     // META-INF/jars. Fabric only expands those for jars in the mods folder, and the dev run loads
     // this one from the classpath (the transformer needs ModernUI classes there), so unpack them
@@ -44,7 +57,7 @@ allprojects {
         def outDir = rootProject.file("build/modernui-libs/${platform}")
         outDir.mkdirs()
         List<File> libraries = []
-        new java.util.zip.ZipFile(jar).withCloseable { zip ->
+        new ZipFile(jar).withCloseable { zip ->
             zip.entries().each { entry ->
                 if (entry.name.startsWith('META-INF/jars/') && entry.name.endsWith('.jar')) {
                     def name = entry.name.substring('META-INF/jars/'.length())

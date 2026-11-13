@@ -183,6 +183,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private float cachedFadeStrength = -1f;
     private Image fadeSnapshot;
     private boolean fadeIsolationDisabled;
+    private boolean fadeFallbackLogged;
+    private boolean suppressFade;
+    private int loggedFadeWidth = -1;
+    private int loggedFadeHeight = -1;
     @Getter
     private float lastTargetScrollPosition;
     private volatile MusicDetail musicDetail;
@@ -921,17 +925,29 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     @Override
     public void draw(@NotNull Canvas canvas) {
-        if (canvas instanceof ArcCanvas arc && needsFadeIsolation() && renderFadeIsolated(arc)) {
+        if (fadeEdgesEnabled && needsFadeBands()) {
+            if (!fadeIsolationDisabled && canvas instanceof ArcCanvas arc
+                    && renderFadeIsolated(arc)) {
+                return;
+            }
+            // The two bands cover the whole viewport, so a direct DST_OUT would erase everything
+            // painted underneath this view (the faded edges then show the raw screen).
+            suppressFade = true;
+            try {
+                super.draw(canvas);
+            } finally {
+                suppressFade = false;
+            }
             return;
         }
         super.draw(canvas);
     }
 
     /**
-     * True while at least one edge fade is actually drawn (content overflows the viewport).
+     * True while the edge fade bands would be drawn (content overflows the viewport).
      */
-    private boolean needsFadeIsolation() {
-        if (!fadeEdgesEnabled || fadeIsolationDisabled || fadeEdgeMaxStrength <= 0f) {
+    private boolean needsFadeBands() {
+        if (fadeEdgeMaxStrength <= 0f) {
             return false;
         }
         int height = getHeight();
@@ -947,6 +963,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         int width = getWidth();
         int height = getHeight();
         if (!fadeTarget.ensure(width, height) && !fadeTarget.isReady()) {
+            logFadeFallback("offscreen target", width, height);
             return false;
         }
         try {
@@ -954,7 +971,19 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
                     super::draw);
             replaceFadeSnapshot(snapshot);
             if (fadeSnapshot == null) {
+                logFadeFallback("snapshot", width, height);
                 return false;
+            }
+            fadeFallbackLogged = false;
+            if (loggedFadeWidth != width || loggedFadeHeight != height) {
+                loggedFadeWidth = width;
+                loggedFadeHeight = height;
+                if (logger == null) {
+                    logger = MusicHud.getLogger(StaggeredLyricScrollView.class);
+                }
+                logger.debug("Lyric fade isolated at {}x{}, scroll=({}, {}), snapshot={}x{}",
+                        width, height, getScrollX(), getScrollY(),
+                        fadeSnapshot.getWidth(), fadeSnapshot.getHeight());
             }
 
             int scrollX = getScrollX();
@@ -1019,9 +1048,20 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     @Override
     public void onDrawForeground(@NotNull Canvas canvas) {
         super.onDrawForeground(canvas);
-        if (fadeEdgesEnabled) {
+        if (fadeEdgesEnabled && !suppressFade) {
             drawFadeEdges(canvas);
         }
+    }
+
+    private void logFadeFallback(String stage, int width, int height) {
+        if (fadeFallbackLogged) {
+            return;
+        }
+        fadeFallbackLogged = true;
+        if (logger == null) {
+            logger = MusicHud.getLogger(StaggeredLyricScrollView.class);
+        }
+        logger.warn("Lyric edge fade disabled: no isolated {} ({}x{})", stage, width, height);
     }
 
     private void drawFadeEdges(Canvas canvas) {

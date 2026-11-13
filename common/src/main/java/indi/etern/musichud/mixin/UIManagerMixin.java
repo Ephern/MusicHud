@@ -1,12 +1,12 @@
 package indi.etern.musichud.mixin;
 
-import icyllis.arc3d.opengl.GLDevice;
 import icyllis.modernui.core.Core;
 import icyllis.modernui.mc.UIManager;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.render.RenderRuntime;
 import indi.etern.musichud.client.ui.render.gpu.MidFrameCommit;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
+import indi.etern.musichud.client.ui.render.gpu.SceneFrameClock;
 import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import net.minecraft.client.gui.GuiGraphics;
 import org.apache.logging.log4j.Logger;
@@ -51,16 +51,25 @@ public abstract class UIManagerMixin {
                 // frame's commands were already recorded, so the loss is visible for one frame.
                 music_hud$LOGGER.error("Failed to add a partial UI recording, batch={}", commit.batch());
             }
-            ((GLDevice) context.getDevice()).flushRenderCalls();
-            if (!context.submit()) {
-                music_hud$LOGGER.error("Failed to submit a partial UI recording, batch={}", commit.batch());
+            SceneInterop.flushArc3d(context);
+            if (SceneInterop.requiresMidFrameSubmit()) {
+                if (!context.submit()) {
+                    music_hud$LOGGER.error("Failed to submit a partial UI recording, batch={}", commit.batch());
+                }
+                SceneInterop.prepareGameGraphics();
             }
-            SceneInterop.prepareGameGraphics();
             try {
                 SceneBlurSlot.runAll(RenderRuntime.getInstance().gpu(), commit.batch());
             } finally {
                 SceneInterop.restoreArc3d();
             }
         }
+    }
+
+    /** Retired textures are released only after this frame's recordings have been submitted. */
+    @Inject(method = "render", at = @At("RETURN"))
+    private void music_hud$endFrame(GuiGraphics graphics, int mouseX, int mouseY,
+                                    float deltaTick, CallbackInfo ci) {
+        SceneFrameClock.tick();
     }
 }

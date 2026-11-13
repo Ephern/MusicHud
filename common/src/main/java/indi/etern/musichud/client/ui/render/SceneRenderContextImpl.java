@@ -66,8 +66,9 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         long startNanos = System.nanoTime();
         prepareUniforms();
         RenderStats.addUniformNanos(System.nanoTime() - startNanos);
-        // The offscreen passes recorded during scene.render() uploaded their uniforms into ring
-        // buffers; advance them now so the next frame never overwrites an in-flight slice.
+        // The offscreen uniform rings are advanced at most once per frame: the HUD and the screen are
+        // separate scenes, and rotating per scene shortens the ring below the number of frames the
+        // backend keeps in flight, so a later draw overwrites a uniform still being read.
         RenderRuntime.getInstance().endSceneFrame();
     }
 
@@ -143,6 +144,7 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         return new TextureSetup(primary, secondary, discriminatorView(owner));
     }
 
+    @SuppressWarnings("resource")
     public void prepareUniforms() {
         for (ElementRecord element : elements) {
             if (element.uniforms == null) continue;

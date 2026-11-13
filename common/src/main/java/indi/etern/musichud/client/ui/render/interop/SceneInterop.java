@@ -25,6 +25,10 @@ public final class SceneInterop {
         return backend.capabilities();
     }
 
+    public static boolean delaysExportedTextures() {
+        return backend.delaysExportedTextures();
+    }
+
     public static @Nullable InteropSource importImage(@Nullable icyllis.arc3d.engine.Image image,
                                                       InteropUsage usage) {
         return backend.importImage(image, usage);
@@ -53,5 +57,13 @@ public final class SceneInterop {
 
     public static void restoreArc3d() {
         backend.restoreArc3d();
+    }
+
+    public static void flushArc3d(icyllis.arc3d.engine.ImmediateContext context) {
+        backend.flushArc3d(context);
+    }
+
+    public static boolean requiresMidFrameSubmit() {
+        return backend.requiresMidFrameSubmit();
     }
 }

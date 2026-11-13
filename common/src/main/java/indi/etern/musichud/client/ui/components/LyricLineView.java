@@ -386,37 +386,6 @@ public class LyricLineView extends LinearLayout {
     }
 
     /**
-     * Drops the cached blur source and result. Used when the row becomes visible again: the last
-     * published texture may predate the current layout, and nothing else would re-request it.
-     */
-    public void invalidateBlur() {
-        frameImage = null;
-        blurResources.invalidate();
-        bloomFrameImage = null;
-        bloomResources.invalidate();
-        bloomFading = false;
-        blurInitialized = false;
-    }
-
-    /** Releases the offscreen render targets but keeps the row blur-capable (e.g. temporary hide). */
-    public void releaseBlurSurfaces() {
-        blurResources.release();
-        frameImage = null;
-        bloomResources.release();
-        bloomFrameImage = null;
-        bloomFading = false;
-    }
-
-    private boolean canPrepareBlur() {
-        return blurPipelineEnabled
-                && !blurDisabled
-                && !blurSlot.isDisabled()
-                && isBlurEligible()
-                && getWidth() > 0
-                && getHeight() > 0;
-    }
-
-    /**
      * Frees the blur and bloom targets of a row that scrolled far out of view. Unlike
      * {@link #releaseBlurResources()}, this is reversible: the next request rebuilds them, so a
      * whole song never keeps one pipeline set per line.
@@ -448,6 +417,41 @@ public class LyricLineView extends LinearLayout {
         blurIdleSinceNanos = 0L;
     }
 
+    /**
+     * Drops the cached blur source and result. Used when the row becomes visible again: the last
+     * published texture may predate the current layout, and nothing else would re-request it.
+     */
+    public void invalidateBlur() {
+        frameImage = null;
+        blurResources.invalidate();
+        bloomFrameImage = null;
+        bloomResources.invalidate();
+        bloomFading = false;
+        blurInitialized = false;
+    }
+
+    /** Releases the offscreen render targets but keeps the row blur-capable (e.g. temporary hide). */
+    public void releaseBlurSurfaces() {
+        blurResources.release();
+        frameImage = null;
+        bloomResources.release();
+        bloomFrameImage = null;
+        bloomFading = false;
+    }
+
+    private boolean canPrepareBlur() {
+        return blurPipelineEnabled
+                && !blurDisabled
+                && !blurSlot.isDisabled()
+                && isBlurEligible()
+                && getWidth() > 0
+                && getHeight() > 0;
+    }
+
+    /**
+     * Parent phase 1: renders the row content offscreen and asks the render thread to blur it. The
+     * composite happens later in {@link #dispatchDraw}; the blur result is already filled by then.
+     */
     public void prepareBlurSource(int padding) {
         frameImage = null;
         if (!canPrepareBlur()) {

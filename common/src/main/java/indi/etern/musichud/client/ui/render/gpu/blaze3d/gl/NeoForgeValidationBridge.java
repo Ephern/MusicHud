@@ -32,6 +32,25 @@ public final class NeoForgeValidationBridge {
         return current;
     }
 
+    /** Unwraps validation proxies only, leaving backend textures untouched. */
+    public static GpuTexture unwrapValidation(GpuTexture texture) {
+        GpuTexture current = texture;
+        for (int depth = 0; depth < 4; depth++) {
+            GpuTexture real = realTexture(current);
+            if (real == null || real == current) {
+                break;
+            }
+            current = real;
+        }
+        return current;
+    }
+
+    /** Unwraps NeoForge's validation proxy around the device, if any. */
+    public static GpuDevice unwrapDevice(GpuDevice device) {
+        Object real = realDevice(device);
+        return real instanceof GpuDevice result ? result : device;
+    }
+
     private static GpuTexture realTexture(GpuTexture texture) {
         try {
             Class<?> type = Class.forName(VALIDATION_TEXTURE, false,

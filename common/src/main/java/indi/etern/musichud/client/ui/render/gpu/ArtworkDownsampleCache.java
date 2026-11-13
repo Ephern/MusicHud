@@ -133,7 +133,7 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
                 return;
             }
             if (owner != null) {
-                owner.release(oldest);
+                SceneRetirement.retire(owner, oldest);
             }
         }
     }
@@ -145,7 +145,7 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
                 return;
             }
             if (owner != null) {
-                owner.release(oldest);
+                SceneRetirement.retire(owner, oldest);
             }
         }
     }
@@ -164,13 +164,13 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
         SceneGpuContext context = owner;
         for (SceneGpuTexture texture : targets.values()) {
             if (context != null) {
-                context.release(texture);
+                SceneRetirement.retire(context, texture);
             }
         }
         targets.clear();
         for (SceneGpuTexture texture : steps.values()) {
             if (context != null) {
-                context.release(texture);
+                SceneRetirement.retire(context, texture);
             }
         }
         steps.clear();

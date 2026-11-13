@@ -62,9 +62,19 @@ public interface SceneGpuContext extends AutoCloseable {
     @Nullable
     MainColorSource mainColorSource();
 
+    /**
+     * True when one full-screen pass mirrors its sampled image vertically (VulkanMod renders with a
+     * GL-style negative-height viewport). Pass pipelines then use a mirrored vertex shader so every
+     * pass stays orientation-neutral, like on OpenGL.
+     */
+    default boolean passOutputMirrored() {
+        return false;
+    }
+
     @Override
     void close();
 
-    record MainColorSource(SceneTextureRef texture, int width, int height, int guiScale) {
+    record MainColorSource(SceneTextureRef texture, int width, int height, int guiScale,
+                           boolean topDown) {
     }
 }

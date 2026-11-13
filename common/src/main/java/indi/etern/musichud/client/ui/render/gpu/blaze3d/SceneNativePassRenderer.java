@@ -17,12 +17,21 @@ import java.util.OptionalInt;
 
 /** Does not own input textures or returned views. */
 final class SceneNativePassRenderer implements AutoCloseable {
+    private final boolean flipVertexV;
     private GpuBuffer fullscreenVertices;
 
-    public static RenderPipeline.Builder pipeline(String fragment) {
+    /**
+     * @param flipVertexV true when a pass mirrors its output (VulkanMod's GL-style viewport); the
+     *                    vertex shaders then mirror the sampled row so passes stay orientation-neutral
+     */
+    SceneNativePassRenderer(boolean flipVertexV) {
+        this.flipVertexV = flipVertexV;
+    }
+
+    public RenderPipeline.Builder pipeline(String fragment) {
         return RenderPipeline.builder()
                 .withLocation(id("pipeline/" + fragment))
-                .withVertexShader(id("core/fullscreen"))
+                .withVertexShader(id(flipVertexV ? "core/fullscreen_flip" : "core/fullscreen"))
                 .withFragmentShader(id("core/" + fragment))
                 .withVertexFormat(DefaultVertexFormat.EMPTY, VertexFormat.Mode.TRIANGLES)
                 .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)

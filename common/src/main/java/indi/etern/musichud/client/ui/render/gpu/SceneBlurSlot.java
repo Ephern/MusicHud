@@ -110,7 +110,9 @@ public final class SceneBlurSlot {
     public void request(@Nullable icyllis.arc3d.engine.Image image,
                         float u0, float v0, float u1, float v1,
                         int outWidth, int outHeight, float sigma, boolean downscaleToSigma) {
-        if (image == null || disabled || outWidth < 1 || outHeight < 1 || !(sigma > 0f)) {
+        var interop = SceneInterop.capabilities();
+        if (image == null || disabled || !interop.canImport() || !interop.canExport()
+                || outWidth < 1 || outHeight < 1 || !(sigma > 0f)) {
             if (image != null) {
                 image.unref();
             }
@@ -331,8 +333,7 @@ public final class SceneBlurSlot {
         return next;
     }
 
-    private Pipeline usePipeline(SceneGpuContext gpu, int width, int height, float sigma) {
-        // The pipeline survives level changes: SceneBlur keeps its published result and only
+    private Pipeline usePipeline(SceneGpuContext gpu, int width, int height, float sigma) {        // The pipeline survives level changes: SceneBlur keeps its published result and only
         // rebuilds the pyramid, so the image consumers hold stays valid.
         Pipeline current = pipeline;
         if (current != null && current.width == width && current.height == height && current.gpu == gpu) {
@@ -394,7 +395,7 @@ public final class SceneBlurSlot {
                 return bloomTarget;
             }
             if (bloomTarget != null) {
-                gpu.release(bloomTarget);
+                SceneRetirement.retire(gpu, bloomTarget);
                 bloomTarget = null;
             }
             try {
@@ -415,7 +416,7 @@ public final class SceneBlurSlot {
             blur.release();
             crop.release();
             if (bloomTarget != null) {
-                gpu.release(bloomTarget);
+                SceneRetirement.retire(gpu, bloomTarget);
                 bloomTarget = null;
             }
             bloomWidth = 0;

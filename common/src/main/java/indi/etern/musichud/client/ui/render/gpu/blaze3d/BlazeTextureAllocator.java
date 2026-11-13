@@ -1,13 +1,11 @@
 package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 
-import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.textures.AddressMode;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.TextureFormat;
 import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
-import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.NeoForgeValidationBridge;
 
 final class BlazeTextureAllocator implements SceneTextureAllocator {
     private static final int USAGE =
@@ -26,10 +24,8 @@ final class BlazeTextureAllocator implements SceneTextureAllocator {
         try {
             texture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
             texture.setTextureFilter(FilterMode.LINEAR, false);
-            int glTextureId = NeoForgeValidationBridge.unwrap(texture) instanceof GlTexture gl
-                    ? gl.glId() : 0;
             return new SceneAllocatedTexture(texture, device.createTextureView(texture),
-                    SceneTextureFormat.RGBA8, glTextureId);
+                    SceneTextureFormat.RGBA8);
         } catch (RuntimeException | Error failure) {
             texture.close();
             throw failure;

@@ -93,7 +93,7 @@ public final class SceneBlurCrop {
 
     private void release(SceneGpuContext gpu) {
         if (target != null && owner == gpu) {
-            gpu.release(target);
+            SceneRetirement.retire(gpu, target);
         }
         target = null;
         owner = null;

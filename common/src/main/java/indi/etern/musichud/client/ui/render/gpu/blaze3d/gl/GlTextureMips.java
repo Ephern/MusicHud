@@ -2,11 +2,11 @@ package indi.etern.musichud.client.ui.render.gpu.blaze3d.gl;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import indi.etern.musichud.MusicHud;
-import net.minecraft.client.Minecraft;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.Blaze3dBackends;
 import net.minecraft.client.renderer.texture.AbstractTexture;
-import net.minecraft.resources.ResourceLocation;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.opengl.GL11;
@@ -17,61 +17,22 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.WeakHashMap;
 
-/** Mip chains for textures sampled minified. */
-public final class GlTextureSampling {
-    private static final Logger LOGGER = MusicHud.getLogger(GlTextureSampling.class);
+/** OpenGL-only mip chain generation for textures sampled minified. */
+public final class GlTextureMips {
+    private static final Logger LOGGER = MusicHud.getLogger(GlTextureMips.class);
     private static final Set<GpuTexture> PREPARED =
             Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
     private static final Set<GpuTexture> FAILED =
             Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
-    private static final Set<GpuTexture> LINEAR =
-            Collections.synchronizedSet(Collections.newSetFromMap(new WeakHashMap<>()));
-    private static final float MINIFY_THRESHOLD = 1.25f;
 
-    private GlTextureSampling() {
-    }
-
-    public static @Nullable AbstractTexture textureOf(ResourceLocation location) {
-        try {
-            return Minecraft.getInstance().getTextureManager().getTexture(location);
-        } catch (RuntimeException missing) {
-            return null;
-        }
-    }
-
-    public static void prepareBlit(ResourceLocation location, int sourceWidth, int sourceHeight,
-                                   int textureWidth, int textureHeight,
-                                   int destinationWidth, int destinationHeight, float pixelScale) {
-        if (destinationWidth <= 0 || destinationHeight <= 0) {
-            return;
-        }
-        AbstractTexture texture = textureOf(location);
-        GpuTexture gpu = texture == null ? null : texture.getTexture();
-        if (gpu == null) {
-            return;
-        }
-        // Callers may pass the slot size, so the texel count comes from the real texture size.
-        float texelsWide = sourceWidth * gpu.getWidth(0) / (float) Math.max(1, textureWidth);
-        float texelsHigh = sourceHeight * gpu.getHeight(0) / (float) Math.max(1, textureHeight);
-        float scale = Math.max(1f, pixelScale);
-        if (texelsWide >= destinationWidth * scale * MINIFY_THRESHOLD
-                || texelsHigh >= destinationHeight * scale * MINIFY_THRESHOLD) {
-            enableTrilinear(texture);
-        }
-    }
-
-    /** Switches the texture to bilinear filtering with clamped addressing. */
-    public static void ensureLinear(@Nullable AbstractTexture texture) {
-        GpuTexture gpu = texture == null ? null : texture.getTexture();
-        if (gpu == null || !LINEAR.add(gpu)) {
-            return;
-        }
-        texture.setFilter(true, false);
-        texture.setClamp(true);
+    private GlTextureMips() {
     }
 
     /** Generates the mip chain and switches to trilinear minification. */
     public static void enableTrilinear(@Nullable AbstractTexture texture) {
+        if (!Blaze3dBackends.isOpenGl(RenderSystem.getDevice())) {
+            return;
+        }
         GpuTexture gpu = texture == null ? null : texture.getTexture();
         GpuTexture real = gpu == null ? null : NeoForgeValidationBridge.unwrap(gpu);
         if (!(real instanceof GlTexture gl) || gl.isClosed()) {

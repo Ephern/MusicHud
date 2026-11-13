@@ -15,7 +15,8 @@
     "SpanSetMixin",
     "ToastManagerMixin",
     "ToastRecordAccessor",
-    "UIManagerMixin"
+    "UIManagerMixin",
+    "VulkanSampledCopyMixin"
   ],
   "injectors": {
     "defaultRequire": 1

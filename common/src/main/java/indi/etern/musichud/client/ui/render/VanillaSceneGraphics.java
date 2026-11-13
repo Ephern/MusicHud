@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.render;
 
-import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.GlTextureSampling;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.TextureSampling;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -34,7 +34,7 @@ public class VanillaSceneGraphics implements SceneGraphics {
     public void blitTextured(String texturePath, int x, int y, int u0, int v0, int width, int height, int u1, int v1, int textureWidth, int textureHeight, int color) {
         ResourceLocation location = ResourceLocation.parse(texturePath);
         // Upscaled blits (the 8x8 player face) keep their magnification filter.
-        GlTextureSampling.prepareBlit(location, u1, v1, textureWidth, textureHeight, width, height,
+        TextureSampling.prepareBlit(location, u1, v1, textureWidth, textureHeight, width, height,
                 guiScale());
         graphics.blit(RenderPipelines.GUI_TEXTURED, location, x, y, u0, v0, width, height, u1, v1, textureWidth, textureHeight, color);
     }

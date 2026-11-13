@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.render.gpu.blaze3d.gl;
 import com.mojang.blaze3d.opengl.GlStateManager;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderSystem;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.Blaze3dBackends;
 import org.lwjgl.opengl.GL11;
 import org.lwjgl.opengl.GL30;
 
@@ -16,7 +17,7 @@ final class GlSupportProbe {
 
     static boolean supportsHalfFloatColorBuffer(GpuDevice device) {
         RenderSystem.assertOnRenderThread();
-        if (!NeoForgeValidationBridge.isGlDevice(device)) {
+        if (!Blaze3dBackends.isOpenGl(device)) {
             return false;
         }
         if (halfFloatColorBuffer != null) {

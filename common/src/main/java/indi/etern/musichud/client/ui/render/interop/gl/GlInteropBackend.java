@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.ui.render.interop.gl;
 
 import com.mojang.blaze3d.opengl.GlStateManager;
+import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.textures.FilterMode;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import icyllis.arc3d.core.ColorInfo;
@@ -8,6 +9,7 @@ import icyllis.arc3d.core.ColorSpaces;
 import icyllis.arc3d.engine.Engine;
 import icyllis.arc3d.engine.ImageProxy;
 import icyllis.arc3d.engine.ImageProxyView;
+import icyllis.arc3d.engine.ImmediateContext;
 import icyllis.arc3d.granite.GraniteImage;
 import icyllis.arc3d.opengl.GLBackendImage;
 import icyllis.arc3d.opengl.GLDevice;
@@ -21,6 +23,7 @@ import icyllis.modernui.mc.b3d.GlTexture_Wrapped;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.BlazeTextureViewRef;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneGpuTextureImpl;
+import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.NeoForgeValidationBridge;
 import indi.etern.musichud.client.ui.render.interop.InteropCapabilities;
 import indi.etern.musichud.client.ui.render.interop.InteropSource;
 import indi.etern.musichud.client.ui.render.interop.InteropTarget;
@@ -93,7 +96,10 @@ public final class GlInteropBackend implements SceneInteropBackend {
         if (!(texture instanceof SceneGpuTextureImpl impl)) {
             return null;
         }
-        int handle = impl.glTextureId();
+        int handle = 0;
+        if (NeoForgeValidationBridge.unwrap(impl.gpuTexture()) instanceof GlTexture gl) {
+            handle = gl.glId();
+        }
         int width = impl.width();
         int height = impl.height();
         if (handle == 0 || width < 1 || height < 1) {
@@ -153,6 +159,13 @@ public final class GlInteropBackend implements SceneInteropBackend {
         try {
             Core.requireImmediateContext().resetContext(ALL_STATE);
         } catch (RuntimeException ignored) {
+        }
+    }
+
+    @Override
+    public void flushArc3d(ImmediateContext context) {
+        if (context.getDevice() instanceof GLDevice device) {
+            device.flushRenderCalls();
         }
     }
 

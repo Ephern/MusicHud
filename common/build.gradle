@@ -35,6 +35,9 @@ dependencies {
     api "fuzs.forgeconfigapiport:forgeconfigapiport-common-neoforgeapi:$rootProject.forge_config_api_port_version"
 
     compileOnly files(modernUiLumenJar('NeoForge'))
+    modCompileOnly files(vulkanModJar())
+    // Vulkan API constants for the arc3d caps mixin; the runtime copy comes from VulkanMod.
+    compileOnly "org.lwjgl:lwjgl-vulkan:3.3.3"
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"

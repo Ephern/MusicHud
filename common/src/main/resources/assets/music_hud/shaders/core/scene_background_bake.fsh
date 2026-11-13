@@ -2,12 +2,12 @@
 
 // Bakes the GUI background display pass into a premultiplied texture, so the ModernUI layer can
 // draw it with plain arc3d image drawing.
+// u_Size: (width, height, cornerRadius, alpha) in physical pixels
+// u_Adjust: (natural saturation, highlightDarkening, highlightKnee, highlightFull)
+// u_Adjust2: (overallBrightness, applyColorAdjust, blackOverlay, fluidScale)
 layout(std140) uniform MHBackgroundBake {
-    // (width, height, cornerRadius, alpha) in physical pixels
     vec4 u_Size;
-    // (natural saturation, highlightDarkening, highlightKnee, highlightFull)
     vec4 u_Adjust;
-    // (overallBrightness, applyColorAdjust, blackOverlay, fluidScale)
     vec4 u_Adjust2;
 };
 

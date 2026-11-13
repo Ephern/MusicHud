@@ -326,7 +326,7 @@ public class HomeView extends ViewGroup {
 
         albumImage = new UrlImageView(context);
         albumImage.setCornerRadius(dp(8));
-        albumImage.loadUrl(MusicHud.ICON_BASE64);
+        albumImage.loadUrl(ImageUtils.coverPlaceholder());
 
         coverContainer = new FrameLayout(context);
         coverContainer.addView(albumImage, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -526,7 +526,7 @@ public class HomeView extends ViewGroup {
     }
 
     private void bindIdle() {
-        albumImage.loadUrl(MusicHud.ICON_BASE64);
+        albumImage.loadUrl(ImageUtils.coverPlaceholder());
         updateCoverScale(false);
         name.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         name.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
@@ -741,7 +741,6 @@ public class HomeView extends ViewGroup {
 
     @Override
     protected void onWindowVisibilityChanged(int visibility) {
-        //noinspection MagicConstant
         super.onWindowVisibilityChanged(visibility);
         if (visibility == VISIBLE) {
             restartProgressUpdater();
