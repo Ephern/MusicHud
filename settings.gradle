@@ -14,10 +14,13 @@ dependencyResolutionManagement {
         mavenLocal()
         mavenCentral()
         maven { url 'https://jitpack.io' }
+        // NeoForm/FML toolchain POMs (earlydisplay, loader, ...) are parsed against these
+        // repositories and import org.lwjgl:lwjgl-bom, which Central does not serve reliably.
+        maven { url 'https://maven.neoforged.net/releases' }
     }
 }
 
-rootProject.name = 'music_hud'
+rootProject.name = 'music_hud.' + properties.get("minecraft_version_range")
 
 include 'processor'
 include 'core'

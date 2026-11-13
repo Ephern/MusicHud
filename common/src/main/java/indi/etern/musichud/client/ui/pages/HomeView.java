@@ -1,145 +1,148 @@
 package indi.etern.musichud.client.ui.pages;
 
-import icyllis.modernui.animation.Animator;
-import icyllis.modernui.animation.AnimatorListener;
 import icyllis.modernui.animation.AnimatorSet;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.annotation.NonNull;
+import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.SpannableStringBuilder;
+import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.TextPaint;
+import icyllis.modernui.text.method.LinkMovementMethod;
+import icyllis.modernui.text.style.ClickableSpan;
+import icyllis.modernui.text.style.ForegroundColorSpan;
 import icyllis.modernui.view.Gravity;
+import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
+import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.beans.api.IdlePlaySource;
-import indi.etern.musichud.beans.music.MusicCollection;
-import indi.etern.musichud.beans.music.MusicCollections;
-import indi.etern.musichud.beans.music.MusicDetail;
-import indi.etern.musichud.beans.music.QueueItem;
-import indi.etern.musichud.beans.music.Traceable;
-import indi.etern.musichud.beans.result.ActionResult;
+import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
+import indi.etern.musichud.client.audio.PlaybackTask;
+import indi.etern.musichud.client.audio.StreamAudioPlayer;
+import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
-import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
-import indi.etern.musichud.client.ui.components.MusicTrackItem;
-import indi.etern.musichud.client.ui.components.StaggeredLyricScrollView;
+import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.ui.components.buttons.ModifyPlaylistTrackModalButton;
+import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButton;
+import indi.etern.musichud.client.ui.components.buttons.VoteSkipButton;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
-import indi.etern.musichud.client.dto.LyricLine;
+import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
+import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
+import indi.etern.musichud.client.ui.screen.MainFragment;
+import indi.etern.musichud.client.ui.shadow.BlurShadowDrawable;
+import indi.etern.musichud.client.ui.shadow.BlurShadowSpec;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
-import indi.etern.musichud.interfaces.Unregister;
 import lombok.Getter;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.player.LocalPlayer;
 import net.minecraft.client.resources.language.I18n;
-import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
-import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.function.BiConsumer;
+import java.time.Duration;
+import java.time.LocalTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.util.Collection;
+import java.util.List;
+import java.util.Queue;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class HomeView extends LinearLayout {
-    /** Card identity: collection id+type per layer; both play modes share one card. */
-    private record CardKey(boolean local, long id, Class<?> type) {
-        static CardKey of(boolean local, IdlePlaySource idlePlaySource) {
-            return new CardKey(local, idlePlaySource.getId(), idlePlaySource.getType());
-        }
-    }
+/**
+ * Home page body: the player information column on the left and the large lyric column on the
+ * right. {@link #infoColumn} and {@link #staggeredLyricScrollView} are direct children so the
+ * layout transition can animate the visible column itself when the lyric column disappears.
+ * The play queue and idle sources live in {@link indi.etern.musichud.client.ui.components.SidebarView}.
+ */
+public class HomeView extends ViewGroup {
+    private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
+    private static final DateTimeFormatter TIME_WITH_HOUR = DateTimeFormatter.ofPattern("HH:mm:ss");
+    private static final DateTimeFormatter TIME_WITHOUT_HOUR = DateTimeFormatter.ofPattern("mm:ss");
 
-    private static final MusicService musicService = MusicService.getInstance();
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
-    private static final Logger LOGGER = MusicHud.getLogger(HomeView.class);
-    /** Mirrors LocalIdlePlaySourceState.loadWithRetry: 3 attempts, 1s apart. */
-    private static final int IDLE_SOURCE_LOAD_ATTEMPTS = 3;
-    private static final SpringInterpolator NEXT_TO_PLAY_INTERPOLATOR = new SpringInterpolator(0.25f, 1);
-    private static final int NEXT_TO_PLAY_ANIM_DURATION_MS =
-            Math.round(NEXT_TO_PLAY_INTERPOLATOR.getDuration() * 1000);
-    private static final float NEXT_TO_PLAY_MIN_SCALE = 0.95f;
+    private static final int INFO_MAX_WIDTH_DP = 520;
+    private static final int INFO_MIN_WIDTH_DP = 240;
+    private static final int INFO_SAFE_LEFT_DP = 16;
+    private static final int INFO_SAFE_RIGHT_DP = 16;
+    /** Keeps the info column clear of the floating navigator bar. */
+    private static final int INFO_SAFE_TOP_DP = 64;
+    private static final int INFO_SAFE_BOTTOM_DP = 16;
+    private static final int INFO_LYRICS_GAP_DP = 32;
+    private static final int LYRICS_RIGHT_DP = 32;
+    private static final int LYRICS_TOP_DP = 64;
+    private static final int LYRICS_BOTTOM_DP = 64;
+    private static final int INFO_COVER_GAP_DP = 28;
+    /** Width and height are coupled through the content height; a few passes settle it. */
+    private static final int INFO_FIT_PASSES = 4;
+    private static final int BUTTON_SIZE_DP = 36;
+    private static final int ACTION_ICON_DP = 16;
+    private static final int PUSHER_PADDING_DP = 8;
+    /** The action row moves onto its own line above this share of the available width. */
+    private static final float BUTTONS_WRAP_RATIO = 0.4f;
+    private static final float COVER_MIN_SCALE = 0.8f;
+    private static final int COVER_SCALE_DURATION_MS = 350;
+    private static final int LAYOUT_TRANSITION_DURATION = 350;
+    private static final SpringInterpolator LAYOUT_TRANSITION_INTERPOLATOR =
+            new SpringInterpolator((float) LAYOUT_TRANSITION_DURATION / 1000, 1);
+    private static final SpringInterpolator COVER_SCALE_INTERPOLATOR =
+            new SpringInterpolator((float) COVER_SCALE_DURATION_MS / 1000, 1);
+
+    private final ClientConfig clientConfig = ClientConfig.getInstance();
+    private final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     @Getter
     private static HomeView instance;
-    private final Set<IdlePlaySource> serverIdlePlaySources = musicService.getIdlePlaySourceState().external().getSources();
-    private final Set<IdlePlaySource> clientIdlePlaySources = musicService.getIdlePlaySourceState().local().getSources();
-    private final Map<CardKey, MusicCollectionCard> idlePlaySourceCardMap = new ConcurrentHashMap<>();
     @Getter
     private StaggeredLyricScrollView staggeredLyricScrollView;
-    private MusicTrackItem nextToPlayItem;
-    private AnimatorSet nextToPlayAnimator;
-    // Latest-wins target arriving while the item switch animation is in flight
-    private Traceable<MusicDetail> pendingNextToPlay;
-    private LinearLayout nextToPlayHeader;
-    private ImageButton rotateNextToPlayButton;
-    private TextView queueTitle;
-    private LinearLayout playQueueListView;
-    private LinearLayout clientIdlePlaySourceView;
-    private LinearLayout serverIdlePlaySourceView;
-    private FlexWrapLayout clientIdlePlaySourceCardsList;
-    private final Consumer<IdlePlaySource> localAddListener = collection -> {
-        MuiModApi.postToUiThread(() -> {
-            CardKey key = CardKey.of(true, collection);
-            if (!idlePlaySourceCardMap.containsKey(key)) {
-                addIdlePlaySourceTo(collection, clientIdlePlaySourceCardsList, true);
-                checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
-            }
-        });
-    };
-    private final Consumer<IdlePlaySource> localRemoveListener = collection -> {
-        MuiModApi.postToUiThread(() -> {
-            if (hasSourceWithKey(clientIdlePlaySources, collection)) {
-                return;
-            }
-            MusicCollectionCard view = idlePlaySourceCardMap.remove(CardKey.of(true, collection));
-            if (view != null) {
-                clientIdlePlaySourceCardsList.removeView(view);
-                checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
-            }
-        });
-    };
-    private FlexWrapLayout serverIdlePlaySourceCardsList;
-    private final Consumer<IdlePlaySource> serverRemoveListener = idlePlaySource -> {
-        MuiModApi.postToUiThread(() -> {
-            if (hasSourceWithKey(serverIdlePlaySources, idlePlaySource)) {
-                return;
-            }
-            MusicCollectionCard view = idlePlaySourceCardMap.remove(CardKey.of(false, idlePlaySource));
-            if (view != null) {
-                serverIdlePlaySourceCardsList.removeView(view);
-                checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
-            }
-        });
-    };
-    private Consumer<QueueItem> musicQueuePushListener;
-    private BiConsumer<Integer, QueueItem> musicQueueRemoveListener;
-    private Unregister localAddRegister;
-    private Unregister localRemoveRegister;
-    private Unregister serverAddRegister;
-    private Unregister serverRemoveRegister;
-    private LocalPlayer localPlayer = Minecraft.getInstance().player;
-    private final Consumer<IdlePlaySource> serverAddListener = collection -> {
-        MuiModApi.postToUiThread(() -> {
-            CardKey key = CardKey.of(false, collection);
-            if ((localPlayer != null && collection.getPusherInfo().playerUUID() != localPlayer.getUUID())
-                    && !idlePlaySourceCardMap.containsKey(key)) {
-                addIdlePlaySourceTo(collection, serverIdlePlaySourceCardsList, false);
-                checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
-            }
-        });
-    };
 
-    private static boolean hasSourceWithKey(Set<IdlePlaySource> sources, IdlePlaySource idlePlaySource) {
-        return sources.stream().anyMatch(c -> c.getId() == idlePlaySource.getId() && c.getType() == idlePlaySource.getType());
-    }
+    private View notificationView;
+    private InfoColumn infoColumn;
+    private UrlImageView albumImage;
+    private FrameLayout coverContainer;
+    private BlurShadowDrawable coverShadow;
+    private MarqueeTextView name;
+    private MarqueeTextView artistsAndAlbum;
+    private ImageButton sourceButton;
+    private PusherWidget pusherWidget;
+    private LinearProgressBar progressBar;
+    private TextView played;
+    private TextView total;
+    private LinearLayout buttonsLayout;
+    private ToggleTrackLikeStateButton likeButton;
+    private ModifyPlaylistTrackModalButton addToPlaylistButton;
+    private VoteSkipButton skipCurrentButton;
+
+    private final AtomicInteger progressUpdaterToken = new AtomicInteger();
+    private AnimatorSet coverScaleAnimator;
+    private long progressUpdaterStartTime;
+    private long progressTextUpdateCount = -1;
+    private boolean audioListenerRegistered;
+    private final Consumer<StreamAudioPlayer.Status> statusListener =
+            status -> MuiModApi.postToUiThread(() -> {
+                applyAudioStatus(status);
+                updateCoverScale(true);
+            });
+
+    private int laidOutInfoX;
+    private int laidOutInfoY;
+    private int laidOutInfoWidth;
+    private int laidOutInfoHeight;
+    private int laidOutLyricsX;
+    private int laidOutLyricsWidth;
 
     public HomeView(Context context) {
         super(context);
@@ -148,475 +151,706 @@ public class HomeView extends LinearLayout {
 
     public void refresh() {
         instance = this;
-        pendingNextToPlay = null;
-        cancelNextToPlayAnimation();
-        if (musicQueuePushListener != null) {
-            musicService.getMusicQueuePushListeners().remove(musicQueuePushListener);
+        progressUpdaterToken.incrementAndGet();
+        cancelCoverScaleAnimator();
+        // Drop the old transition before rebuilding, otherwise removed children stay in the
+        // disappearing set and the fresh layout is dropped while isChangingLayout() is true.
+        setLayoutTransition(null);
+        clearDisappearingChildren();
+        removeAllViews();
+        clearBoundViews();
+
+        Context context = getContext();
+        boolean enabled = clientConfig.getEnable();
+        if (ConnectionStateMachine.getConnectStatus() != ConnectionStateMachine.ConnectStatus.CONNECTED
+                && !clientConfig.getEnableIsolatedMode() || !enabled) {
+            notificationView = Theme.getNotificationTextView(context, enabled);
+            addView(notificationView, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+            return;
         }
-        if (musicQueueRemoveListener != null) {
-            musicService.getMusicQueueRemoveListeners().remove(musicQueueRemoveListener);
+
+        buildInfoColumn(context);
+        staggeredLyricScrollView = new StaggeredLyricScrollView(context);
+        staggeredLyricScrollView.setLyricFollowRatio(0.3f);
+        staggeredLyricScrollView.setManualScrollFadeOffset(dp(56));
+        addView(staggeredLyricScrollView, new ViewGroup.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        applyLyricsVisibility();
+
+        LayoutTransition layoutTransition = new LayoutTransition();
+        LayoutTransitionReflow.attach(layoutTransition);
+//        layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+        layoutTransition.setAnimateParentHierarchy(false);
+        layoutTransition.setInterpolator(LayoutTransition.CHANGING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setInterpolator(LayoutTransition.APPEARING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setInterpolator(LayoutTransition.DISAPPEARING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setInterpolator(LayoutTransition.CHANGE_APPEARING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setInterpolator(LayoutTransition.CHANGE_DISAPPEARING, LAYOUT_TRANSITION_INTERPOLATOR);
+        layoutTransition.setDuration(LAYOUT_TRANSITION_DURATION);
+        // Start the reflow together with the lyric fade instead of waiting a whole default cycle.
+        layoutTransition.setStartDelay(LayoutTransition.CHANGE_DISAPPEARING, 0);
+        // Attached only after the initial children exist so building the page does not animate.
+        setLayoutTransition(layoutTransition);
+
+        bindMusic(nowPlayingInfo.getCurrentlyPlayingMusic());
+    }
+
+    private void clearBoundViews() {
+        notificationView = null;
+        infoColumn = null;
+        albumImage = null;
+        coverContainer = null;
+        if (coverShadow != null) {
+            setBackground(null);
+            coverShadow.close();
+            coverShadow = null;
+        }
+        name = null;
+        artistsAndAlbum = null;
+        sourceButton = null;
+        pusherWidget = null;
+        progressBar = null;
+        played = null;
+        total = null;
+        buttonsLayout = null;
+        likeButton = null;
+        addToPlaylistButton = null;
+        skipCurrentButton = null;
+        staggeredLyricScrollView = null;
+    }
+
+    private void buildInfoColumn(Context context) {
+        LinearLayout infoView = new LinearLayout(context);
+        infoView.setOrientation(LinearLayout.VERTICAL);
+
+        FlexWrapLayout row1 = new FlexWrapLayout(context);
+        row1.setLineGravity(Gravity.CENTER_VERTICAL);
+        infoView.addView(row1, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+        LinearLayout texts = new LinearLayout(context);
+        texts.setOrientation(LinearLayout.VERTICAL);
+        row1.addView(texts, new LinearLayout.LayoutParams(0, WRAP_CONTENT, 1));
+
+        {
+            name = new MarqueeTextView(context);
+            name.setTextSize(Theme.TEXT_SIZE_LARGE);
+            name.setTextColor(Theme.NORMAL_TEXT_COLOR);
+            texts.addView(name, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        }
+        {
+            artistsAndAlbum = new MarqueeTextView(context);
+            artistsAndAlbum.setTextSize(Theme.TEXT_SIZE_LARGE);
+            artistsAndAlbum.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            artistsAndAlbum.setMovementMethod(LinkMovementMethod.getInstance());
+            texts.addView(artistsAndAlbum, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        }
+
+        buttonsLayout = new LinearLayout(context);
+        LayoutTransition layoutTransition = new LayoutTransition();
+        LayoutTransitionReflow.attach(layoutTransition);
+        buttonsLayout.setLayoutTransition(layoutTransition);
+        buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
+        buttonsLayout.setGravity(Gravity.START);
+        buttonsLayout.setVisibility(GONE);
+        {
+            InsetBackgroundFactory buttonsBackground = InsetBackgroundFactory.builder()
+                    .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                    .cornerRadius(dp(4)).build();
+            int buttonSize = dp(BUTTON_SIZE_DP);
+
+            pusherWidget = new PusherWidget(context);
+            pusherWidget.setVisibility(GONE);
+            buttonsBackground.applyBackgroundTo(pusherWidget);
+            int pusherPadding = dp(PUSHER_PADDING_DP);
+            pusherWidget.setPadding(pusherPadding, pusherPadding, pusherPadding, pusherPadding);
+            buttonsLayout.addView(pusherWidget, new LinearLayout.LayoutParams(buttonSize, buttonSize));
+
+            sourceButton = new ImageButton(context);
+            sourceButton.setVisibility(GONE);
+            sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
+            if (sourceIcon != null) {
+                sourceButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(
+                        context.getResources(), sourceIcon, dp(ACTION_ICON_DP), dp(ACTION_ICON_DP)), dp(1)));
+            }
+            sourceButton.setOnClickListener(this::onSourceClick);
+            buttonsBackground.applyBackgroundTo(sourceButton);
+            buttonsLayout.addView(sourceButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
+
+            likeButton = new ToggleTrackLikeStateButton(context);
+            buttonsBackground.applyBackgroundTo(likeButton);
+            buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
+            addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
+            buttonsBackground.applyBackgroundTo(addToPlaylistButton);
+            buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
+            skipCurrentButton = new VoteSkipButton(context);
+            buttonsBackground.applyBackgroundTo(skipCurrentButton);
+            buttonsLayout.addView(skipCurrentButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
+        }
+        row1.addView(buttonsLayout, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        row1.setWrapThresholdRatio(buttonsLayout, BUTTONS_WRAP_RATIO);
+
+        progressBar = new LinearProgressBar(context, Theme.mediaProgressStyle());
+        progressBar.setProgressFraction(0f);
+        progressBar.setVisibility(GONE);
+        LinearLayout.LayoutParams progressParams = new LinearLayout.LayoutParams(MATCH_PARENT, dp(6));
+        progressParams.setMargins(0, dp(12), 0, 0);
+        infoView.addView(progressBar, progressParams);
+
+        LinearLayout progressTexts = new LinearLayout(context);
+        progressTexts.setOrientation(LinearLayout.HORIZONTAL);
+        infoView.addView(progressTexts, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        {
+            played = new TextView(context);
+            played.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            played.setTextColor(Theme.THIRDERY_TEXT_COLOR);
+            LinearLayout.LayoutParams playedParams =
+                    new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            playedParams.setMargins(0, dp(8), 0, 0);
+            progressTexts.addView(played, playedParams);
+        }
+        progressTexts.addView(new View(context), new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
+        {
+            total = new TextView(context);
+            total.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            total.setTextColor(Theme.THIRDERY_TEXT_COLOR);
+            LinearLayout.LayoutParams totalParams =
+                    new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            totalParams.setMargins(0, dp(8), 0, 0);
+            progressTexts.addView(total, totalParams);
+        }
+
+        LinearLayout controlBar = new LinearLayout(context);
+        controlBar.setOrientation(LinearLayout.HORIZONTAL);
+        controlBar.setGravity(Gravity.CENTER);
+        infoView.addView(controlBar, new LinearLayout.LayoutParams(MATCH_PARENT, dp(48)));
+
+        albumImage = new UrlImageView(context);
+        albumImage.setCornerRadius(dp(8));
+        albumImage.loadUrl(ImageUtils.coverPlaceholder());
+
+        coverContainer = new FrameLayout(context);
+        coverContainer.addView(albumImage, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+        coverShadow = new BlurShadowDrawable(new BlurShadowSpec(
+                new BlurShadowSpec.Shape.RoundedRect(8f),
+                32f, 0f, 8f, 0x70000000, 1f,
+                BlurShadowSpec.CacheMode.STATIC), coverContainer);
+        setBackground(coverShadow);
+
+        infoColumn = new InfoColumn(context, coverContainer, infoView);
+        addView(infoColumn, new ViewGroup.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+    }
+
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int width = MeasureSpec.getSize(widthMeasureSpec);
+        int height = MeasureSpec.getSize(heightMeasureSpec);
+        int contentWidth = Math.max(0, width - getPaddingLeft() - getPaddingRight());
+        int contentHeight = Math.max(0, height - getPaddingTop() - getPaddingBottom());
+
+        if (notificationView != null) {
+            notificationView.measure(
+                    MeasureSpec.makeMeasureSpec(contentWidth, MeasureSpec.AT_MOST),
+                    MeasureSpec.makeMeasureSpec(contentHeight, MeasureSpec.AT_MOST));
+        } else if (infoColumn != null) {
+            boolean lyricsVisible = staggeredLyricScrollView != null
+                    && staggeredLyricScrollView.getVisibility() == VISIBLE;
+            int split = Math.min(contentWidth,
+                    lyricsVisible ? Math.max(dp(INFO_MIN_WIDTH_DP), contentWidth / 2) : contentWidth);
+
+            int slotLeft = getPaddingLeft() + dp(INFO_SAFE_LEFT_DP);
+            int slotRight = getPaddingLeft() + split
+                    - (lyricsVisible ? dp(INFO_LYRICS_GAP_DP) : dp(INFO_SAFE_RIGHT_DP));
+            int slotWidth = Math.max(0, slotRight - slotLeft);
+            int infoWidth = Math.min(slotWidth, dp(INFO_MAX_WIDTH_DP));
+
+            int availableInfoHeight = Math.max(0,
+                    contentHeight - dp(INFO_SAFE_TOP_DP) - dp(INFO_SAFE_BOTTOM_DP));
+            infoColumn.measure(
+                    MeasureSpec.makeMeasureSpec(infoWidth, MeasureSpec.AT_MOST),
+                    MeasureSpec.makeMeasureSpec(availableInfoHeight, MeasureSpec.AT_MOST));
+            laidOutInfoWidth = infoColumn.getMeasuredWidth();
+            laidOutInfoHeight = infoColumn.getMeasuredHeight();
+            laidOutInfoX = slotLeft + Math.max(0, (slotWidth - laidOutInfoWidth) / 2);
+            laidOutInfoY = getPaddingTop() + dp(INFO_SAFE_TOP_DP)
+                    + Math.max(0, (availableInfoHeight - laidOutInfoHeight) / 2);
+
+            laidOutLyricsX = getPaddingLeft() + split;
+            laidOutLyricsWidth = Math.max(0, contentWidth - split - dp(LYRICS_RIGHT_DP));
+            if (lyricsVisible) {
+                int lyricsHeight = Math.max(0,
+                        contentHeight - dp(LYRICS_TOP_DP) - dp(LYRICS_BOTTOM_DP));
+                staggeredLyricScrollView.measure(
+                        MeasureSpec.makeMeasureSpec(laidOutLyricsWidth, MeasureSpec.EXACTLY),
+                        MeasureSpec.makeMeasureSpec(lyricsHeight, MeasureSpec.EXACTLY));
+            }
+        }
+        setMeasuredDimension(resolveSize(width, widthMeasureSpec), resolveSize(height, heightMeasureSpec));
+    }
+
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        if (notificationView != null) {
+            int width = getWidth() - getPaddingLeft() - getPaddingRight();
+            int height = getHeight() - getPaddingTop() - getPaddingBottom();
+            int childWidth = notificationView.getMeasuredWidth();
+            int childHeight = notificationView.getMeasuredHeight();
+            int x = getPaddingLeft() + Math.max(0, (width - childWidth) / 2);
+            int y = getPaddingTop() + Math.max(0, (height - childHeight) / 2);
+            notificationView.layout(x, y, x + childWidth, y + childHeight);
+            return;
+        }
+        if (infoColumn != null) {
+            infoColumn.layout(laidOutInfoX, laidOutInfoY,
+                    laidOutInfoX + laidOutInfoWidth, laidOutInfoY + laidOutInfoHeight);
+        }
+        if (staggeredLyricScrollView != null && staggeredLyricScrollView.getVisibility() == VISIBLE) {
+            int lyricsTop = getPaddingTop() + dp(LYRICS_TOP_DP);
+            int lyricsBottom = Math.max(lyricsTop,
+                    getHeight() - getPaddingBottom() - dp(LYRICS_BOTTOM_DP));
+            staggeredLyricScrollView.layout(laidOutLyricsX, lyricsTop,
+                    laidOutLyricsX + laidOutLyricsWidth, lyricsBottom);
+        }
+    }
+
+    private void onSourceClick(View view) {
+        Object tag = sourceButton.getTag();
+        if (!(tag instanceof SourceMeta sourceMeta)) {
+            return;
+        }
+        Class<?> type = sourceMeta.type();
+        if (!MusicCollection.class.isAssignableFrom(type)) {
+            return;
         }
         Context context = getContext();
-        removeAllViews();
-        idlePlaySourceCardMap.clear();
-
-        boolean enabled = clientConfig.getEnable();
-        if (ConnectionStateMachine.getConnectStatus() != ConnectionStateMachine.ConnectStatus.CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
-            setGravity(Gravity.CENTER);
-            TextView textView = Theme.getNotificationTextView(context, enabled);
-            addView(textView);
-            return;
-        }
-
-        setOrientation(HORIZONTAL);
-        {
-            LinearLayout lyricsView = new LinearLayout(context);
-            lyricsView.setOrientation(VERTICAL);
-            LayoutParams lyricsViewParams = new LayoutParams(0, MATCH_PARENT, 3);
-            addView(lyricsView, lyricsViewParams);
-
-            staggeredLyricScrollView = new StaggeredLyricScrollView(context);
-            lyricsView.addView(staggeredLyricScrollView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-        }
-        {
-            LinearLayout queueView = new LinearLayout(context);
-            queueView.setOrientation(VERTICAL);
-            LayoutParams queueViewParams = new LayoutParams(0, MATCH_PARENT, 2);
-            addView(queueView, queueViewParams);
-
-            var scrollView = new ScrollView(context);
-            scrollView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
-            scrollView.setFillViewport(true);
-            queueView.addView(scrollView, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-
-            LinearLayout scrollViewContainer = new LinearLayout(context);
-            scrollViewContainer.setOrientation(VERTICAL);
-            scrollView.addView(scrollViewContainer, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-            LayoutTransition transition1 = new LayoutTransition();
-            transition1.setAnimateParentHierarchy(false);
-            transition1.enableTransitionType(LayoutTransition.CHANGING);
-            scrollViewContainer.setLayoutTransition(transition1);
-
-            nextToPlayHeader = new LinearLayout(context);
-            nextToPlayHeader.setOrientation(LinearLayout.HORIZONTAL);
-            nextToPlayHeader.setGravity(Gravity.CENTER_VERTICAL);
-            nextToPlayHeader.setVisibility(GONE);
-            LayoutParams nextToPlayHeaderParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            nextToPlayHeaderParams.setMargins(0, dp(32), 0, dp(16));
-            scrollViewContainer.addView(nextToPlayHeader, nextToPlayHeaderParams);
-
-            TextView nextToPlayTitle = new TextView(context);
-            nextToPlayTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            nextToPlayTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.nextToPlay"));
-            nextToPlayHeader.addView(nextToPlayTitle, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-
-            rotateNextToPlayButton = new ImageButton(context);
-            rotateNextToPlayButton.setVisibility(GONE);
-            rotateNextToPlayButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            rotateNextToPlayButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.rotateNextToPlay"));
-            Image rotateIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/refresh_ccw_dot.png");
-            rotateNextToPlayButton.setImageDrawable(new ScaledImageDrawable(context.getResources(), rotateIcon, dp(16), dp(16)));
-            InsetBackgroundFactory.builder()
-                    .inset(0)
-                    .cornerRadius(dp(4))
-                    .build()
-                    .applyBackgroundTo(rotateNextToPlayButton);
-            rotateNextToPlayButton.setOnClickListener(v -> musicService.rotateNextToPlay().thenAccept(result -> {
-                if (result.actionResult() == ActionResult.FAIL) {
-                    ToastUtil.show(I18n.get(result.message()));
-                }
-            }));
-            LinearLayout.LayoutParams rotateButtonParams = new LinearLayout.LayoutParams(dp(24), dp(24));
-            rotateButtonParams.setMargins(dp(8), 0, 0, 0);
-            nextToPlayHeader.addView(rotateNextToPlayButton, rotateButtonParams);
-
-            nextToPlayItem = new MusicTrackItem(context);
-//            nextToPlayItem.getAlbumImageView().setTransitionDuration(0);
-            nextToPlayItem.setVisibility(GONE);
-            scrollViewContainer.addView(nextToPlayItem, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
-            queueTitle = new TextView(context);
-            queueTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            queueTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.playQueue"));
-            queueTitle.setSingleLine();
-            LayoutParams queueTitleParams = new LayoutParams(WRAP_CONTENT, dp(24));
-            queueTitleParams.setMargins(0, dp(32), 0, dp(16));
-            scrollViewContainer.addView(queueTitle, queueTitleParams);
-
-            playQueueListView = new LinearLayout(context);
-            playQueueListView.setOrientation(VERTICAL);
-            LayoutParams queueViewParams1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            playQueueListView.setMinimumHeight(dp(256));
-            LayoutTransition transition = new LayoutTransition();
-            transition.enableTransitionType(LayoutTransition.CHANGING);
-            playQueueListView.setLayoutTransition(transition);
-            scrollViewContainer.addView(playQueueListView, queueViewParams1);
-
-            clientIdlePlaySourceView = new LinearLayout(context);
-            clientIdlePlaySourceView.setVisibility(GONE);
-            clientIdlePlaySourceView.setOrientation(VERTICAL);
-            clientIdlePlaySourceView.setLayoutParams(new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
-            TextView clientIdlePlaySourceViewTitle = new TextView(context);
-            clientIdlePlaySourceViewTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            clientIdlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
-            clientIdlePlaySourceViewTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySources"));
-            LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            params2.setMargins(0, dp(32), 0, 0);
-            clientIdlePlaySourceView.addView(clientIdlePlaySourceViewTitle, params2);
-
-            TextView idlePlaySourceViewDescription = new TextView(context);
-            idlePlaySourceViewDescription.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            idlePlaySourceViewDescription.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            idlePlaySourceViewDescription.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
-            clientIdlePlaySourceView.addView(idlePlaySourceViewDescription, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-
-            clientIdlePlaySourceCardsList = new FlexWrapLayout(context);
-            LayoutParams params4 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params4.setMargins(0, dp(16), 0, 0);
-            clientIdlePlaySourceView.addView(clientIdlePlaySourceCardsList, params4);
-            scrollViewContainer.addView(clientIdlePlaySourceView, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
-
-            serverIdlePlaySourceView = new LinearLayout(context);
-            serverIdlePlaySourceView.setVisibility(GONE);
-            serverIdlePlaySourceView.setOrientation(VERTICAL);
-            serverIdlePlaySourceView.setLayoutParams(new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
-            TextView serverIdlePlaySourceViewTitle = new TextView(context);
-            serverIdlePlaySourceViewTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            serverIdlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
-            serverIdlePlaySourceViewTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.othersIdlePlaySources"));
-            LayoutParams params5 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            params5.setMargins(0, dp(32), 0, 0);
-            serverIdlePlaySourceView.addView(serverIdlePlaySourceViewTitle, params5);
-
-            TextView idlePlaySourceViewDescription1 = new TextView(context);
-            idlePlaySourceViewDescription1.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            idlePlaySourceViewDescription1.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            idlePlaySourceViewDescription1.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
-            serverIdlePlaySourceView.addView(idlePlaySourceViewDescription1, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-
-            serverIdlePlaySourceCardsList = new FlexWrapLayout(context);
-            LayoutParams params6 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params6.setMargins(0, dp(16), 0, 0);
-            serverIdlePlaySourceView.addView(serverIdlePlaySourceCardsList, params6);
-            scrollViewContainer.addView(serverIdlePlaySourceView, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
-            localPlayer = Minecraft.getInstance().player;
-
-            clientIdlePlaySources.forEach(idlePlaySource -> {
-                if (!idlePlaySourceCardMap.containsKey(CardKey.of(true, idlePlaySource))) {
-                    addIdlePlaySourceTo(idlePlaySource, clientIdlePlaySourceCardsList, true);
-                }
-            });
-            serverIdlePlaySources.forEach(idlePlaySource -> {
-                if (localPlayer != null && !idlePlaySource.getPusherInfo().playerUUID().equals(localPlayer.getUUID()) && !idlePlaySourceCardMap.containsKey(CardKey.of(false, idlePlaySource))) {
-                    addIdlePlaySourceTo(idlePlaySource, serverIdlePlaySourceCardsList, false);
-                }
-            });
-            checkIdlePlaySources(clientIdlePlaySources, clientIdlePlaySourceView);
-            checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
-            Queue<QueueItem> queue = musicService.getMusicQueue();
-            checkQueue(queue);
-
-            localAddRegister = musicService.getIdlePlaySourceState().local().onAdd(localAddListener);
-            localRemoveRegister = musicService.getIdlePlaySourceState().local().onRemove(localRemoveListener);
-            serverAddRegister = musicService.getIdlePlaySourceState().external().onAdd(serverAddListener);
-            serverRemoveRegister = musicService.getIdlePlaySourceState().external().onRemove(serverRemoveListener);
-
-            playQueueListView.removeAllViews();
-
-            // Snapshot before iterating: the client queue is a plain ArrayDeque mutated on
-            // network threads and its iterator is fail-fast
-            for (QueueItem item : List.copyOf(queue)) {
-                addMusicQueueItem(item, playQueueListView);
-            }
-
-            musicQueuePushListener = item -> {
-                MuiModApi.postToUiThread(() -> {
-                    addMusicQueueItem(item, playQueueListView);
-                    checkQueue(musicService.getMusicQueue());
-                });
-            };
-            musicQueueRemoveListener = (removeIndex, item) -> {
-                MuiModApi.postToUiThread(() -> {
-                    if (removeIndex >= 0 && removeIndex < playQueueListView.getChildCount()) {
-                        playQueueListView.removeViewAt(removeIndex);
+        //noinspection unchecked
+        MusicService.getInstance()
+                .loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
+                .thenAccept(collection -> MuiModApi.postToUiThread(() -> {
+                    RouterContainer router = MainFragment.getInstance().getRouterContainer();
+                    if (router != null) {
+                        router.pushNavigate(new MusicCollectionDetailView(context, collection));
                     }
-                    checkQueue(musicService.getMusicQueue());
-                });
-            };
-            musicService.getMusicQueuePushListeners().add(musicQueuePushListener);
-            musicService.getMusicQueueRemoveListeners().add(musicQueueRemoveListener);
-
-            addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-                @Override
-                public void onViewAttachedToWindow(View v) {
-                }
-
-                @Override
-                public void onViewDetachedFromWindow(View v) {
-                    if (localAddRegister != null) localAddRegister.unregister();
-                    if (localRemoveRegister != null) localRemoveRegister.unregister();
-                    if (serverAddRegister != null) serverAddRegister.unregister();
-                    if (serverRemoveRegister != null) serverRemoveRegister.unregister();
-                    musicService.getMusicQueuePushListeners().remove(musicQueuePushListener);
-                    musicService.getMusicQueueRemoveListeners().remove(musicQueueRemoveListener);
-                    instance = null;
-                }
-            });
-        }
+                }));
     }
 
-    private void addIdlePlaySourceTo(IdlePlaySource idlePlaySource, FlexWrapLayout targetView, boolean local) {
-        CardKey key = CardKey.of(local, idlePlaySource);
-        MusicCollection musicCollection = idlePlaySource.getMusicCollection();
-        if (MusicCollections.isUsable(musicCollection)) {
-            addInternal(idlePlaySource, musicCollection, targetView, key);
-        } else {
-            loadIdlePlaySourceCard(idlePlaySource, targetView, key, IDLE_SOURCE_LOAD_ATTEMPTS);
-        }
-    }
-
-    /**
-     * Loads a card's collection, retrying transient failures so the card is not built from a
-     * failure sentinel (which would break id-based recovery and the detail page).
-     */
-    private void loadIdlePlaySourceCard(IdlePlaySource idlePlaySource, FlexWrapLayout targetView, CardKey key, int attemptsLeft) {
-        // View construction and addView must happen on the UI thread; the future may
-        // complete on a network virtual thread (observed: GetPlaylistDetailResponse)
-        musicService.loadMusicCollectionDetail(idlePlaySource.getId(), idlePlaySource.getType())
-                .whenComplete((collection, throwable) -> {
-                    if (throwable == null && MusicCollections.isUsable(collection)) {
-                        MuiModApi.postToUiThread(() -> addInternal(idlePlaySource, collection, targetView, key));
-                    } else if (attemptsLeft > 0) {
-                        MusicHud.EXECUTOR.execute(() -> {
-                            try {
-                                Thread.sleep(1000);
-                            } catch (InterruptedException e) {
-                                Thread.currentThread().interrupt();
-                                return;
-                            }
-                            loadIdlePlaySourceCard(idlePlaySource, targetView, key, attemptsLeft - 1);
-                        });
-                    } else {
-                        LOGGER.warn("Failed to load idle play source card {} ({})",
-                                idlePlaySource.getType().getSimpleName(), idlePlaySource.getId(), throwable);
-                    }
-                });
-    }
-
-    private void addInternal(IdlePlaySource idlePlaySource, MusicCollection musicCollection, FlexWrapLayout targetView, CardKey key) {
-        MusicCollectionCard child = new MusicCollectionCard(getContext(), musicCollection, idlePlaySource.getPusherInfo());
-        targetView.addView(child);
-        idlePlaySourceCardMap.put(key, child);
-    }
-
-    private void checkQueue(Queue<QueueItem> queue) {
-        if (queue.isEmpty()) {
-            queueTitle.setVisibility(View.GONE);
-            playQueueListView.setVisibility(View.GONE);
-            checkNextToPlay(NowPlayingInfo.getInstance().getNextToPlayMusic());
-        } else {
-            queueTitle.setVisibility(View.VISIBLE);
-            playQueueListView.setVisibility(View.VISIBLE);
-            QueueItem peek = queue.peek();
-            checkNextToPlay(peek == null ? Traceable.of(MusicDetail.NONE) : peek.musicDetail());
-        }
-    }
-
-    private void checkIdlePlaySources(Set<IdlePlaySource> idlePlaySources, View targetView) {
-        if (idlePlaySources.isEmpty()) {
-            targetView.setVisibility(View.GONE);
-        } else {
-            targetView.setVisibility(View.VISIBLE);
-        }
-        checkQueue(musicService.getMusicQueue());
-    }
-
-    private void checkNextToPlay(Traceable<MusicDetail> nextIdle) {
-        Queue<QueueItem> musicQueue = musicService.getMusicQueue();
-        boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty() || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();
-        MusicDetail next = hasIdlePlaySources && nextIdle != null ? nextIdle.value() : null;
-        boolean show = musicQueue.isEmpty() && next != null && !next.equals(MusicDetail.NONE);
-        applyNextToPlay(show, show ? nextIdle : null);
-    }
-
-    /**
-     * Drives visibility and content of the "next to play" row. When the row is already showing a
-     * different track, the switch is animated: the old content shrinks to {@link #NEXT_TO_PLAY_MIN_SCALE}
-     * and fades out, then the new content is bound and enters in reverse.
-     */
-    private void applyNextToPlay(boolean show, Traceable<MusicDetail> nextIdle) {
-        if (!show) {
-            pendingNextToPlay = null;
-            cancelNextToPlayAnimation();
-            nextToPlayHeader.setVisibility(GONE);
-            nextToPlayItem.setVisibility(GONE);
-            rotateNextToPlayButton.setVisibility(GONE);
-            resetNextToPlayItemVisual();
-            return;
-        }
-        if (nextToPlayAnimator != null) {
-            // A switch is already in flight: keep only the newest target.
-            pendingNextToPlay = nextIdle;
-            return;
-        }
-        boolean itemShown = nextToPlayItem.getVisibility() == VISIBLE;
-        nextToPlayHeader.setVisibility(VISIBLE);
-        if (itemShown && Objects.equals(nextToPlayItem.getMusicTrace(), nextIdle)) {
-            // Same track re-synced: refresh in place without replaying the switch animation.
-            updateNextToPlayRotateButton(nextIdle);
-            return;
-        }
-        if (!itemShown) {
-            // First appearance: bind in place, no outgoing content to animate.
-            nextToPlayItem.setVisibility(VISIBLE);
-            nextToPlayItem.bindData(nextIdle);
-            resetNextToPlayItemVisual();
-            updateNextToPlayRotateButton(nextIdle);
-            return;
-        }
-        startNextToPlaySwitch(nextIdle);
-    }
-
-    private void startNextToPlaySwitch(Traceable<MusicDetail> target) {
-        pendingNextToPlay = null;
-        ObjectAnimator outAlpha = ObjectAnimator.ofFloat(nextToPlayItem, View.ALPHA, nextToPlayItem.getAlpha(), 0f);
-        ObjectAnimator outScaleX = ObjectAnimator.ofFloat(nextToPlayItem, View.SCALE_X, nextToPlayItem.getScaleX(), NEXT_TO_PLAY_MIN_SCALE);
-        ObjectAnimator outScaleY = ObjectAnimator.ofFloat(nextToPlayItem, View.SCALE_Y, nextToPlayItem.getScaleY(), NEXT_TO_PLAY_MIN_SCALE);
-        AnimatorSet outSet = new AnimatorSet();
-        outSet.playTogether(outAlpha, outScaleX, outScaleY);
-        outSet.setDuration(NEXT_TO_PLAY_ANIM_DURATION_MS);
-        outSet.setInterpolator(NEXT_TO_PLAY_INTERPOLATOR);
-        nextToPlayAnimator = outSet;
-        outSet.addListener(new AnimatorListener() {
-            @Override
-            public void onAnimationEnd(@NonNull Animator animation) {
-                // Stale callbacks (canceled / replaced) must not settle a newer transition.
-                if (nextToPlayAnimator != outSet) {
-                    return;
-                }
-                Traceable<MusicDetail> bindTarget = target;
-                // A newer target may have arrived during the fade-out; skip the stale one entirely.
-                if (pendingNextToPlay != null) {
-                    bindTarget = pendingNextToPlay;
-                    pendingNextToPlay = null;
-                }
-                nextToPlayItem.clearData();
-                nextToPlayItem.bindData(bindTarget);
-                updateNextToPlayRotateButton(bindTarget);
-                post(() -> startNextToPlayEnter());
-            }
-        });
-        outSet.start();
-    }
-
-    private void startNextToPlayEnter() {
-        nextToPlayItem.setAlpha(0f);
-        nextToPlayItem.setScaleX(NEXT_TO_PLAY_MIN_SCALE);
-        nextToPlayItem.setScaleY(NEXT_TO_PLAY_MIN_SCALE);
-        ObjectAnimator inAlpha = ObjectAnimator.ofFloat(nextToPlayItem, View.ALPHA, 0f, 1f);
-        ObjectAnimator inScaleX = ObjectAnimator.ofFloat(nextToPlayItem, View.SCALE_X, NEXT_TO_PLAY_MIN_SCALE, 1f);
-        ObjectAnimator inScaleY = ObjectAnimator.ofFloat(nextToPlayItem, View.SCALE_Y, NEXT_TO_PLAY_MIN_SCALE, 1f);
-        AnimatorSet inSet = new AnimatorSet();
-        inSet.playTogether(inAlpha, inScaleX, inScaleY);
-        inSet.setDuration(NEXT_TO_PLAY_ANIM_DURATION_MS);
-        inSet.setInterpolator(NEXT_TO_PLAY_INTERPOLATOR);
-        nextToPlayAnimator = inSet;
-        inSet.addListener(new AnimatorListener() {
-            @Override
-            public void onAnimationEnd(@NonNull Animator animation) {
-                if (nextToPlayAnimator != inSet) {
-                    return;
-                }
-                nextToPlayAnimator = null;
-                resetNextToPlayItemVisual();
-                if (pendingNextToPlay != null) {
-                    Traceable<MusicDetail> pending = pendingNextToPlay;
-                    pendingNextToPlay = null;
-                    applyNextToPlay(true, pending);
-                }
-            }
-        });
-        inSet.start();
-    }
-
-    private void cancelNextToPlayAnimation() {
-        AnimatorSet animator = nextToPlayAnimator;
-        // Clear the field first so the cancel callback is treated as stale and does not advance.
-        nextToPlayAnimator = null;
-        if (animator != null) {
-            animator.cancel();
-        }
-    }
-
-    private void resetNextToPlayItemVisual() {
-        nextToPlayItem.setAlpha(1f);
-        nextToPlayItem.setScaleX(1f);
-        nextToPlayItem.setScaleY(1f);
-    }
-
-    private void updateNextToPlayRotateButton(Traceable<MusicDetail> nextIdle) {
-        MusicDetail next = nextIdle == null ? null : nextIdle.value();
-        rotateNextToPlayButton.setVisibility(
-                next != null && isLocalPlayer(next.getPusherInfo().playerUUID()) ? VISIBLE : GONE);
-    }
-
-    /** Re-renders only the idle "next to play" row (e.g. after a server-side reroll). */
-    public void updateNextToPlay(Traceable<MusicDetail> nextIdle) {
-        MuiModApi.postToUiThread(() -> checkNextToPlay(nextIdle));
-    }
-
-    private static boolean isLocalPlayer(UUID playerUUID) {
-        LocalPlayer player = Minecraft.getInstance().player;
-        return player != null && player.getUUID().equals(playerUUID);
-    }
-
-    private void addMusicQueueItem(QueueItem item, LinearLayout playQueueView) {
-        Traceable<MusicDetail> musicTrace = item.musicDetail();
-        MusicDetail musicDetail = musicTrace.value();
-        var musicListItem = new MusicTrackItem(getContext());
-        musicListItem.bindData(musicTrace);
-        LayoutParams layoutParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        layoutParams.setMargins(0, 0, 0, dp(16));
-
-        assert Minecraft.getInstance().player != null;
-        if (musicDetail.getPusherInfo().playerUUID().equals(Minecraft.getInstance().player.getUUID())) {
-            ImageButton removeButton = new ImageButton(getContext());
-            Image removeIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/trash_2.png");
-            removeButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            removeButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), removeIcon, dp(16), dp(16)));
-            InsetBackgroundFactory.builder()
-                    .inset(dp(2))
-                    .cornerRadius(dp(4))
-                    .build()
-                    .applyBackgroundTo(removeButton);
-            removeButton.setOnClickListener(v -> {
-                musicService.sendRemoveMusicFromQueue(item);
-            });
-            musicListItem.getButtonsLayout().addView(removeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
-        }
-        musicListItem.setLayoutParams(layoutParams);
-        playQueueView.addView(musicListItem, layoutParams);
-    }
-
-    public void switchMusic(Traceable<MusicDetail> musicDetail, Traceable<MusicDetail> next, Queue<LyricLine> lyricLines) {
+    public void switchMusic(@Nullable Traceable<MusicDetail> musicDetail, @Nullable Queue<LyricLine> lyricLines) {
         MuiModApi.postToUiThread(() -> {
-            if (staggeredLyricScrollView != null) {
-                staggeredLyricScrollView.switchLyrics(musicDetail == null ? MusicDetail.NONE : musicDetail.value(), lyricLines);
-                checkNextToPlay(next);
+            bindMusic(musicDetail);
+            if (staggeredLyricScrollView == null) {
+                return;
+            }
+            if (hasNormalLyrics(lyricLines)) {
+                staggeredLyricScrollView.setVisibility(VISIBLE);
+                staggeredLyricScrollView.switchLyrics(
+                        musicDetail == null ? null : musicDetail.value(), lyricLines);
+            } else {
+                staggeredLyricScrollView.setVisibility(GONE);
+                staggeredLyricScrollView.switchLyrics(null, null);
             }
         });
+    }
+
+    private void applyLyricsVisibility() {
+        if (staggeredLyricScrollView == null) {
+            return;
+        }
+        staggeredLyricScrollView.setVisibility(
+                hasNormalLyrics(nowPlayingInfo.getLyricLines()) ? VISIBLE : GONE);
+    }
+
+    private static boolean hasNormalLyrics(@Nullable Collection<LyricLine> lines) {
+        if (lines == null || lines.isEmpty()) {
+            return false;
+        }
+        int normalLines = 0;
+        for (LyricLine line : lines) {
+            if (line.getType() == LyricLine.Type.NORMAL && ++normalLines > 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void bindMusic(@Nullable Traceable<MusicDetail> trace) {
+        if (infoColumn == null) {
+            return;
+        }
+        MusicDetail detail = trace == null ? null : trace.value();
+        if (detail == null || detail.equals(MusicDetail.NONE)) {
+            bindIdle();
+            return;
+        }
+
+        Album album = detail.getAlbum();
+        int coverTarget = albumImage.getWidth();
+        if (coverTarget <= 0) {
+            coverTarget = dp(INFO_MAX_WIDTH_DP);
+        }
+        albumImage.loadUrl(album.getPicUrl(), coverTarget, coverTarget);
+        updateCoverScale(false);
+
+        name.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        name.setText(detail.getName());
+        artistsAndAlbum.setText(buildMetaText(detail));
+
+        PusherInfo pusherInfo = detail.getPusherInfo();
+        if (pusherInfo == null || PusherInfo.EMPTY.equals(pusherInfo)) {
+            pusherWidget.clear();
+            pusherWidget.setVisibility(GONE);
+        } else {
+            pusherWidget.bind(pusherInfo);
+            pusherWidget.setVisibility(VISIBLE);
+        }
+
+        SourceMeta source = trace.source();
+        if (source != null) {
+            sourceButton.setTag(source);
+            sourceButton.setVisibility(VISIBLE);
+            Tooltip.attach(sourceButton, buildSourceLabel(source));
+        } else {
+            sourceButton.setTag(null);
+            sourceButton.setVisibility(GONE);
+            Tooltip.attach(sourceButton, null);
+        }
+
+        Duration duration = Duration.of(detail.getDurationMillis(), ChronoUnit.MILLIS);
+        DateTimeFormatter formatter = formatterFor(duration);
+        total.setText(formatter.format(LocalTime.MIDNIGHT.plusSeconds(duration.toSeconds())));
+
+        progressBar.setVisibility(VISIBLE);
+        progressBar.setProgressFraction(nowPlayingInfo.getProgressRate());
+        applyAudioStatus(StreamAudioPlayer.getInstance().getStatus());
+
+        updateActionButtons(detail);
+        startProgressUpdater(detail, formatter, duration);
+    }
+
+    private void bindIdle() {
+        albumImage.loadUrl(ImageUtils.coverPlaceholder());
+        updateCoverScale(false);
+        name.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        name.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
+        artistsAndAlbum.setText("");
+        pusherWidget.clear();
+        pusherWidget.setVisibility(GONE);
+        sourceButton.setTag(null);
+        sourceButton.setVisibility(GONE);
+        Tooltip.attach(sourceButton, null);
+        progressBar.setIndeterminate(false);
+        progressBar.setProgressFraction(0f);
+        progressBar.setVisibility(GONE);
+        played.setText("");
+        total.setText("");
+        buttonsLayout.setVisibility(GONE);
+        likeButton.bindMusicList(null);
+        addToPlaylistButton.bindMusicDetail(null);
+        progressUpdaterToken.incrementAndGet();
+    }
+
+    private CharSequence buildMetaText(MusicDetail detail) {
+        Context context = getContext();
+        SpannableStringBuilder builder = new SpannableStringBuilder();
+        List<Artist> artists = detail.getArtists();
+        for (int i = 0; i < artists.size(); i++) {
+            Artist artist = artists.get(i);
+            if (i > 0) {
+                builder.append(" / ");
+            }
+            int start = builder.length();
+            builder.append(artist.getName());
+            int end = builder.length();
+            if (artist.getId() > 0) {
+                builder.setSpan(new ClickableSpan() {
+                    @Override
+                    public void onClick(@NotNull View widget) {
+                        RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
+                        if (routerContainer != null) {
+                            routerContainer.pushNavigate(new ArtistDetailView(context, artist));
+                        }
+                    }
+
+                    @Override
+                    public void updateDrawState(@NotNull TextPaint ds) {
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
+                        ds.setUnderline(false);
+                    }
+                }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else {
+                builder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                        start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+
+        Album album = detail.getAlbum();
+        String albumName = album.getName() == null ? "" : album.getName();
+        if (!Album.NONE.equals(album) && !albumName.isBlank()) {
+            if (!builder.isEmpty()) {
+                builder.append(" - ");
+            }
+            int start = builder.length();
+            builder.append(albumName);
+            int end = builder.length();
+            if (album.getId() > 0) {
+                builder.setSpan(new ClickableSpan() {
+                    @Override
+                    public void onClick(@NotNull View widget) {
+                        RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
+                        if (routerContainer != null) {
+                            routerContainer.pushNavigate(new MusicCollectionDetailView(context, album));
+                        }
+                    }
+
+                    @Override
+                    public void updateDrawState(@NotNull TextPaint ds) {
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
+                        ds.setUnderline(false);
+                    }
+                }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else {
+                builder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                        start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
+        }
+        return builder;
+    }
+
+    private static SpannableString buildSourceLabel(SourceMeta source) {
+        SpannableString text = new SpannableString("    " + source.name());
+        String iconPath = Album.class.isAssignableFrom(source.type())
+                ? "/assets/music_hud/textures/gui/icons/disc_album.png"
+                : "/assets/music_hud/textures/gui/icons/list_music.png";
+        Image icon = ImageUtils.getImageFromResource(iconPath);
+        if (icon != null) {
+            text.setSpan(ImageUtils.getIconSpan(icon), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        String playModeIconPath = switch (source.playMode()) {
+            case RANDOM -> "/assets/music_hud/textures/gui/icons/shuffle.png";
+            case SEQUENTIAL -> "/assets/music_hud/textures/gui/icons/repeat.png";
+            case INTELLIGENT -> "/assets/music_hud/textures/gui/icons/heart_pulse.png";
+        };
+        Image modeIcon = ImageUtils.getImageFromResource(playModeIconPath);
+        if (modeIcon != null) {
+            text.setSpan(ImageUtils.getIconSpan(modeIcon), 2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return text;
+    }
+
+    private void updateActionButtons(@Nullable MusicDetail detail) {
+        if (buttonsLayout == null) {
+            return;
+        }
+        if (detail == null || detail.equals(MusicDetail.NONE)) {
+            buttonsLayout.setVisibility(GONE);
+            likeButton.bindMusicList(null);
+            addToPlaylistButton.bindMusicDetail(null);
+            return;
+        }
+        skipCurrentButton.reset();
+        likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(detail).currentUsersLikeList());
+        addToPlaylistButton.bindMusicDetail(detail);
+        buttonsLayout.setVisibility(VISIBLE);
+    }
+
+    private static DateTimeFormatter formatterFor(Duration duration) {
+        return duration.toHoursPart() >= 1 ? TIME_WITH_HOUR : TIME_WITHOUT_HOUR;
+    }
+
+    private void startProgressUpdater(MusicDetail detail, DateTimeFormatter formatter, Duration duration) {
+        int token = progressUpdaterToken.incrementAndGet();
+        long now = System.currentTimeMillis();
+        long deadline = now + duration.toMillis() + 120_000;
+        progressUpdaterStartTime = now;
+        progressTextUpdateCount = -1;
+        postProgressFrame(detail, formatter, deadline, token);
+    }
+
+    private void postProgressFrame(MusicDetail detail, DateTimeFormatter formatter, long deadline, int token) {
+        Choreographer.getInstance().postFrameCallback((choreographer, frameTimeNanos) -> {
+            if (progressUpdaterToken.get() != token || progressBar == null || !isShown()) {
+                return;
+            }
+            long count = (System.currentTimeMillis() - progressUpdaterStartTime) / 1000;
+            if (count > progressTextUpdateCount) {
+                progressTextUpdateCount = count;
+                Duration playedDuration = nowPlayingInfo.getPlayedDuration();
+                played.setText(formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds())));
+            }
+            progressBar.setProgressFraction(nowPlayingInfo.getProgressRate());
+            if (detail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())
+                    && nowPlayingInfo.getProgressRate() < 1
+                    && System.currentTimeMillis() < deadline) {
+                postProgressFrame(detail, formatter, deadline, token);
+            }
+        });
+    }
+
+    private void applyAudioStatus(StreamAudioPlayer.Status status) {
+        if (progressBar == null) {
+            return;
+        }
+        progressBar.setIndeterminate(status == StreamAudioPlayer.Status.BUFFERING
+                || status == StreamAudioPlayer.Status.RETRYING);
+    }
+
+    private static boolean isCoverExpanded() {
+        MusicDetail detail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
+        if (detail == null || detail.equals(MusicDetail.NONE) || PlaybackTask.getTargetGain() == 0) {
+            return false;
+        }
+        return StreamAudioPlayer.getInstance().getStatus() == StreamAudioPlayer.Status.PLAYING;
+    }
+
+    public void updateCoverScale(boolean animate) {
+        View cover = coverContainer != null ? coverContainer : albumImage;
+        if (cover == null) {
+            return;
+        }
+        float target = isCoverExpanded() ? 1f : COVER_MIN_SCALE;
+        cancelCoverScaleAnimator();
+        if (!animate) {
+            cover.setScaleX(target);
+            cover.setScaleY(target);
+            return;
+        }
+        ObjectAnimator scaleX = ObjectAnimator.ofFloat(cover, View.SCALE_X, target);
+        ObjectAnimator scaleY = ObjectAnimator.ofFloat(cover, View.SCALE_Y, target);
+        for (ObjectAnimator animator : new ObjectAnimator[]{scaleX, scaleY}) {
+            animator.setInterpolator(COVER_SCALE_INTERPOLATOR);
+            animator.setDuration(COVER_SCALE_DURATION_MS);
+        }
+        AnimatorSet set = new AnimatorSet();
+        set.playTogether(scaleX, scaleY);
+        coverScaleAnimator = set;
+        set.start();
+    }
+
+    private void cancelCoverScaleAnimator() {
+        if (coverScaleAnimator != null) {
+            coverScaleAnimator.cancel();
+            coverScaleAnimator = null;
+        }
+    }
+
+    @Override
+    protected void onVisibilityChanged(@NonNull View changedView, int visibility) {
+        super.onVisibilityChanged(changedView, visibility);
+        if (visibility == VISIBLE) {
+            restartProgressUpdater();
+        }
+    }
+
+    @Override
+    protected void onWindowVisibilityChanged(int visibility) {
+        super.onWindowVisibilityChanged(visibility);
+        if (visibility == VISIBLE) {
+            restartProgressUpdater();
+        }
+    }
+
+    private void restartProgressUpdater() {
+        if (progressBar == null) {
+            return;
+        }
+        MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+        if (detail == null || detail.equals(MusicDetail.NONE)) {
+            return;
+        }
+        Duration duration = Duration.of(detail.getDurationMillis(), ChronoUnit.MILLIS);
+        startProgressUpdater(detail, formatterFor(duration), duration);
+    }
+
+    @Override
+    protected void onAttachedToWindow() {
+        super.onAttachedToWindow();
+        instance = this;
+        if (!audioListenerRegistered) {
+            StreamAudioPlayer.getInstance().getStatusChangeListener().add(statusListener);
+            audioListenerRegistered = true;
+        }
+        applyAudioStatus(StreamAudioPlayer.getInstance().getStatus());
+        updateCoverScale(false);
+        restartProgressUpdater();
     }
 
     @Override
     protected void onDetachedFromWindow() {
+        progressUpdaterToken.incrementAndGet();
+        cancelCoverScaleAnimator();
+        if (audioListenerRegistered) {
+            StreamAudioPlayer.getInstance().getStatusChangeListener().remove(statusListener);
+            audioListenerRegistered = false;
+        }
+        if (instance == this) {
+            instance = null;
+        }
         super.onDetachedFromWindow();
-        pendingNextToPlay = null;
-        cancelNextToPlayAnimation();
-        // 组件内部已处理资源清理，只需将 instance 置空
-        instance = null;
+    }
+
+    /**
+     * Cover and everything below it share one width. The cover is square, so its height is also
+     * that width; the content height depends on it too, hence the small settling loop.
+     */
+    private static final class InfoColumn extends ViewGroup {
+        private final View cover;
+        private final LinearLayout content;
+
+        InfoColumn(Context context, View cover, LinearLayout content) {
+            super(context);
+            this.cover = cover;
+            this.content = content;
+            // The layout frame lags behind the final child sizes while HomeView animates a
+            // column resize, so clipping here would cut the cover mid-transition.
+            setClipChildren(false);
+            addView(cover, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            addView(content, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+        }
+
+        @Override
+        protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+            int maxWidth = MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED
+                    ? Math.max(getWidth(), 0) : MeasureSpec.getSize(widthMeasureSpec);
+            int maxHeight = MeasureSpec.getMode(heightMeasureSpec) == MeasureSpec.UNSPECIFIED
+                    ? Integer.MAX_VALUE : MeasureSpec.getSize(heightMeasureSpec);
+            // The cover is square with the column width as its side, so the column may never be
+            // wider than the height the page grants it.
+            int heightCap = maxHeight == Integer.MAX_VALUE
+                    ? maxWidth : Math.min(maxWidth, maxHeight);
+            int minWidth = Math.min(dp(INFO_MIN_WIDTH_DP), heightCap);
+
+            // Content height is non-increasing in width, so shrinking from the widest candidate
+            // only moves one way and settles in a couple of passes.
+            //noinspection SuspiciousNameCombination
+            int columnWidth = heightCap;
+            int contentHeight = measureContent(columnWidth);
+            for (int i = 0; i < INFO_FIT_PASSES; i++) {
+                int fit = maxHeight == Integer.MAX_VALUE
+                        ? maxWidth : maxHeight - dp(INFO_COVER_GAP_DP) - contentHeight;
+                int next = Math.clamp(fit, minWidth, heightCap);
+                if (next == columnWidth) {
+                    break;
+                }
+                columnWidth = next;
+                contentHeight = measureContent(columnWidth);
+            }
+
+            cover.measure(MeasureSpec.makeMeasureSpec(columnWidth, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(columnWidth, MeasureSpec.EXACTLY));
+            int totalHeight = columnWidth + dp(INFO_COVER_GAP_DP) + contentHeight;
+            setMeasuredDimension(columnWidth, Math.min(totalHeight, maxHeight));
+        }
+
+        private int measureContent(int width) {
+            content.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.EXACTLY),
+                    MeasureSpec.makeMeasureSpec(0, MeasureSpec.UNSPECIFIED));
+            return content.getMeasuredHeight();
+        }
+
+        @Override
+        protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+            int width = right - left;
+            cover.layout(0, 0, width, width);
+            int contentTop = width + dp(INFO_COVER_GAP_DP);
+            content.layout(0, contentTop, width, contentTop + content.getMeasuredHeight());
+        }
     }
 }

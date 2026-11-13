@@ -17,11 +17,13 @@ import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.RouterContainer;
-import indi.etern.musichud.client.ui.components.cards.ArtistCard;
-import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
-import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.UrlImageView;
+import indi.etern.musichud.client.ui.components.cards.ArtistCard;
+import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
+import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.interfaces.IClientLoginService;
@@ -63,7 +65,7 @@ public class AccountView extends LinearLayout {
             }
             long id = playlist.getId();
             elementMap.computeIfAbsent(new ElementKey(Playlist.class, id), (key) -> {
-                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY);
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY, dp(160));
                 card.setTag(id);
                 mySubscribedPlaylistCards.addView(card);
                 return card;
@@ -77,7 +79,7 @@ public class AccountView extends LinearLayout {
             }
             long id = album.getId();
             elementMap.computeIfAbsent(new ElementKey(Album.class, id), (key) -> {
-                MusicCollectionCard card = new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY);
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY, dp(160));
                 card.setTag(id);
                 albumCards.addView(card);
                 return card;
@@ -263,14 +265,14 @@ public class AccountView extends LinearLayout {
                 .build();
         buildCard(context, backgroundFactory1, buttons, I18n.get(MusicHud.MOD_ID + ".button.history"), "/assets/music_hud/textures/gui/icons/rotate_ccw_clock.png",
                 v -> {
-                    RouterContainer routerContainer = RouterContainer.getInstance();
+                    RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                     if (routerContainer != null) {
                         routerContainer.pushNavigate(new PlayHistoryView(context));
                     }
                 });
         buildCard(context, backgroundFactory1, buttons, I18n.get(MusicHud.MOD_ID + ".button.cloud"), "/assets/music_hud/textures/gui/icons/cloud.png",
                 v -> {
-                    RouterContainer routerContainer = RouterContainer.getInstance();
+                    RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
                     if (routerContainer != null) {
                         routerContainer.pushNavigate(new CloudDriveView(context));
                     }
@@ -285,7 +287,7 @@ public class AccountView extends LinearLayout {
         {
             ImageButton refreshButton = new ImageButton(context);
             backgroundFactory2.applyBackgroundTo(refreshButton);
-            refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+            Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
             refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
             Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
@@ -298,7 +300,7 @@ public class AccountView extends LinearLayout {
         {
             ImageButton logoutButton = new ImageButton(context);
             backgroundFactory2.applyBackgroundTo(logoutButton);
-            logoutButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
+            Tooltip.attach(logoutButton, I18n.get(MusicHud.MOD_ID + ".button.logout"));
             logoutButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
             var resources = getContext().getResources();
             Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/log_out.png");
@@ -414,7 +416,7 @@ public class AccountView extends LinearLayout {
                 Playlist likeList = categoryPlaylists.getLikeList();
                 if (likeList != null && likeList.getId() != -1) {
                     elementMap.computeIfAbsent(new ElementKey(Playlist.class, likeList.getId()), key -> {
-                        MusicCollectionCard card = new MusicCollectionCard(context, likeList, PusherInfo.EMPTY);
+                        MusicCollectionCard card = new MusicCollectionCard(context, likeList, PusherInfo.EMPTY, dp(160));
                         card.setTag(likeList.getId());
                         myPlaylistCards.addView(card);
                         return card;
@@ -422,7 +424,7 @@ public class AccountView extends LinearLayout {
                 }
                 ObservableSequencedSet<Playlist> createdPlaylist = categoryPlaylists.getCreatedPlaylist();
                 createdPlaylist.forEach(playlist -> elementMap.computeIfAbsent(new ElementKey(Playlist.class, playlist.getId()), key -> {
-                    MusicCollectionCard card = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY);
+                    MusicCollectionCard card = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY, dp(160));
                     card.setTag(playlist.getId());
                     myPlaylistCards.addView(card);
                     return card;

@@ -30,22 +30,11 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * Utility for fetching api-enhanced binary releases from GitHub.
+ * Fetches api-enhanced binary releases from GitHub.
  * <p>
- * Rate-limit strategy:
- * <ul>
- *   <li>{@link #listReleaseSummaries()} — parses the Atom feed ({@code releases.atom}),
- *       which is <b>not</b> subject to REST API rate limits. Zero API quota consumed.</li>
- *   <li>{@link #downloadLatestForCurrentPlatform(Path, Consumer)} — uses GitHub's
- *       direct-download URL ({@code releases/latest/download/&lt;asset&gt;}), which
- *       issues a 302 redirect to the CDN. Zero API quota consumed.</li>
- *   <li>{@link #downloadAssetByTag(String, Path, Consumer)} — uses the direct-download
- *       URL ({@code releases/download/&lt;tag&gt;/&lt;asset&gt;}). Zero API quota consumed.</li>
- *   <li>{@link #listReleases()} — the <b>only</b> method that hits the REST API
- *       ({@code api.github.com/repos/.../releases}). Use sparingly or set
- *       {@code GITHUB_TOKEN} with {@link #setGitHubToken(String)} to raise the limit.</li>
- * </ul>
- * Not yet wired into the main flow — call methods directly as needed.
+ * Only {@link #listReleases()} hits the REST API (limited, raise it with
+ * {@link #setGitHubToken(String)}); the other calls use the Atom feed or the
+ * {@code releases/latest/download/...} redirect and consume no API quota.
  */
 public class ApiServerFetcher {
     private static final Logger LOGGER = MusicHud.getLogger(ApiServerFetcher.class);
@@ -59,7 +48,7 @@ public class ApiServerFetcher {
     private static final String LATEST_DOWNLOAD_URL = LATEST_RELEASE_URL + "/download/";
     private static final String TAG_DOWNLOAD_URL = BASE + "/releases/download/";
 
-    // ---- Atom feed regex patterns ----
+    // Atom feed regex patterns
     private static final Pattern ENTRY_PATTERN = Pattern.compile("<entry>\\s*(.*?)\\s*</entry>", Pattern.DOTALL);
     private static final Pattern TITLE_PATTERN = Pattern.compile("<title[^>]*>\\s*(.*?)\\s*</title>", Pattern.DOTALL);
     private static final Pattern LINK_HREF_PATTERN = Pattern.compile("<link[^>]+href=\"([^\"]+)\"");
@@ -75,8 +64,6 @@ public class ApiServerFetcher {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .executor(MusicHud.EXECUTOR)
             .build();
-
-    // ---- data models ----
 
     /** Lightweight release summary from Atom feed — zero API quota consumed. */
     public record ReleaseSummary(String tag, String title, String htmlUrl, String publishedAt) {}
@@ -148,8 +135,6 @@ public class ApiServerFetcher {
             return proxyBase + originalUrl;
         }
     }
-
-    // ---- public API ----
 
     /**
      * (Optional) Set a GitHub personal access token to raise the REST API
@@ -240,13 +225,10 @@ public class ApiServerFetcher {
     }
 
     /**
-     * Download the latest binary for the current platform to a custom filename via a proxy.
-     * <b>Zero REST API quota consumed.</b>
+     * Downloads the latest binary for this platform to a custom filename through a proxy. Consumes no
+     * REST API quota.
      *
-     * @param targetDir directory to save into
-     * @param targetName custom filename to use
-     * @param proxy download proxy to route through
-     * @param progress optional detailed progress callback (downloaded bytes, total bytes), may be null
+     * @param progress optional (downloaded bytes, total bytes) callback, may be null
      */
     public static CompletableFuture<Void> downloadLatestForCurrentPlatform(Path targetDir, String targetName, DownloadProxy proxy, BiConsumer<Long, Long> progress) {
         Platform platform = Platform.detect();
@@ -334,8 +316,6 @@ public class ApiServerFetcher {
     public static CompletableFuture<Void> downloadAsset(Asset asset, Path target, Consumer<Double> progress) {
         return downloadFromUrl(asset.getBrowserDownloadUrl(), target, progress);
     }
-
-    // ---- internal ----
 
     private static CompletableFuture<Void> downloadFromUrl(String url, Path target, Consumer<Double> progress) {
         return downloadFromUrl(url, target, progress != null ? (downloaded, total) -> {

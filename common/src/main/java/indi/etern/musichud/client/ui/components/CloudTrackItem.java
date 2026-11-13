@@ -39,7 +39,6 @@ public class CloudTrackItem extends LinearLayout {
     private final TextView statusText;
     private final ImageButton actionButton;
     private final ImageButton removeButton;
-    private final ImageButton deleteButton;
     private final TextView sizeTextView;
 
     private CloudTrackEntry entry;
@@ -76,15 +75,12 @@ public class CloudTrackItem extends LinearLayout {
                 .cornerRadius(dp(4))
                 .build();
 
-        deleteButton = new ImageButton(context);
-        applyIcon(deleteButton, ICON_DELETE, I18n.get(MusicHud.MOD_ID + ".button.delete"));
-        iconBackground.applyBackgroundTo(deleteButton);
-        deleteButton.setOnClickListener(v -> {
-            if (entry != null && onDelete != null) {
-                onDelete.accept(entry);
-            }
-        });
-        musicItem.getButtonsLayout().addView(deleteButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
+        musicItem.addActionButton(ICON_DELETE,
+                I18n.get(MusicHud.MOD_ID + ".button.delete"), v -> {
+                    if (entry != null && onDelete != null) {
+                        onDelete.accept(entry);
+                    }
+                });
 
         statusStrip = new LinearLayout(context);
         statusStrip.setOrientation(HORIZONTAL);
@@ -158,23 +154,23 @@ public class CloudTrackItem extends LinearLayout {
 
         switch (state) {
             case UPLOADED, COMPLETED_PRESENTED -> {
-                musicItem.getButtonsLayout().setVisibility(VISIBLE);
+                musicItem.setActionButtonsVisible(true);
                 statusStrip.setVisibility(GONE);
             }
             case COMPLETED -> {
-                musicItem.getButtonsLayout().setVisibility(GONE);
+                musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
                 long total = task == null ? 0 : Math.max(task.getFileSize(), 1);
                 progressBar.setMax((int) Math.min(Integer.MAX_VALUE, total));
                 progressBar.setProgress((int) Math.min(Integer.MAX_VALUE, total), false);
                 progressBar.setIndeterminate(false);
                 statusText.setText(I18n.get(MusicHud.MOD_ID + ".text.cloudUploadDone"));
-                statusText.setTooltipText(null);
+                Tooltip.attach(statusText, null);
                 actionButton.setVisibility(GONE);
                 removeButton.setVisibility(GONE);
             }
             case UPLOADING -> {
-                musicItem.getButtonsLayout().setVisibility(GONE);
+                musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
                 long total = task == null ? 0 : task.getFileSize();
                 long done = task == null ? 0 : task.getBytesUploaded();
@@ -183,13 +179,13 @@ public class CloudTrackItem extends LinearLayout {
                 progressBar.setProgress((int) Math.min(max, done), true);
                 progressBar.setIndeterminate(false);
                 statusText.setText(total > 0 ? (done * 100 / total) + "%" : "");
-                statusText.setTooltipText(null);
+                Tooltip.attach(statusText, null);
                 applyIcon(actionButton, ICON_CANCEL, I18n.get(MusicHud.MOD_ID + ".button.cancel"));
                 actionButton.setVisibility(VISIBLE);
                 removeButton.setVisibility(GONE);
             }
             case MATCHING -> {
-                musicItem.getButtonsLayout().setVisibility(GONE);
+                musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
                 long total = task == null ? 0 : Math.max(task.getFileSize(), 1);
                 progressBar.setMax((int) Math.min(Integer.MAX_VALUE, total));
@@ -198,23 +194,23 @@ public class CloudTrackItem extends LinearLayout {
                 String hint = task == null ? "" : task.getErrorMessage();
                 boolean uncertain = hint != null && !hint.isBlank();
                 statusText.setText(uncertain ? hint : I18n.get(MusicHud.MOD_ID + ".text.cloudUploadMatching"));
-                statusText.setTooltipText(uncertain ? hint : null);
+                Tooltip.attach(statusText, uncertain ? hint : null);
                 actionButton.setVisibility(GONE);
                 removeButton.setVisibility(VISIBLE);
             }
             case QUEUED -> {
-                musicItem.getButtonsLayout().setVisibility(GONE);
+                musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
                 progressBar.setMax(1);
                 progressBar.setProgress(0, false);
                 progressBar.setIndeterminate(false);
                 statusText.setText(I18n.get(MusicHud.MOD_ID + ".text.cloudUploadQueued"));
-                statusText.setTooltipText(null);
+                Tooltip.attach(statusText, null);
                 actionButton.setVisibility(GONE);
                 removeButton.setVisibility(VISIBLE);
             }
             case FAILED, CANCELLED -> {
-                musicItem.getButtonsLayout().setVisibility(GONE);
+                musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
                 progressBar.setMax(1);
                 progressBar.setProgress(0, false);
@@ -234,7 +230,7 @@ public class CloudTrackItem extends LinearLayout {
                         int length = spannableString.length();
                         spannableString.setSpan(ImageUtils.getIconSpan(icon), length - 1, length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                     }
-                    statusText.setTooltipText(message);
+                    Tooltip.attach(statusText, message);
                 }
                 applyIcon(actionButton, ICON_RETRY, I18n.get(MusicHud.MOD_ID + ".button.retry"));
                 actionButton.setVisibility(VISIBLE);
@@ -248,7 +244,7 @@ public class CloudTrackItem extends LinearLayout {
     }
 
     private void applyIcon(ImageButton button, String iconPath, String tooltip) {
-        button.setTooltipText(tooltip);
+        Tooltip.attach(button, tooltip);
         button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         Image icon = ImageUtils.getImageFromResource(iconPath);
         if (icon != null) {

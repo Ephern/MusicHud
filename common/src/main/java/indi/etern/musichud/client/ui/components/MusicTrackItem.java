@@ -2,13 +2,22 @@ package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.SpannableStringBuilder;
 import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.TextPaint;
+import icyllis.modernui.text.method.LinkMovementMethod;
+import icyllis.modernui.text.style.ClickableSpan;
+import icyllis.modernui.text.style.ForegroundColorSpan;
 import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
+import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
-import icyllis.modernui.widget.Button;
+import icyllis.modernui.view.ViewGroup;
+import icyllis.modernui.widget.ImageButton;
+import icyllis.modernui.widget.ImageView;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
@@ -17,15 +26,17 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.buttons.ModifyPlaylistTrackModalButton;
 import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButton;
-import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
+import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.server.api.playmode.PlayMode;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.client.resources.language.I18n;
+import org.jetbrains.annotations.NotNull;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -41,6 +52,17 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicTrackItem extends LinearLayout {
     public static final int imageSize = 56;
+    private static final int COMPACT_MAX_WIDTH_DP = 400;
+    /** Wide enough to keep the arrangement stable when the width sits on the threshold. */
+    private static final int COMPACT_EXIT_WIDTH_DP = 416;
+    private static final int ACTION_BUTTON_NORMAL_DP = 40;
+    private static final int ACTION_BUTTON_COMPACT_DP = 22;
+    private static final int ACTION_NORMAL_INSET_DP = 1;
+    private static final int ACTION_NORMAL_CORNER_DP = 4;
+    private static final int ACTION_COMPACT_INSET_DP = 0;
+    private static final int ACTION_COMPACT_CORNER_DP = 4;
+    private static final int ACTION_ICON_DP = 14;
+    private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
     private static final MusicService musicService = MusicService.getInstance();
     private static final DateTimeFormatter PLAY_RECORD_FORMATTER =
             DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm").withZone(ZoneId.systemDefault());
@@ -48,9 +70,10 @@ public class MusicTrackItem extends LinearLayout {
     private final DateTimeFormatter timeFormatter = DateTimeFormatter.ofPattern("mm:ss");
     @Getter
     private UrlImageView albumImageView;
-    private TextView musicName;
+    private MarqueeTextView musicName;
     private TextView feeLabel;
-    private FlexWrapLayout row2;
+    private MarqueeTextView row2;
+    private LinearLayout row1;
     private TextView durationText;
     @Setter
     @Getter
@@ -61,13 +84,15 @@ public class MusicTrackItem extends LinearLayout {
     private Traceable<MusicDetail> musicTrace;
     private PusherWidget pusherWidget;
     private ToggleTrackLikeStateButton likeButton;
-    @Getter
     private LinearLayout buttonsLayout;
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
-    private Button sourceButton;
+    private ImageButton sourceButton;
     private TextView playRecordTimeText;
     @Getter
     private LinearLayout infoRow;
+    private boolean compact;
+    private InsetBackgroundFactory normalActionButtonBackground;
+    private InsetBackgroundFactory compactActionButtonBackground;
 
     public MusicTrackItem(Context context) {
         super(context);
@@ -89,22 +114,25 @@ public class MusicTrackItem extends LinearLayout {
         musicTexts.setOrientation(VERTICAL);
         musicTexts.setGravity(Gravity.CENTER_VERTICAL);
         LayoutParams textsParams = new LayoutParams(0, WRAP_CONTENT, 1);
-        textsParams.setMargins(dp(12), 0, 0, 0);
+        textsParams.setMargins(dp(8), 0, 0, 0);
         addView(musicTexts, textsParams);
 
-        LinearLayout row1 = new LinearLayout(context);
+        row1 = new LinearLayout(context);
         row1.setOrientation(HORIZONTAL);
         row1.setGravity(Gravity.CENTER_VERTICAL);
-        musicTexts.addView(row1);
+        musicTexts.addView(row1, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-        musicName = new TextView(context);
-        musicName.setSingleLine(true);
+        musicName = new MarqueeTextView(context);
         musicName.setTextSize(Theme.TEXT_SIZE_LARGE);
         musicName.setTextColor(Theme.NORMAL_TEXT_COLOR);
-        row1.addView(musicName, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        row1.addView(musicName, new LayoutParams(0, WRAP_CONTENT, 1));
 
-        row2 = new FlexWrapLayout(context);
-        row2.setAnimationsEnabled(false);
+        row2 = new MarqueeTextView(context);
+        row2.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        row2.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        row2.setGravity(Gravity.CENTER_VERTICAL);
+        row2.setMinimumHeight(dp(16));
+        row2.setMovementMethod(LinkMovementMethod.getInstance());
         musicTexts.addView(row2, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         infoRow = new LinearLayout(context);
@@ -126,22 +154,21 @@ public class MusicTrackItem extends LinearLayout {
         feeLabel.setTextSize(Theme.TEXT_SIZE_NORMAL);
         feeLabel.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         feeLabel.setVisibility(GONE);
-        LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        LayoutParams params1 = new LayoutParams(WRAP_CONTENT, dp(16));
         params1.setMargins(0, 0, dp(12), 0);
         infoRow.addView(feeLabel, params1);
 
-        pusherWidget = new PusherWidget(context);
-        pusherWidget.setVisibility(View.GONE);
-        LayoutParams params2 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params2.setMargins(0, 0, dp(12), 0);
-        infoRow.addView(pusherWidget, params2);
-
-        sourceButton = new Button(context);
+        float infoAlpha = 0.44f;
+        sourceButton = new ImageButton(context);
         sourceButton.setVisibility(View.GONE);
-        sourceButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        sourceButton.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        sourceButton.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-        sourceButton.setSingleLine();
+        sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
+        if (sourceIcon != null) {
+            ScaledImageDrawable drawable = new ScaledImageDrawable(context.getResources(), sourceIcon, dp(16), dp(16));
+            drawable.setAlpha(infoAlpha);
+            sourceButton.setImageDrawable(new InsetDrawable(
+                    drawable, dp(1)));
+        }
         sourceButton.setOnClickListener(view -> {
             Object tag = sourceButton.getTag();
             if (tag instanceof SourceMeta sourceMeta) {
@@ -150,17 +177,29 @@ public class MusicTrackItem extends LinearLayout {
                     //noinspection unchecked
                     MusicService.getInstance().loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
                             .thenAccept((musicCollection) ->
-                                    MuiModApi.postToUiThread(() -> RouterContainer.getInstance().pushNavigate(
+                                    MuiModApi.postToUiThread(() -> MainFragment.getInstance().getRouterContainer().pushNavigate(
                                             new MusicCollectionDetailView(getContext(), musicCollection)))
                             );
                 }
             }
         });
+
+        int dp2 = dp(2);
         InsetBackgroundFactory.builder()
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .padding(new InsetBackgroundFactory.Padding(0, sourceButton.dp(1), 0, sourceButton.dp(1)))
+                .padding(new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2))
                 .cornerRadius(sourceButton.dp(4)).build().applyBackgroundTo(sourceButton);
-        infoRow.addView(sourceButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        params3.setMargins(0, 0, dp(2), 0);
+        infoRow.addView(sourceButton, params3);
+
+        pusherWidget = new PusherWidget(context);
+        pusherWidget.setVisibility(GONE);
+        pusherWidget.setFallbackIconSize(dp(ACTION_ICON_DP));
+        pusherWidget.setFallbackIconAlpha(infoAlpha);
+        LayoutParams params2 = new LayoutParams(dp(16), dp(16));
+        params2.setMargins(0, 0, dp(12), 0);
+        infoRow.addView(pusherWidget, params2);
 
         playRecordTimeText = new TextView(context);
         playRecordTimeText.setSingleLine(true);
@@ -177,21 +216,147 @@ public class MusicTrackItem extends LinearLayout {
         buttonsLayoutParams.setMargins(0, 0, dp(10), 0);
         addView(buttonsLayout, buttonsLayoutParams);
 
-        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
-                .inset(dp(2))
+        normalActionButtonBackground = InsetBackgroundFactory.builder()
+                .inset(dp(ACTION_NORMAL_INSET_DP))
                 .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .cornerRadius(dp(4)).build();
+                .cornerRadius(dp(ACTION_NORMAL_CORNER_DP))
+                .build();
+        compactActionButtonBackground = InsetBackgroundFactory.builder()
+                .inset(dp(ACTION_COMPACT_INSET_DP))
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .cornerRadius(dp(ACTION_COMPACT_CORNER_DP))
+                .padding(new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2))
+                .build();
+
         addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
-        backgroundFactory.applyBackgroundTo(addToPlaylistButton);
-        buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
+        applyActionButtonStyle(addToPlaylistButton);
+        buttonsLayout.addView(addToPlaylistButton);
 
         likeButton = new ToggleTrackLikeStateButton(context);
-        backgroundFactory.applyBackgroundTo(likeButton);
-        buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(dp(40), dp(40), 0));
+        applyActionButtonStyle(likeButton);
+        buttonsLayout.addView(likeButton);
     }
 
-    public void setRowAnimationsEnabled(boolean enabled) {
-        row2.setAnimationsEnabled(enabled);
+    @Override
+    protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+        int width = MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED
+                ? getWidth()
+                : MeasureSpec.getSize(widthMeasureSpec);
+        updateCompact(width);
+        super.onMeasure(widthMeasureSpec, heightMeasureSpec);
+    }
+
+    /**
+     * Decided by the measure pass only: layout animations report interpolated sizes, and reacting to
+     * them rearranges the item, which changes its height and restarts the animation. The width keeps
+     * a dead zone so a width on the threshold cannot flip the arrangement back and forth.
+     * <p>
+     * Applying here, before {@code super.onMeasure}, means this very pass already measures the new
+     * arrangement, so it does not depend on a later layout pass (which transitions can suppress).
+     */
+    private void updateCompact(int width) {
+        if (width <= 0) {
+            return;
+        }
+        boolean next = compact
+                ? width < dp(COMPACT_EXIT_WIDTH_DP)
+                : width < dp(COMPACT_MAX_WIDTH_DP);
+        if (next == compact) {
+            return;
+        }
+        compact = next;
+        applyResponsiveLayout();
+    }
+
+    /**
+     * Wide items keep the action buttons on the right; narrow ones move the whole container after
+     * the name so the title row stays one line high.
+     */
+    private void applyResponsiveLayout() {
+        if (row1 == null || buttonsLayout == null) {
+            return;
+        }
+        ViewGroup target = compact ? row1 : this;
+        if (buttonsLayout.getParent() != target) {
+            detachActionButtons();
+            target.addView(buttonsLayout, actionButtonsContainerParams(compact));
+        }
+        applyActionButtonMetrics();
+    }
+
+    private void detachActionButtons() {
+        if (buttonsLayout.getParent() instanceof ViewGroup parent) {
+            parent.removeView(buttonsLayout);
+        }
+    }
+
+    private LinearLayout.LayoutParams actionButtonsContainerParams(boolean compactLayout) {
+        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(
+                WRAP_CONTENT, compactLayout ? WRAP_CONTENT : MATCH_PARENT, 0);
+        if (compactLayout) {
+            lp.setMargins(dp(8), 0, 0, 0);
+        } else {
+            lp.setMargins(0, 0, dp(10), 0);
+        }
+        return lp;
+    }
+
+    private InsetBackgroundFactory currentActionButtonBackground() {
+        return compact ? compactActionButtonBackground : normalActionButtonBackground;
+    }
+
+    private int currentActionButtonSize() {
+        return dp(compact ? ACTION_BUTTON_COMPACT_DP : ACTION_BUTTON_NORMAL_DP);
+    }
+
+    private void applyActionButtonMetrics() {
+        int size = currentActionButtonSize();
+        InsetBackgroundFactory background = currentActionButtonBackground();
+        for (int i = 0; i < buttonsLayout.getChildCount(); i++) {
+            View child = buttonsLayout.getChildAt(i);
+            background.applyBackgroundTo(child);
+            child.setLayoutParams(new LinearLayout.LayoutParams(size, size, 0));
+        }
+    }
+
+    private void applyActionButtonStyle(View button) {
+        currentActionButtonBackground().applyBackgroundTo(button);
+        int size = currentActionButtonSize();
+        button.setLayoutParams(new LinearLayout.LayoutParams(size, size, 0));
+    }
+
+    /** Consistently styled action button; callers only supply icon, tooltip and action. */
+    public ImageButton addActionButton(String iconPath, CharSequence tooltip, View.OnClickListener listener) {
+        ImageButton button = new ImageButton(getContext());
+        button.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        Image icon = ImageUtils.getImageFromResource(iconPath);
+        if (icon != null) {
+            button.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), icon,
+                    dp(ACTION_ICON_DP), dp(ACTION_ICON_DP)));
+        }
+        Tooltip.attach(button, tooltip);
+        button.setOnClickListener(listener);
+        applyActionButtonStyle(button);
+        buttonsLayout.addView(button);
+        return button;
+    }
+
+    public void setActionButtonsVisible(boolean visible) {
+        buttonsLayout.setVisibility(visible ? VISIBLE : GONE);
+    }
+
+    public void setNormalActionButtonBackground(InsetBackgroundFactory background) {
+        normalActionButtonBackground = Objects.requireNonNull(background, "background");
+        if (!compact) {
+            applyActionButtonMetrics();
+        }
+    }
+
+    public void setCompactActionButtonBackground(InsetBackgroundFactory background) {
+        compactActionButtonBackground = Objects.requireNonNull(background, "background");
+        if (compact) {
+            applyActionButtonMetrics();
+        }
     }
 
     public void clearData() {
@@ -200,9 +365,9 @@ public class MusicTrackItem extends LinearLayout {
         feeLabel.setText("");
         feeLabel.setVisibility(GONE);
         durationText.setText("");
-        row2.removeAllViews();
+        row2.setText("");
         pusherWidget.clear();
-        pusherWidget.setVisibility(View.GONE);
+        pusherWidget.setVisibility(GONE);
         playRecordTimeText.setText("");
         playRecordTimeText.setVisibility(GONE);
         addToPlaylistButton.bindMusicDetail(null);
@@ -253,74 +418,69 @@ public class MusicTrackItem extends LinearLayout {
             feeLabel.setVisibility(GONE);
         }
 
-        row2.removeAllViews();
-        int index = 0;
         Context context = getContext();
-        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
-                .inset(0)
-                .cornerRadius(dp(2))
-                .padding(new InsetBackgroundFactory.Padding(0, 0, 0, 0))
-                .build();
         List<Artist> artists = musicDetail.getArtists();
-        for (final Artist artist : artists) {
-            if (index != 0) {
-                TextView split = new TextView(context);
-                split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-                split.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                split.setText(" / ");
-                split.setSingleLine();
-                row2.addView(split);
+        SpannableStringBuilder metaBuilder = new SpannableStringBuilder();
+        for (int i = 0; i < artists.size(); i++) {
+            final Artist artist = artists.get(i);
+            if (i > 0) {
+                metaBuilder.append(" / ");
             }
-            index++;
-            Button artistButton = new Button(context);
-            backgroundFactory.applyBackgroundTo(artistButton);
-            boolean validArtist = artist.getId() > 0;
-            artistButton.setEnabled(validArtist);
-            artistButton.setTextColor(validArtist ? Theme.PRIMARY_COLOR : Theme.SECONDARY_TEXT_COLOR);
-            artistButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            artistButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-            artistButton.setText(artist.getName());
-            artistButton.setSingleLine();
-            artistButton.setOnClickListener(button -> {
-                RouterContainer routerContainer = RouterContainer.getInstance();
-                if (routerContainer != null) {
-                    routerContainer.pushNavigate(
-                            new ArtistDetailView(context, artist)
-                    );
-                }
-            });
-            row2.addView(artistButton);
+            int start = metaBuilder.length();
+            metaBuilder.append(artist.getName());
+            int end = metaBuilder.length();
+            if (artist.getId() > 0) {
+                metaBuilder.setSpan(new ClickableSpan() {
+                    @Override
+                    public void onClick(@NotNull View widget) {
+                        RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
+                        if (routerContainer != null) {
+                            routerContainer.pushNavigate(new ArtistDetailView(context, artist));
+                        }
+                    }
+
+                    @Override
+                    public void updateDrawState(@NotNull TextPaint ds) {
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
+                        ds.setUnderline(false);
+                    }
+                }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else {
+                metaBuilder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                        start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
         }
         String albumName = album.getName();
         albumName = albumName == null ? "" : albumName;
-        if (!artists.isEmpty() && !artists.getFirst().getName().isBlank() && !albumName.isBlank()) {
-            TextView split = new TextView(context);
-            split.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            split.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            split.setText(" - ");
-            split.setSingleLine();
-            row2.addView(split);
+        if (!Album.NONE.equals(album) && !albumName.isBlank()) {
+            if (!metaBuilder.isEmpty()) {
+                metaBuilder.append(" - ");
+            }
+            int start = metaBuilder.length();
+            metaBuilder.append(albumName);
+            int end = metaBuilder.length();
+            if (album.getId() > 0) {
+                metaBuilder.setSpan(new ClickableSpan() {
+                    @Override
+                    public void onClick(@NotNull View widget) {
+                        RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
+                        if (routerContainer != null) {
+                            routerContainer.pushNavigate(new MusicCollectionDetailView(context, album));
+                        }
+                    }
+
+                    @Override
+                    public void updateDrawState(@NotNull TextPaint ds) {
+                        ds.setColor(Theme.SECONDARY_TEXT_COLOR);
+                        ds.setUnderline(false);
+                    }
+                }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            } else {
+                metaBuilder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                        start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            }
         }
-        if (!Album.NONE.equals(album)) {
-            Button albumButton = new Button(context);
-            backgroundFactory.applyBackgroundTo(albumButton);
-            boolean validAlbum = album.getId() > 0;
-            albumButton.setEnabled(validAlbum);
-            albumButton.setTextColor(validAlbum ? Theme.PRIMARY_COLOR : Theme.SECONDARY_TEXT_COLOR);
-            albumButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            albumButton.setText(albumName);
-            albumButton.setSingleLine();
-            albumButton.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-            albumButton.setOnClickListener(button -> {
-                RouterContainer routerContainer = RouterContainer.getInstance();
-                if (routerContainer != null) {
-                    routerContainer.pushNavigate(
-                            new MusicCollectionDetailView(context, album)
-                    );
-                }
-            });
-            row2.addView(albumButton);
-        }
+        row2.setText(metaBuilder);
 
         Duration duration = Duration.of(musicDetail.getDurationMillis(), ChronoUnit.MILLIS);
         DateTimeFormatter formatter = duration.toHoursPart() >= 1 ?
@@ -372,8 +532,7 @@ public class MusicTrackItem extends LinearLayout {
                     }
                 }
 
-
-                sourceButton.setText(text);
+                Tooltip.attach(sourceButton, text);
                 sourceButton.setVisibility(VISIBLE);
             } else {
                 sourceButton.setVisibility(GONE);

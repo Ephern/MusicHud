@@ -1,14 +1,18 @@
 package indi.etern.musichud.client.ui.pages.search;
 
 import icyllis.modernui.R;
+import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.SpannableString;
+import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.style.ImageSpan;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.KeyEvent;
-import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.EditText;
+import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
 import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
@@ -18,7 +22,11 @@ import indi.etern.musichud.beans.music.Artist;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Playlist;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.components.SegmentedBar;
+import indi.etern.musichud.client.ui.components.Tooltip;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.RequestResponseManager;
@@ -41,7 +49,8 @@ import java.util.function.Consumer;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class SearchView extends LinearLayout {
+public class SearchView extends FrameLayout {
+    private static final int BAR_TOP_MARGIN = 12;
     @Getter
     private static SearchView instance = null;
     @Getter
@@ -49,9 +58,7 @@ public class SearchView extends LinearLayout {
     @Getter
     private final HashSet<Consumer<SearchMeta>> searchRefreshListeners = new HashSet<>();
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
-    private final InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
-            .inset(0).padding(new InsetBackgroundFactory.Padding(dp(8), 0, dp(8), 0))
-            .cornerRadius(dp(4)).build();
+    private LinearLayout topBar;
     private EditText searchTextInput;
     private SearchResultTabPage searchResultTabPage;
     @Getter
@@ -66,64 +73,95 @@ public class SearchView extends LinearLayout {
     public void refresh() {
         Context context = getContext();
         removeAllViews();
-        setOrientation(VERTICAL);
+        topBar = null;
+        searchResultTabPage = null;
 
         boolean enabled = clientConfig.getEnable();
         if (ConnectionStateMachine.getConnectStatus() != ConnectionStateMachine.ConnectStatus.CONNECTED && !ClientConfig.getInstance().getEnableIsolatedMode() || !enabled) {
-            setGravity(Gravity.CENTER);
             TextView textView = Theme.getNotificationTextView(context, enabled);
-            addView(textView);
+            addView(textView, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, Gravity.CENTER));
             return;
         }
 
-        LinearLayout top = new LinearLayout(context);
-        top.setGravity(Gravity.CENTER);
-        top.setOrientation(HORIZONTAL);
-        LayoutParams topParams = new LayoutParams(MATCH_PARENT, dp(38));
-        topParams.setMargins(0, dp(32), 0, 0);
-        addView(top, topParams);
-
-        LinearLayout searchWidget = new LinearLayout(context) {
-            @Override
-            protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-                int maxWidth = dp(480);
-                int specWidth = MeasureSpec.getSize(widthMeasureSpec);
-                int targetWidth = Math.min(specWidth, maxWidth);
-
-                super.onMeasure(
-                        MeasureSpec.makeMeasureSpec(targetWidth, MeasureSpec.EXACTLY),
-                        heightMeasureSpec
-                );
-                setMeasuredDimension(targetWidth, getMeasuredHeight());
-            }
-        };
-        searchWidget.setOrientation(HORIZONTAL);
-
-        searchTextInput = new EditText(context, null, R.attr.editTextOutlinedStyle);
-        searchTextInput.setTextAlignment(SearchView.TEXT_ALIGNMENT_CENTER);
-        searchTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".field.hint.searchMusic"));
-        searchTextInput.setSingleLine();
-        LayoutParams params = new LayoutParams(0, WRAP_CONTENT, 1);
-        params.setMargins(dp(52), 0, 0, 0);
-        searchWidget.addView(searchTextInput, params);
-
-        Button searchButton = new Button(context);
-        searchButton.setText(I18n.get(MusicHud.MOD_ID + ".button.searchMusic"));
-        LayoutParams buttonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
-        backgroundFactory.applyBackgroundTo(searchButton);
-        buttonParams.setMargins(dp(8), 0, 0, 0);
-        searchWidget.addView(searchButton, buttonParams);
-
-        LayoutParams params1 = new LayoutParams(0, WRAP_CONTENT, 1);
-        top.addView(searchWidget, params1);
-
-//        top.addView(new View(context), new LayoutParams(0, WRAP_CONTENT, 2));
-
         searchResultTabPage = new SearchResultTabPage(context);
+        addView(searchResultTabPage, new LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-        LayoutParams resultAreaParams = new LayoutParams(MATCH_PARENT, 0, 1);
-//        resultAreaParams.setMargins(dp(32), 0, dp(32), 0);
-        addView(searchResultTabPage, resultAreaParams);
+        topBar = new LinearLayout(context);
+        topBar.setGravity(Gravity.CENTER);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+
+        LinearLayout searchWidget = new LinearLayout(context);
+        searchWidget.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.addView(searchWidget, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+        SegmentedBar tabBar = new SegmentedBar(context);
+        tabBar.setClickable(true);
+        int dp2 = dp(2);
+        {
+            tabBar.addItem(new SegmentedBar.Item("music", null,
+                    "/assets/music_hud/textures/gui/icons/eighth_note.png",
+                    I18n.get(MusicHud.MOD_ID + ".text.page.search.music")));
+            tabBar.addItem(new SegmentedBar.Item("playlist", null,
+                    "/assets/music_hud/textures/gui/icons/list_music.png",
+                    I18n.get(MusicHud.MOD_ID + ".text.page.search.playlist")));
+            tabBar.addItem(new SegmentedBar.Item("album", null,
+                    "/assets/music_hud/textures/gui/icons/disc_album.png",
+                    I18n.get(MusicHud.MOD_ID + ".text.page.search.album")));
+            tabBar.addItem(new SegmentedBar.Item("artist", null,
+                    "/assets/music_hud/textures/gui/icons/user.png",
+                    I18n.get(MusicHud.MOD_ID + ".text.page.search.artist")));
+            PanelStyle.applyDynamically(tabBar, dp(16),
+                    new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2),
+                    InsetBackgroundFactory.BackdropBlur.UI_LAYER);
+            LinearLayout.LayoutParams params2 = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            params2.setMargins(0, 0, dp(8), 0);
+            searchWidget.addView(tabBar, params2);
+        }
+        {
+            LinearLayout searchBar = new LinearLayout(context);
+            searchBar.setClickable(true);
+            PanelStyle.applyDynamically(searchBar, dp(16),
+                    new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2),
+                    InsetBackgroundFactory.BackdropBlur.UI_LAYER);
+            searchWidget.addView(searchBar, new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT));
+            LayoutTransition transition = new LayoutTransition();
+            transition.enableTransitionType(LayoutTransition.CHANGING);
+            searchWidget.setLayoutTransition(transition);
+            {
+                searchTextInput = new EditText(context, null, R.attr.editTextStyle);
+                searchTextInput.setTextAlignment(SearchView.TEXT_ALIGNMENT_TEXT_START);
+                searchTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".field.hint.searchMusic"));
+                searchTextInput.setSingleLine();
+                searchTextInput.setTextSize(Theme.TEXT_SIZE_LARGE);
+                searchTextInput.setMinWidth(dp(240));
+                LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT);
+                searchBar.addView(searchTextInput, params);
+
+                Button searchButton = new Button(context);
+                searchButton.setTextSize(Theme.TEXT_SIZE_LARGE);
+                ImageSpan iconSpan = ImageUtils.getIconSpan(ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/search.png"));
+                SpannableString text = new SpannableString(" ");
+                text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                searchButton.setText(text);
+
+                Tooltip.attach(searchButton, I18n.get(MusicHud.MOD_ID + ".button.searchMusic"));
+                InsetBackgroundFactory.builder()
+                        .inset(dp(1))
+                        .cornerRadius(dp(14))
+                        .build()
+                        .applyBackgroundTo(searchButton);
+                searchBar.addView(searchButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+                searchButton.setOnClickListener((v) -> refreshSearch(true));
+            }
+        }
+
+        searchResultTabPage.bindBar(tabBar);
+
+        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        topBarParams.gravity = Gravity.TOP;
+        topBarParams.setMargins(0, dp(BAR_TOP_MARGIN), 0, 0);
+        // Added last: its backdrop blur samples the content recorded underneath.
+        addView(topBar, topBarParams);
 
         searchTextInput.setOnKeyListener((v, keyCode, event) -> {
             if (keyCode == KeyEvent.KEY_ENTER && event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -132,7 +170,6 @@ public class SearchView extends LinearLayout {
             }
             return false;
         });
-        searchButton.setOnClickListener((v) -> refreshSearch(true));
 
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
@@ -145,6 +182,18 @@ public class SearchView extends LinearLayout {
                 searchMetas.clear();
             }
         });
+    }
+
+    /**
+     * The results start below the floating bar, whose height is only known after measure.
+     */
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        if (topBar != null && searchResultTabPage != null) {
+            FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
+            searchResultTabPage.setContentTopInset(lp.topMargin + topBar.getMeasuredHeight());
+        }
+        super.onLayout(changed, left, top, right, bottom);
     }
 
     public void refreshSearch(boolean force) {

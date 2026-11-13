@@ -5,6 +5,7 @@ import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
+import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
@@ -25,13 +26,17 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.CloudTrackItem;
 import indi.etern.musichud.client.ui.components.RouterContainer;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.modals.Modal;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.layouts.CloudTrackItemAdapter;
 import indi.etern.musichud.client.ui.layouts.VirtualizedListLayout;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.ByteUnitFormatter;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.interfaces.Unregister;
 import indi.etern.musichud.utils.collections.ObservableSequencedSet;
 import net.minecraft.client.resources.language.I18n;
@@ -45,9 +50,10 @@ import java.util.*;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class CloudDriveView extends LinearLayout {
+public class CloudDriveView extends FrameLayout {
     private static final int PAGE_SIZE = 100;
 
+    private final LinearLayout topBar;
     private final ProgressBar loadingRing;
     private final VirtualizedListLayout<CloudTrackEntry, CloudTrackItem> virtualList;
     private final TextView emptyText;
@@ -70,107 +76,14 @@ public class CloudDriveView extends LinearLayout {
 
     public CloudDriveView(Context context) {
         super(context);
-        setOrientation(VERTICAL);
-        setLayoutParams(new LayoutParams(MATCH_PARENT, MATCH_PARENT));
-
-        LinearLayout topBar = new LinearLayout(context);
-        topBar.setOrientation(HORIZONTAL);
-        topBar.setGravity(Gravity.CENTER_VERTICAL);
-        topBar.setMinimumHeight(dp(48));
-        topBar.setLayoutTransition(new LayoutTransition());
-        LayoutParams topBarParams = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        topBarParams.setMargins(0, dp(24), 0, dp(16));
-        addView(topBar, topBarParams);
-
-        ImageButton backButton = new ImageButton(context);
-        backButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.back"));
-        Image backIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
-        if (backIcon != null) {
-            backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), backIcon, dp(16), dp(16)));
-        }
-        backButton.setOnClickListener(view -> {
-            RouterContainer routerContainer = RouterContainer.getInstance();
-            if (routerContainer != null) {
-                routerContainer.popNavigate();
-            }
-        });
-        InsetBackgroundFactory.builder()
-                .inset(0)
-                .cornerRadius(dp(4))
-                .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
-                .build()
-                .applyBackgroundTo(backButton);
-        LayoutParams backButtonParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT);
-        backButtonParams.setMargins(0, 0, dp(4), 0);
-        topBar.addView(backButton, backButtonParams);
-
-        TextView title = new TextView(context);
-        title.setTextSize(Theme.TEXT_SIZE_LARGER);
-        title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-        title.setText(I18n.get(MusicHud.MOD_ID + ".button.cloud"));
-        LayoutParams titleParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        titleParams.setMargins(dp(12), 0, dp(12), 0);
-        topBar.addView(title, titleParams);
-
-        InsetBackgroundFactory iconBackgroundFactory = InsetBackgroundFactory.builder()
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .inset(dp(1))
-                .cornerRadius(dp(4))
-                .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4)))
-                .build();
-
-        ImageButton refreshButton = new ImageButton(context);
-        iconBackgroundFactory.applyBackgroundTo(refreshButton);
-        refreshButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.refresh"));
-        refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        Image refreshIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
-        if (refreshIcon != null) {
-            refreshButton.setImageDrawable(new InsetDrawable(
-                    new ScaledImageDrawable(getContext().getResources(), refreshIcon, dp(12), dp(16)), dp(3)));
-        }
-        refreshButton.setOnClickListener(view -> refresh());
-        topBar.addView(refreshButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-
-        ImageButton uploadButton = new ImageButton(context);
-        iconBackgroundFactory.applyBackgroundTo(uploadButton);
-        uploadButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.upload"));
-        uploadButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-        Image uploadIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/upload.png");
-        if (uploadIcon != null) {
-            uploadButton.setImageDrawable(new InsetDrawable(
-                    new ScaledImageDrawable(getContext().getResources(), uploadIcon, dp(12), dp(16)), dp(3)));
-        }
-        uploadButton.setOnClickListener(view -> pickAndUpload());
-        topBar.addView(uploadButton, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-
-        usageInfo = new LinearLayout(context);
-        usageInfo.setVisibility(GONE);
-        usageInfo.setOrientation(HORIZONTAL);
-        usageInfo.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams params = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params.setMargins(dp(12), 0, 0, 0);
-        topBar.addView(usageInfo, params);
-        {
-            usageBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
-            usageBarWidth = dp(160);
-            usageBar.setMax(usageBarWidth);
-            LayoutParams params1 = new LayoutParams(usageBarWidth, WRAP_CONTENT);
-            params1.setMargins(0, 0, dp(8), 0);
-            usageInfo.addView(usageBar, params1);
-        }
-        {
-            usageText = new TextView(context, null);
-            usageText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            usageText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-            usageInfo.addView(usageText, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-        }
+        setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
         FrameLayout content = new FrameLayout(context);
-        addView(content, new LayoutParams(MATCH_PARENT, 0, 1));
+        addView(content, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
         scrollView = new ScrollView(context);
         scrollView.setScrollBarStyle(View.SCROLLBARS_INSIDE_INSET);
+        scrollView.setClipToPadding(false);
         content.addView(scrollView, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
         virtualList = new VirtualizedListLayout<>(context, new CloudTrackItemAdapter(
@@ -178,16 +91,12 @@ public class CloudDriveView extends LinearLayout {
         virtualList.setDefaultItemHeight(dp(72));
         scrollView.addView(virtualList, new ScrollView.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> {
-            virtualList.updateWindow(scrollY, v.getHeight());
+            updateVirtualWindow();
             maybeLoadMore(scrollY, v.getHeight());
         });
-        scrollView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) -> {
-            int height = bottom - top;
-            if (height > 0) {
-                virtualList.updateWindow(v.getScrollY(), height);
-            }
-        });
-        scrollView.post(() -> virtualList.updateWindow(0, scrollView.getHeight()));
+        scrollView.addOnLayoutChangeListener((v, left, top, right, bottom, oldLeft, oldTop, oldRight, oldBottom) ->
+                updateVirtualWindow());
+        scrollView.post(this::updateVirtualWindow);
 
         loadingRing = new ProgressBar(context);
         loadingRing.setIndeterminate(true);
@@ -215,6 +124,113 @@ public class CloudDriveView extends LinearLayout {
         errorParams.gravity = Gravity.CENTER;
         content.addView(errorText, errorParams);
 
+        topBar = new LinearLayout(context);
+        LayoutTransition layoutTransition = new LayoutTransition();
+        layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+        LayoutTransitionReflow.attach(layoutTransition);
+        topBar.setLayoutTransition(layoutTransition);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setClickable(true);
+
+        InsetBackgroundFactory buttonBackgroundFactory = InsetBackgroundFactory.builder()
+                .inset(dp(1))
+                .cornerRadius(dp(14))
+                .build();
+
+        ImageButton backButton = new ImageButton(context);
+        Tooltip.attach(backButton, I18n.get(MusicHud.MOD_ID + ".button.back"));
+        Image backIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
+        if (backIcon != null) {
+            backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), backIcon, dp(16), dp(16)));
+        }
+        backButton.setOnClickListener(view -> {
+            RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
+            if (routerContainer != null) {
+                routerContainer.popNavigate();
+            }
+        });
+        buttonBackgroundFactory.applyBackgroundTo(backButton);
+        topBar.addView(backButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        TextView title = new TextView(context);
+        title.setTextSize(Theme.TEXT_SIZE_LARGER);
+        title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+        title.setText(I18n.get(MusicHud.MOD_ID + ".button.cloud"));
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        titleParams.setMargins(dp(4), 0, dp(4), 0);
+        topBar.addView(title, titleParams);
+
+        ImageButton refreshButton = new ImageButton(context);
+        buttonBackgroundFactory.applyBackgroundTo(refreshButton);
+        Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+        refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        Image refreshIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
+        if (refreshIcon != null) {
+            refreshButton.setImageDrawable(new InsetDrawable(
+                    new ScaledImageDrawable(getContext().getResources(), refreshIcon, dp(12), dp(16)), dp(3)));
+        }
+        refreshButton.setOnClickListener(view -> refresh());
+        topBar.addView(refreshButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        ImageButton uploadButton = new ImageButton(context);
+        buttonBackgroundFactory.applyBackgroundTo(uploadButton);
+        Tooltip.attach(uploadButton, I18n.get(MusicHud.MOD_ID + ".button.upload"));
+        uploadButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        Image uploadIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/upload.png");
+        if (uploadIcon != null) {
+            uploadButton.setImageDrawable(new InsetDrawable(
+                    new ScaledImageDrawable(getContext().getResources(), uploadIcon, dp(12), dp(16)), dp(3)));
+        }
+        uploadButton.setOnClickListener(view -> pickAndUpload());
+        topBar.addView(uploadButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+
+        usageInfo = new LinearLayout(context);
+        usageInfo.setVisibility(GONE);
+        usageInfo.setOrientation(LinearLayout.HORIZONTAL);
+        usageInfo.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams usageParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        usageParams.setMargins(0, 0, dp(12), 0);
+        topBar.addView(usageInfo, usageParams);
+        {
+            View usageDivider = new View(context);
+            usageDivider.setVisibility(GONE);
+            ShapeDrawable dividerBg = new ShapeDrawable();
+            dividerBg.setShape(ShapeDrawable.VLINE);
+            dividerBg.setSize(usageDivider.dp(1), usageDivider.dp(1));
+            dividerBg.setColor(Theme.DIVIDER_COLOR);
+            usageDivider.setBackground(dividerBg);
+            LinearLayout.LayoutParams dividerParams =
+                    new LinearLayout.LayoutParams(usageDivider.dp(1), MATCH_PARENT);
+            dividerParams.setMargins(usageDivider.dp(2), usageDivider.dp(8),
+                    usageDivider.dp(2), usageDivider.dp(8));
+            topBar.addView(usageDivider, dividerParams);
+        }
+        {
+            usageBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
+            usageBarWidth = dp(160);
+            usageBar.setMax(usageBarWidth);
+            LinearLayout.LayoutParams usageBarParams = new LinearLayout.LayoutParams(usageBarWidth, WRAP_CONTENT);
+            usageBarParams.setMargins(dp(12), 0, dp(8), 0);
+            usageInfo.addView(usageBar, usageBarParams);
+        }
+        {
+            usageText = new TextView(context, null);
+            usageText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            usageText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            usageInfo.addView(usageText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        }
+
+        PanelStyle.applyDynamically(topBar, dp(16),
+                new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)),
+                InsetBackgroundFactory.BackdropBlur.UI_LAYER);
+        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        topBarParams.gravity = Gravity.TOP;
+        topBarParams.setMargins(0, dp(12), 0, 0);
+        // Added last so its backdrop blur samples the list painted underneath.
+        addView(topBar, topBarParams);
+
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
             public void onViewAttachedToWindow(View v) {
@@ -238,6 +254,30 @@ public class CloudDriveView extends LinearLayout {
                 scheduledCompletion.clear();
             }
         });
+    }
+
+    /**
+     * The list inset equals the space the floating bar occupies, which is only known after measure.
+     * Applying it before laying children out keeps the first frame below the bar.
+     */
+    @Override
+    protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
+        FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
+        int inset = lp.topMargin + topBar.getMeasuredHeight();
+        if (scrollView.getPaddingTop() != inset) {
+            scrollView.setPadding(0, inset, 0, 0);
+        }
+        super.onLayout(changed, left, top, right, bottom);
+    }
+
+    private void updateVirtualWindow() {
+        int viewport = scrollView.getHeight();
+        if (viewport <= 0) {
+            return;
+        }
+        // The list starts below the bar, so shift the window up by that inset to keep the
+        // content covered by the bar realized (it is what the bar's blur samples).
+        virtualList.updateWindow(scrollView.getScrollY() - scrollView.getPaddingTop(), viewport);
     }
 
     private static Long parseId(String value) {
@@ -309,7 +349,7 @@ public class CloudDriveView extends LinearLayout {
                         endReached = true;
                     }
                     rebuildEntries();
-                    scrollView.post(() -> virtualList.updateWindow(scrollView.getScrollY(), scrollView.getHeight()));
+                    scrollView.post(this::updateVirtualWindow);
                 }));
     }
 
@@ -318,7 +358,7 @@ public class CloudDriveView extends LinearLayout {
             return;
         }
         int height = virtualList.getHeight();
-        if (height > 0 && scrollY + viewportHeight >= height - dp(64)) {
+        if (height > 0 && scrollY + viewportHeight >= scrollView.getPaddingTop() + height - dp(64)) {
             loadNext(false);
         }
     }
@@ -391,7 +431,7 @@ public class CloudDriveView extends LinearLayout {
         List<Artist> artists = artistName == null || artistName.isBlank()
                 ? List.of()
                 : List.of(new Artist(-1, artistName, "", 0, 0, "", List.of(), 0));
-        String cover = task.getCoverDataUri() != null ? task.getCoverDataUri() : MusicHud.ICON_BASE64;
+        String cover = task.getCoverDataUri() != null ? task.getCoverDataUri() : ImageUtils.coverPlaceholder();
         Album album = new Album(0, task.getAlbum() == null ? "" : task.getAlbum(), cover, "", "", 0,
                 new ObservableSequencedSet<>(0), new LinkedHashSet<>(), new LinkedHashSet<>());
         return new CloudTrackInfo(MusicDetail.of(displayId, task.getSong(), task.getDurationMillis(), artists, album), "", 0);
@@ -421,7 +461,7 @@ public class CloudDriveView extends LinearLayout {
             return;
         }
         LinearLayout warningContent = new LinearLayout(getContext());
-        warningContent.setOrientation(VERTICAL);
+        warningContent.setOrientation(LinearLayout.VERTICAL);
         TextView warningText = new TextView(getContext());
         warningText.setText(I18n.get(MusicHud.MOD_ID + ".modal.deleteCloudTrack.warning"));
         warningText.setTextSize(Theme.TEXT_SIZE_LARGE);

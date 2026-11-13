@@ -5,13 +5,9 @@ public final class MusicCollections {
     }
 
     /**
-     * Distinguishes a genuinely loaded collection from the generic failure sentinels.
-     * <p>
-     * The id-based test is required because the sentinel singletons are serialized over the
-     * network as fresh instances, so reference comparison would not survive the round trip:
-     * {@link Playlist#EMPTY} (id -1) and {@link Album#NONE} (id 0) are rejected, while a
-     * legitimately empty collection (e.g. {@link Playlist#empty(long)}) keeps a positive id
-     * and is considered usable.
+     * Distinguishes a loaded collection from the failure sentinels of the same type. Ids are tested
+     * because the sentinels are serialized as fresh instances: {@link Playlist#EMPTY} (-1) and
+     * {@link Album#NONE} (0) are rejected while a legitimately empty collection keeps a positive id.
      */
     public static boolean isUsable(MusicCollection collection) {
         return collection != null && collection.getId() > 0;

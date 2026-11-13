@@ -1,18 +1,13 @@
 package indi.etern.musichud.client.ui.components.modals;
 
 import icyllis.modernui.R;
-import icyllis.modernui.animation.Animator;
-import icyllis.modernui.animation.AnimatorListener;
-import icyllis.modernui.animation.AnimatorSet;
-import icyllis.modernui.animation.ObjectAnimator;
+import icyllis.modernui.animation.*;
 import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.drawable.ColorDrawable;
 import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.resources.TypedValue;
-import icyllis.modernui.util.ColorStateList;
-import icyllis.modernui.util.StateSet;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
@@ -21,7 +16,9 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.Easing;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import lombok.Getter;
+import org.jetbrains.annotations.NotNull;
 
 import java.util.function.BiConsumer;
 
@@ -66,13 +63,10 @@ public class Modal {
             }
         };
 
-        FrameLayout overlayFrame = new FrameLayout(context);
-
         dimView = new View(context);
         dimView.setBackground(new ColorDrawable(SCREEN_DIM_COLOR));
         dimView.setClickable(true);
         dimView.setOnClickListener(v -> dismiss());
-        overlayFrame.addView(dimView, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
         card = new LinearLayout(context) {
             {
@@ -85,8 +79,8 @@ public class Modal {
                 return true;
             }
         };
-
-        applyOutlinedCardBackground(context, card);
+        PanelStyle.applyDynamically(card, card.dp(CORNER_RADIUS), null,
+                InsetBackgroundFactory.BackdropBlur.NONE);
 
         int topPadding = card.dp(CONTENT_PADDING);
         int sidePadding = card.dp(CONTENT_PADDING);
@@ -97,7 +91,7 @@ public class Modal {
             TypedValue tv = new TypedValue();
             var theme = context.getTheme();
             if (theme.resolveAttribute(R.ns, R.attr.colorOnSurface, tv, true)) {
-                titleView.setTextColor(theme.getResources().loadColorStateList(tv, theme));
+                titleView.setTextColor(theme.getResources().loadColorStateList(tv, null, theme));
             } else {
                 titleView.setTextColor(0xFFFFFFFF);
             }
@@ -114,13 +108,7 @@ public class Modal {
         ShapeDrawable dividerBg = new ShapeDrawable();
         dividerBg.setShape(ShapeDrawable.HLINE);
         dividerBg.setSize(card.dp(DIVIDER_HEIGHT), card.dp(DIVIDER_HEIGHT));
-        TypedValue dividerTv = new TypedValue();
-        var theme = context.getTheme();
-        if (theme.resolveAttribute(R.ns, R.attr.colorOutlineVariant, dividerTv, true)) {
-            dividerBg.setColor(theme.getResources().loadColorStateList(dividerTv, theme));
-        } else {
-            dividerBg.setColor(0xFF3E3E42);
-        }
+        dividerBg.setColor(Theme.DIVIDER_COLOR);
         divider.setBackground(dividerBg);
         LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(
                 MATCH_PARENT, card.dp(DIVIDER_HEIGHT));
@@ -144,7 +132,7 @@ public class Modal {
             button.setText(buttonMeta.getText());
             TypedValue btnTv = new TypedValue();
             if (context.getTheme().resolveAttribute(R.ns, R.attr.colorOnSurface, btnTv, true)) {
-                button.setTextColor(context.getTheme().getResources().loadColorStateList(btnTv, context.getTheme()));
+                button.setTextColor(context.getTheme().getResources().loadColorStateList(btnTv, null, context.getTheme()));
             } else {
                 button.setTextColor(0xFFFFFFFF);
             }
@@ -161,12 +149,16 @@ public class Modal {
             }
             buttonRow.addView(button, btnParams);
 
-            buttonMeta.injectView(button, buttonRow, btnParams);
+            buttonMeta.injectView(button, buttonRow);
         }
 
         FrameLayout.LayoutParams cardParams = new FrameLayout.LayoutParams(
                 card.dp(MAX_WIDTH), WRAP_CONTENT);
         cardParams.gravity = Gravity.CENTER;
+
+        ModalOverlay overlayFrame = new ModalOverlay(context, dimView, card, SCREEN_DIM_COLOR,
+                card.dp(CORNER_RADIUS), card.dp(PanelStyle.BACK_DROP_BLUR_RADIUS));
+        overlayFrame.addView(dimView, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
         overlayFrame.addView(card, cardParams);
 
         popupWindow.setContentView(overlayFrame);
@@ -175,36 +167,6 @@ public class Modal {
         popupWindow.setFocusable(true);
         popupWindow.setOutsideTouchable(false);
         popupWindow.setTouchModal(true);
-    }
-
-    private void applyOutlinedCardBackground(Context context, View layout) {
-        ShapeDrawable bg = new ShapeDrawable();
-        bg.setCornerRadius(layout.dp(CORNER_RADIUS));
-        TypedValue value = new TypedValue();
-        var theme = context.getTheme();
-        if (theme.resolveAttribute(R.ns, R.attr.colorSurface, value, true)) {
-            bg.setColor(theme.getResources().loadColorStateList(value, theme));
-        } else {
-            bg.setColor(0xFF2D2D30);
-        }
-
-        int[] strokeColors = new int[2];
-        if (theme.resolveAttribute(R.ns, R.attr.colorOutlineVariant, value, true)) {
-            strokeColors[0] = value.data;
-            theme.resolveAttribute(R.ns, R.attr.colorOutline, value, true);
-            strokeColors[1] = ColorStateList.modulateColor(value.data, 0.12f);
-        } else {
-            strokeColors[0] = 0x20FFFFFF;
-            strokeColors[1] = 0x08FFFFFF;
-        }
-        bg.setStroke(layout.dp(1), new ColorStateList(
-                new int[][]{
-                        StateSet.get(StateSet.VIEW_STATE_ENABLED),
-                        StateSet.WILD_CARD
-                },
-                strokeColors
-        ));
-        layout.setBackground(bg);
     }
 
     public void show() {
@@ -250,6 +212,14 @@ public class Modal {
             currentAnimation.setDuration(SHOW_DURATION);
             currentAnimation.setInterpolator(Easing.EASE_OUT_QUAD);
             currentAnimation.start();
+            currentAnimation.addListener(new AnimatorListener() {
+                @Override
+                public void onAnimationEnd(@NotNull Animator animation) {
+                    LayoutTransition layoutTransition = new LayoutTransition();
+                    layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+                    card.setLayoutTransition(layoutTransition);
+                }
+            });
         });
     }
 
@@ -266,9 +236,12 @@ public class Modal {
         }
 
         ObjectAnimator dimFadeOut = ObjectAnimator.ofFloat(dimView, View.ALPHA, dimView.getAlpha(), 0f);
-        ObjectAnimator cardFadeOut = ObjectAnimator.ofFloat(card, View.ALPHA, card.getAlpha(), 0f);
-        ObjectAnimator cardScaleXOut = ObjectAnimator.ofFloat(card, View.SCALE_X, card.getScaleX(), 0.95f);
-        ObjectAnimator cardScaleYOut = ObjectAnimator.ofFloat(card, View.SCALE_Y, card.getScaleY(), 0.95f);
+        ObjectAnimator cardFadeOut = ObjectAnimator.ofFloat(card, View.ALPHA,
+                card.getAlpha(), 0f);
+        ObjectAnimator cardScaleXOut = ObjectAnimator.ofFloat(card, View.SCALE_X,
+                card.getScaleX(), 0.95f);
+        ObjectAnimator cardScaleYOut = ObjectAnimator.ofFloat(card, View.SCALE_Y,
+                card.getScaleY(), 0.95f);
 
         AnimatorSet set = new AnimatorSet();
         set.playTogether(dimFadeOut, cardFadeOut, cardScaleXOut, cardScaleYOut);
@@ -296,10 +269,9 @@ public class Modal {
 
     public static final class ActionButton {
         @Getter
-        private String text;
-        @Getter
         private final BiConsumer<ActionButton, Modal> onClickListener;
-
+        @Getter
+        private String text;
         @Getter
         private Button button;
         private ViewGroup parent;
@@ -309,7 +281,7 @@ public class Modal {
             this.onClickListener = onClickListener;
         }
 
-        void injectView(Button button, ViewGroup parent, ViewGroup.LayoutParams params) {
+        void injectView(Button button, ViewGroup parent) {
             this.button = button;
             this.parent = parent;
         }

@@ -15,14 +15,8 @@ import java.util.function.Function;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 
-/*
-* 相较于Fragment在切换时保留了上下文
-* */
 @SuppressWarnings("unused")
 public class RouterContainer extends FrameLayout {
-    @Getter
-    private static RouterContainer instance;
-
     private final Map<String, View> pageCache = new HashMap<>();
     private final Map<String, Function<Context, View>> pageFactories = new HashMap<>();
     private String currentPageKey = null;
@@ -80,7 +74,7 @@ public class RouterContainer extends FrameLayout {
             public List<Animator> createAnimators(View fromPage, View toPage,
                                                   int duration, TimeInterpolator interpolator) {
                 List<Animator> animators = new ArrayList<>();
-                int width = instance.getWidth();
+                int width = toPage.getWidth();
 
                 if (fromPage != null) {
                     ObjectAnimator slideOut = ObjectAnimator.ofFloat(fromPage, View.TRANSLATION_X,
@@ -116,7 +110,7 @@ public class RouterContainer extends FrameLayout {
             public List<Animator> createAnimators(View fromPage, View toPage,
                                                   int duration, TimeInterpolator interpolator) {
                 List<Animator> animators = new ArrayList<>();
-                int width = instance.getWidth();
+                int width = toPage.getWidth();
 
                 if (fromPage != null) {
                     ObjectAnimator slideOut = ObjectAnimator.ofFloat(fromPage, View.TRANSLATION_X,
@@ -323,14 +317,6 @@ public class RouterContainer extends FrameLayout {
             }
         };
 
-        /**
-         * 创建过渡动画
-         * @param fromPage 当前页面,可能为 null
-         * @param toPage 目标页面
-         * @param duration 动画持续时间
-         * @param interpolator 缓动函数
-         * @return 动画列表
-         */
         public abstract List<Animator> createAnimators(@Nullable View fromPage, View toPage,
                                                        int duration, TimeInterpolator interpolator);
     }
@@ -352,20 +338,26 @@ public class RouterContainer extends FrameLayout {
         default void onTransitionStart(@Nullable String fromKey, @NonNull String toKey, @NonNull TransitionType type) {}
     }
 
+    public interface RouteAware {
+        default void onRoutePushed() {}
+
+        default void onRoutePopped() {}
+    }
+
+    private static void notifyRoutePushed(@Nullable View view) {
+        if (view instanceof RouteAware aware) {
+            aware.onRoutePushed();
+        }
+    }
+
+    private static void notifyRoutePopped(@Nullable View view) {
+        if (view instanceof RouteAware aware) {
+            aware.onRoutePopped();
+        }
+    }
+
     public RouterContainer(Context context) {
         super(context);
-        RouterContainer thisInstance = this;
-        addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
-            @Override
-            public void onViewAttachedToWindow(View v) {
-                instance = thisInstance;
-            }
-
-            @Override
-            public void onViewDetachedFromWindow(View v) {
-                instance = null;
-            }
-        });
     }
 
     public void registerPage(@NonNull String key, @NonNull Function<Context, View> factory) {
@@ -390,15 +382,27 @@ public class RouterContainer extends FrameLayout {
             return;
         }
 
+        // Keep the visible sub-page as the exit page so the outgoing animation has something to
+        // animate; the deeper ones are not visible and can go right away. finishTransition removes it.
+        boolean animateExit = !isTransitioning;
+        View exitPage = null;
         while (!routeStack.empty()) {
             String popKey = routeStack.pop();
             View view = dynamicViews.get(popKey);
             if (view != null) {
-                removeView(view);
+                notifyRoutePopped(view);
+                if (animateExit && exitPage == null) {
+                    exitPage = view;
+                } else {
+                    removeView(view);
+                }
             }
         }
 
         if (isTransitioning) {
+            if (exitPage != null) {
+                removeView(exitPage);
+            }
             pendingNavigationKey = key;
             transitionTargetKey = key;
             if (currentAnimation != null && currentAnimation.isRunning()) {
@@ -416,7 +420,8 @@ public class RouterContainer extends FrameLayout {
         }
 
         View targetPage = getOrCreatePage(key);
-        View currentPage = currentPageKey != null ? pageCache.get(currentPageKey) : null;
+        View currentPage = exitPage != null ? exitPage
+                : currentPageKey != null ? pageCache.get(currentPageKey) : null;
 
         routeStack.push(key);
 
@@ -442,6 +447,7 @@ public class RouterContainer extends FrameLayout {
         dynamicViews.put(dynamicKey, view);
 
         isTransitioning = true;
+        transitionTargetKey = dynamicKey;
 
         View currentPage = getCurrentViewFromStack();
 
@@ -450,6 +456,7 @@ public class RouterContainer extends FrameLayout {
         }
 
         routeStack.push(dynamicKey);
+        notifyRoutePushed(view);
 
         AnimationStyle effectiveStyle = animationStyle != null ? animationStyle : AnimationStyle.SCALE_FADE_PUSH;
 
@@ -483,6 +490,9 @@ public class RouterContainer extends FrameLayout {
             isTransitioning = false;
             return;
         }
+
+        transitionTargetKey = parentKey;
+        notifyRoutePopped(currentPage);
 
         if (pageChangeListener != null) {
             pageChangeListener.onPageChangeStart(currentKey, parentKey);
@@ -527,14 +537,8 @@ public class RouterContainer extends FrameLayout {
     }
 
     /**
-     * 帧对齐的页面结构变更驱动。
-     * <p>通过 {@link OnPageChangeListener#onBeforeSwap} 钩子做帧对齐，并把新视图的
-     * addView 用 post 推迟到下一帧，避免影响布局的切换与页面 addView 同帧重排：
-     * <ul>
-     *     <li>SERIAL：先播旧视图离场；离场结束、旧视图 GONE（删除）的前一帧触发钩子，
-     *         post 下一帧再 addView 并入场。</li>
-     *     <li>CROSS：第一帧触发钩子并让旧视图开始淡出，post 下一帧再 addView 并入场（重叠即交叉）。</li>
-     * </ul>
+     * 帧对齐的页面结构变更：通过 {@link OnPageChangeListener#onBeforeSwap} 把新视图的 addView
+     * post 到下一帧，避免与布局重排同帧；SERIAL 等旧视图离场完成，CROSS 第一帧就开始淡出。
      */
     private void driveTransition(@Nullable View fromPage, @NonNull View toPage, String toKey,
                                  @Nullable AnimationStyle customStyle, @Nullable Easing customEasing) {
@@ -670,6 +674,7 @@ public class RouterContainer extends FrameLayout {
         isTransitioning = false;
         transitionTargetKey = null;
         currentPageKey = toKey;
+        notifyRoutePushed(toPage);
         if (pageChangeListener != null) {
             pageChangeListener.onPageChangeEnd(toKey);
         }
@@ -727,6 +732,12 @@ public class RouterContainer extends FrameLayout {
         return page;
     }
 
+    @Nullable
+    public View getEffectivePage() {
+        String key = getEffectivePageKey();
+        return key != null ? getViewByKey(key) : null;
+    }
+
     public void setAnimationStyle(@NonNull AnimationStyle style) {
         animationStyle = style;
     }
@@ -746,9 +757,11 @@ public class RouterContainer extends FrameLayout {
 
     public void clearAllPageCache() {
         for (View page : pageCache.values()) {
+            notifyRoutePopped(page);
             removeView(page);
         }
         for (View page : dynamicViews.values()) {
+            notifyRoutePopped(page);
             removeView(page);
         }
         pageCache.clear();

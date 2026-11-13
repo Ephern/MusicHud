@@ -1,135 +1,97 @@
 package indi.etern.musichud.client.ui.lyric;
 
-import icyllis.arc3d.core.ColorInfo;
-import icyllis.arc3d.core.ColorSpace;
-import icyllis.arc3d.core.ImageInfo;
-import icyllis.arc3d.engine.Engine;
-import icyllis.arc3d.granite.GraniteSurface;
-import icyllis.arc3d.granite.RecordingContext;
-import icyllis.arc3d.sketch.Image;
-import icyllis.arc3d.sketch.Paint;
-import icyllis.arc3d.sketch.Surface;
-import icyllis.modernui.core.Core;
-import org.jetbrains.annotations.Nullable;
-
+import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
+import indi.etern.musichud.client.ui.render.gpu.SceneOffscreen;
 /**
- * Per-lyric-line offscreen render targets and cached convolution results used by
- * {@link LineBlurRenderer}. All fields are mutated on the UI/render thread only.
- * <p>
- * A {@link GraniteSurface} image snapshot is a real copy (never a shared handle) and is
- * cached by the surface, so {@link Surface#notifyWillChange()} must be called before the
- * same target is drawn into again.
+ * Offscreen source target of one lyric row, plus the cached state that decides when it must be
+ * re-rendered and re-blurred. The blurred result itself lives in {@link SceneBlurSlot}.
  */
 public final class LineBlurResources {
-    Surface sourceSurface;
-    Surface scratchSurface;
-    Surface finalSurface;
+    /** Below this the spring's float jitter is invisible and must not trigger a re-convolution. */
+    private static final float RADIUS_EPSILON = 0.05f;
+    /** The pipeline must keep producing results at radius zero so losing focus is seamless. */
+    private static final float MIN_SIGMA = 0.2f;
 
-    /** Cached snapshot of the rendered line content. */
-    Image sourceImage;
-    /** Cached snapshot of the fully blurred content. */
-    Image finalImage;
+    private final SceneOffscreen target = new SceneOffscreen("musichud-line-blur-src", true);
+    private int padding;
 
-    final Paint tapPaint = new Paint();
+    /** Signature of the rendered content; {@link Long#MIN_VALUE} forces a re-render. */
+    private long cachedContentStamp = Long.MIN_VALUE;
+    /** Radius the cached source was rendered with; NaN forces a re-render. */
+    private float cachedRadius = Float.NaN;
 
     private boolean closed;
 
-    int surfaceWidth;
-    int surfaceHeight;
-    float downscale = -1f;
-
-    /** Signature of the rendered content; {@link Long#MIN_VALUE} forces a re-render. */
-    long cachedContentStamp = Long.MIN_VALUE;
-    /** Radius the cached {@link #finalImage} was blurred with; NaN forces a re-blur. */
-    float cachedRadius = Float.NaN;
-
     /**
-     * Ensures the three render targets match the requested size/downscale.
+     * Renders the row content if it changed and asks the render thread to blur it.
      *
-     * @return true if the targets were (re)created, i.e. any cached content is stale
+     * @return true when the offscreen target and the deferred blur are ready for this frame
      */
-    boolean ensureSurfaces(int width, int height, float downscale) {
-        if (sourceSurface != null
-                && this.surfaceWidth == width
-                && this.surfaceHeight == height
-                && this.downscale == downscale) {
+    public boolean prepare(int viewWidth, int viewHeight, int padding, float radius,
+                           long contentStamp,
+                           LineBlurRenderer.ContentDrawer drawer, SceneBlurSlot slot) {
+        if (closed || viewWidth < 1 || viewHeight < 1 || padding < 0) {
             return false;
         }
-        releaseSurfaces();
-        RecordingContext rc = Core.requireUiRecordingContext();
-        ImageInfo info = ImageInfo.make(width, height,
-                ColorInfo.CT_RGBA_8888, ColorInfo.AT_PREMUL, ColorSpace.get(ColorSpace.Named.SRGB));
-        sourceSurface = GraniteSurface.makeRenderTarget(rc, info, false,
-                Engine.SurfaceOrigin.kUpperLeft, "musichud-line-blur-src");
-        scratchSurface = GraniteSurface.makeRenderTarget(rc, info, false,
-                Engine.SurfaceOrigin.kUpperLeft, "musichud-line-blur-scratch");
-        finalSurface = GraniteSurface.makeRenderTarget(rc, info, false,
-                Engine.SurfaceOrigin.kUpperLeft, "musichud-line-blur-final");
-        this.surfaceWidth = width;
-        this.surfaceHeight = height;
-        this.downscale = downscale;
+        // The padding is fixed at the row's maximum radius so the target size stays stable while the
+        // radius spring animates; only sigma changes.
+        int width = viewWidth + 2 * padding;
+        int height = viewHeight + 2 * padding;
+        boolean recreated = target.ensure(width, height);
+        if (!target.isReady()) {
+            return false;
+        }
+        this.padding = padding;
+        boolean contentChanged = recreated || cachedContentStamp != contentStamp;
+        boolean radiusChanged = Float.isNaN(cachedRadius)
+                || Math.abs(cachedRadius - radius) >= RADIUS_EPSILON;
+        if (contentChanged) {
+            target.render(padding, padding, drawer::draw);
+            cachedContentStamp = contentStamp;
+        }
+        if (contentChanged || radiusChanged) {
+            var texture = SceneBlurSlot.imageOf(target.surface());
+            if (texture != null) {
+                slot.request(texture, 0f, 0f, 1f, 1f, width, height,
+                        Math.max(LineBlurRenderer.sigmaFor(radius), MIN_SIGMA), true);
+            }
+            cachedRadius = radius;
+        }
+        return true;
+    }
+
+    public int padding() {
+        return padding;
+    }
+
+    /** Forces the next prepare() to re-render the source and re-request the blur. */
+    public void invalidate() {
         cachedContentStamp = Long.MIN_VALUE;
         cachedRadius = Float.NaN;
-        return isReady();
     }
 
-    boolean isReady() {
-        return sourceSurface != null && scratchSurface != null && finalSurface != null;
+    public int width() {
+        return target.width();
     }
 
-    void replaceSourceImage(@Nullable Image image) {
-        if (sourceImage == image) {
-            return;
-        }
-        if (sourceImage != null) {
-            sourceImage.unref();
-        }
-        sourceImage = image;
+    public int height() {
+        return target.height();
     }
 
-    void replaceFinalImage(@Nullable Image image) {
-        if (finalImage == image) {
-            return;
-        }
-        if (finalImage != null) {
-            finalImage.unref();
-        }
-        finalImage = image;
-    }
-
-    /** Releases GPU render targets but keeps the reusable native paint. */
     public void release() {
-        releaseSurfaces();
+        target.release();
+        padding = 0;
+        cachedContentStamp = Long.MIN_VALUE;
+        cachedRadius = Float.NaN;
     }
 
-    /** Releases everything including the native paint. */
     public void close() {
         if (closed) {
             return;
         }
         closed = true;
-        release();
-        tapPaint.close();
-    }
-
-    private void releaseSurfaces() {
-        if (sourceSurface != null) {
-            sourceSurface.unref();
-            sourceSurface = null;
-        }
-        if (scratchSurface != null) {
-            scratchSurface.unref();
-            scratchSurface = null;
-        }
-        if (finalSurface != null) {
-            finalSurface.unref();
-            finalSurface = null;
-        }
-        replaceSourceImage(null);
-        replaceFinalImage(null);
-        surfaceWidth = 0;
-        surfaceHeight = 0;
-        downscale = -1f;
+        target.close();
+        padding = 0;
         cachedContentStamp = Long.MIN_VALUE;
         cachedRadius = Float.NaN;
     }

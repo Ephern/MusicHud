@@ -3,15 +3,9 @@ package indi.etern.musichud.client.utils.ui;
 import icyllis.modernui.animation.TimeInterpolator;
 
 /**
- * Smooth, asymmetric "bump" over {@code t in [0, 1]}: value 0 at both ends, peaks at 1.
- * <p>
- * The shape is the normalized monomial {@code t^alpha * (1 - t)^beta}. For
- * {@code alpha > 1} and {@code beta > 1} the value <b>and its derivative</b> are 0 at
- * both ends, so the bump can leave from and return to rest ({@code v = 0}) without a
- * velocity discontinuity. The peak sits at {@code alpha / (alpha + beta)}, so
- * {@code alpha < beta} gives a fast rise and a slower fall, {@code alpha > beta} the
- * opposite, and {@code alpha == beta == 1} degenerates to the symmetric parabola
- * {@code t(1 - t)} (which has non-zero end velocities).
+ * Asymmetric "bump" over {@code t in [0, 1]}: 0 at both ends, 1 at the peak {@code alpha/(alpha+beta)}.
+ * The normalized monomial {@code t^alpha * (1-t)^beta} has zero value and slope at both ends for
+ * {@code alpha, beta > 1}, so the bump leaves and returns to rest without a velocity step.
  */
 public class SmoothBumpInterpolator implements TimeInterpolator {
     private final float alpha;

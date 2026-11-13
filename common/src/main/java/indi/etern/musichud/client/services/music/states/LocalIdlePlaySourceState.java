@@ -342,14 +342,10 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
     }
 
     /**
-     * Settles a failed add. With a pre-batch entry ({@code base != null}, mode switch) the
-     * previous entry is restored (silently first, so removing the new one never leaves the
-     * local layer empty mid-notification) and the failed variant is dropped from live state
-     * and config. Without a base (first add / login re-push) the entry is kept live,
-     * persisted and marked unconfirmed: it stays in {@link #pendingAdds} so server pushes
-     * cannot reconcile it away, the CycleButton warning offers a manual re-sync and the
-     * next login re-pushes automatically. Never runs when the batch was superseded by a
-     * newer switch.
+     * Settles a failed add. With a pre-batch entry (mode switch) the previous entry is restored and
+     * the failed variant dropped; otherwise the entry stays live, persisted and unconfirmed, so server
+     * pushes cannot reconcile it away and the next login re-pushes it. Never runs when the batch was
+     * superseded by a newer switch.
      */
     private void settleAdd(IdlePlaySource idlePlaySource, DebounceKey key, DebounceState state, int version,
                            String rawMessage) {

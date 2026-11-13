@@ -22,11 +22,10 @@ public class MusicListFactory {
     }
     public static MusicTrackItem createItem(ViewGroup parent, Function<View, Boolean> clickFilter) {
         MusicTrackItem item = new MusicTrackItem(parent.getContext());
-        item.setRowAnimationsEnabled(false);
         item.setShowPusherInfo(false);
         if (item.getBackground() == null) {
             InsetBackgroundFactory.builder()
-                    .cornerRadius(item.dp(7))
+                    .cornerRadius(item.dp(6))
                     .inset(item.dp(1))
                     .padding(new InsetBackgroundFactory.Padding(item.dp(4), item.dp(4), item.dp(4), item.dp(4)))
                     .build()

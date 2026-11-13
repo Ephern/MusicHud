@@ -57,6 +57,14 @@ public final class ImageTextureData implements Closeable {
         }
     }
 
+    /**
+     * Closes the GPU texture immediately, without the "still playing" deferral of {@link #close()}.
+     * Must run on the render thread; used by owners that already decided the texture is unused.
+     */
+    public void closeDirect() {
+        texture.close();
+    }
+
     public Bitmap convertToBitmap() {
         NativeImage pixels = texture.getPixels();
         if (pixels == null) {
