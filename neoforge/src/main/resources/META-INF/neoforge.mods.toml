@@ -15,7 +15,7 @@ logoFile = "assets/music_hud/icon.png"
 [[dependencies.music_hud]]
 modId = "neoforge"
 type = "required"
-versionRange = "[26.3,26.4)"
+versionRange = "[26.3.0.37-beta,26.4)"
 ordering = "NONE"
 side = "BOTH"
 
