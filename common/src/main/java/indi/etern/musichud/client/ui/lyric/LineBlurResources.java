@@ -53,7 +53,7 @@ public final class LineBlurResources {
             var texture = SceneBlurSlot.imageOf(target.surface());
             if (texture != null) {
                 slot.request(texture, 0f, 0f, 1f, 1f, width, height,
-                        Math.max(LineBlurRenderer.sigmaFor(radius), MIN_SIGMA));
+                        Math.max(LineBlurRenderer.sigmaFor(radius), MIN_SIGMA), true);
             }
             cachedRadius = radius;
         }

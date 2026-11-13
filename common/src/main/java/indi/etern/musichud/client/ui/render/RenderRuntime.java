@@ -39,6 +39,8 @@ public final class RenderRuntime {
     private int precompileFailures;
     private long nextPrecompileAttemptMillis;
     private long precompileNotReadyDeadlineMillis;
+    private long frameStamp;
+    private long rotatedStamp;
 
     private RenderRuntime() {
     }
@@ -130,11 +132,20 @@ public final class RenderRuntime {
         }
     }
 
-    /** Advances the offscreen uniform rings once per recorded scene frame. */
+    /** Advances the offscreen uniform rings and the retirement clock once per rendered frame. */
     void endSceneFrame() {
-        if (gpu != null) {
-            gpu.endFrame();
+        if (rotatedStamp != frameStamp) {
+            rotatedStamp = frameStamp;
+            SceneRetirement.endFrame();
+            if (gpu != null) {
+                gpu.endFrame();
+            }
         }
+    }
+
+    /** Bumps the frame stamp; called once per rendered frame, before any scene is recorded. */
+    public void beginFrameStamp() {
+        frameStamp++;
     }
 
     /**

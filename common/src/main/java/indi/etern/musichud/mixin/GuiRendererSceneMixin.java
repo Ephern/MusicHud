@@ -7,6 +7,7 @@ import com.mojang.blaze3d.pipeline.RenderTarget;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.mojang.blaze3d.vertex.VertexFormat;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
 import indi.etern.musichud.client.ui.render.SceneRenderContext;
 import indi.etern.musichud.client.ui.render.SceneRenderContextImpl;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
@@ -42,6 +43,7 @@ public class GuiRendererSceneMixin {
     private void music_hud$resetFrameState(CallbackInfo ci) {
         music_hud$elementSetups.clear();
         music_hud$currentRenderPass = null;
+        RenderRuntime.getInstance().beginFrameStamp();
     }
 
     @Inject(method = "render", at = @At("RETURN"))

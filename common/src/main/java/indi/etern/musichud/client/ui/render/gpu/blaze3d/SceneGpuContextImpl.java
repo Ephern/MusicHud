@@ -242,7 +242,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         var key = new UniformKey(pipeline.name(), name, size);
         DynamicUniformStorage<UniformAdapter> storage = uniformStorages.computeIfAbsent(key,
                 ignored -> new DynamicUniformStorage<>(
-                        "MusicHud GPU uniform " + name, size, 64));
+                        "MusicHud GPU uniform " + name, size, 256));
         return storage.writeUniform(new UniformAdapter(uniform));
     }
 
