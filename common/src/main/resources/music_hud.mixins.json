@@ -6,15 +6,12 @@
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
     "GuiRendererSceneMixin",
-    "ModernUiBitmapMixin",
     "ModernUiGuardMixin",
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
     "SpanSetMixin",
-    "ToastManagerMixin",
-    "ToastRecordAccessor",
     "UIManagerMixin",
     "VulkanSampledCopyMixin"
   ],
