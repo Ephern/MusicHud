@@ -1,10 +1,13 @@
 package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 
+import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
 import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
+
+import java.util.OptionalInt;
 
 @SuppressWarnings("resource")
 public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
@@ -45,7 +48,10 @@ public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable
     void clear(int argb) {
         RenderSystem.assertOnRenderThread();
         if (closed) throw new IllegalStateException("Scene target is closed");
-        RenderSystem.getDevice().createCommandEncoder().clearColorTexture(texture, argb);
+        //noinspection EmptyTryBlock
+        try (RenderPass ignored = RenderSystem.getDevice().createCommandEncoder()
+                .createRenderPass(() -> "MusicHud scene clear", view, OptionalInt.of(argb))) {
+        }
     }
 
     @Override

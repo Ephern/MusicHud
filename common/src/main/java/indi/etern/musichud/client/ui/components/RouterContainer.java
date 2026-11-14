@@ -324,17 +324,7 @@ public class RouterContainer extends FrameLayout {
     public interface OnPageChangeListener {
         void onPageChangeStart(@Nullable String fromKey, @NonNull String toKey);
         void onPageChangeEnd(@NonNull String pageKey);
-
-        /**
-         * 在页面结构发生变更（旧页面退出/删除、新页面添加）的前一帧同步触发，
-         * 供外部对会影响布局的操作做帧对齐（例如侧边栏的 show/hide）。
-         */
         default void onBeforeSwap(@Nullable String fromKey, @NonNull String toKey, @NonNull TransitionType type) {}
-
-        /**
-         * 过渡刚开始（两帧对齐钩子 {@link #onBeforeSwap} 之前、离场动画播放前）触发，
-         * 供外部提前启动某些动画（例如提前进行右侧歌词栏的隐藏动画）。
-         */
         default void onTransitionStart(@Nullable String fromKey, @NonNull String toKey, @NonNull TransitionType type) {}
     }
 
@@ -536,10 +526,6 @@ public class RouterContainer extends FrameLayout {
         return page;
     }
 
-    /**
-     * 帧对齐的页面结构变更：通过 {@link OnPageChangeListener#onBeforeSwap} 把新视图的 addView
-     * post 到下一帧，避免与布局重排同帧；SERIAL 等旧视图离场完成，CROSS 第一帧就开始淡出。
-     */
     private void driveTransition(@Nullable View fromPage, @NonNull View toPage, String toKey,
                                  @Nullable AnimationStyle customStyle, @Nullable Easing customEasing) {
         AnimationStyle style = customStyle != null ? customStyle : animationStyle;
@@ -625,8 +611,6 @@ public class RouterContainer extends FrameLayout {
             finishTransition(fromPage, toPage, toKey);
             return;
         }
-        // 页面在缓存区被置为 GONE/alpha=0，必须在入场动画开始前设为 VISIBLE，
-        // 否则 alpha 0→1 的淡入会在不可见视图上进行，直到动画结束才闪现 → 入场动画"消失"。
         toPage.setVisibility(VISIBLE);
         AnimatorSet enterSet = new AnimatorSet();
         enterSet.playTogether(enterAnims);

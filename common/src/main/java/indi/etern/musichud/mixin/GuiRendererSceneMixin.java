@@ -46,6 +46,11 @@ public class GuiRendererSceneMixin {
         RenderRuntime.getInstance().beginFrameStamp();
     }
 
+    @Inject(method = "render", at = @At("HEAD"))
+    private void music_hud$drawDeferredBackdrop(GpuBufferSlice bufferSlice, CallbackInfo ci) {
+        RenderRuntime.getInstance().drawDeferredBackdrop();
+    }
+
     @Inject(method = "render", at = @At("RETURN"))
     private void music_hud$endGuiFrame(GpuBufferSlice bufferSlice, CallbackInfo ci) {
         if (SceneRenderContext.getCurrent() instanceof SceneRenderContextImpl impl) {

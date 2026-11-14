@@ -2,6 +2,7 @@ package indi.etern.musichud.client.ui.render.gpu;
 
 public enum ScenePipelineKey {
     SCENE_CAPTURE,
+    SCENE_COPY,
     SCENE_BACKGROUND_BAKE,
     SCENE_BLUR_DOWNSAMPLE,
     SCENE_BLUR_GAUSSIAN,
