@@ -143,6 +143,16 @@ public final class RenderRuntime {
         }
     }
 
+    /**
+     * Composes this frame's sampled backdrop. Called when the GUI is submitted: the world has been
+     * rendered and the pass that wrote the main target is closed.
+     */
+    public void drawDeferredBackdrop() {
+        if (gpu != null) {
+            gpu.runDeferredBackdrop();
+        }
+    }
+
     /** Bumps the frame stamp; called once per rendered frame, before any scene is recorded. */
     public void beginFrameStamp() {
         frameStamp++;

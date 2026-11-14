@@ -53,6 +53,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     private final List<SceneGpuMeshImpl> meshes = new ArrayList<>();
     private final Map<String, GpuTextureView> samplerScratch = new HashMap<>();
     private final Map<String, GpuBufferSlice> uniformScratch = new HashMap<>();
+    private final List<Runnable> deferredBackdrops = new ArrayList<>();
     private boolean closed;
 
     public SceneGpuContextImpl() {
@@ -252,6 +253,9 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                     .withSampler("Sampler0")
                     .withUniform("MHCapture", UniformType.UNIFORM_BUFFER)
                     .build();
+            case SCENE_COPY -> SceneNativePassRenderer.pipeline("scene_copy")
+                    .withSampler("Sampler0")
+                    .build();
             case SCENE_BACKGROUND_BAKE -> SceneNativePassRenderer.pipeline("scene_background_bake")
                     .withSampler("Sampler0")
                     .withUniform("MHBackgroundBake", UniformType.UNIFORM_BUFFER)
@@ -331,6 +335,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         RenderSystem.assertOnRenderThread();
         if (closed) return;
         closed = true;
+        deferredBackdrops.clear();
         for (SceneGpuTextureImpl texture : new ArrayList<>(textures)) {
             RenderStats.targetReleased(texture.byteSize());
             texture.close();
@@ -344,6 +349,29 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         renderer.close();
         if (generation == latestGeneration) {
             SceneInterop.install(null);
+        }
+    }
+
+    @Override
+    public void deferBackdrop(@Nullable Runnable work) {
+        assertOpen();
+        if (work != null) {
+            deferredBackdrops.add(work);
+        }
+    }
+
+    @Override
+    public void runDeferredBackdrop() {
+        if (deferredBackdrops.isEmpty()) return;
+        List<Runnable> work = new ArrayList<>(deferredBackdrops);
+        deferredBackdrops.clear();
+        for (Runnable step : work) {
+            try {
+                step.run();
+            } catch (RuntimeException failure) {
+                MusicHud.getLogger(SceneGpuContextImpl.class)
+                        .debug("While composing a deferred backdrop", failure);
+            }
         }
     }
 

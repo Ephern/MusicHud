@@ -62,6 +62,14 @@ public interface SceneGpuContext extends AutoCloseable {
     @Nullable
     MainColorSource mainColorSource();
 
+    /** Marks the work that composes this frame's sampled backdrop; it runs at draw time. */
+    default void deferBackdrop(@Nullable Runnable work) {
+    }
+
+    /** Runs the deferred backdrop composition before the GUI draw ranges are submitted. */
+    default void runDeferredBackdrop() {
+    }
+
     @Override
     void close();
 
