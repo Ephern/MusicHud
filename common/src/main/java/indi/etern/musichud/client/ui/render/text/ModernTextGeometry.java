@@ -236,8 +236,9 @@ public final class ModernTextGeometry {
 
         @Override
         public GpuSampler sampler() {
-            // the Modern UI atlas is minified when rows animate scale, so sample it linearly with mips
-            return SceneSamplers.linearClamp();
+            // Direct-mask runs use our fragment shader, which does its own bilinear taps from a
+            // NEAREST sampler; the SDF atlas is sampled linearly with mips when it is minified.
+            return directMask ? SceneSamplers.nearestClamp() : SceneSamplers.linearClamp();
         }
 
         @Override
