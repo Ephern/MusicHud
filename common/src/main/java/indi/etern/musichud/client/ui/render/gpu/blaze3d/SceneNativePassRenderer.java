@@ -3,7 +3,6 @@ package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 import com.mojang.blaze3d.buffers.GpuBuffer;
 import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.pipeline.RenderPipeline;
-import com.mojang.blaze3d.platform.DepthTestFunction;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.textures.GpuSampler;
@@ -39,8 +38,11 @@ final class SceneNativePassRenderer implements AutoCloseable {
                 .withVertexShader(id(flipVertexV ? "core/fullscreen_flip" : "core/fullscreen"))
                 .withFragmentShader(id("core/" + fragment))
                 .withVertexFormat(DefaultVertexFormat.EMPTY, VertexFormat.Mode.TRIANGLES)
-                .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-                .withDepthWrite(false).withCull(false).withoutBlend();
+                .withDepthStencilState(java.util.Optional.empty())
+                .withCull(false)
+                .withColorTargetState(new com.mojang.blaze3d.pipeline.ColorTargetState(
+                        java.util.Optional.empty(),
+                        com.mojang.blaze3d.pipeline.ColorTargetState.WRITE_ALL));
     }
 
     public static RenderPipeline.Builder meshPipeline(String shader) {
@@ -49,8 +51,11 @@ final class SceneNativePassRenderer implements AutoCloseable {
                 .withVertexShader(id("core/" + shader))
                 .withFragmentShader(id("core/" + shader))
                 .withVertexFormat(DefaultVertexFormat.POSITION_TEX, VertexFormat.Mode.TRIANGLES)
-                .withDepthTestFunction(DepthTestFunction.NO_DEPTH_TEST)
-                .withDepthWrite(false).withCull(false).withoutBlend();
+                .withDepthStencilState(java.util.Optional.empty())
+                .withCull(false)
+                .withColorTargetState(new com.mojang.blaze3d.pipeline.ColorTargetState(
+                        java.util.Optional.empty(),
+                        com.mojang.blaze3d.pipeline.ColorTargetState.WRITE_ALL));
     }
 
     private static Identifier id(String path) {

@@ -2,7 +2,7 @@ package indi.etern.musichud.client.ui.screen;
 
 import indi.etern.musichud.client.ui.ModernUiSupport;
 import net.minecraft.util.Util;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.CommonComponents;
@@ -37,13 +37,13 @@ public class ModernUiRequiredScreen extends Screen {
     }
 
     @Override
-    public void render(@NotNull GuiGraphics graphics, int mouseX, int mouseY, float delta) {
-        super.render(graphics, mouseX, mouseY, delta);
+    public void extractRenderState(@NotNull GuiGraphicsExtractor graphics, int mouseX, int mouseY, float delta) {
+        super.extractRenderState(graphics, mouseX, mouseY, delta);
         int centerX = width / 2;
         int top = height / 2 - 52;
-        graphics.drawCenteredString(font, TITLE, centerX, top, 0xFFFFFFFF);
-        graphics.drawCenteredString(font, MESSAGE, centerX, top + 22, 0xFFB0B0B0);
-        graphics.drawCenteredString(font, Component.literal(ModernUiSupport.DOWNLOAD_URL),
+        graphics.centeredText(font, TITLE, centerX, top, 0xFFFFFFFF);
+        graphics.centeredText(font, MESSAGE, centerX, top + 22, 0xFFB0B0B0);
+        graphics.centeredText(font, Component.literal(ModernUiSupport.DOWNLOAD_URL),
                 centerX, top + 42, 0xFF6EA8FF);
     }
 

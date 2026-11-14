@@ -37,7 +37,7 @@ import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.NonNull;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
 import net.minecraft.client.input.KeyEvent;
@@ -102,7 +102,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     }
 
     @Override
-    public void renderBackground(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
+    public void extractBackground(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
         if (callback != null && !callback.hasDefaultBackground()) {
             MinecraftBackgroundTexture.clear();
@@ -110,14 +110,14 @@ public class MusicHudScreen extends Screen implements MuiScreen {
             return;
         }
         if (minecraft != null && minecraft.level == null) {
-            renderPanorama(gr, deltaTick);
+            extractPanorama(gr, deltaTick);
         }
         float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
         hudOccluded = progress >= 1f;
         renderBlurredBackground(gr, progress);
     }
 
-    private void renderBlurredBackground(GuiGraphics gr, float progress) {
+    private void renderBlurredBackground(GuiGraphicsExtractor gr, float progress) {
         try {
             backgroundStyle.setAlpha(progress);
             backgroundStyle.setBounds(0, 0, this.width, this.height);
@@ -136,7 +136,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         }
     }
 
-    private void renderSolidBackground(GuiGraphics gr, float progress) {
+    private void renderSolidBackground(GuiGraphicsExtractor gr, float progress) {
         float alpha = (float) CLIENT_CONFIG.getGuiBackgroundSamplingBlackOverlay() * progress;
         if (alpha <= 1e-4f) {
             return;
@@ -144,13 +144,13 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         fillBlack(gr, alpha);
     }
 
-    private void fillBlack(GuiGraphics gr, float alpha) {
+    private void fillBlack(GuiGraphicsExtractor gr, float alpha) {
         int alphaByte = Math.clamp((int) (alpha * 255), 0, 255);
         gr.fill(0, 0, this.width, this.height, (alphaByte << 24));
     }
 
     @Override
-    public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
+    public void extractRenderState(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
         // Blur sources are committed mid-frame and consumed by UIManagerMixin before this recording.
         mHost.render(gr, mouseX, mouseY, deltaTick);
     }

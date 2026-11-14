@@ -8,7 +8,7 @@ import indi.etern.musichud.client.ui.render.gpu.MidFrameCommit;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
 import indi.etern.musichud.client.ui.render.gpu.SceneFrameClock;
 import indi.etern.musichud.client.ui.render.interop.SceneInterop;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import org.apache.logging.log4j.Logger;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
@@ -36,7 +36,7 @@ public abstract class UIManagerMixin {
             at = @At(value = "INVOKE",
                     target = "Licyllis/arc3d/engine/ImmediateContext;addTask" +
                             "(Licyllis/arc3d/engine/Task;)Z"))
-    private void music_hud$runMidFrames(GuiGraphics graphics, int mouseX, int mouseY,
+    private void music_hud$runMidFrames(GuiGraphicsExtractor graphics, int mouseX, int mouseY,
                                         float deltaTick, CallbackInfo ci) {
         List<MidFrameCommit.Commit> commits = MidFrameCommit.takeAll();
         if (commits.isEmpty()) {
@@ -68,7 +68,7 @@ public abstract class UIManagerMixin {
 
     /** Retired textures are released only after this frame's recordings have been submitted. */
     @Inject(method = "render", at = @At("RETURN"))
-    private void music_hud$endFrame(GuiGraphics graphics, int mouseX, int mouseY,
+    private void music_hud$endFrame(GuiGraphicsExtractor graphics, int mouseX, int mouseY,
                                     float deltaTick, CallbackInfo ci) {
         SceneFrameClock.tick();
     }

@@ -4,19 +4,19 @@ import indi.etern.musichud.client.ui.render.gpu.blaze3d.TextureSampling;
 import com.mojang.blaze3d.platform.Window;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.renderer.RenderPipelines;
 import net.minecraft.resources.Identifier;
 import org.joml.Matrix3x2fStack;
 
 public class VanillaSceneGraphics implements SceneGraphics {
-    private final GuiGraphics graphics;
+    private final GuiGraphicsExtractor graphics;
 
-    public VanillaSceneGraphics(GuiGraphics graphics) {
+    public VanillaSceneGraphics(GuiGraphicsExtractor graphics) {
         this.graphics = graphics;
     }
 
-    public GuiGraphics vanilla() {
+    public GuiGraphicsExtractor vanilla() {
         return graphics;
     }
 
@@ -57,7 +57,7 @@ public class VanillaSceneGraphics implements SceneGraphics {
 
     @Override
     public void drawString(Font font, String text, int x, int y, int color, boolean dropShadow) {
-        graphics.drawString(font, text, x, y, color, dropShadow);
+        graphics.text(font, text, x, y, color, dropShadow);
     }
 
     @Override

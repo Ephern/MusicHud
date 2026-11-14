@@ -13,8 +13,6 @@
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
     "SpanSetMixin",
-    "ToastManagerMixin",
-    "ToastRecordAccessor",
     "UIManagerMixin"
   ],
   "injectors": {

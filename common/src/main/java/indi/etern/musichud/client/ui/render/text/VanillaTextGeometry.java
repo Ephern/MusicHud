@@ -8,7 +8,6 @@ import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneSamplers;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.font.TextRenderable;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.locale.Language;
 import net.minecraft.network.chat.FormattedText;
 import net.minecraft.util.FormattedCharSequence;
@@ -107,7 +106,7 @@ public final class VanillaTextGeometry {
             Matrix4f matrix = new Matrix4f().mul(pose);
             VertexConsumer wrapper = new GradientVertexConsumer(consumer, originX, totalAdvance, gradient, alpha, fade);
             for (TextRenderable renderable : textRenderables) {
-                renderable.render(matrix, wrapper, LightTexture.FULL_BRIGHT, true);
+                renderable.render(matrix, wrapper, 0xF000F0 /* full bright */, true);
             }
         }
     }

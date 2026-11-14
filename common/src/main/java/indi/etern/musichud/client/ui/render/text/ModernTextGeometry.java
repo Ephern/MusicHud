@@ -17,7 +17,6 @@ import indi.etern.musichud.client.ui.render.gpu.blaze3d.SceneSamplers;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
-import net.minecraft.client.renderer.LightTexture;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
 
@@ -321,13 +320,13 @@ public final class ModernTextGeometry {
                     v2 += dv;
                 }
                 consumer.addVertexWith2DPose(pose, rx + upSkew, ry)
-                        .setColor(colorLeft).setUv(u1, v1).setLight(LightTexture.FULL_BRIGHT);
+                        .setColor(colorLeft).setUv(u1, v1).setLight(0xF000F0 /* full bright */);
                 consumer.addVertexWith2DPose(pose, rx + downSkew, ry + h)
-                        .setColor(colorLeft).setUv(u1, v2).setLight(LightTexture.FULL_BRIGHT);
+                        .setColor(colorLeft).setUv(u1, v2).setLight(0xF000F0 /* full bright */);
                 consumer.addVertexWith2DPose(pose, rx + w + downSkew, ry + h)
-                        .setColor(colorRight).setUv(u2, v2).setLight(LightTexture.FULL_BRIGHT);
+                        .setColor(colorRight).setUv(u2, v2).setLight(0xF000F0 /* full bright */);
                 consumer.addVertexWith2DPose(pose, rx + w + upSkew, ry)
-                        .setColor(colorRight).setUv(u2, v1).setLight(LightTexture.FULL_BRIGHT);
+                        .setColor(colorRight).setUv(u2, v1).setLight(0xF000F0 /* full bright */);
             }
         }
 

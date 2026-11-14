@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.render.gpu.blaze3d.gl;
 
-import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.opengl.GlTexture;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.textures.GpuTexture;
@@ -66,11 +65,15 @@ public final class NeoForgeValidationBridge {
     }
 
     static boolean isGlDevice(GpuDevice device) {
-        if (device instanceof GlDevice) {
+        if (device == null) {
+            return false;
+        }
+        if ("OpenGL".equals(device.getBackendName())) {
             return true;
         }
         Object real = realDevice(device);
-        return real instanceof GlDevice;
+        return real instanceof GpuDevice unwrapped
+                && "OpenGL".equals(unwrapped.getBackendName());
     }
 
     static GpuTexture wrap(GpuDevice device, GpuTexture texture) {
@@ -95,14 +98,14 @@ public final class NeoForgeValidationBridge {
     private record Validation(Object validationDevice, Method wrapMethod,
                               Object validator, Method validateUsage) {
         private static Validation resolve(GpuDevice device) {
-            if (device instanceof GlDevice) {
+            if (isGlDevice(device) && realDevice(device) == null) {
                 return null;
             }
             try {
                 Class<?> type = Class.forName(VALIDATION_DEVICE, false,
                         device.getClass().getClassLoader());
                 if (!type.isInstance(device)
-                        || !(type.getMethod("getRealDevice").invoke(device) instanceof GlDevice)) {
+                        || !isGlDevice((GpuDevice) type.getMethod("getRealDevice").invoke(device))) {
                     throw new UnsupportedOperationException(
                             "Scene native targets require the OpenGL backend");
                 }

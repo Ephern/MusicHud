@@ -1,8 +1,6 @@
 package indi.etern.musichud.client.ui.render.gpu.blaze3d;
 
-import com.mojang.blaze3d.opengl.GlDevice;
 import com.mojang.blaze3d.systems.GpuDevice;
-import indi.etern.musichud.client.ui.render.gpu.blaze3d.gl.NeoForgeValidationBridge;
 
 /** Backend detection shared by the scene renderer and the interop factories. */
 public final class Blaze3dBackends {
@@ -12,11 +10,7 @@ public final class Blaze3dBackends {
     }
 
     public static boolean isOpenGl(GpuDevice device) {
-        if (device == null) return false;
-        if (NeoForgeValidationBridge.unwrapDevice(device) instanceof GlDevice) {
-            return true;
-        }
-        return "OpenGL".equals(device.getBackendName());
+        return device != null && "OpenGL".equals(device.getBackendName());
     }
 
     public static boolean isVulkan(GpuDevice device) {
