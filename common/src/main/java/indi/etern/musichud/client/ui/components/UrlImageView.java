@@ -47,24 +47,21 @@ public class UrlImageView extends FrameLayout {
     private ImageView nextImageView;
     private String currentURLString;
     private int cornerRadius = -1;
-    // 延迟加载相关字段
     private String pendingUrl = null;
     private boolean hasLoadedImage = false;
     private int loadTargetW = 0;
     private int loadTargetH = 0;
-    /** Size this load actually requests: the caller's, or the view's own size when it gave none. */
     private int effectiveLoadW = 0;
     private int effectiveLoadH = 0;
     private boolean isAttachedToWindow = false;
     private CompletableFuture<Void> loadFuture;
     private AnimatorSet currentAnimator;
-    // 滚动监听器
     private final ViewTreeObserver.OnScrollChangedListener scrollListener = this::checkVisibilityAndLoad;
     private final ViewTreeObserver.OnPreDrawListener preDrawListener = () -> {
         checkVisibilityAndLoad();
         return true;
     };
-    private float aspectRatio = 1.0f; // 默认长宽比
+    private float aspectRatio = 1.0f;
     @Setter
     @Getter
     private int transitionDuration = 400;
@@ -132,9 +129,6 @@ public class UrlImageView extends FrameLayout {
         return (long) Math.max(1, image.getWidth()) * Math.max(1, image.getHeight()) * 4L;
     }
 
-    /**
-     * Texture size for {@code loadUrl(url)}: the view's own size, since the drawable scales.
-     */
     private int implicitTargetSize() {
         int side = Math.max(getWidth(), getHeight());
         if (side <= 0) {
@@ -225,10 +219,6 @@ public class UrlImageView extends FrameLayout {
         applyCornerRadius(nextImageView == null ? null : nextImageView.getDrawable());
     }
 
-    /**
-     * The drawable works in image pixels and FIT_CENTER scales it with the view, so the drawable
-     * radius must follow the view size to keep the visible radius constant.
-     */
     private void applyCornerRadius(Drawable drawable) {
         if (!(drawable instanceof RoundedImageDrawable rounded) || rounded.isCircular()) {
             return;
@@ -254,10 +244,8 @@ public class UrlImageView extends FrameLayout {
             int width = getMeasuredWidth();
             int height = (int) (width / aspectRatio);
 
-            // 设置测量尺寸
             setMeasuredDimension(width, height);
 
-            // 同时设置内部ImageView的尺寸
             LayoutParams params = new LayoutParams(width, height);
             imageView.setLayoutParams(params);
             nextImageView.setLayoutParams(params);
@@ -269,12 +257,10 @@ public class UrlImageView extends FrameLayout {
         super.onAttachedToWindow();
         isAttachedToWindow = true;
 
-        // 添加滚动和绘制监听器
         ViewTreeObserver observer = getViewTreeObserver();
         observer.addOnScrollChangedListener(scrollListener);
         observer.addOnPreDrawListener(preDrawListener);
 
-        // 检查是否需要加载待处理的图片
         checkVisibilityAndLoad();
     }
 
@@ -283,7 +269,6 @@ public class UrlImageView extends FrameLayout {
         super.onDetachedFromWindow();
         isAttachedToWindow = false;
 
-        // 移除监听器
         ViewTreeObserver observer = getViewTreeObserver();
         observer.removeOnScrollChangedListener(scrollListener);
         observer.removeOnPreDrawListener(preDrawListener);
@@ -297,16 +282,12 @@ public class UrlImageView extends FrameLayout {
         }
     }
 
-    /**
-     * 检查 View 是否在可见区域内,如果是则加载待处理的图片
-     */
     private void checkVisibilityAndLoad() {
         if (!isAttachedToWindow || hasLoadedImage || pendingUrl == null) {
             return;
         }
 
         if (isVisibleInScrollContainer()) {
-            // View 现在可见,开始加载图片
             String urlToLoad = pendingUrl;
             pendingUrl = null;
             hasLoadedImage = true;
@@ -314,9 +295,6 @@ public class UrlImageView extends FrameLayout {
         }
     }
 
-    /**
-     * 检查 View 是否在滚动容器的可见区域内
-     */
     private boolean isVisibleInScrollContainer() {
         if (getVisibility() != VISIBLE) {
             return false;
@@ -326,34 +304,27 @@ public class UrlImageView extends FrameLayout {
             return false;
         }
 
-        // 获取 View 在窗口中的位置
         int[] location = new int[2];
         getLocationInWindow(location);
         int viewTop = location[1];
         int viewBottom = viewTop + getHeight();
 
-        // 获取根 View 的高度作为可见区域
         View rootView = getRootView();
         if (rootView == null) {
-            return true; // 如果没有根 View,假设可见
+            return true;
         }
 
         int screenHeight = rootView.getHeight();
 
-        // 检查 View 是否与可见区域有交集
         return viewBottom > -detectBorder && viewTop < screenHeight + detectBorder;
     }
 
-    /**
-     * 公开的加载方法,设置待加载的 URL
-     */
     public void loadUrl(String urlString) {
         loadUrl(urlString, 0, 0);
     }
 
     /**
-     * 加载图片并降采样到不超过 targetW x targetH（保持长宽比）。
-     * 传入与原图相同的 URL 时可复用 ImageUtils 的字节缓存（含 JMTC 下载的全尺寸图）。
+     * with downsample up to targetW x targetH
      */
     public void loadUrl(String urlString, int targetW, int targetH) {
         if (urlString != null && urlString.equals(currentURLString)
@@ -375,9 +346,6 @@ public class UrlImageView extends FrameLayout {
         }
     }
 
-    /**
-     * 实际执行加载的方法
-     */
     private void actuallyLoadUrl(String urlString) {
         if (loadTargetW <= 0 || loadTargetH <= 0) {
             int side = implicitTargetSize();
