@@ -5,13 +5,17 @@
   "compatibilityLevel": "JAVA_21",
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
-    "GuiRendererHudMixin",
+    "GuiRendererSceneMixin",
+    "ModernUiBitmapMixin",
+    "ModernUiGuardMixin",
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
     "SpanSetMixin",
-    "VulkanSampledCopyMixin"
+    "ToastManagerMixin",
+    "ToastRecordAccessor",
+    "UIManagerMixin"
   ],
   "injectors": {
     "defaultRequire": 1

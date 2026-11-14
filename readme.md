@@ -1,6 +1,5 @@
-![Banner](
-https://cdn.modrinth.com/data/7Rnb6oJr/images/28c55d88f0786e40489e150aa8fcc44788e01cca.png)
-![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/0384594f476bc719b558f63070bc9da22f945063.png)
+![Banner](https://cdn.modrinth.com/data/7Rnb6oJr/images/8dc0713e4e67153bc72f0b7ce7bd1098184d1cae.png)
+![Home View](https://cdn.modrinth.com/data/7Rnb6oJr/images/016966fe2d95e409b2c9d49ad52906b844b69e7e.png)
 (See more in [gallery](https://modrinth.com/plugin/music-hud/gallery))
 
 **A GUI-based, all situations (singleplayer/multiplayers) music mod/plugin designed with zero modifications to game mechanics**
@@ -163,8 +162,8 @@ Deploy separately (recommend for server)
 ## 兼容
 - 在 MusicHUD 播放时静音 Reactive Music
 - 连接模式与 ViaVersion 兼容
-- 适配 Sound Physics Perfected, 禁用 MusicHUD 音频管线的混响以保证音质
-- 在 1.21.1 上兼容 Raise Sound Limit Simplified，同时保持了 Blaze3D 音频管线上的修复
+- 适配 Sound Physics Perfected, 禁用其无差别应用于 MusicHUD 音频管线的混响以保证音质
+- 在 1.21.1 上兼容 Raise Sound Limit Simplified，同时保留了对 Blaze3D 音频管线的修复
 
 ## ~~大饼~~ 待办清单
 - 可自定义的 HUD 布局 [目标 1.4.0]

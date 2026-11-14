@@ -1,8 +1,7 @@
 package indi.etern.musichud.neoforge;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
+import indi.etern.musichud.client.ui.ModernUiSupport;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.platform.Environment;
@@ -19,9 +18,7 @@ import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.fml.event.config.ModConfigEvent;
 import net.neoforged.fml.loading.FMLEnvironment;
-import net.neoforged.neoforge.client.event.RenderGuiEvent;
 import net.neoforged.neoforge.client.gui.IConfigScreenFactory;
-import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.network.event.RegisterPayloadHandlersEvent;
 
 @Mod(MusicHud.MOD_ID)
@@ -37,6 +34,7 @@ public final class CommonInitializer {
 
         if (FMLEnvironment.getDist().isClient()) {
             MusicHud.setCurrentEnvironment(Environment.of(Environment.Side.CLIENT, Environment.Platform.NEOFORGE));
+            ModernUiSupport.ensureProbed();
             container.registerConfig(ModConfig.Type.COMMON, ServerConfigDefinition.configure.getRight());
             container.registerConfig(ModConfig.Type.CLIENT, ClientConfigDefinition.configure.getRight());
             container.registerExtensionPoint(IConfigScreenFactory.class, new ConfigScreenFactory());
@@ -47,14 +45,6 @@ public final class CommonInitializer {
         MusicHud.init();
     }
 
-    public static HudRendererManager hudRendererManager;
-
-    public static void onRenderGui(RenderGuiEvent.Pre event) {
-        if (hudRendererManager != null) {
-            hudRendererManager.renderFrame(new VanillaHudGraphics(event.getGuiGraphics()));
-        }
-    }
-
     void onConfigEvent(final ModConfigEvent configEvent) {
         ModConfig config = configEvent.getConfig();
         if (config.getSpec() == ServerConfigDefinition.configure.getRight()) {
@@ -62,8 +52,9 @@ public final class CommonInitializer {
             NeoForgeClientEventService.getInstance();
         } else if (config.getSpec() == ClientConfigDefinition.configure.getRight()) {
             clientConfig.setConfigured(true);
-            hudRendererManager = HudRendererManager.getInstance();
-            NeoForge.EVENT_BUS.addListener(CommonInitializer::onRenderGui);
+            if (ModernUiSupport.available()) {
+                ClientUiBootstrap.ensureStarted();
+            }
         }
         NeoForgeCommonEventService.getInstance();
     }

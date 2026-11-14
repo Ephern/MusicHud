@@ -1,0 +1,86 @@
+package indi.etern.musichud.mixin;
+
+import com.mojang.blaze3d.buffers.GpuBuffer;
+import com.mojang.blaze3d.buffers.GpuBufferSlice;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
+import com.mojang.blaze3d.pipeline.RenderTarget;
+import com.mojang.blaze3d.systems.RenderPass;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.VertexFormat;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.SceneRenderContext;
+import indi.etern.musichud.client.ui.render.SceneRenderContextImpl;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import net.minecraft.client.gui.render.GuiRenderer;
+import net.minecraft.client.gui.render.TextureSetup;
+import org.jetbrains.annotations.Nullable;
+import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
+import org.spongepowered.asm.mixin.injection.At;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.LocalCapture;
+
+import java.util.ArrayDeque;
+import java.util.Deque;
+import java.util.function.Supplier;
+
+@Mixin(GuiRenderer.class)
+public class GuiRendererSceneMixin {
+    @Unique
+    private @Nullable RenderPass music_hud$currentRenderPass;
+
+    @Unique
+    private final Deque<TextureSetup> music_hud$elementSetups = new ArrayDeque<>();
+
+    @Inject(method = "recordMesh", at = @At("HEAD"))
+    private void music_hud$recordElementSetup(BufferBuilder bufferBuilder, RenderPipeline pipeline,
+                                              TextureSetup textureSetup, ScreenRectangle scissor, CallbackInfo ci) {
+        music_hud$elementSetups.addLast(textureSetup);
+    }
+
+    @Inject(method = "prepare", at = @At("HEAD"))
+    private void music_hud$resetFrameState(CallbackInfo ci) {
+        music_hud$elementSetups.clear();
+        music_hud$currentRenderPass = null;
+        RenderRuntime.getInstance().beginFrameStamp();
+    }
+
+    @Inject(method = "render", at = @At("RETURN"))
+    private void music_hud$endGuiFrame(GpuBufferSlice bufferSlice, CallbackInfo ci) {
+        if (SceneRenderContext.getCurrent() instanceof SceneRenderContextImpl impl) {
+            impl.endGuiFrame();
+        }
+    }
+
+    @Inject(method = "executeDrawRange",
+            at = @At(value = "INVOKE", target = "Lcom/mojang/blaze3d/systems/RenderSystem;bindDefaultUniforms" +
+                    "(Lcom/mojang/blaze3d/systems/RenderPass;)V", shift = At.Shift.AFTER, remap = false),
+            locals = LocalCapture.CAPTURE_FAILSOFT)
+    private void music_hud$bindAllUniforms(Supplier<String> label, RenderTarget mainRenderTarget,
+                                           GpuBufferSlice fog, GpuBufferSlice dynamicTransforms,
+                                           GpuBuffer indexBuffer, VertexFormat.IndexType indexType,
+                                           int startIndex, int endIndex, CallbackInfo ci,
+                                           RenderPass renderPass) {
+        music_hud$currentRenderPass = renderPass;
+        if (SceneRenderContext.getCurrent() instanceof SceneRenderContextImpl impl) {
+            impl.bindAllUniforms(renderPass);
+        }
+    }
+
+    @Inject(method = "executeDrawRange",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/client/gui/render/GuiRenderer;executeDraw(Lnet/minecraft/client/gui/render/GuiRenderer$Draw;Lcom/mojang/blaze3d/systems/RenderPass;Lcom/mojang/blaze3d/buffers/GpuBuffer;Lcom/mojang/blaze3d/vertex/VertexFormat$IndexType;)V"))
+    private void music_hud$bindElementUniforms(Supplier<String> label, RenderTarget mainRenderTarget,
+                                               GpuBufferSlice fog, GpuBufferSlice dynamicTransforms,
+                                               GpuBuffer indexBuffer, VertexFormat.IndexType indexType,
+                                               int startIndex, int endIndex, CallbackInfo ci) {
+        RenderPass pass = music_hud$currentRenderPass;
+        if (pass == null) return;
+        TextureSetup textureSetup = music_hud$elementSetups.poll();
+        if (textureSetup == null) return;
+        if (SceneRenderContext.getCurrent() instanceof SceneRenderContextImpl impl) {
+            impl.bindElementUniforms(pass, textureSetup, pass::setUniform);
+        }
+    }
+}

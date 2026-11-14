@@ -1,0 +1,146 @@
+package indi.etern.musichud.client.ui.render.gpu.blaze3d.gl;
+
+import com.mojang.blaze3d.opengl.GlDevice;
+import com.mojang.blaze3d.opengl.GlTexture;
+import com.mojang.blaze3d.systems.GpuDevice;
+import com.mojang.blaze3d.textures.GpuTexture;
+
+import java.lang.reflect.Field;
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
+/** Reflection bridge for NeoForge's validation device wrapper. */
+public final class NeoForgeValidationBridge {
+    private static final String VALIDATION_DEVICE =
+            "net.neoforged.neoforge.client.blaze3d.validation.ValidationGpuDevice";
+    private static final String VALIDATION_TEXTURE =
+            "net.neoforged.neoforge.client.blaze3d.validation.ValidationGpuTexture";
+
+    private NeoForgeValidationBridge() {
+    }
+
+    /** Unwraps NeoForge's validation proxy so backend textures can be inspected. */
+    public static GpuTexture unwrap(GpuTexture texture) {
+        GpuTexture current = texture;
+        for (int depth = 0; depth < 4 && !(current instanceof GlTexture); depth++) {
+            GpuTexture real = realTexture(current);
+            if (real == null || real == current) {
+                break;
+            }
+            current = real;
+        }
+        return current;
+    }
+
+    /** Unwraps validation proxies only, leaving backend textures untouched. */
+    public static GpuTexture unwrapValidation(GpuTexture texture) {
+        GpuTexture current = texture;
+        for (int depth = 0; depth < 4; depth++) {
+            GpuTexture real = realTexture(current);
+            if (real == null || real == current) {
+                break;
+            }
+            current = real;
+        }
+        return current;
+    }
+
+    /** Unwraps NeoForge's validation proxy around the device, if any. */
+    public static GpuDevice unwrapDevice(GpuDevice device) {
+        Object real = realDevice(device);
+        return real instanceof GpuDevice result ? result : device;
+    }
+
+    private static GpuTexture realTexture(GpuTexture texture) {
+        try {
+            Class<?> type = Class.forName(VALIDATION_TEXTURE, false,
+                    texture.getClass().getClassLoader());
+            if (!type.isInstance(texture)) {
+                return null;
+            }
+            Object real = type.getMethod("getRealTexture").invoke(texture);
+            return real instanceof GpuTexture result ? result : null;
+        } catch (ReflectiveOperationException | LinkageError | RuntimeException ignored) {
+            return null;
+        }
+    }
+
+    static boolean isGlDevice(GpuDevice device) {
+        if (device instanceof GlDevice) {
+            return true;
+        }
+        Object real = realDevice(device);
+        return real instanceof GlDevice;
+    }
+
+    static GpuTexture wrap(GpuDevice device, GpuTexture texture) {
+        Validation validation = Validation.resolve(device);
+        return validation == null ? texture : validation.wrap(texture);
+    }
+
+    private static Object realDevice(GpuDevice device) {
+        try {
+            Class<?> type = Class.forName(VALIDATION_DEVICE, false,
+                    device.getClass().getClassLoader());
+            if (!type.isInstance(device)) {
+                return null;
+            }
+            return type.getMethod("getRealDevice").invoke(device);
+        } catch (ReflectiveOperationException | LinkageError ignored) {
+            return null;
+        }
+    }
+
+    /** Resolved reflection handles. */
+    private record Validation(Object validationDevice, Method wrapMethod,
+                              Object validator, Method validateUsage) {
+        private static Validation resolve(GpuDevice device) {
+            if (device instanceof GlDevice) {
+                return null;
+            }
+            try {
+                Class<?> type = Class.forName(VALIDATION_DEVICE, false,
+                        device.getClass().getClassLoader());
+                if (!type.isInstance(device)
+                        || !(type.getMethod("getRealDevice").invoke(device) instanceof GlDevice)) {
+                    throw new UnsupportedOperationException(
+                            "Scene native targets require the OpenGL backend");
+                }
+                Field validatorField = type.getDeclaredField("validator");
+                Method wrap = type.getDeclaredMethod("wrapGpuTexture",
+                        GpuTexture.class, validatorField.getType());
+                Method validateUsage = validatorField.getType()
+                        .getDeclaredMethod("validateTextureUsage", int.class);
+                if (!validatorField.trySetAccessible() || !wrap.trySetAccessible()
+                        || !validateUsage.trySetAccessible()) {
+                    throw new UnsupportedOperationException(
+                            "NeoForge validation texture bridge is inaccessible");
+                }
+                return new Validation(device, wrap, validatorField.get(device), validateUsage);
+            } catch (ReflectiveOperationException | LinkageError failure) {
+                throw new UnsupportedOperationException(
+                        "Unsupported scene GPU device wrapper", failure);
+            }
+        }
+
+        private GpuTexture wrap(GpuTexture texture) {
+            try {
+                validateUsage.invoke(validator, texture.usage());
+                Object wrapped = wrapMethod.invoke(validationDevice, texture, validator);
+                if (!(wrapped instanceof GpuTexture result) || result == texture) {
+                    throw new IllegalStateException(
+                            "NeoForge did not create a validation texture wrapper");
+                }
+                return result;
+            } catch (InvocationTargetException failure) {
+                if (failure.getCause() instanceof RuntimeException runtime) throw runtime;
+                if (failure.getCause() instanceof Error error) throw error;
+                throw new IllegalStateException(
+                        "NeoForge texture validation wrapper failed", failure.getCause());
+            } catch (ReflectiveOperationException failure) {
+                throw new IllegalStateException(
+                        "Cannot create NeoForge validation texture wrapper", failure);
+            }
+        }
+    }
+}

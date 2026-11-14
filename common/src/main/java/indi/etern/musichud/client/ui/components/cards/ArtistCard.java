@@ -12,6 +12,7 @@ import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
+import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 
@@ -67,7 +68,7 @@ public class ArtistCard extends LinearLayout {
 
         setClickable(true);
         setOnClickListener((view) -> {
-            RouterContainer routerContainer = RouterContainer.getInstance();
+            RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
             if (routerContainer != null && artist != null) {
                 routerContainer.pushNavigate(
                         new ArtistDetailView(context, artist)

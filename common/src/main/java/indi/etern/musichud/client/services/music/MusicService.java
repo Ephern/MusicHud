@@ -21,7 +21,8 @@ import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.states.*;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.hud.presentation.CoverImageStore;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -111,9 +112,9 @@ public class MusicService implements IClientMusicService {
                 inst.musicQueue.clear();
             }
         }
-        HudRendererManager hudRendererManager = HudRendererManager.getActiveInstance();
-        if (switchToNone && hudRendererManager != null) {
-            hudRendererManager.reset();
+        HudPresenter presenter = HudPresenter.getActiveInstance();
+        if (switchToNone && presenter != null) {
+            presenter.reset();
         }
     }
 
@@ -347,12 +348,12 @@ public class MusicService implements IClientMusicService {
             if (head != null) {// preload image
                 MusicDetail peek = head.musicDetail().value();
                 Album album = peek.getAlbum();
-                ImageUtils.downloadScaledAsync(album.getPicUrl(), 240, 240);
-                HudRendererManager.getInstance().preloadAlbumImage(peek.getAlbum());
+                ImageUtils.prefetchBytes(album.getPicUrl());
+                CoverImageStore.getInstance().preload(peek.getAlbum());
             } else if (nextIdleMusicDetail != null && !nextIdleMusicDetail.value().equals(MusicDetail.NONE)) {
                 Album album = nextIdleMusicDetail.value().getAlbum();
-                ImageUtils.downloadScaledAsync(album.getPicUrl(), 240, 240);
-                HudRendererManager.getInstance().preloadAlbumImage(nextIdleMusicDetail.value().getAlbum());
+                ImageUtils.prefetchBytes(album.getPicUrl());
+                CoverImageStore.getInstance().preload(nextIdleMusicDetail.value().getAlbum());
             }
             if (!message.isEmpty()) {
                 MuiModApi.postToUiThread(() -> {
@@ -363,7 +364,7 @@ public class MusicService implements IClientMusicService {
             }
             if (!musicDetail.value().equals(MusicDetail.NONE)) {
                 Album album = musicDetail.value().getAlbum();
-                ImageUtils.downloadScaledAsync(album.getPicUrl(), 240, 240);
+                ImageUtils.prefetchBytes(album.getPicUrl());
                 StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
                 nowPlayingInfo.switchMusicInfo(musicDetail, nextIdleMusicDetail);
                 PlaybackTask task = streamAudioPlayer.obtainTaskFor(musicDetail, serverStartTime);
@@ -397,8 +398,8 @@ public class MusicService implements IClientMusicService {
         Traceable<MusicDetail> next = Objects.requireNonNullElse(nextIdleMusicDetail, Traceable.of(MusicDetail.NONE));
         MusicDetail nextDetail = next.value();
         if (!nextDetail.equals(MusicDetail.NONE)) {
-            ImageUtils.downloadScaledAsync(nextDetail.getAlbum().getPicUrl(), 240, 240);
-            HudRendererManager.getInstance().preloadAlbumImage(nextDetail.getAlbum());
+            ImageUtils.prefetchBytes(nextDetail.getAlbum().getPicUrl());
+            CoverImageStore.getInstance().preload(nextDetail.getAlbum());
         }
         NowPlayingInfo.getInstance().updateNextToPlayIdle(next);
     }

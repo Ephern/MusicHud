@@ -10,6 +10,7 @@ import indi.etern.musichud.interfaces.Unregister;
 import net.minecraft.client.resources.language.I18n;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 public class ToggleTrackLikeStateButton extends ToggleIconButton {
     private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 800;
@@ -72,16 +73,16 @@ public class ToggleTrackLikeStateButton extends ToggleIconButton {
             setChecked(false);
             toggleVersion.incrementAndGet();
             setEnabled(true);
-            setTooltipText(isChecked() ? getTooltipTextOn() : getTooltipTextOff());
+            Tooltip.attach(this, isChecked() ? getTooltipTextOn() : getTooltipTextOff());
             return;
         }
         if (!LoginService.getInstance().isLogined()) {
             setEnabled(false);
-            setTooltipText(I18n.get(MusicHud.MOD_ID + ".text.loginRequired"));
+            Tooltip.attach(this, I18n.get(MusicHud.MOD_ID + ".text.loginRequired"));
             return;
         }
         setEnabled(true);
-        setTooltipText(isChecked() ? getTooltipTextOn() : getTooltipTextOff());
+        Tooltip.attach(this, isChecked() ? getTooltipTextOn() : getTooltipTextOff());
         ps.isContained().whenComplete((contains, throwable) -> {
             if (throwable != null) {
                 throw new RuntimeException(throwable);
