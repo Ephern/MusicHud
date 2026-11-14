@@ -96,7 +96,6 @@ public class HudConfigScreen extends Screen implements MuiScreen {
             this.renderPanorama(guiGraphics, deltaTick);
             guiGraphics.nextStratum();
             RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
-            return;
         }
         // renderBackground runs before render, so this frame's result is written before the UI
         // recording that samples it executes.
