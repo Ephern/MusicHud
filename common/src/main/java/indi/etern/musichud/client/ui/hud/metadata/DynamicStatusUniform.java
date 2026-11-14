@@ -50,9 +50,4 @@ public class DynamicStatusUniform implements SceneUniform {
                 0
         );
     }
-
-    @Override
-    public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-        return false;//always update
-    }
 }

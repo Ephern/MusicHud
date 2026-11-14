@@ -383,10 +383,5 @@ public final class SceneBlur {
             writer.putVec4(1f / sourceWidth, 1f / sourceHeight, sourceWidth, sourceHeight);
             writer.putVec4(directionX, directionY, sigma, radius);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 }

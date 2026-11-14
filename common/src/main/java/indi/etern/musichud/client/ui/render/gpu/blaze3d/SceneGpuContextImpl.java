@@ -27,10 +27,13 @@ import org.jetbrains.annotations.Nullable;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalInt;
+import java.util.Set;
 
 @SuppressWarnings("resource")
 public final class SceneGpuContextImpl implements SceneGpuContext {
@@ -50,6 +53,8 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     // relies on driver-side buffer renaming and can stall.
     private final Map<UniformKey, DynamicUniformStorage<UniformAdapter>> uniformStorages =
             new HashMap<>();
+    private final Set<DynamicUniformStorage<UniformAdapter>> writtenStorages =
+            Collections.newSetFromMap(new IdentityHashMap<>());
     private final List<SceneGpuTextureImpl> textures = new ArrayList<>();
     private final List<SceneGpuMeshImpl> meshes = new ArrayList<>();
     private final Map<String, GpuTextureView> samplerScratch = new HashMap<>();
@@ -260,6 +265,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         DynamicUniformStorage<UniformAdapter> storage = uniformStorages.computeIfAbsent(key,
                 ignored -> new DynamicUniformStorage<>(
                         "MusicHud GPU uniform " + name, size, 256));
+        writtenStorages.add(storage);
         return storage.writeUniform(new UniformAdapter(uniform));
     }
 
@@ -363,6 +369,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         meshes.clear();
         for (DynamicUniformStorage<UniformAdapter> storage : uniformStorages.values()) storage.close();
         uniformStorages.clear();
+        writtenStorages.clear();
         pipelines.clear();
         renderer.close();
         if (generation == latestGeneration) {
@@ -397,9 +404,11 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     @Override
     public void endFrame() {
         if (closed) return;
-        for (DynamicUniformStorage<UniformAdapter> storage : uniformStorages.values()) {
+        // Advancing a ring that was not written this frame would only create and close a fence.
+        for (DynamicUniformStorage<UniformAdapter> storage : writtenStorages) {
             storage.endFrame();
         }
+        writtenStorages.clear();
     }
 
     @Override
