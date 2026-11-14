@@ -213,7 +213,6 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
                 : SceneCapture.extent(capturePlan.captureRegion().height(), downscale);
         SceneGpuTexture output = deferredBackdrop.reserve(gpu, outputWidth, outputHeight);
         if (output == null) return false;
-        boolean topDown = source.topDown();
         int sceneBlurRadius = plan.sceneBlurRadius();
         SceneGpuTexture deferredCover = cover;
         gpu.deferBackdrop(() -> {
@@ -234,7 +233,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
                     }
                 }
             }
-            deferredBackdrop.copy(gpu, result, topDown);
+            deferredBackdrop.copy(gpu, result);
         });
 
         // The fluid was composited inside the deferred chain, so only the sampling overlay applies.

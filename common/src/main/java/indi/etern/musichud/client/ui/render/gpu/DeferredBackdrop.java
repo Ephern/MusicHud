@@ -45,24 +45,24 @@ public final class DeferredBackdrop {
         }
     }
 
-    /** Copies the chain result into the published texture, preserving the source row order. */
-    public void copy(SceneGpuContext gpu, SceneGpuTexture source, boolean topDown) {
+    /** Copies the chain result into the published texture, keeping its rows and alpha. */
+    public void copy(SceneGpuContext gpu, SceneGpuTexture source) {
         if (output == null || owner != gpu || source == null) return;
         gpu.draw(new SceneDraw(output,
-                gpu.pipeline(ScenePipelineKey.SCENE_CAPTURE, output.actualFormat()),
+                gpu.pipeline(ScenePipelineKey.SCENE_COPY, output.actualFormat()),
                 List.of(new SceneSamplerBinding("Sampler0", source)),
-                List.of(new SceneUniformBinding(SceneCapture.CaptureUniform.UBO_NAME,
-                        new SceneCapture.CaptureUniform(0f, 0f, width, height,
-                                source.width(), source.height(), 1, topDown ? 0f : 1f)))));
+                List.of()));
     }
 
     public void release() {
-        if (output != null && owner != null) {
-            SceneRetirement.retire(owner, output);
-        }
+        SceneGpuContext previousOwner = owner;
+        SceneGpuTexture previousOutput = output;
         output = null;
         owner = null;
         width = 0;
         height = 0;
+        if (previousOutput != null && previousOwner != null) {
+            SceneRetirement.retire(() -> previousOwner.release(previousOutput));
+        }
     }
 }

@@ -136,10 +136,10 @@ public final class SceneCapture {
         }
     }
 
-    record CaptureUniform(float left, float top, float width, float height,
-                          int sourceWidth, int sourceHeight,
-                          int downscale, float flipY) implements SceneUniform {
-        static final String UBO_NAME = "MHCapture";
+    private record CaptureUniform(float left, float top, float width, float height,
+                                  int sourceWidth, int sourceHeight,
+                                  int downscale, float flipY) implements SceneUniform {
+        private static final String UBO_NAME = "MHCapture";
         private static final int UBO_SIZE = Std140Sizes.calc().putVec4().putVec4().get();
 
         @Override

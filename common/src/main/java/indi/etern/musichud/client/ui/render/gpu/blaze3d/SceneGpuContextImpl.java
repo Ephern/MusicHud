@@ -269,6 +269,9 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
                     .withSampler("Sampler0")
                     .withUniform("MHCapture", UniformType.UNIFORM_BUFFER)
                     .build();
+            case SCENE_COPY -> renderer.pipeline("scene_copy")
+                    .withSampler("Sampler0")
+                    .build();
             case SCENE_BACKGROUND_BAKE -> renderer.pipeline("scene_background_bake")
                     .withSampler("Sampler0")
                     .withUniform("MHBackgroundBake", UniformType.UNIFORM_BUFFER)
