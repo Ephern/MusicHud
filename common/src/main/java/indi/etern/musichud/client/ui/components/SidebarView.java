@@ -1406,7 +1406,10 @@ public class SidebarView extends LinearLayout {
     }
 
     private void checkIdlePlaySources(Set<IdlePlaySource> idlePlaySources, View targetView) {
-        targetView.setVisibility(idlePlaySources.isEmpty() ? GONE : VISIBLE);
+        int visibility = idlePlaySources.isEmpty() ? GONE : VISIBLE;
+        if (targetView.getVisibility() != visibility) {
+            targetView.post(() -> targetView.setVisibility(visibility));
+        }
         checkQueue(musicService.getMusicQueue());
     }
 

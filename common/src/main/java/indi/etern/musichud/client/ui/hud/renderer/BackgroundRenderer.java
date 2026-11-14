@@ -17,6 +17,7 @@ import indi.etern.musichud.client.ui.render.RenderStats;
 import indi.etern.musichud.client.ui.render.SceneElementRenderState;
 import indi.etern.musichud.client.ui.render.SceneRenderContext;
 import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.gpu.DeferredBackdrop;
 import indi.etern.musichud.client.ui.render.gpu.MinecraftBackgroundTexture;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlur;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurCrop;
@@ -59,6 +60,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
     private static final float ORBIT_DRIFT_FREQ_SCALE = (float) Math.sqrt(1.2);
     private final BackgroundFrameResolver frameResolver;
     private final BackgroundTarget target;
+    private final DeferredBackdrop deferredBackdrop = new DeferredBackdrop();
     private final SceneCapture sceneCapture = new SceneCapture();
     private final SceneBlur backgroundBlur = new SceneBlur();
     private final SceneBlurCrop backgroundCrop = new SceneBlurCrop();
@@ -97,6 +99,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         sceneCoverWarpProcedural.reset();
         sceneCoverLayers.release();
         sceneCoverOverlay.release();
+        deferredBackdrop.release();
     }
 
     /** Drops the cover crossfade state, so a paused renderer does not keep the artwork alive. */
@@ -182,10 +185,8 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         BackgroundFramePlan plan = frameResolver.plan(
                 style, source, cover != null, masterOpacity);
         boolean fluidWanted = plan.fluidWanted();
-        boolean fluidAttempted = false;
 
         if (plan.path() == BackgroundFramePlan.Path.FLUID_ONLY) {
-            fluidAttempted = true;
             SceneGpuTexture fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
                     time, layerOpacity, plan.fluidBlurRadius());
             if (fluid != null) {
@@ -201,13 +202,59 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         CapturePlan capturePlan = capturePlan(region, source, plan.sceneBlurRadius());
         if (capturePlan == null) return false;
         int downscale = capturePlan.downscale();
+
+        // The world is only drawn after the GUI was extracted, so the whole chain runs while the GUI
+        // is submitted and the element samples its result later in the same frame.
+        int outputWidth = capturePlan.needsCrop()
+                ? downscaled(capturePlan.targetWidth(), downscale)
+                : SceneCapture.extent(capturePlan.captureRegion().width(), downscale);
+        int outputHeight = capturePlan.needsCrop()
+                ? downscaled(capturePlan.targetHeight(), downscale)
+                : SceneCapture.extent(capturePlan.captureRegion().height(), downscale);
+        SceneGpuTexture output = deferredBackdrop.reserve(gpu, outputWidth, outputHeight);
+        if (output == null) return false;
+        int sceneBlurRadius = plan.sceneBlurRadius();
+        SceneGpuTexture deferredCover = cover;
+        gpu.deferBackdrop(() -> {
+            SceneGpuTexture sampled = sampleScene(gpu, source, capturePlan, sceneBlurRadius, downscale);
+            if (sampled == null) return;
+            SceneGpuTexture result = sampled;
+            if (fluidWanted) {
+                SceneGpuTexture fluid = buildFluid(gpu, deferredCover, region, canvasWidth, canvasHeight,
+                        time, layerOpacity, plan.fluidBlurRadius());
+                if (fluid != null) {
+                    SceneGpuTexture composite = sceneCoverOverlay.apply(
+                            gpu, sampled, fluid, plan.masterOpacity(),
+                            plan.samplingBlackOverlay(),
+                            backgroundAdjustUniform(false, 0f, 0f),
+                            audioReactiveScaleTimed());
+                    if (composite != null) {
+                        result = composite;
+                    }
+                }
+            }
+            deferredBackdrop.copy(gpu, result);
+        });
+
+        // The fluid was composited inside the deferred chain, so only the sampling overlay applies.
+        long submitStart = System.nanoTime();
+        boolean presented = submitOrPublishBackground(context, gpu, source, style, output, false,
+                fluidWanted ? 0f : plan.samplingBlackOverlay(), 1f);
+        RenderStats.phaseSubmitNanos(System.nanoTime() - submitStart);
+        return presented;
+    }
+
+    /** Copies the scene under the HUD, blurs it and crops it to the panel. */
+    private @Nullable SceneGpuTexture sampleScene(SceneGpuContext gpu,
+                                                  SceneGpuContext.MainColorSource source,
+                                                  CapturePlan capturePlan,
+                                                  int sceneBlurRadius, int downscale) {
         long captureStart = System.nanoTime();
         SceneGpuTexture captured = sceneCapture.capture(gpu, source,
                 capturePlan.captureRegion(), downscale);
         RenderStats.phaseCaptureNanos(System.nanoTime() - captureStart);
-        if (captured == null) return false;
+        if (captured == null) return null;
         SceneGpuTexture background = captured;
-        int sceneBlurRadius = plan.sceneBlurRadius();
         if (sceneBlurRadius > 0) {
             long sceneBlurStart = System.nanoTime();
             // Sigma is expressed in the (possibly downscaled) capture's pixel space.
@@ -223,38 +270,10 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
                     capturePlan.u0(), capturePlan.v0(), capturePlan.u1(), capturePlan.v1(),
                     downscaled(capturePlan.targetWidth(), downscale),
                     downscaled(capturePlan.targetHeight(), downscale));
-            if (cropped == null) return false;
+            if (cropped == null) return null;
             background = cropped;
         }
-
-        SceneGpuTexture output = background;
-        boolean backgroundOnly = true;
-        // scaleOrGamma = 0 selects the overlay shader's linear tone mapping.
-        SceneUniform adjustUniform = backgroundAdjustUniform(false, 0f, 0f);
-        if (fluidWanted) {
-            if (!fluidAttempted) {
-                SceneGpuTexture fluid = buildFluid(gpu, cover, region, canvasWidth, canvasHeight,
-                        time, layerOpacity, plan.fluidBlurRadius());
-                if (fluid != null) {
-                    float scale = audioReactiveScaleTimed();
-                    SceneGpuTexture composite = sceneCoverOverlay.apply(
-                            gpu, background, fluid, plan.masterOpacity(),
-                            plan.samplingBlackOverlay(), adjustUniform,
-                            scale);
-                    if (composite != null) {
-                        output = composite;
-                        backgroundOnly = false;
-                    }
-                }
-            }
-        }
-
-        // The zoom stays in the sampling, or the captured scene would move with it.
-        long submitStart = System.nanoTime();
-        boolean presented = submitOrPublishBackground(context, gpu, source, style, output, false,
-                backgroundOnly ? plan.samplingBlackOverlay() : 0f, 1f);
-        RenderStats.phaseSubmitNanos(System.nanoTime() - submitStart);
-        return presented;
+        return background;
     }
 
     /** {@link #audioReactiveScale()} with its own timing, since it takes the audio player lock. */
