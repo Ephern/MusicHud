@@ -263,10 +263,5 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
         public void write(Std140Writer writer) {
             writer.putVec4(gate, 0f, 0f, 0f);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 }

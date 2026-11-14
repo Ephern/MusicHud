@@ -36,6 +36,9 @@ public class SceneRenderContextImpl implements SceneRenderContext {
             new IdentityHashMap<>();
     private final Map<RenderLayer, Map<CacheKey, LastWritten>> lastWrittenUniforms =
             new IdentityHashMap<>();
+    private final Map<SceneUniform, Boolean> dirtyUniforms = new IdentityHashMap<>();
+    private final Set<DynamicUniformStorage<UniformAdapter>> writtenStorages =
+            Collections.newSetFromMap(new IdentityHashMap<>());
 
     private final List<ElementRecord> elements = new ArrayList<>();
     private final Map<TextureSetup, Map<String, GpuBufferSlice>> elementSlices = new IdentityHashMap<>();
@@ -63,11 +66,13 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     @Override
     public void endFrame() {
         RenderStats.endTextFrame();
-        long startNanos = System.nanoTime();
-        prepareUniforms();
-        RenderStats.addUniformNanos(System.nanoTime() - startNanos);
-        // The offscreen passes recorded during scene.render() uploaded their uniforms into ring
-        // buffers; advance them now so the next frame never overwrites an in-flight slice.
+        if (!elements.isEmpty()) {
+            long startNanos = System.nanoTime();
+            prepareUniforms();
+            RenderStats.addUniformNanos(System.nanoTime() - startNanos);
+        }
+        // The rings are rotated once per frame even when nothing was recorded: the next pass writes
+        // into the slot this rotation frees.
         RenderRuntime.getInstance().endSceneFrame();
     }
 
@@ -77,11 +82,12 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         elementSlices.clear();
         defaultSlices.clear();
         scissorStack.clear();
-        for (Map<CacheKey, DynamicUniformStorage<UniformAdapter>> ownerStorages : storageMap.values()) {
-            for (DynamicUniformStorage<?> storage : ownerStorages.values()) {
-                storage.endFrame();
-            }
+        // Only a storage written this frame needs its ring advanced; advancing a cold one would just
+        // create and close a fence every frame for a layer no one draws.
+        for (DynamicUniformStorage<UniformAdapter> storage : writtenStorages) {
+            storage.endFrame();
         }
+        writtenStorages.clear();
         RenderRuntime.getInstance().processPendingGpuRecreate();
     }
 
@@ -144,6 +150,10 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     }
 
     public void prepareUniforms() {
+        // Slices come from a ring buffer that rotates once per frame, so a slice cached by an earlier
+        // pass may already hold other data: only dedupe within this pass.
+        lastWrittenUniforms.clear();
+        dirtyUniforms.clear();
         for (ElementRecord element : elements) {
             if (element.uniforms == null) continue;
             Map<String, GpuBufferSlice> slices = elementSlices.get(element.textureSetup);
@@ -151,9 +161,17 @@ public class SceneRenderContextImpl implements SceneRenderContext {
                     element.owner, key -> new HashMap<>());
             for (SceneUniform uniform : element.uniforms) {
                 CacheKey cacheKey = new CacheKey(element.pipeline, uniform.getUBOName());
+                Boolean dirty = dirtyUniforms.get(uniform);
+                if (dirty == null) {
+                    DirtyFlag flag = new DirtyFlag();
+                    uniform.checkDirty(flag);
+                    dirty = flag.dirty;
+                    dirtyUniforms.put(uniform, dirty);
+                }
                 GpuBufferSlice slice;
                 LastWritten last = ownerCache.get(cacheKey);
-                if (last != null && last.uniform.shouldUseBuffer(uniform)
+                //noinspection resource
+                if (!dirty && last != null && last.uniform == uniform
                         && last.slice != null && !last.slice.buffer().isClosed()) {
                     slice = last.slice;
                 } else {
@@ -163,6 +181,7 @@ public class SceneRenderContextImpl implements SceneRenderContext {
                                     key -> new DynamicUniformStorage<>(
                                             uniform.getUBOName(), uniform.getUBOSize(), 256));
                     slice = storage.writeUniform(new UniformAdapter(uniform));
+                    writtenStorages.add(storage);
                 }
                 ownerCache.put(cacheKey, new LastWritten(uniform, slice));
                 if (slices != null) {
@@ -299,6 +318,15 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     }
 
     private record LastWritten(SceneUniform uniform, GpuBufferSlice slice) {
+    }
+
+    private static final class DirtyFlag implements DirtyMarker {
+        private boolean dirty;
+
+        @Override
+        public void markDirty() {
+            dirty = true;
+        }
     }
 
     private record ElementRecord(RenderLayer owner, ScenePipeline pipeline, TextureSetup textureSetup, SceneUniform[] uniforms) {
