@@ -203,8 +203,8 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         if (capturePlan == null) return false;
         int downscale = capturePlan.downscale();
 
-        // The world is only drawn after the GUI was extracted, so the whole chain runs while the GUI
-        // is submitted and the element samples its result later in the same frame.
+        // The HUD is extracted before the world is drawn, so its stage has to run while the GUI is
+        // submitted and the element samples the result in the same frame.
         int outputWidth = capturePlan.needsCrop()
                 ? downscaled(capturePlan.targetWidth(), downscale)
                 : SceneCapture.extent(capturePlan.captureRegion().width(), downscale);
@@ -215,7 +215,7 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         if (output == null) return false;
         int sceneBlurRadius = plan.sceneBlurRadius();
         SceneGpuTexture deferredCover = cover;
-        gpu.deferBackdrop(() -> {
+        Runnable compose = () -> {
             SceneGpuTexture sampled = sampleScene(gpu, source, capturePlan, sceneBlurRadius, downscale);
             if (sampled == null) return;
             SceneGpuTexture result = sampled;
@@ -234,7 +234,14 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
                 }
             }
             deferredBackdrop.copy(gpu, result);
-        });
+        };
+        // A screen renders after the world, so its stage can run right away; only the HUD is
+        // extracted before the world reached the main target.
+        if (target == BackgroundTarget.HUD) {
+            gpu.deferBackdrop(compose);
+        } else {
+            compose.run();
+        }
 
         // The fluid was composited inside the deferred chain, so only the sampling overlay applies.
         long submitStart = System.nanoTime();

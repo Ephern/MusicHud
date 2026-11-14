@@ -81,11 +81,6 @@ public class ScrollingLyricLineRenderer implements RenderLayer {
         );
     }
 
-    /**
-     * 设置双行文本及其样式。可从工作线程调用：请求按顺序排队，由渲染线程应用，快速切换不会丢行。
-     *
-     * @param animate whether to start the vertical switch spring
-     */
     public void setLines(Line line1, Line line2, boolean animate) {
         int width = cachedContainerWidth;
         float maxScroll1 = computeMaxScrollOffset(line1.text(), line1Height, width);
