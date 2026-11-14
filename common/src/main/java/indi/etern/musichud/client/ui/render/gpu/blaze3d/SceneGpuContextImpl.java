@@ -54,6 +54,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     private final List<SceneGpuMeshImpl> meshes = new ArrayList<>();
     private final Map<String, GpuTextureView> samplerScratch = new HashMap<>();
     private final Map<String, GpuBufferSlice> uniformScratch = new HashMap<>();
+    private final List<Runnable> deferredBackdrops = new ArrayList<>();
     private boolean closed;
 
     public SceneGpuContextImpl() {
@@ -347,6 +348,7 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         RenderSystem.assertOnRenderThread();
         if (closed) return;
         closed = true;
+        deferredBackdrops.clear();
         MinecraftBackgroundTexture.clear();
         HudPanelBackdrop.clear();
         for (SceneGpuTextureImpl texture : new ArrayList<>(textures)) {
@@ -362,6 +364,29 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         renderer.close();
         if (generation == latestGeneration) {
             SceneInterop.install(null);
+        }
+    }
+
+    @Override
+    public void deferBackdrop(@Nullable Runnable work) {
+        assertOpen();
+        if (work != null) {
+            deferredBackdrops.add(work);
+        }
+    }
+
+    @Override
+    public void runDeferredBackdrop() {
+        if (deferredBackdrops.isEmpty()) return;
+        List<Runnable> work = new ArrayList<>(deferredBackdrops);
+        deferredBackdrops.clear();
+        for (Runnable step : work) {
+            try {
+                step.run();
+            } catch (RuntimeException failure) {
+                MusicHud.getLogger(SceneGpuContextImpl.class)
+                        .debug("While composing a deferred backdrop", failure);
+            }
         }
     }
 

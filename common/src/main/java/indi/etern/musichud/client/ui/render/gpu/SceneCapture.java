@@ -29,6 +29,11 @@ public final class SceneCapture {
         return pending.target();
     }
 
+    /** Size of a source region after {@code downscale}, matching {@link #prepare}. */
+    public static int extent(float pixels, int downscale) {
+        return Math.max(1, (int) Math.ceil(pixels / Math.max(1, downscale)));
+    }
+
     public @Nullable PendingCapture prepare(SceneGpuContext gpu,
                                             SceneGpuContext.MainColorSource source,
                                             Region region, int downscale) {
@@ -131,10 +136,10 @@ public final class SceneCapture {
         }
     }
 
-    private record CaptureUniform(float left, float top, float width, float height,
-                                  int sourceWidth, int sourceHeight,
-                                  int downscale, float flipY) implements SceneUniform {
-        private static final String UBO_NAME = "MHCapture";
+    record CaptureUniform(float left, float top, float width, float height,
+                          int sourceWidth, int sourceHeight,
+                          int downscale, float flipY) implements SceneUniform {
+        static final String UBO_NAME = "MHCapture";
         private static final int UBO_SIZE = Std140Sizes.calc().putVec4().putVec4().get();
 
         @Override
