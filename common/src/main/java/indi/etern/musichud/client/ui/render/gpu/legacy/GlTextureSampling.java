@@ -20,6 +20,8 @@ public final class GlTextureSampling {
     private static final Logger LOGGER = MusicHud.getLogger(GlTextureSampling.class);
     private static final Set<AbstractTexture> LINEAR = Collections.synchronizedSet(
             Collections.newSetFromMap(new WeakHashMap<>()));
+    private static final Set<AbstractTexture> NEAREST = Collections.synchronizedSet(
+            Collections.newSetFromMap(new WeakHashMap<>()));
     private static final Set<AbstractTexture> PREPARED = Collections.synchronizedSet(
             Collections.newSetFromMap(new WeakHashMap<>()));
     private static final Set<AbstractTexture> FAILED = Collections.synchronizedSet(
@@ -53,11 +55,42 @@ public final class GlTextureSampling {
         }
     }
 
+    /** Nearest filtering with clamped addressing, for a source that is drawn magnified. */
+    public static void ensureNearest(@Nullable AbstractTexture texture) {
+        if (texture == null || !NEAREST.add(texture)) {
+            return;
+        }
+        LINEAR.remove(texture);
+        withBound(texture, () -> {
+            if (GL11.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER)
+                    != GL11.GL_NEAREST) {
+                GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER,
+                        GL11.GL_NEAREST);
+            }
+            if (GL11.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER)
+                    != GL11.GL_NEAREST) {
+                GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER,
+                        GL11.GL_NEAREST);
+            }
+            if (GL11.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S)
+                    != GL12.GL_CLAMP_TO_EDGE) {
+                GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S,
+                        GL12.GL_CLAMP_TO_EDGE);
+            }
+            if (GL11.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T)
+                    != GL12.GL_CLAMP_TO_EDGE) {
+                GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T,
+                        GL12.GL_CLAMP_TO_EDGE);
+            }
+        });
+    }
+
     /** Switches the texture to bilinear filtering with clamped addressing. */
     public static void ensureLinear(@Nullable AbstractTexture texture) {
         if (texture == null || !LINEAR.add(texture)) {
             return;
         }
+        NEAREST.remove(texture);
         withBound(texture, () -> {
             if (GL11.glGetTexParameteri(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER)
                     != GL11.GL_LINEAR) {

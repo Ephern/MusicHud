@@ -89,11 +89,18 @@ public class AlbumImageRenderer implements RenderLayer {
         if (pixels == null) {
             return null;
         }
-        GlTextureSampling.ensureLinear(texture);
         float guiScale = guiScale();
+        // A source smaller than its slot is magnified and cannot gain detail: nearest keeps it crisp
+        // instead of smearing the texels, while a larger source is minified and needs linear.
+        float targetWidth = hudStyle.getWidth() * guiScale;
+        float targetHeight = hudStyle.getHeight() * guiScale;
+        if (pixels.getWidth() <= targetWidth && pixels.getHeight() <= targetHeight) {
+            GlTextureSampling.ensureNearest(texture);
+        } else {
+            GlTextureSampling.ensureLinear(texture);
+        }
         return artworkCache.get(gpu, source, LegacyTextureRefs.of(texture),
-                pixels.getWidth(), pixels.getHeight(),
-                hudStyle.getWidth() * guiScale, hudStyle.getHeight() * guiScale);
+                pixels.getWidth(), pixels.getHeight(), targetWidth, targetHeight);
     }
 
     private @Nullable ImageTextureData sourceOf(@Nullable BackgroundData data) {
