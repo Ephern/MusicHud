@@ -58,6 +58,14 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     @Nullable
     private final ScreenCallback mCallback;
     private final PanelBlurRenderer panelBlur = new PanelBlurRenderer();
+    // Deferred every frame the screen is open, whether a panel asks for a blur or not.
+    private final Runnable panelBlurTask = () -> {
+        try {
+            SceneGpuContext gpu = RenderRuntime.getInstance().gpu();
+            panelBlur.render(gpu, gpu.mainColorSource());
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    };
     @Getter
     private static volatile boolean visible = false;
 
@@ -94,14 +102,11 @@ public class HudConfigScreen extends Screen implements MuiScreen {
             this.extractPanorama(guiGraphics, deltaTick);
             guiGraphics.nextStratum();
             RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
-            return;
         }
-        // renderBackground runs before render, so this frame's result is written before the UI
-        // recording that samples it executes.
+        // Captured where the frame holds only the world: the UI recording samples the previous
+        // frame's result, so the panel must never be part of what gets blurred.
         try {
-            RenderRuntime runtime = RenderRuntime.getInstance();
-            SceneGpuContext gpu = runtime.gpu();
-            panelBlur.render(gpu, gpu.mainColorSource());
+            RenderRuntime.getInstance().gpu().deferBackdrop(panelBlurTask);
         } catch (RuntimeException | LinkageError ignored) {
         }
     }

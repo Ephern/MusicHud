@@ -157,10 +157,5 @@ public final class SceneCapture {
             writer.putVec4(left, top, width, height);
             writer.putVec4(sourceWidth, sourceHeight, downscale, flipY);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 }

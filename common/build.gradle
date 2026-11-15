@@ -58,6 +58,9 @@ dependencies {
 
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     compileOnly "org.lwjgl:lwjgl-vulkan:$rootProject.lwjgl_version"
+    // VulkanMod is not on Maven; the jar in libs/ is only needed to compile the Vulkan interop
+    // backend and is loaded at runtime from run/*/mods.
+    compileOnly files(rootProject.fileTree(dir: rootProject.file('libs'), include: 'VulkanMod*.jar'))
     compileOnly project(':processor')
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     annotationProcessor project(':processor')

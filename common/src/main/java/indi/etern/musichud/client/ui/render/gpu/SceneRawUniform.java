@@ -39,9 +39,4 @@ public final class SceneRawUniform implements SceneUniform {
     public void write(@NotNull ByteBuffer byteBuffer) {
         writer.accept(byteBuffer);
     }
-
-    @Override
-    public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-        return false;
-    }
 }

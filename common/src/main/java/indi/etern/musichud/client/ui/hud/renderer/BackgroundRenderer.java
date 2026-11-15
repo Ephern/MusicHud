@@ -203,8 +203,8 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         if (capturePlan == null) return false;
         int downscale = capturePlan.downscale();
 
-        // The HUD is extracted before the world is drawn, so its stage has to run while the GUI is
-        // submitted and the element samples the result in the same frame.
+        // The main target can only be sampled once its pass is closed, so the stage always runs when
+        // the GUI is submitted: after the world for the HUD, after the screen's own passes here.
         int outputWidth = capturePlan.needsCrop()
                 ? downscaled(capturePlan.targetWidth(), downscale)
                 : SceneCapture.extent(capturePlan.captureRegion().width(), downscale);
@@ -215,6 +215,9 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         if (output == null) return false;
         int sceneBlurRadius = plan.sceneBlurRadius();
         SceneGpuTexture deferredCover = cover;
+        // The fluid was composited inside the chain, so only the sampling overlay applies.
+        float overlay = fluidWanted ? 0f : plan.samplingBlackOverlay();
+        boolean layerTarget = target == BackgroundTarget.GUI;
         Runnable compose = () -> {
             SceneGpuTexture sampled = sampleScene(gpu, source, capturePlan, sceneBlurRadius, downscale);
             if (sampled == null) return;
@@ -234,19 +237,19 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
                 }
             }
             deferredBackdrop.copy(gpu, result);
+            // The UI layer samples the published background later in this same frame.
+            if (layerTarget) {
+                bakeForLayer(gpu, source, style, output, false, overlay, 1f);
+            }
         };
-        // A screen renders after the world, so its stage can run right away; only the HUD is
-        // extracted before the world reached the main target.
-        if (target == BackgroundTarget.HUD) {
-            gpu.deferBackdrop(compose);
-        } else {
-            compose.run();
+        gpu.deferBackdrop(compose);
+        if (layerTarget) {
+            return true;
         }
 
-        // The fluid was composited inside the deferred chain, so only the sampling overlay applies.
         long submitStart = System.nanoTime();
         boolean presented = submitOrPublishBackground(context, gpu, source, style, output, false,
-                fluidWanted ? 0f : plan.samplingBlackOverlay(), 1f);
+                overlay, 1f);
         RenderStats.phaseSubmitNanos(System.nanoTime() - submitStart);
         return presented;
     }
@@ -461,11 +464,6 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             writer.putVec4(saturation, highlightDarkening, highlightKnee, highlightFull);
             writer.putVec4(overallBrightness, applyColorAdjust ? 1f : 0f, blackOverlay, fluidScale);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 
     private static BackgroundAdjustUniform backgroundAdjustUniform(boolean applyColorAdjust,
@@ -665,11 +663,6 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         public void write(Std140Writer writer) {
             writer.putVec4(red, green, blue, alpha);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 
     /**
@@ -701,11 +694,6 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             writer.putVec4(saturation, highlightDarkening, highlightKnee, highlightFull);
             writer.putVec4(overallBrightness, applyColorAdjust ? 1f : 0f,
                     blackOverlay, scaleOrGamma);
-        }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
         }
     }
 

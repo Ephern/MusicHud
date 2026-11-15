@@ -92,6 +92,7 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
         }
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean pass(SceneGpuContext gpu, SceneGpuTexture target, SceneTextureRef source,
                                 int sourceWidth, int sourceHeight, int width, int height) {
         float spanX = Math.max(1f, sourceWidth / (float) width);
@@ -215,11 +216,6 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
         @Override
         public void write(Std140Writer writer) {
             writer.putVec4(invSourceWidth, invSourceHeight, spanX, spanY);
-        }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
         }
     }
 }
