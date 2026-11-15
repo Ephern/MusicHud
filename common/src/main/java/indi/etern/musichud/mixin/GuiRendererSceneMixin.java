@@ -46,7 +46,11 @@ public class GuiRendererSceneMixin {
         RenderRuntime.getInstance().beginFrameStamp();
     }
 
-    @Inject(method = "render", at = @At("HEAD"))
+    /**
+     * The world (or the panorama) is already in the main target here, and the GUI ranges have not
+     * been drawn yet: this is the first point with content to sample that the GUI does not own.
+     */
+    @Inject(method = "draw", at = @At("HEAD"))
     private void music_hud$drawDeferredBackdrop(GpuBufferSlice bufferSlice, CallbackInfo ci) {
         RenderRuntime.getInstance().drawDeferredBackdrop();
     }
