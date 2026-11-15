@@ -119,10 +119,5 @@ public final class SceneBlurCrop {
         public void write(Std140Writer writer) {
             writer.putVec4(u0, v0, u1, v1);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 }

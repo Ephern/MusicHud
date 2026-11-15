@@ -133,10 +133,14 @@ public final class HudLayouts {
                                 .overflowOrder(20)
                                 .hideOnOverflow(true)
                                 .minHeight(infoTextSize)
-                                .child(Layouts.leaf("artists", leaf -> leaf.grow(1).height(infoTextSize)))
+                                .child(Layouts.leaf("artists", leaf -> leaf
+                                        .grow(1)
+                                        .shrink(1)
+                                        .minWidth(0)
+                                        .height(infoTextSize)))
                                 .child(Layouts.leaf("playtime", leaf -> leaf
                                         .height(infoTextSize)
-                                        .shrink(1)
+                                        .shrink(0)
                                         .minWidth(0)))
                         ))
                         .child(Layouts.leaf("progress", leaf -> leaf

@@ -157,10 +157,5 @@ public final class SceneCoverLayers {
                     halfSpanY * THIRD_LAYER_SCALE, opacity, enabledValue);
             writer.putVec4(canvasAspect, 0f, 0f, 0f);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 }

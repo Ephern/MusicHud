@@ -209,10 +209,5 @@ public final class SceneCover {
             writer.putVec4(u0, v0, u1, v1);
             writer.putVec4(downsample ? 1f : 0f, 0f, 0f, 0f);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 }

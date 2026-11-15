@@ -10,8 +10,6 @@ import indi.etern.musichud.client.utils.ui.UniformDataUtils;
 import lombok.Getter;
 import lombok.Setter;
 
-import java.util.Objects;
-
 public class ProgressBarData implements SceneUniform {
     public static final int UBO_SIZE = Std140Sizes.calc().putVec3().putVec4().putVec4().putVec4().align(16).get();
     public final int playedColor;
@@ -52,17 +50,5 @@ public class ProgressBarData implements SceneUniform {
                .putVec4(UniformDataUtils.colorToVector(playedColor))
                .putVec4(UniformDataUtils.colorToVector(currentColor))
                .putVec4(UniformDataUtils.colorToVector(backgroundColor));
-    }
-
-    @Override
-    public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-        return lastBuffered instanceof ProgressBarData progressBarData
-                && Objects.equals(playedColor, progressBarData.playedColor)
-                && Objects.equals(currentColor, progressBarData.currentColor)
-                && Objects.equals(backgroundColor, progressBarData.backgroundColor)
-                && Objects.equals(gradientLength, progressBarData.gradientLength)
-                && Objects.equals(gradientRightOffset, progressBarData.gradientRightOffset)
-                && Objects.equals(transitionBorderRate, progressBarData.transitionBorderRate)
-                && hudStyle.shouldUseBuffer(progressBarData.hudStyle);
     }
 }

@@ -29,6 +29,7 @@ public final class SceneCapture {
         return pending.target();
     }
 
+
     public @Nullable PendingCapture prepare(SceneGpuContext gpu,
                                             SceneGpuContext.MainColorSource source,
                                             Region region, int downscale) {
@@ -153,11 +154,6 @@ public final class SceneCapture {
         public void write(Std140Writer writer) {
             writer.putVec4(left, top, width, height);
             writer.putVec4(sourceWidth, sourceHeight, downscale, 0f);
-        }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
         }
     }
 }

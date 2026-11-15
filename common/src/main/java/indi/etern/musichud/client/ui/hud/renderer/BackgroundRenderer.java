@@ -462,11 +462,6 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             writer.putVec4(saturation, highlightDarkening, highlightKnee, highlightFull);
             writer.putVec4(overallBrightness, applyColorAdjust ? 1f : 0f, blackOverlay, fluidScale);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 
     private static BackgroundAdjustUniform backgroundAdjustUniform(boolean applyColorAdjust,
@@ -666,11 +661,6 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
         public void write(Std140Writer writer) {
             writer.putVec4(red, green, blue, alpha);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 
     /**
@@ -702,11 +692,6 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
             writer.putVec4(saturation, highlightDarkening, highlightKnee, highlightFull);
             writer.putVec4(overallBrightness, applyColorAdjust ? 1f : 0f,
                     blackOverlay, scaleOrGamma);
-        }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
         }
     }
 

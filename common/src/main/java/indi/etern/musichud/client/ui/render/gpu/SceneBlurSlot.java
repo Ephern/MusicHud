@@ -444,11 +444,6 @@ public final class SceneBlurSlot {
             writer.putVec4(0.3f, 0.8f, 0f, 0f);
             writer.putVec4(1f, 1f, 1f, 1f);
         }
-
-        @Override
-        public boolean shouldUseBuffer(SceneUniform lastBuffered) {
-            return false;
-        }
     }
 
     private record Request(icyllis.arc3d.engine.Image image,
