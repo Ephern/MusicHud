@@ -6,7 +6,7 @@ import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.decoder.*;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
+import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
 import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
@@ -141,6 +141,7 @@ public class PlaybackTask {
     private volatile boolean restartRequested = false;
     private volatile boolean downloadDone = false;
     private volatile OpenAlSource source;
+    private volatile PcmSink pcmSink;
     private volatile long fadeStartNanos = -1;
     private volatile long fadeDurationMs = 0;
     private volatile float lastSetGain = -1;
@@ -205,6 +206,17 @@ public class PlaybackTask {
                 Fade.of(StreamAudioPlayer.DEFAULT_FADE_IN_MS), Fade.of(StreamAudioPlayer.DEFAULT_FADE_OUT_MS));
     }
 
+    /** Attach a non-blocking observer of the PCM window currently playing, including rebuilt sources. */
+    public void setPcmSink(PcmSink sink) {
+        sourceLock.lock();
+        try {
+            pcmSink = sink;
+            if (source != null) source.setPcmSink(sink);
+        } finally {
+            sourceLock.unlock();
+        }
+    }
+
     public Fade fadeIn() {
         return fadeIn;
     }
@@ -224,6 +236,17 @@ public class PlaybackTask {
 
     public PlaybackState state() {
         return state;
+    }
+
+    public SourcePcmClock.Reading pcmClock() {
+        OpenAlSource current = source;
+        return current == null ? null : current.getPcmClock();
+    }
+
+    /** Last successfully applied OpenAL gain, including volume and fades. */
+    public float appliedGain() {
+        OpenAlSource current = source;
+        return current == null ? 0 : current.getAppliedGain();
     }
 
     public boolean isAudible() {
@@ -689,12 +712,8 @@ public class PlaybackTask {
     }
 
     /**
-     * Close and drop the OpenAL source when the task was cancelled or its play
-     * worker interrupted. This is the safety net for the cancel/creation race:
-     * {@link #cancel()}'s teardown may have run while {@code source} was still
-     * null (a LOADING task), so any source the play worker creates afterwards
-     * must be torn down here rather than relying on a later {@code finish()}
-     * cleanup that could be dropped or delayed.
+     * Closes a source that was created after {@link #cancel()} already ran its teardown (the source
+     * was still null then), so cancellation cannot leak it.
      *
      * @return true when the caller must abort the current playback round
      */
@@ -771,6 +790,7 @@ public class PlaybackTask {
                 return PlayResult.RESTARTED;
             }
             source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
+            source.setPcmSink(pcmSink);
         } finally {
             sourceLock.unlock();
         }
@@ -849,20 +869,14 @@ public class PlaybackTask {
         LOGGER.debug("Playback started, wallStart={}, fadeIn={} ms", wallStart, fadeDurationMs);
 
         LoopExitReason exitReason = mainLoop(wallStart);
-        // Only a completed fade-out (real end of stream or an explicit fade-out) may
-        // finish the task. A dead source or an interrupted loop must be recovered by
-        // playLoop instead of being reported as a natural end.
+        // Only a real end of stream or an explicit fade-out finishes the task; a dead source or an
+        // interrupted loop is restarted by playLoop.
         return exitReason == LoopExitReason.ENDED ? PlayResult.FINISHED : PlayResult.RESTARTED;
     }
 
     /**
-     * Starts buffering the next queued/idle track once the current one is close
-     * enough to its end. The preloaded task is reused on the next switch, so the
-     * transition no longer pays the initial buffering cost.
-     *
-     * <p>Only the teardown state is skipped: retrying or buffering current tracks
-     * still preload their successor. The plain duration-based switch remains the
-     * fallback when no preload was requested.</p>
+     * Starts buffering the next track once the current one nears its end, so the next switch does not
+     * pay the initial buffering. Only the teardown state is skipped.
      */
     private void maybePreloadNextTrack(ZonedDateTime wallStart) {
         if (cancelled || state == PlaybackState.FADING_OUT
@@ -1145,9 +1159,9 @@ public class PlaybackTask {
     private void updateGain() {
         float targetGain = getTargetGain();
         if (lastVolume != targetGain && source != null) {
-            HudRendererManager rendererManager = HudRendererManager.getActiveInstance();
-            if (rendererManager != null) {
-                rendererManager.updateStatus(null);
+            HudPresenter presentationService = HudPresenter.getActiveInstance();
+            if (presentationService != null) {
+                presentationService.updateStatus(null);
             }
             lastVolume = targetGain;
         }
@@ -1257,11 +1271,9 @@ public class PlaybackTask {
     }
 
     /**
-     * Fast recovery when the OpenAL source name went invalid mid-playback
-     * (context reload / device loss): drop the dead source and let the next
-     * {@code playOnce()} round rebuild it. Unlike the full retry this keeps the
-     * decoder, the buffered chunks and the ledger position, so playback resumes
-     * almost seamlessly instead of restarting after a 1s sleep.
+     * Fast recovery when the OpenAL source name went invalid mid-playback (context reload / device
+     * loss): drop the dead source so the next round rebuilds it. Keeps the decoder, buffered chunks
+     * and ledger position.
      *
      * @return true if the recovery was applied (caller should retry playback)
      */
@@ -1319,13 +1331,9 @@ public class PlaybackTask {
     }
 
     /**
-     * Reconcile the play-side content position after the downloader skipped the
-     * decoder forward in {@link #syncPlaying()}. Buffered chunks enqueued before
-     * the skip are stale and get dropped; then {@code fedBytes} is advanced to
-     * the absolute skip target, so the skipped span is accounted exactly once.
-     * Without this the skipped bytes are invisible to {@code fedBytes}, which
-     * then looks permanently behind the wall clock and makes {@link #takeChunk}
-     * drop live audio every second.
+     * Reconciles the play-side position after the downloader skipped the decoder forward: drops the
+     * now stale buffered chunks and advances {@code fedBytes} to the absolute skip target, or the
+     * skipped span would look permanently behind the wall clock.
      */
     private void dropToSyncTarget() {
         long boundary = syncSkipBoundary.get();
@@ -1351,12 +1359,9 @@ public class PlaybackTask {
     }
 
     /**
-     * Drop whole chunks from the head of the prefetch buffer until the content
-     * position reaches the wall clock. Used after a context reload: the
-     * recovered queue lags the wall clock by the reload duration, and dropping
-     * it makes playback resume at the synchronized position. Chunks are never
-     * dropped past the wall clock, so the resume point is at most one chunk
-     * behind (never ahead).
+     * Drops whole chunks from the head of the prefetch buffer until the content position reaches the
+     * wall clock, which is what a context reload needs: the recovered queue lags by the reload
+     * duration. Never drops past the wall clock.
      */
     private void dropStaleToWallClock() {
         if (serverStartTime == null || currentDecoder == null) return;

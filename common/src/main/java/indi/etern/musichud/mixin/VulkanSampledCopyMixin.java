@@ -11,6 +11,11 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
 import static org.lwjgl.vulkan.VK11.*;
 
+/**
+ * arc3d's Vulkan caps never implement {@code getImageDescForSampledCopy}, which makes
+ * {@code Surface.makeImageSnapshot()} return null and breaks every offscreen read-back.
+ * The mixin targets the base caps class so {@code GLCaps}' own override keeps precedence.
+ */
 @Pseudo
 @Mixin(value = Caps.class, remap = false)
 public abstract class VulkanSampledCopyMixin {

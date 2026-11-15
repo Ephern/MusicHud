@@ -1,12 +1,8 @@
 package indi.etern.musichud.client.audio;
 
 /**
- * Consumes the PCM data currently being played (position-corrected via the
- * OpenAL sample offset), not the data just fed into the source queue, so
- * visualizers stay in sync with what is actually audible.
- * <p>
- * Called on the play worker thread; implementations must not block or do heavy
- * work (run FFT/rendering on another thread).
+ * Consumes the PCM that is currently audible (position-corrected by the OpenAL sample offset), not
+ * the data just queued. Called on the play worker thread: must not block or do heavy work.
  */
 @FunctionalInterface
 public interface PcmSink {

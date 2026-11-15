@@ -21,10 +21,8 @@ public enum SoundEngineState {
     private static volatile SoundEngineState current = SHUTDOWN;
 
     /**
-     * Bumped every time the SoundEngine is reloaded (F3+T), which destroys and
-     * recreates the OpenAL context. Any source/buffer created before the bump
-     * belongs to the old context and must be treated as invalid, even if its
-     * numeric id happens to be valid (reused) in the new context.
+     * Bumped whenever the SoundEngine is reloaded (F3+T), which recreates the OpenAL context: every
+     * source/buffer created before the bump belongs to the old context and is invalid.
      */
     private static final AtomicLong reloadGeneration = new AtomicLong();
 

@@ -138,6 +138,8 @@ dependencies {
 
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     compileOnly "org.lwjgl:lwjgl-vulkan:$rootProject.lwjgl_version"
+    // common sources are compiled in this source set, so the Vulkan interop needs the same jar
+    compileOnly files(rootProject.fileTree(dir: rootProject.file('libs'), include: 'VulkanMod*.jar'))
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     testCompileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     testAnnotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"

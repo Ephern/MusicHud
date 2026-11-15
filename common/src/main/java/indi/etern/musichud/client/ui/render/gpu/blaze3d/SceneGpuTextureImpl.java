@@ -1,0 +1,100 @@
+package indi.etern.musichud.client.ui.render.gpu.blaze3d;
+
+import com.mojang.renderpearl.api.commands.RenderPass;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.renderpearl.api.textures.GpuTexture;
+import com.mojang.renderpearl.api.textures.GpuTextureView;
+import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
+import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
+import net.minecraft.util.ARGB;
+
+import java.util.Optional;
+
+@SuppressWarnings("resource")
+public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
+    private final SceneTextureFormat format;
+    private final SceneTextureFormat actualFormat;
+    private final GpuTexture texture;
+    private final GpuTextureView view;
+    private boolean closed;
+
+    SceneGpuTextureImpl(SceneTextureFormat format,
+                        SceneTextureAllocator.SceneAllocatedTexture allocated,
+                        int maxTextureSize) {
+        RenderSystem.assertOnRenderThread();
+        int width = allocated.texture().getWidth(0);
+        int height = allocated.texture().getHeight(0);
+        if (width < 1 || height < 1 || width > maxTextureSize || height > maxTextureSize) {
+            allocated.view().close();
+            allocated.texture().close();
+            throw new IllegalArgumentException(
+                    "Invalid scene target size: " + width + "x" + height);
+        }
+        this.format = format;
+        this.actualFormat = allocated.actualFormat();
+        this.texture = allocated.texture();
+        this.view = allocated.view();
+    }
+
+    GpuTextureView view() {
+        if (closed) throw new IllegalStateException("Scene target is closed");
+        return view;
+    }
+
+    /** Raw game texture, used by the interop backends. */
+    public GpuTexture gpuTexture() {
+        return texture;
+    }
+
+    void clear(int argb) {
+        RenderSystem.assertOnRenderThread();
+        if (closed) throw new IllegalStateException("Scene target is closed");
+        //noinspection EmptyTryBlock
+        try (RenderPass ignored = RenderSystem.getDevice().createCommandEncoder()
+                .createRenderPass(() -> "MusicHud scene clear", view,
+                        Optional.of(ARGB.vector4fFromARGB32(argb)))) {
+        }
+    }
+
+    @Override
+    public int width() {
+        return texture.getWidth(0);
+    }
+
+    @Override
+    public int height() {
+        return texture.getHeight(0);
+    }
+
+    @Override
+    public SceneTextureFormat format() {
+        return format;
+    }
+
+    @Override
+    public SceneTextureFormat actualFormat() {
+        return actualFormat;
+    }
+
+    /** Approximate VRAM footprint of this target, used by the debug render statistics. */
+    long byteSize() {
+        return (long) width() * height() * (actualFormat == SceneTextureFormat.RGBA16F ? 8L : 4L);
+    }
+
+    @Override
+    public boolean isClosed() {
+        return closed;
+    }
+
+    @Override
+    public void close() {
+        RenderSystem.assertOnRenderThread();
+        if (closed) return;
+        closed = true;
+        try {
+            view.close();
+        } finally {
+            texture.close();
+        }
+    }
+}

@@ -23,12 +23,20 @@ package indi.etern.musichud.client.ui.screen;
  */
 
 import icyllis.modernui.fragment.Fragment;
-import icyllis.modernui.graphics.Color;
 import icyllis.modernui.mc.*;
+import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;
+import indi.etern.musichud.client.ui.hud.renderer.BackgroundRenderer;
+import indi.etern.musichud.client.ui.hud.renderer.BackgroundTarget;
+import indi.etern.musichud.client.ui.render.HorizontalAlign;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.gpu.MinecraftBackgroundTexture;
+import indi.etern.musichud.client.ui.render.SceneStyle;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
+import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import lombok.NonNull;
-import lombok.Setter;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.input.CharacterEvent;
@@ -36,6 +44,8 @@ import net.minecraft.client.input.KeyEvent;
 import net.minecraft.client.input.MouseButtonEvent;
 import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.Objects;
@@ -46,26 +56,22 @@ import java.util.Objects;
  */
 @SuppressWarnings("UnstableApiUsage")
 public class MusicHudScreen extends Screen implements MuiScreen {
-    static {
-        MuiModApi.addOnScreenChangeListener((oldScreen, newScreen) -> {
-            if (newScreen instanceof MusicHudScreen || newScreen instanceof HudConfigScreen) {
-                BlurHandler.INSTANCE.blur(null);
-                BlurHandler.INSTANCE.blur(newScreen);
-            }
-        });
-    }
-
+    private static final ClientConfig CLIENT_CONFIG = ClientConfig.getInstance();
+    private static final Logger LOGGER = MusicHud.getLogger(MusicHudScreen.class);
+    private static final BackgroundRenderer BACKGROUND_RENDERER =
+            new BackgroundRenderer(BackgroundTarget.GUI);
+    @Getter
+    private static volatile boolean hudOccluded;
     private final UIManager mHost;
     @Nullable
     private final Screen mPrevious;
     private final Fragment mFragment;
     @Nullable
     private final ScreenCallback mCallback;
+    private final SceneStyle backgroundStyle = new SceneStyle(
+            0, 0, 0, 0, 0, HorizontalAlign.CENTER, VerticalAlign.CENTER);
 
     private final static int FADE_IN_DURATION_MILLIS = 200;
-    @Getter
-    @Setter
-    private static double darken = ClientConfig.getInstance().getMainScreenAdditionalBackgroundDarken();
 
     MusicHudScreen(UIManager host, Fragment fragment,
                    @Nullable ScreenCallback callback, @Nullable Screen previous,
@@ -91,33 +97,80 @@ public class MusicHudScreen extends Screen implements MuiScreen {
     @Override
     protected void init() {
         super.init();
+        hudOccluded = false;
         mHost.initScreen(this);
     }
 
     @Override
     public void extractBackground(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
         ScreenCallback callback = getCallback();
-        if (callback == null || callback.hasDefaultBackground()) {
-            if (minecraft.level == null) {
-                super.extractBackground(gr, mouseX, mouseY, deltaTick);
-            } else {
-                BlurHandler.INSTANCE.drawScreenBackground(gr, 0, 0, this.width, this.height);
-            }
-            float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
-            gr.fill(0, 0, this.width, this.height, Color.argb((int) (progress * darken * 255), 0, 0, 0));//additional darken
+        if (callback != null && !callback.hasDefaultBackground()) {
+            MinecraftBackgroundTexture.clear();
+            hudOccluded = true;
+            return;
         }
+        if (minecraft != null && minecraft.level == null) {
+            extractPanorama(gr, deltaTick);
+        }
+        float progress = Math.clamp((float) MuiModApi.getElapsedTime() / FADE_IN_DURATION_MILLIS, 0, 1);
+        hudOccluded = progress >= 1f;
+        renderBlurredBackground(gr, progress);
+    }
+
+    private void renderBlurredBackground(GuiGraphicsExtractor gr, float progress) {
+        try {
+            backgroundStyle.setAlpha(progress);
+            backgroundStyle.setBounds(0, 0, this.width, this.height);
+            gr.nextStratum();
+            RenderRuntime.getInstance().renderFrame(
+                    new VanillaSceneGraphics(gr),
+                    context -> {
+                        if (!BACKGROUND_RENDERER.renderFluidBackground(context, backgroundStyle)) {
+                            MinecraftBackgroundTexture.clear();
+                            renderSolidBackground(gr, progress);
+                        }
+                    }
+            );
+        } catch (Exception e) {
+            LOGGER.error("While rendering main GUI background", e);
+        }
+    }
+
+    private void renderSolidBackground(GuiGraphicsExtractor gr, float progress) {
+        float alpha = (float) CLIENT_CONFIG.getGuiBackgroundSamplingBlackOverlay() * progress;
+        if (alpha <= 1e-4f) {
+            return;
+        }
+        fillBlack(gr, alpha);
+    }
+
+    private void fillBlack(GuiGraphicsExtractor gr, float alpha) {
+        int alphaByte = Math.clamp((int) (alpha * 255), 0, 255);
+        gr.fill(0, 0, this.width, this.height, (alphaByte << 24));
     }
 
     @Override
     public void extractRenderState(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
+        // Blur sources are committed mid-frame and consumed by UIManagerMixin before this recording.
         mHost.render(gr, mouseX, mouseY, deltaTick);
-        super.extractRenderState(gr, mouseX, mouseY, deltaTick);
     }
 
     @Override
     public void removed() {
         super.removed();
+        hudOccluded = false;
         mHost.removed(this);
+        BackgroundState.getInstance().getOverrides().clear();
+        // Only the sampling path (fluid opacity < 1) allocates the full-screen capture and the
+        // blur pyramid sized from it; releasing those is worth a lazy rebuild. The default
+        // fluid-only background holds ~2-3 MiB, which is cheaper to keep than to rebuild (~11 ms).
+        if (CLIENT_CONFIG.getGuiBackgroundFluidOpacity() < 0.999) {
+            BACKGROUND_RENDERER.release();
+        } else {
+            // Keeping the targets is cheap, but the stale cover source would block the artwork
+            // release (and be sampled again after a long pause), so drop just the cover state.
+            BACKGROUND_RENDERER.releaseCoverState();
+        }
     }
 
     @Override
@@ -155,69 +208,54 @@ public class MusicHudScreen extends Screen implements MuiScreen {
         return false;
     }
 
+    // IMPL - GuiEventListener
+
     @Override
     public void onBackPressed() {
         mHost.getOnBackPressedDispatcher().onBackPressed();
     }
 
-    // IMPL - GuiEventListener
-
     @Override
     public void mouseMoved(double mouseX, double mouseY) {
-        super.mouseMoved(mouseX, mouseY);
         mHost.onHoverMove(true);
     }
 
     @Override
-    public boolean mouseClicked(@NonNull MouseButtonEvent event, boolean doubleClick) {
-        super.mouseClicked(event, doubleClick);
+    public boolean mouseClicked(@NotNull MouseButtonEvent event, boolean bl) {
         return false;
     }
 
     @Override
-    public boolean mouseReleased(@NonNull MouseButtonEvent event) {
-        super.mouseReleased(event);
+    public boolean mouseReleased(@NotNull MouseButtonEvent event) {
         return false;
     }
 
     @Override
-    public boolean mouseDragged(@NonNull MouseButtonEvent event, double dx, double dy) {
-        super.mouseDragged(event, dx, dy);
+    public boolean mouseDragged(@NotNull MouseButtonEvent event, double deltaX, double deltaY) {
         return true;
     }
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double deltaX, double deltaY) {
-        if (super.mouseScrolled(mouseX, mouseY, deltaX, deltaY)) {
-            return true;
-        }
         mHost.onScroll(deltaX, deltaY);
         return true;
     }
 
     @Override
-    public boolean keyPressed(@NonNull KeyEvent event) {
-        if (getFocused() != null && getFocused().keyPressed(event)) {
-            return true;
-        }
+    public boolean keyPressed(KeyEvent event) {
         mHost.onKeyPress(event.key(), event.keycode(), event.modifiers());
         return false;
     }
 
     @Override
-    public boolean keyReleased(@NonNull KeyEvent event) {
-        if (getFocused() != null && getFocused().keyReleased(event)) {
-            return true;
-        }
+    public boolean keyReleased(KeyEvent event) {
         mHost.onKeyRelease(event.key(), event.keycode(), event.modifiers());
         return false;
     }
 
     @Override
-    public boolean charTyped(@NonNull CharacterEvent event) {
-        if (getFocused() != null && getFocused().charTyped(event)) {
-            return true;
-        }
-        return mHost.onCharTyped(event.codepoint());
+    public boolean charTyped(CharacterEvent event) {
+        return mHost.onCharTyped((char) event.codepoint());
     }
 }
+

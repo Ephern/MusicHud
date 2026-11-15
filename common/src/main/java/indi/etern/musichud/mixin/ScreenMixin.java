@@ -1,8 +1,9 @@
 
 package indi.etern.musichud.mixin;
 
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
+import indi.etern.musichud.client.ui.hud.scene.HudScene;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
 import net.minecraft.client.gui.screens.LevelLoadingScreen;
 import net.minecraft.client.gui.screens.Screen;
@@ -14,13 +15,13 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 @Mixin(Screen.class)
 public class ScreenMixin {
-    @Inject(method = "extractBackground",
+    @Inject(method = "extractRenderState",
             at = @At("RETURN"))
     private void music_hud$onRender(GuiGraphicsExtractor guiGraphics, int i, int j, float f, CallbackInfo ci) {
         //noinspection ConstantValue (incorrect warning)
         if (((Object) this instanceof ServerReconfigScreen) || ((Object) this instanceof LevelLoadingScreen)) {
             guiGraphics.nextStratum();
-            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
+            RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
         }
     }
 }

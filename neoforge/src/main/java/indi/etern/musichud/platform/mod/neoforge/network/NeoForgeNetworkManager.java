@@ -113,7 +113,7 @@ public class NeoForgeNetworkManager implements INetworkRegister, VanillaServerNe
         for (RegistrationInfo<?> info : pendingRegistrations) {
             registerPayloadInternal(info);
         }
-        pendingRegistrations.clear(); // 清空，避免重复注册
+        pendingRegistrations.clear();
     }
 
     @Override

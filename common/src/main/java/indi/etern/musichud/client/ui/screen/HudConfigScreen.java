@@ -26,8 +26,12 @@ import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.mc.MuiScreen;
 import icyllis.modernui.mc.ScreenCallback;
 import icyllis.modernui.mc.UIManager;
-import indi.etern.musichud.client.ui.hud.HudRendererManager;
-import indi.etern.musichud.client.ui.hud.renderer.VanillaHudGraphics;
+import indi.etern.musichud.client.ui.hud.scene.HudScene;
+import indi.etern.musichud.client.ui.render.RenderRuntime;
+import indi.etern.musichud.client.ui.render.VanillaSceneGraphics;
+import indi.etern.musichud.client.ui.render.gpu.HudPanelBackdrop;
+import indi.etern.musichud.client.ui.render.gpu.PanelBlurRenderer;
+import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import lombok.Getter;
 import lombok.NonNull;
 import net.minecraft.client.gui.GuiGraphicsExtractor;
@@ -53,6 +57,15 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     private final Fragment mFragment;
     @Nullable
     private final ScreenCallback mCallback;
+    private final PanelBlurRenderer panelBlur = new PanelBlurRenderer();
+    // Deferred every frame the screen is open, whether a panel asks for a blur or not.
+    private final Runnable panelBlurTask = () -> {
+        try {
+            SceneGpuContext gpu = RenderRuntime.getInstance().gpu();
+            panelBlur.render(gpu, gpu.mainColorSource());
+        } catch (RuntimeException | LinkageError ignored) {
+        }
+    };
     @Getter
     private static volatile boolean visible = false;
 
@@ -88,7 +101,13 @@ public class HudConfigScreen extends Screen implements MuiScreen {
         if (minecraft.level == null) {
             this.extractPanorama(guiGraphics, deltaTick);
             guiGraphics.nextStratum();
-            HudRendererManager.getInstance().renderFrame(new VanillaHudGraphics(guiGraphics));
+            RenderRuntime.getInstance().renderFrame(new VanillaSceneGraphics(guiGraphics), HudScene.getInstance());
+        }
+        // Captured where the frame holds only the world: the UI recording samples the previous
+        // frame's result, so the panel must never be part of what gets blurred.
+        try {
+            RenderRuntime.getInstance().gpu().deferBackdrop(panelBlurTask);
+        } catch (RuntimeException | LinkageError ignored) {
         }
     }
 
@@ -101,6 +120,8 @@ public class HudConfigScreen extends Screen implements MuiScreen {
     public void removed() {
         super.removed();
         visible = false;
+        HudPanelBackdrop.clear();
+        panelBlur.release();
         mHost.removed(this);
     }
 

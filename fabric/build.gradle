@@ -63,6 +63,8 @@ dependencies {
     minecraft "net.minecraft:minecraft:$rootProject.minecraft_version"
 
     implementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
+    // common sources are compiled in this source set, so the Vulkan interop needs the same jar
+    compileOnly files(rootProject.fileTree(dir: rootProject.file('libs'), include: 'VulkanMod*.jar'))
 
     coreLib(project(path: ':core')) { transitive = false }
     shadowBundle(project(path: ':core')) { transitive = false }

@@ -5,13 +5,18 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.graphics.drawable.StateListDrawable;
+import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.widget.CheckableImageButton;
 import icyllis.modernui.widget.ImageView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 
 import java.util.function.Supplier;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 public class ToggleIconButton extends CheckableImageButton {
+    private final CharSequence tooltipOn;
+    private final CharSequence tooltipOff;
+
     public ToggleIconButton(Context context, ToggleTrackLikeStateButton.Appearance appearance) {
         this(context, appearance, false);
     }
@@ -21,16 +26,9 @@ public class ToggleIconButton extends CheckableImageButton {
 
         setScaleType(ImageView.ScaleType.CENTER_INSIDE);
 
-        CharSequence tooltipOn = appearance.tooltipOn.get();
-        if (tooltipOn != null && !tooltipOn.isEmpty()) {
-            setTooltipTextOn(tooltipOn);
-        }
+        tooltipOn = appearance.tooltipOn.get();
         Image imageOn = appearance.imageOn.get();
-
-        CharSequence tooltipOff = appearance.tooltipOff.get();
-        if (tooltipOff != null && !tooltipOff.isEmpty()) {
-            setTooltipTextOff(tooltipOff);
-        }
+        tooltipOff = appearance.tooltipOff.get();
         Image imageOff = appearance.imageOff.get();
 
         StateListDrawable selector = new StateListDrawable();
@@ -42,6 +40,24 @@ public class ToggleIconButton extends CheckableImageButton {
         setImageDrawable(selector);
 
         setChecked(initialChecked);
+        applyTooltip();
+    }
+
+    @Override
+    public void setChecked(boolean checked) {
+        super.setChecked(checked);
+        applyTooltip();
+    }
+
+    private void applyTooltip() {
+        Tooltip.attach(this, isChecked() ? tooltipOn : tooltipOff);
+    }
+
+    /** Disabled buttons must still show their tooltip, which the listener path skips. */
+    @Override
+    protected boolean dispatchHoverEvent(MotionEvent event) {
+        Tooltip.handleHover(this, event);
+        return super.dispatchHoverEvent(event);
     }
 
     public record Appearance(

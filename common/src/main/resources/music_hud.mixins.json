@@ -5,12 +5,14 @@
   "compatibilityLevel": "JAVA_25",
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
-    "GuiRendererHudMixin",
+    "GuiRendererSceneMixin",
+    "ModernUiGuardMixin",
     "ReactiveMusicCompatMixin",
     "ScreenMixin",
     "SoundEngineMixin",
     "SoundEngineSppCompatMixin",
     "SpanSetMixin",
+    "UIManagerMixin",
     "VulkanSampledCopyMixin"
   ],
   "injectors": {
