@@ -133,8 +133,6 @@ public final class HudLayouts {
                                 .overflowOrder(20)
                                 .hideOnOverflow(true)
                                 .minHeight(infoTextSize)
-                                // The artists line scrolls and ellipsizes, so it is the one that gives way;
-                                // the play time must keep its measured width or it loses digits.
                                 .child(Layouts.leaf("artists", leaf -> leaf
                                         .grow(1)
                                         .shrink(1)
