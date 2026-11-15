@@ -184,9 +184,10 @@ public class TextRenderer implements RenderLayer {
         float y = absolutePosition.y();
         float measuredWidth = measureWidth(text);
         float textRenderWidth = scale * measuredWidth;
-        boolean overflow = textRenderWidth > boxWidth;
+        boolean overflow = textRenderWidth > boxWidth + 0.5f;
 
         float x = boxLeft;
+        float drawnRight = boxRight;
         float marqueeWidth = 0;
         float marqueeOffset = 0;
         float fadeBandLeft = 0;
@@ -226,7 +227,12 @@ public class TextRenderer implements RenderLayer {
                 }
             }
         } else {
-            String trimmed = trimToWidth(text, boxWidth / scale);
+            // The box is often sized from this very measurement (the play time is), so only a real
+            // overflow may trim: a sub-pixel mismatch must not replace the tail with an ellipsis.
+            // The play time is a fixed label: losing a digit is worse than overflowing the padding,
+            // and its box is sized from a measurement that no longer matches this font build.
+            String trimmed = overflow && position != Position.RIGHT
+                    ? trimToWidth(text, boxWidth / scale) : text;
             if (trimmed.isEmpty()) return;
             text = trimmed;
             float trimmedWidth = measureWidth(text) * scale;
@@ -236,9 +242,12 @@ public class TextRenderer implements RenderLayer {
                 case RIGHT -> boxRight - trimmedWidth;
             };
             x = Math.max(boxLeft, x);
+            // Right-aligned runs sit flush with the box edge, where rounding alone can clip them.
+            drawnRight = Math.max(boxRight, x + trimmedWidth);
             overflow = false;
         }
-        context.pushScissor((int) boxLeft, (int) y, (int) boxRight, (int) (y + hudStyle.getHeight() + 1));
+        context.pushScissor((int) boxLeft, (int) y, (int) Math.ceil(drawnRight),
+                (int) (y + hudStyle.getHeight() + 1));
         Transforming transform = context.transform();
         String finalText = text;
         TextEdgeFade fade = TextEdgeFade.between(boxLeft, boxRight, fadeBandLeft, fadeBandRight,
