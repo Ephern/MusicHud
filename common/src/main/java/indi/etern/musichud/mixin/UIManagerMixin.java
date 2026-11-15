@@ -8,6 +8,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.render.RenderRuntime;
 import indi.etern.musichud.client.ui.render.gpu.MidFrameCommit;
 import indi.etern.musichud.client.ui.render.gpu.SceneBlurSlot;
+import indi.etern.musichud.client.ui.render.gpu.SceneRetirement;
 import indi.etern.musichud.client.ui.render.interop.SceneInterop;
 import net.minecraft.client.gui.GuiGraphics;
 import org.apache.logging.log4j.Logger;
@@ -74,7 +75,7 @@ public abstract class UIManagerMixin {
             // recording, so resolve the queued blurs now, before the retirement clock advances.
             SceneBlurSlot.runAll(RenderRuntime.getInstance().gpu(), MidFrameCommit.currentBatch());
         }
-        SceneBlurSlot.endFrame();
+        SceneRetirement.endFrame();
     }
 
     @Unique

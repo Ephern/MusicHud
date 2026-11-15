@@ -19,7 +19,8 @@ public final class SceneRetirement {
     private SceneRetirement() {
     }
 
-    static void endFrame() {
+    /** Advances the retirement clock; called once per rendered frame. */
+    public static void endFrame() {
         List<Runnable> due = null;
         synchronized (ENTRIES) {
             frame++;

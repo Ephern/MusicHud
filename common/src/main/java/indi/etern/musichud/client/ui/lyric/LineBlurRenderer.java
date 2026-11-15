@@ -71,7 +71,7 @@ public final class LineBlurRenderer {
                                   int surfaceWidth, int surfaceHeight, int padding,
                                   @Nullable Paint paint) {
         main.getCanvas().drawImageRect(image,
-                new Rect2f(0, 0, surfaceWidth, surfaceHeight),
+                new Rect2f(0, 0, image.getWidth(), image.getHeight()),
                 new Rect2f(-padding, -padding, surfaceWidth - padding, surfaceHeight - padding),
                 SamplingOptions.LINEAR, paint != null ? paint.getNativePaint() : null,
                 icyllis.arc3d.sketch.Canvas.SRC_RECT_CONSTRAINT_FAST);
