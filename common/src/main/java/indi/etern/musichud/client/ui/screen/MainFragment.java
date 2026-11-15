@@ -1,19 +1,16 @@
 package indi.etern.musichud.client.ui.screen;
 
-import icyllis.modernui.animation.*;
 import icyllis.modernui.annotation.Nullable;
-import icyllis.modernui.core.Choreographer;
+import icyllis.modernui.animation.ValueAnimator;
 import icyllis.modernui.fragment.Fragment;
 import icyllis.modernui.graphics.Image;
+import icyllis.modernui.graphics.drawable.Drawable;
+import icyllis.modernui.graphics.drawable.ShapeDrawable;
 import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.mc.ui.ClampingScrollView;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
 import icyllis.modernui.util.DataSet;
-import icyllis.modernui.view.Gravity;
-import icyllis.modernui.view.LayoutInflater;
-import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
+import icyllis.modernui.view.*;
 import icyllis.modernui.widget.Button;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.LinearLayout;
@@ -21,8 +18,6 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
-import indi.etern.musichud.client.audio.PlaybackTask;
-import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.ui.Theme;
@@ -34,21 +29,18 @@ import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
-import indi.etern.musichud.client.utils.ui.SpringInterpolator;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
+import lombok.Getter;
 import lombok.NonNull;
 import lombok.Setter;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.language.I18n;
+import org.jetbrains.annotations.NotNull;
 
-import java.time.Duration;
-import java.time.LocalTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Queue;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.function.Consumer;
 
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
@@ -56,17 +48,11 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class MainFragment extends Fragment {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final ConnectionManager connectionManager = ConnectionManager.getInstance();
-    private static final AtomicInteger progressUpdaterToken = new AtomicInteger(0);
-    private static final int LYRICS_ANIMATION_DURATION = 300;
-    private static final SpringInterpolator LYRIC_PANEL_SWITCH_INTERPOLATOR =
-            new SpringInterpolator((float) LYRICS_ANIMATION_DURATION / 1000, 1);
-    private static final float CARD_COVER_MIN_SCALE = 0.8f;
-    private static final int CARD_ANIM_DURATION_MS = 350;
-    private static final SpringInterpolator MUSIC_SWITCH_INTERPOLATOR =
-            new SpringInterpolator((float) CARD_ANIM_DURATION_MS / 1000, 1);
-    private static final DateTimeFormatter formatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
-    private static final DateTimeFormatter formatterWithoutHour = DateTimeFormatter.ofPattern("mm:ss");
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
+    private static final String PAGE_HOME = "Home";
+    private static final String ICON_LIBRARY = "/assets/music_hud/textures/gui/icons/square_library.png";
+    private static final String ICON_TURNTABLE = "/assets/music_hud/textures/gui/icons/turntable.png";
+    private static final int NAVIGATOR_BACKGROUND_ANIMATION_DURATION = 300;
     private static volatile MainFragment instance = null;
 
     static {
@@ -78,26 +64,21 @@ public class MainFragment extends Fragment {
     }
 
     private final NowPlayingInfo playingInfo = NowPlayingInfo.getInstance();
-    long progressUpdaterStartTime = 0;
-    long progressTextUpdateCount = 0;
     private boolean visible = false;
     @Setter
     private int defaultSelectedIndex = 0;
     private Button switchServerConnectButton;
-    private int sideWidth = -1;
-    private StaggeredLyricScrollView lyricsScrollView;
-    private LinearLayout lyricsSidebar;
-    private int lyricsPanelWidth = -1;
-    private boolean lyricsPanelShown = false;
-    private AnimatorSet lyricsAnimator = null;
-    private FrameLayout cardWrapper;
-    private MusicInfoCard activeCard;
-    private MusicInfoCard stagedCard;
-    private AnimatorSet cardAnimator;
-    private AnimatorSet coverScaleAnimator;
-    private boolean cardSwitching = false;
-    private Traceable<MusicDetail> pendingSwitch;
-    private MusicDetail displayedDetail;
+    @Getter
+    private RouterContainer routerContainer;
+    private Button sidebarButton;
+    private SidebarView sidebar;
+    private LinearLayout contentRow;
+    private LinearLayout navigatorWrapper;
+    private ValueAnimator navigatorBackgroundAnimator;
+    /**
+     * Mode remembered for non-Home pages; Home always shows the library.
+     */
+    private SidebarView.Mode otherPageMode = SidebarView.Mode.PLAYER;
 
     private MainFragment() {
     }
@@ -115,12 +96,12 @@ public class MainFragment extends Fragment {
         if (accountBaseView != null) {
             accountBaseView.refresh();
         }
-        if (instance != null && instance.visible && instance.activeCard != null) {
-            NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-            Traceable<MusicDetail> current = nowPlayingInfo.getCurrentlyPlayingMusic();
-            Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayMusic();
-            Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
-            instance.applyMusic(current, nextToPlay, lines, true);
+        MainFragment target = instance;
+        if (target != null && target.visible && target.sidebar != null) {
+            target.sidebar.refresh();
+            NowPlayingInfo info = NowPlayingInfo.getInstance();
+            target.applyMusic(info.getCurrentlyPlayingMusic(), info.getNextToPlayMusic(),
+                    info.getLyricLines(), true);
         }
     }
 
@@ -128,24 +109,6 @@ public class MainFragment extends Fragment {
         if (instance != null && instance.visible) {
             instance.applyMusic(musicDetailTrace, nextToPlayTrace, lines, true);
         }
-    }
-
-    private static boolean isSameMusic(MusicDetail a, MusicDetail b) {
-        MusicDetail normalizedA = a == null ? MusicDetail.NONE : a;
-        MusicDetail normalizedB = b == null ? MusicDetail.NONE : b;
-        return normalizedA.equals(normalizedB);
-    }
-
-    /**
-     * The album cover is full size only when a track is actually playing and not muted.
-     */
-    private static boolean isCoverExpanded() {
-        MusicDetail detail = NowPlayingInfo.getInstance().getCurrentlyPlayingMusicDetail();
-        if (detail == null || detail.equals(MusicDetail.NONE) || PlaybackTask.getTargetGain() == 0) {
-            return false;
-        }
-        StreamAudioPlayer.Status status = StreamAudioPlayer.getInstance().getStatus();
-        return status == StreamAudioPlayer.Status.PLAYING;
     }
 
     /**
@@ -158,8 +121,12 @@ public class MainFragment extends Fragment {
         }
         try {
             MuiModApi.postToUiThread(() -> {
-                if (target.visible && target.activeCard != null) {
-                    target.updateCoverScale(true);
+                if (target.visible && target.sidebar != null) {
+                    target.sidebar.updateCoverScale(true);
+                }
+                HomeView homeView = HomeView.getInstance();
+                if (homeView != null) {
+                    homeView.updateCoverScale(true);
                 }
             });
         } catch (IllegalStateException ignored) {
@@ -168,11 +135,9 @@ public class MainFragment extends Fragment {
     }
 
     public static void updateNextToPlay(Traceable<MusicDetail> nextToPlayTrace) {
-        if (instance != null && instance.visible) {
-            HomeView homeView = HomeView.getInstance();
-            if (homeView != null) {
-                homeView.updateNextToPlay(nextToPlayTrace);
-            }
+        MainFragment target = instance;
+        if (target != null && target.visible && target.sidebar != null) {
+            target.sidebar.updateNextToPlay(nextToPlayTrace);
         }
     }
 
@@ -184,14 +149,16 @@ public class MainFragment extends Fragment {
                 MuiModApi.postToUiThread(staggeredLyricScrollView::refreshLinesStyle);
             }
         }
-        if (instance != null && instance.visible && instance.lyricsScrollView != null) {
-            MuiModApi.postToUiThread(instance.lyricsScrollView::refreshLinesStyle);
+        MainFragment target = instance;
+        if (target != null && target.visible && target.sidebar != null) {
+            MuiModApi.postToUiThread(target.sidebar::refreshLyrics);
         }
     }
 
     public static void refreshLyricsSidebarVisibility() {
-        if (instance != null && instance.visible) {
-            instance.updateLyricsPanelVisibility();
+        MainFragment target = instance;
+        if (target != null && target.visible && target.sidebar != null) {
+            target.sidebar.updateLyricsVisibility();
         }
     }
 
@@ -206,213 +173,25 @@ public class MainFragment extends Fragment {
         return instance;
     }
 
+    private static boolean hasMusic() {
+        MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+        return detail != null && !detail.equals(MusicDetail.NONE);
+    }
+
     private void applyMusic(Traceable<MusicDetail> musicDetailTrace, Traceable<MusicDetail> nextToPlayTrace,
                             Queue<LyricLine> lines, boolean animate) {
-        MusicDetail musicDetail = musicDetailTrace == null ? MusicDetail.NONE : musicDetailTrace.value();
-        if (musicDetail != null && !musicDetail.equals(MusicDetail.NONE)) {
-            startProgressUpdater(musicDetail);
-        }
-        if (!animate || activeCard == null || stagedCard == null) {
-            // Initial display (or cards not built yet): bind in place without animating.
-            if (activeCard != null) {
-                activeCard.bind(musicDetailTrace, sideWidth);
-                displayedDetail = musicDetail;
-                updateCoverScale(false);
-            }
-        } else if (cardSwitching) {
-            // Keep only the newest request; it plays once the running transition settles.
-            pendingSwitch = musicDetailTrace;
-        } else if (isSameMusic(displayedDetail, musicDetail)) {
-            // Same track re-synced (startAt / reconnect / config refresh): refresh contents in place.
-            activeCard.bind(musicDetailTrace, sideWidth);
-            displayedDetail = musicDetail;
-        } else {
-            startCardSwitch(musicDetailTrace);
+        if (sidebar != null) {
+            sidebar.bindMusic(musicDetailTrace, nextToPlayTrace, lines, animate);
         }
         HomeView homeView = HomeView.getInstance();
         if (homeView != null) {
-            homeView.switchMusic(musicDetailTrace, nextToPlayTrace, lines);
+            homeView.switchMusic(musicDetailTrace, lines);
         }
-        if (lyricsScrollView != null) {
-            if (notAbsoluteMusicLyric()) {
-                lyricsScrollView.switchLyrics(musicDetail, lines);
-            } else {
-                lyricsScrollView.clearLyrics();
-            }
-        }
-        updateLyricsPanelVisibility();
-    }
-
-    /**
-     * Starts the card-style right-to-left switch: the active card slides out to the left while the
-     * staged card slides in from the right. Both cards move in parallel sharing one spring so the
-     * seam never gaps; album covers scale uniformly between {@link #CARD_COVER_MIN_SCALE} and 1.
-     */
-    private void startCardSwitch(Traceable<MusicDetail> musicDetailTrace) {
-        int width = sideWidth;
-        cardSwitching = true;
-        if (coverScaleAnimator != null) {
-            coverScaleAnimator.cancel();
-            coverScaleAnimator = null;
-        }
-        float targetCoverScale = isCoverExpanded() ? 1 : CARD_COVER_MIN_SCALE;
-
-        // Prepare the incoming card off-screen right; visible before bind so image lazy-load triggers.
-        stagedCard.setVisibility(View.VISIBLE);
-        stagedCard.setTranslationX(width);
-        stagedCard.setAlpha(0f);
-        UrlImageView activeAlbumImageView = activeCard.getAlbumImage();
-        UrlImageView stagedAlbumImageView = stagedCard.getAlbumImage();
-        stagedAlbumImageView.setScaleX(CARD_COVER_MIN_SCALE);
-        stagedAlbumImageView.setScaleY(CARD_COVER_MIN_SCALE);
-        stagedCard.bind(musicDetailTrace, width);
-
-        ObjectAnimator outX = ObjectAnimator.ofFloat(activeCard, View.TRANSLATION_X, 0f, -width);
-        ObjectAnimator outA = ObjectAnimator.ofFloat(activeCard, View.ALPHA, 1f, 0f);
-        ObjectAnimator outSx = ObjectAnimator.ofFloat(activeAlbumImageView, View.SCALE_X, activeAlbumImageView.getScaleX(), CARD_COVER_MIN_SCALE);
-        ObjectAnimator outSy = ObjectAnimator.ofFloat(activeAlbumImageView, View.SCALE_Y, activeAlbumImageView.getScaleY(), CARD_COVER_MIN_SCALE);
-        ObjectAnimator inX = ObjectAnimator.ofFloat(stagedCard, View.TRANSLATION_X, width, 0f);
-        ObjectAnimator inA = ObjectAnimator.ofFloat(stagedCard, View.ALPHA, 0f, 1f);
-        ObjectAnimator inSx = ObjectAnimator.ofFloat(stagedAlbumImageView, View.SCALE_X, CARD_COVER_MIN_SCALE, targetCoverScale);
-        ObjectAnimator inSy = ObjectAnimator.ofFloat(stagedAlbumImageView, View.SCALE_Y, CARD_COVER_MIN_SCALE, targetCoverScale);
-        List<ObjectAnimator> animators = List.of(outX, outA, outSx, outSy, inX, inA, inSx, inSy);
-        for (ObjectAnimator animator : animators) {
-            animator.setInterpolator(MUSIC_SWITCH_INTERPOLATOR);
-            animator.setDuration(CARD_ANIM_DURATION_MS);
-        }
-
-        AnimatorSet set = new AnimatorSet();
-        set.playTogether(outX, outA, outSx, outSy, inX, inA, inSx, inSy);
-        final MusicDetail newDetail = musicDetailTrace == null ? null : musicDetailTrace.value();
-        final AnimatorSet thisAnimator = set;
-        cardAnimator = set;
-        set.addListener(new AnimatorListener() {
-            @Override
-            public void onAnimationEnd(@NonNull Animator animation) {
-                // Stale callbacks (canceled / replaced) must not settle the newer transition.
-                if (cardAnimator != thisAnimator) {
-                    return;
-                }
-                settleCardSwitch(newDetail);
-            }
-        });
-        set.start();
-    }
-
-    private void settleCardSwitch(MusicDetail newDetail) {
-        cardAnimator = null;
-
-        MusicInfoCard oldCard = activeCard;
-        oldCard.setVisibility(View.INVISIBLE);
-        oldCard.setTranslationX(0f);
-        oldCard.setAlpha(0f);
-        oldCard.getAlbumImage().setScaleX(1f);
-        oldCard.getAlbumImage().setScaleY(1f);
-
-        activeCard = stagedCard;
-        stagedCard = oldCard;
-        activeCard.setTranslationX(0f);
-        activeCard.setAlpha(1f);
-        activeCard.setVisibility(View.VISIBLE);
-        displayedDetail = newDetail;
-        cardSwitching = false;
-        // Recycle the outgoing card immediately so no stale content leaks into its next slide-in.
-        stagedCard.clear();
-        updateCoverScale(true);
-
-        // Drain the latest-wins slot, if any switch arrived while animating.
-        if (pendingSwitch != null) {
-            Traceable<MusicDetail> pending = pendingSwitch;
-            pendingSwitch = null;
-            MusicDetail pendingDetail = pending.value();
-            if (isSameMusic(displayedDetail, pendingDetail)) {
-                activeCard.bind(pending, sideWidth);
-                displayedDetail = pendingDetail;
-            } else {
-                startCardSwitch(pending);
-            }
-        }
-    }
-
-    /**
-     * Moves the active cover between {@link #CARD_COVER_MIN_SCALE} and 1 to match playback state.
-     */
-    private void updateCoverScale(boolean animate) {
-        if (activeCard == null) {
-            return;
-        }
-        View cover = activeCard.getAlbumImage();
-        float target = isCoverExpanded() ? 1f : CARD_COVER_MIN_SCALE;
-        if (!animate) {
-            cover.setScaleX(target);
-            cover.setScaleY(target);
-            return;
-        }
-        // A card transition owns the cover scale while it runs.
-        if (cardSwitching || (cover.getScaleX() == target && cover.getScaleY() == target)) {
-            return;
-        }
-        if (coverScaleAnimator != null) {
-            coverScaleAnimator.cancel();
-        }
-        ObjectAnimator scaleX = ObjectAnimator.ofFloat(cover, View.SCALE_X, target);
-        ObjectAnimator scaleY = ObjectAnimator.ofFloat(cover, View.SCALE_Y, target);
-        scaleX.setInterpolator(MUSIC_SWITCH_INTERPOLATOR);
-        scaleY.setInterpolator(MUSIC_SWITCH_INTERPOLATOR);
-        scaleX.setDuration(CARD_ANIM_DURATION_MS);
-        scaleY.setDuration(CARD_ANIM_DURATION_MS);
-        AnimatorSet set = new AnimatorSet();
-        set.playTogether(scaleX, scaleY);
-        coverScaleAnimator = set;
-        set.start();
-    }
-
-    private void startProgressUpdater(MusicDetail musicDetail) {
-        int token = progressUpdaterToken.incrementAndGet();
-        // The volatile field may be nulled by a concurrent switch-to-idle/stop between the UI task
-        // being posted and running, so fall back to the track's own duration instead of NPE-ing.
-        Duration musicDuration = nowPlayingInfo.getMusicDuration();
-        if (musicDuration == null) {
-            musicDuration = Duration.ofMillis(musicDetail.getDurationMillis());
-        }
-        DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
-                formatterWithHour :
-                formatterWithoutHour;
-        // 兜底退出：startAt 可能因任务被取代/失败永不触发，超时后结束进度循环防泄漏
-        long currentTimeMillis = System.currentTimeMillis();
-        long deadline = currentTimeMillis + musicDuration.toMillis() + 120_000;
-        progressUpdaterStartTime = currentTimeMillis;
-        progressTextUpdateCount = -1;
-        postFrameCallback(musicDetail, formatter, deadline, token);
-    }
-
-    private void postFrameCallback(MusicDetail musicDetail, DateTimeFormatter formatter, long deadline, int token) {
-        Choreographer.getInstance().postFrameCallback((choreographer, frameTimeNanos) -> {
-            if (progressUpdaterToken.get() != token) return;
-            MusicInfoCard card = activeCard;
-            if (card != null) {
-                long currentTimeMillis = System.currentTimeMillis();
-                long count = (currentTimeMillis - progressUpdaterStartTime) / 1000;
-                if (count > progressTextUpdateCount) {
-                    progressTextUpdateCount = count;
-                    Duration playedDuration = nowPlayingInfo.getPlayedDuration();
-                    String playedTimeString = formatter.format(LocalTime.MIDNIGHT.plusSeconds(playedDuration.toSeconds()));
-                    card.getPlayedTimeText().setText(playedTimeString);
-                }
-                card.getProgressBar().setProgress((int) (nowPlayingInfo.getProgressRate() * instance.sideWidth));
-                if (musicDetail.equals(nowPlayingInfo.getCurrentlyPlayingMusicDetail())
-                        && nowPlayingInfo.getProgressRate() < 1
-                        && System.currentTimeMillis() < deadline) {
-                    postFrameCallback(musicDetail, formatter, deadline, token);
-                }
-            }
-        });
     }
 
     private void reset() {
         visible = false;
         defaultSelectedIndex = 0;
-        lyricsPanelShown = false;
     }
 
     @Override
@@ -422,171 +201,176 @@ public class MainFragment extends Fragment {
         try {
             visible = true;
             var context = requireContext();
-            var base = new LinearLayout(context);
-            base.setPadding(base.dp(24), 0, base.dp(24), 0);
 
-            var baseParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
-            base.setLayoutParams(baseParams);
-            base.setOrientation(LinearLayout.HORIZONTAL);
+            var root = new FrameLayout(context);
+            root.setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+            root.addView(new MinecraftBackgroundView(context),
+                    new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-            var routerContainer = new RouterContainer(context);
+            var base = new FrameLayout(context);
+            int dp12 = base.dp(12);
+            base.setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+            root.addView(base, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
+            // Everything except the floating control bar keeps its original row arrangement.
+            contentRow = new LinearLayout(context);
+            contentRow.setOrientation(LinearLayout.HORIZONTAL);
+            base.addView(contentRow, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
+
+            routerContainer = new RouterContainer(context);
             routerContainer.setAnimationStyle(RouterContainer.AnimationStyle.SCALE_FADE_ROOT);
             routerContainer.setAnimationDuration(300);
+            var routerParams = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
+            routerParams.setMargins(routerContainer.dp(32), 0, routerContainer.dp(32), 0);
+            contentRow.addView(routerContainer, routerParams);
+
+            sidebar = new SidebarView(context);
+            sidebar.setVisibility(View.GONE);
+            {
+                FrameLayout.LayoutParams sidebarParams =
+                        new FrameLayout.LayoutParams(sidebar.getPanelWidth(), MATCH_PARENT);
+                sidebarParams.gravity = Gravity.TOP | Gravity.START;
+                sidebarParams.setMargins(dp12, base.dp(64), 0, dp12);
+                base.addView(sidebar, sidebarParams);
+            }
+            otherPageMode = hasMusic() ? SidebarView.Mode.PLAYER : SidebarView.Mode.LIBRARY;
 
             {
-                var side = new LinearLayout(context);
-                side.setOrientation(LinearLayout.VERTICAL);
-                base.addView(side, new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT));
+                LinearLayout controlBar = new LinearLayout(context);
+                var params = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+                params.gravity = Gravity.TOP | Gravity.START;
+                params.setMargins(dp12, dp12, 0, 0);
+                // Added after the content row so its blur can sample what is painted underneath.
+                base.addView(controlBar, params);
 
-                //noinspection UnstableApiUsage
-                var sideScrollView = new ClampingScrollView(context);
-                side.addView(sideScrollView, new LinearLayout.LayoutParams(WRAP_CONTENT, 0, 1));
+                {
+                    navigatorWrapper = new LinearLayout(context);
+                    navigatorWrapper.setOrientation(LinearLayout.HORIZONTAL);
+                    int dp2 = navigatorWrapper.dp(2);
+                    PanelStyle.applyDynamically(navigatorWrapper, navigatorWrapper.dp(16),
+                            new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2),
+                            InsetBackgroundFactory.BackdropBlur.UI_LAYER);
+                    // Runs after PanelStyle's attach listener, which rebuilds the background on re-attach.
+                    navigatorWrapper.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
+                        @Override
+                        public void onViewAttachedToWindow(View v) {
+                            updateNavigatorBackground(false);
+                        }
 
-                var sideContent = new LinearLayout(context);
-                sideContent.setOrientation(LinearLayout.VERTICAL);
+                        @Override
+                        public void onViewDetachedFromWindow(View v) {
+                            cancelNavigatorBackgroundAnimator();
+                        }
+                    });
+                    controlBar.addView(navigatorWrapper, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                    InsetBackgroundFactory factory = InsetBackgroundFactory.builder()
+                            .padding(new InsetBackgroundFactory.Padding(controlBar.dp(2), controlBar.dp(1), controlBar.dp(2), controlBar.dp(1)))
+                            .cornerRadius(controlBar.dp(14)).inset(controlBar.dp(1)).build();
+                    {
+                        sidebarButton = new Button(context) {
+                            @Override
+                            protected boolean dispatchHoverEvent(@NotNull MotionEvent event) {
+                                Tooltip.handleHover(this, event);
+                                return super.dispatchHoverEvent(event);
+                            }
+                        };
+                        sidebarButton.setTextSize(Theme.TEXT_SIZE_LARGE);
+                        sidebarButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+                        sidebarButton.setGravity(Gravity.CENTER);
+                        factory.applyBackgroundTo(sidebarButton);
+                        sidebarButton.setOnClickListener(b -> toggleSidebar());
+                        sidebarButton.setWidth(sidebarButton.dp(40));
+                        sidebarButton.setHeight(sidebarButton.dp(40));
 
-                sideContent.addView(new View(context), new LinearLayout.LayoutParams(MATCH_PARENT, sideContent.dp(24)));
-
-                sideWidth = base.dp(240);
-                var params = new LinearLayout.LayoutParams(sideWidth, MATCH_PARENT);
-                params.gravity = Gravity.CENTER;
-
-                // Merged album cover + info card, double-buffered for right-to-left switching.
-                // (ViewGroup clips children by default, so off-screen cards are cut at the wrapper bounds.)
-                cardWrapper = new FrameLayout(context);
-                activeCard = new MusicInfoCard(context, sideWidth);
-                stagedCard = new MusicInfoCard(context, sideWidth);
-                cardWrapper.addView(activeCard, new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-                cardWrapper.addView(stagedCard, new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-                stagedCard.setVisibility(View.INVISIBLE);
-                stagedCard.setTranslationX(sideWidth);
-                stagedCard.setAlpha(0f);
-                stagedCard.getAlbumImage().setScaleX(CARD_COVER_MIN_SCALE);
-                stagedCard.getAlbumImage().setScaleY(CARD_COVER_MIN_SCALE);
-                LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-                cardParams.setMargins(0, 0, 0, sideContent.dp(24));
-                sideContent.addView(cardWrapper, cardParams);
-
-                StreamAudioPlayer streamAudioPlayer = StreamAudioPlayer.getInstance();
-                StreamAudioPlayer.Status status = streamAudioPlayer.getStatus();
-                checkAudioPlayerStatus(status);
-                Consumer<StreamAudioPlayer.Status> statusListener = newStatus -> MuiModApi.postToUiThread(
-                        () -> checkAudioPlayerStatus(newStatus)
-                );
-                streamAudioPlayer.getStatusChangeListener().add(statusListener);
-                base.addOnAttachStateChangeListener(new View.OnAttachStateChangeListener() {
-                    @Override
-                    public void onViewAttachedToWindow(View v) {
+                        navigatorWrapper.addView(sidebarButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                        refreshSidebarStatus();
                     }
-
-                    @Override
-                    public void onViewDetachedFromWindow(View v) {
-                        streamAudioPlayer.getStatusChangeListener().remove(statusListener);
+                    {
+                        View divider = new View(context);
+                        ShapeDrawable dividerBg = new ShapeDrawable();
+                        dividerBg.setShape(ShapeDrawable.VLINE);
+                        dividerBg.setSize(divider.dp(1), divider.dp(1));
+                        dividerBg.setColor(Theme.DIVIDER_COLOR);
+                        divider.setBackground(dividerBg);
+                        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(divider.dp(1), MATCH_PARENT);
+                        dividerParams.setMargins(divider.dp(2), divider.dp(8), divider.dp(2), divider.dp(8));
+                        navigatorWrapper.addView(divider, dividerParams);
                     }
-                });
+                    {
+                        NavigatorWidget navigator = new NavigatorWidget(context, routerContainer);
+                        if (Minecraft.getInstance().player != null) {//in game
+                            var homeNav = navigator.createNavigationPage("Home", "/assets/music_hud/textures/gui/icons/house.png",
+                                    I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
+                            var searchNav = navigator.createNavigationPage("Search", "/assets/music_hud/textures/gui/icons/search.png",
+                                    I18n.get(MusicHud.MOD_ID + ".text.page.search"), SearchView::new);
+                            var accountNav = navigator.createNavigationPage("Account", "/assets/music_hud/textures/gui/icons/square_user_round.png",
+                                    I18n.get(MusicHud.MOD_ID + ".text.page.account"), AccountBaseView::new);
+                            var settingsNav = navigator.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
+                                    I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
+                            NavigatorWidget.NavigationMeta defaultMeta = List.of(homeNav, searchNav, accountNav, settingsNav).get(defaultSelectedIndex);
+                            defaultMeta.select();
+                        } else {
+                            var settingsNav = navigator.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
+                                    I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
+                            settingsNav.select();
+                        }
+                        navigatorWrapper.addView(navigator, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                    }
+                    {
+                        View divider = new View(context);
+                        ShapeDrawable dividerBg = new ShapeDrawable();
+                        dividerBg.setShape(ShapeDrawable.VLINE);
+                        dividerBg.setSize(divider.dp(1), divider.dp(1));
+                        dividerBg.setColor(Theme.DIVIDER_COLOR);
+                        divider.setBackground(dividerBg);
+                        LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(divider.dp(1), MATCH_PARENT);
+                        dividerParams.setMargins(divider.dp(2), divider.dp(8), divider.dp(2), divider.dp(8));
+                        navigatorWrapper.addView(divider, dividerParams);
+                    }
+                    {
+                        switchServerConnectButton = new Button(context) {
+                            @Override
+                            protected boolean dispatchHoverEvent(@NotNull MotionEvent event) {
+                                Tooltip.handleHover(this, event);
+                                return super.dispatchHoverEvent(event);
+                            }
+                        };
+                        switchServerConnectButton.setTextSize(Theme.TEXT_SIZE_LARGE);
+                        switchServerConnectButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+                        switchServerConnectButton.setGravity(Gravity.CENTER);
+                        factory.applyBackgroundTo(switchServerConnectButton);
+                        switchServerConnectButton.setOnClickListener(b -> connectionManager.toggleConnection());
+                        switchServerConnectButton.setWidth(switchServerConnectButton.dp(40));
+                        switchServerConnectButton.setHeight(switchServerConnectButton.dp(40));
 
-                var sideMenu = new SideMenu(context, routerContainer);
-                if (Minecraft.getInstance().player != null) {//in game
-                    var homeNav = sideMenu.createNavigationPage("Home", "/assets/music_hud/textures/gui/icons/house.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
-                    var searchNav = sideMenu.createNavigationPage("Search", "/assets/music_hud/textures/gui/icons/search.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.search"), SearchView::new);
-                    var accountNav = sideMenu.createNavigationPage("Account", "/assets/music_hud/textures/gui/icons/square_user_round.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.account"), AccountBaseView::new);
-                    var settingsNav = sideMenu.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
-                    SideMenu.NavigationMeta defaultMeta = List.of(homeNav, searchNav, accountNav, settingsNav).get(defaultSelectedIndex);
-                    defaultMeta.select();
-                } else {
-                    var settingsNav = sideMenu.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
-                            I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
-                    settingsNav.select();
-                }
-                sideContent.addView(sideMenu, params);
-
-                var sideParams = new LinearLayout.LayoutParams(sideWidth, MATCH_PARENT);
-                sideScrollView.addView(sideContent, sideParams);
-
-                LinearLayout serverConnectPanel = new LinearLayout(context);
-                serverConnectPanel.setOrientation(LinearLayout.VERTICAL);
-                serverConnectPanel.setGravity(Gravity.CENTER_VERTICAL);
-
-                switchServerConnectButton = new Button(context);
-                switchServerConnectButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
-                switchServerConnectButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
-                switchServerConnectButton.setGravity(Gravity.LEFT | Gravity.CENTER_VERTICAL);
-                InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
-                        .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                        .padding(new InsetBackgroundFactory.Padding(switchServerConnectButton.dp(2), switchServerConnectButton.dp(1), switchServerConnectButton.dp(2), switchServerConnectButton.dp(1)))
-                        .cornerRadius(switchServerConnectButton.dp(4)).build();
-                backgroundFactory.applyBackgroundTo(switchServerConnectButton);
-                switchServerConnectButton.setOnClickListener(b -> connectionManager.toggleConnection());
-                serverConnectPanel.addView(switchServerConnectButton, new LinearLayout.LayoutParams(MATCH_PARENT, base.dp(36)));
-                refreshServerConnectStatus();
-                LinearLayout.LayoutParams params4 = new LinearLayout.LayoutParams(sideWidth, WRAP_CONTENT);
-                params4.setMargins(0, serverConnectPanel.dp(8), 0, serverConnectPanel.dp(16));
-                side.addView(serverConnectPanel, params4);
-
-                LayoutTransition transition2 = new LayoutTransition();
-                transition2.enableTransitionType(LayoutTransition.CHANGING);
-                sideContent.setLayoutTransition(transition2);
-
-                LayoutTransition transition3 = new LayoutTransition();
-                transition3.disableTransitionType(LayoutTransition.DISAPPEARING);
-                transition3.disableTransitionType(LayoutTransition.APPEARING);
-                transition3.enableTransitionType(LayoutTransition.CHANGING);
-                serverConnectPanel.setLayoutTransition(transition3);
-
-                NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
-                Traceable<MusicDetail> currentlyPlaying = nowPlayingInfo.getCurrentlyPlayingMusic();
-                Traceable<MusicDetail> nextToPlay = nowPlayingInfo.getNextToPlayMusic();
-
-                // Seed both cards without animating: the active one shows current playback,
-                // the staged one shows idle so both measure to a stable height.
-                stagedCard.bind(Traceable.of(MusicDetail.NONE), sideWidth);
-                applyMusic(currentlyPlaying, nextToPlay, playingInfo.getLyricLines(), false);
-            }
-
-            lyricsPanelWidth = base.dp(320);
-            lyricsSidebar = new LinearLayout(context);
-            lyricsSidebar.setOrientation(LinearLayout.VERTICAL);
-            lyricsSidebar.setVisibility(View.GONE);
-            lyricsSidebar.setAlpha(0f);
-            lyricsSidebar.setTranslationX(lyricsPanelWidth);
-
-            lyricsScrollView = new StaggeredLyricScrollView(context);
-            lyricsScrollView.setMainLyricSize(Theme.SIDEBAR_MAIN_LYRIC_SIZE);
-            lyricsScrollView.setSubLyricSize(Theme.SIDEBAR_SUB_LYRIC_SIZE);
-            lyricsSidebar.addView(lyricsScrollView, new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
-
-            MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
-            Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
-            if (currentMusic != null && currentLyrics != null && !currentMusic.equals(MusicDetail.NONE)) {
-                if (notAbsoluteMusicLyric()) {
-                    lyricsScrollView.switchLyrics(currentMusic, currentLyrics);
-                } else {
-                    lyricsScrollView.clearLyrics();
+                        navigatorWrapper.addView(switchServerConnectButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                        refreshServerConnectStatus();
+                    }
                 }
             }
-
             routerContainer.setOnPageChangeListener(new RouterContainer.OnPageChangeListener() {
                 @Override
                 public void onPageChangeStart(@Nullable String fromKey, @NonNull String toKey) {
-                    boolean useSerial = ("Home".equals(fromKey) || "Home".equals(toKey)) && shouldShowLyricsPanel();
+                    // Only a Home transition changes the sidebar's docked state, so serialize those.
+                    boolean sidebarChanges = PAGE_HOME.equals(fromKey) || PAGE_HOME.equals(toKey);
                     routerContainer.setTransitionType(
-                            useSerial ? RouterContainer.TransitionType.SERIAL : RouterContainer.TransitionType.CROSS
+                            sidebarChanges ? RouterContainer.TransitionType.SERIAL : RouterContainer.TransitionType.CROSS
                     );
                 }
 
                 @Override
                 public void onPageChangeEnd(@NonNull String pageKey) {
-                    // animation is already triggered in onBeforeSwap
+                    // Late safety net: the panel may have been built after the initial navigation.
+                    updateSidebarForPage();
+                    updateNavigatorBackground(false);
+                    refreshSidebarStatus();
                 }
 
                 @Override
                 public void onTransitionStart(@Nullable String fromKey, @NonNull String toKey,
                                               @NonNull RouterContainer.TransitionType type) {
+                    // transitionTargetKey is already set, so isHomePage() resolves the incoming page.
+                    updateNavigatorBackground(true);
                     if ("Home".equals(toKey)) {
                         HomeView homeView = HomeView.getInstance();
                         if (homeView != null) {
@@ -598,24 +382,23 @@ public class MainFragment extends Fragment {
                                 MusicDetail currentMusic = playingInfo.getCurrentlyPlayingMusicDetail();
                                 Queue<LyricLine> currentLyrics = playingInfo.getLyricLines();
                                 if (!scrollView.isShowing(currentMusic, currentLyrics)) {
-                                    scrollView.switchLyrics(currentMusic == null ? MusicDetail.NONE : currentMusic, currentLyrics);
+                                    scrollView.switchLyrics(currentMusic, currentLyrics);
                                 }
                                 scrollView.reinitialize();
                             }
                         }
-                        hideLyricsPanel();
+                        // The panel docks on every other page; entering Home always closes it.
+                        if (sidebar != null) {
+                            sidebar.setPlayerVisible(false, fromKey != null);
+                            sidebar.hide(fromKey != null);
+                        }
                     }
                 }
 
                 @Override
                 public void onBeforeSwap(@Nullable String fromKey, @NonNull String toKey,
                                          @NonNull RouterContainer.TransitionType type) {
-                    if ("Home".equals(toKey)) {
-                        hideLyricsPanel();
-                        if (lyricsSidebar != null) {
-                            lyricsSidebar.setVisibility(View.GONE);
-                        }
-                    } else {
+                    if (!"Home".equals(toKey)) {
                         HomeView homeView = HomeView.getInstance();
                         if (homeView != null) {
                             StaggeredLyricScrollView scrollView = homeView.getStaggeredLyricScrollView();
@@ -623,128 +406,177 @@ public class MainFragment extends Fragment {
                                 scrollView.suspendLyricFollowingAndHide();
                             }
                         }
-                        showLyricsPanel();
                     }
+                    syncSidebarBeforeSwap();
                 }
             });
 
-            var params = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
-            params.setMargins(routerContainer.dp(64), 0, 0, 0);
-            base.addView(routerContainer, params);
+            NowPlayingInfo info = NowPlayingInfo.getInstance();
+            applyMusic(info.getCurrentlyPlayingMusic(), info.getNextToPlayMusic(),
+                    playingInfo.getLyricLines(), false);
+            updateSidebarForPage();
+            updateNavigatorBackground(false);
 
-            LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(lyricsPanelWidth, MATCH_PARENT);
-            params1.setMargins(base.dp(24), 0, 0, 0);
-            base.addView(lyricsSidebar, params1);
-
-            if (defaultSelectedIndex != 0) {
-                showLyricsPanel();
-            }
-
-            return base;
+            return root;
         } catch (Exception e) {
             visible = false;
             throw e;
         }
     }
 
-    private boolean shouldShowLyricsPanel() {
-        if (!clientConfig.getEnableLyricsSidebar()) {
-            return false;
+    /**
+     * Current page key; a null router or an unterminated initial navigation counts as Home.
+     */
+    private boolean isHomePage() {
+        // Use the router of this view: the static instance is only set once attached, and the
+        // initial navigation (e.g. to Home) already happened while building the view.
+        if (routerContainer == null) {
+            return true;
         }
-        MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-        boolean musicInvalid = detail == null || detail.equals(MusicDetail.NONE);
-        if (musicInvalid) {
-            return false;
-        }
-        return notAbsoluteMusicLyric();
+        String pageKey = routerContainer.getEffectivePageKey();
+        return pageKey == null || PAGE_HOME.equals(pageKey);
     }
 
-    private static boolean notAbsoluteMusicLyric() {
-        Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
-        return lines != null && !lines.isEmpty()
-                && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
-    }
-
-    private void updateLyricsPanelVisibility() {
-        RouterContainer rc = RouterContainer.getInstance();
-        if (rc == null) return;
-        // Use the effective (in-transition target) key: currentPageKey is stale until the
-        // transition finishes, so a music switch landing mid-transition to Home would otherwise
-        // wrongly re-show the sidebar after the page-change listener already hid it.
-        String currentKey = rc.getEffectivePageKey();
-        if ("Home".equals(currentKey) || currentKey == null) return;
-        if (shouldShowLyricsPanel()) {
-            showLyricsPanel();
+    /**
+     * Applies the sidebar state for the current page: Home floats it (library only, visibility is
+     * user controlled), every other page docks it and always shows it.
+     */
+    private void updateSidebarForPage() {
+        if (sidebar == null) {
+            return;
+        }
+        if (isHomePage()) {
+            setContentLeftPadding(0);
+            sidebar.setMode(SidebarView.Mode.LIBRARY);
+            sidebar.setPlayerVisible(false, false);
         } else {
-            hideLyricsPanel();
+            setContentLeftPadding(sidebar.getDockedWidth());
+            sidebar.setPlayerVisible(true, false);
+            sidebar.setMode(otherPageMode);
+            sidebar.show(false);
+        }
+        refreshSidebarStatus();
+    }
+
+    /**
+     * Frame-aligned variant for the router's swap hook: the incoming page must be laid out at its
+     * final size, so a hide is applied immediately instead of sliding out into a reflow.
+     */
+    private void syncSidebarBeforeSwap() {
+        if (sidebar == null) {
+            return;
+        }
+        if (isHomePage()) {
+            setContentLeftPadding(0);
+            sidebar.setMode(SidebarView.Mode.LIBRARY, true);
+            sidebar.setPlayerVisible(false, true);
+            sidebar.hide(false);
+        } else {
+            setContentLeftPadding(sidebar.getDockedWidth());
+            sidebar.setMode(otherPageMode, true);
+            sidebar.setPlayerVisible(true, true);
+            sidebar.show(true);
+        }
+        sidebar.updateLyricsVisibility();
+    }
+
+    private void setContentLeftPadding(int left) {
+        if (contentRow != null && contentRow.getPaddingLeft() != left) {
+            contentRow.setPadding(left, 0, contentRow.getPaddingRight(), 0);
         }
     }
 
-    private void showLyricsPanel() {
-        if (lyricsSidebar == null || lyricsPanelShown) {
+    /**
+     * Home hides the navigator panel so its icons float over the content; other pages always show it.
+     */
+    private void updateNavigatorBackground(boolean animate) {
+        if (navigatorWrapper == null) {
             return;
         }
-        if (!shouldShowLyricsPanel()) {
+        cancelNavigatorBackgroundAnimator();
+        float target = isHomePage() ? 0f : 1f;
+        float current = getNavigatorBackgroundAlpha();
+        if (!animate || Math.abs(current - target) < 0.001f) {
+            setNavigatorBackgroundAlpha(target);
             return;
         }
-        lyricsPanelShown = true;
-        if (lyricsAnimator != null) {
-            lyricsAnimator.cancel();
-        }
+        ValueAnimator animator = ValueAnimator.ofFloat(current, target);
+        animator.setDuration(NAVIGATOR_BACKGROUND_ANIMATION_DURATION);
+        animator.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
+        animator.addUpdateListener(a -> setNavigatorBackgroundAlpha((Float) a.getAnimatedValue()));
+        navigatorBackgroundAnimator = animator;
+        animator.start();
+    }
 
-        ViewGroup.LayoutParams lp = lyricsSidebar.getLayoutParams();
-        lp.width = lyricsPanelWidth;
-        lyricsSidebar.setLayoutParams(lp);
-        lyricsSidebar.setVisibility(View.VISIBLE);
-        lyricsSidebar.setTranslationX(lyricsPanelWidth);
-        lyricsSidebar.setAlpha(0f);
-
-        ObjectAnimator slideIn = ObjectAnimator.ofFloat(lyricsSidebar, View.TRANSLATION_X, lyricsPanelWidth, 0);
-        slideIn.setDuration(LYRICS_ANIMATION_DURATION);
-        slideIn.setInterpolator(LYRIC_PANEL_SWITCH_INTERPOLATOR);
-        ObjectAnimator fadeIn = ObjectAnimator.ofFloat(lyricsSidebar, View.ALPHA, 0f, 1f);
-        fadeIn.setDuration(LYRICS_ANIMATION_DURATION);
-        fadeIn.setInterpolator(LYRIC_PANEL_SWITCH_INTERPOLATOR);
-
-        lyricsAnimator = new AnimatorSet();
-        lyricsAnimator.playTogether(slideIn, fadeIn);
-        lyricsAnimator.start();
-
-        if (lyricsScrollView != null) {
-            lyricsScrollView.reinitialize();
+    private void cancelNavigatorBackgroundAnimator() {
+        if (navigatorBackgroundAnimator != null) {
+            navigatorBackgroundAnimator.cancel();
+            navigatorBackgroundAnimator = null;
         }
     }
 
-    private void hideLyricsPanel() {
-        if (lyricsSidebar == null || !lyricsPanelShown) {
+    private float getNavigatorBackgroundAlpha() {
+        Drawable background = navigatorWrapper != null ? navigatorWrapper.getBackground() : null;
+        return background != null ? background.getAlpha() : 1f;
+    }
+
+    private void setNavigatorBackgroundAlpha(float alpha) {
+        Drawable background = navigatorWrapper != null ? navigatorWrapper.getBackground() : null;
+        if (background != null) {
+            background.setAlpha(alpha);
+        }
+    }
+
+    /**
+     * Toggles the sidebar: open/close on Home, player/library content elsewhere.
+     */
+    private void toggleSidebar() {
+        if (sidebar == null) {
             return;
         }
-        lyricsPanelShown = false;
-        if (lyricsAnimator != null) {
-            lyricsAnimator.cancel();
-        }
-        if (lyricsScrollView != null) {
-            lyricsScrollView.suspendLyricFollowingAndHide();
-        }
-
-        ObjectAnimator slideOut = ObjectAnimator.ofFloat(lyricsSidebar, View.TRANSLATION_X, 0, lyricsPanelWidth);
-        slideOut.setDuration(LYRICS_ANIMATION_DURATION);
-        slideOut.setInterpolator(Easing.EASE_IN_QUINT);
-        ObjectAnimator fadeOut = ObjectAnimator.ofFloat(lyricsSidebar, View.ALPHA, 1f, 0f);
-        fadeOut.setDuration(LYRICS_ANIMATION_DURATION);
-        fadeOut.setInterpolator(Easing.EASE_IN_OUT_CUBIC);
-
-        lyricsAnimator = new AnimatorSet();
-        lyricsAnimator.playTogether(slideOut, fadeOut);
-        lyricsAnimator.addListener(new AnimatorListener() {
-            @Override
-            public void onAnimationEnd(@NonNull Animator animation) {
-                ViewGroup.LayoutParams lp = lyricsSidebar.getLayoutParams();
-                lp.width = 0;
-                lyricsSidebar.setLayoutParams(lp);
+        if (isHomePage()) {
+            // Home never shows the player page, even if the mode switch raced the page transition.
+            sidebar.setMode(SidebarView.Mode.LIBRARY, true);
+            sidebar.setPlayerVisible(false, false);
+            if (sidebar.isVisible()) {
+                sidebar.hide(true);
+            } else {
+                sidebar.show(true);
             }
-        });
-        lyricsAnimator.start();
+        } else {
+            otherPageMode = sidebar.getMode() == SidebarView.Mode.PLAYER
+                    ? SidebarView.Mode.LIBRARY : SidebarView.Mode.PLAYER;
+            sidebar.setMode(otherPageMode, true);
+        }
+        refreshSidebarStatus();
+    }
+
+    private void refreshSidebarStatus() {
+        if (sidebarButton == null) {
+            return;
+        }
+        sidebarButton.setVisibility(View.VISIBLE);
+        String icon;
+        String tooltip;
+        if (isHomePage()) {
+            icon = ICON_LIBRARY;
+            boolean open = sidebar != null && sidebar.isVisible();
+            tooltip = I18n.get(MusicHud.MOD_ID + (open
+                    ? ".text.sidebar.closeLibrary" : ".text.sidebar.openLibrary"));
+        } else if (sidebar != null && sidebar.getMode() == SidebarView.Mode.PLAYER) {
+            icon = ICON_TURNTABLE;
+            tooltip = I18n.get(MusicHud.MOD_ID + ".text.sidebar.switchToLibrary");
+        } else {
+            icon = ICON_LIBRARY;
+            tooltip = I18n.get(MusicHud.MOD_ID + ".text.sidebar.switchToPlayer");
+        }
+        Tooltip.attach(sidebarButton, tooltip);
+        SpannableString string = new SpannableString(" ");
+        Image imageFromResource = ImageUtils.getImageFromResource(icon);
+        if (imageFromResource != null) {
+            string.setSpan(ImageUtils.getIconSpan(imageFromResource), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        sidebarButton.setText(string);
     }
 
     private void refreshServerConnectStatus() {
@@ -759,11 +591,11 @@ public class MainFragment extends Fragment {
                     if (singlePlayer) {
                         buttonText = I18n.get(MusicHud.MOD_ID + ".text.connected.integrated");
                         switchServerConnectButton.setEnabled(false);
-                        switchServerConnectButton.setTooltipText(null);
+                        Tooltip.attach(switchServerConnectButton, buttonText);
                     } else {
                         buttonText = I18n.get(MusicHud.MOD_ID + ".text.connected");
                         switchServerConnectButton.setEnabled(true);
-                        switchServerConnectButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.disconnect"));
+                        Tooltip.attach(switchServerConnectButton, buttonText + "\n" + I18n.get(MusicHud.MOD_ID + ".button.disconnect"));
                     }
                 }
                 case NOT_CONNECTED -> {
@@ -774,26 +606,25 @@ public class MainFragment extends Fragment {
                         buttonText = I18n.get(MusicHud.MOD_ID + ".text.notConnected");
                     }
                     switchServerConnectButton.setEnabled(true);
-                    switchServerConnectButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
+                    Tooltip.attach(switchServerConnectButton, buttonText + "\n" + I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }
                 case INCOMPATIBLE -> {
                     icon = "/assets/music_hud/textures/gui/icons/unlink.png";
                     String template;
                     if (clientConfig.getEnableIsolatedMode()) {
-                        template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer.isolated");
+                        template = I18n.get(buttonText + "\n" + MusicHud.MOD_ID + ".text.incompatibleWithServer.isolated");
                     } else {
-                        template = I18n.get(MusicHud.MOD_ID + ".text.incompatibleWithServer");
+                        template = I18n.get(buttonText + "\n" + MusicHud.MOD_ID + ".text.incompatibleWithServer");
                     }
                     buttonText = template.replace("{version}", connectionManager.getServerVersion().toString());
                     switchServerConnectButton.setEnabled(false);
-                    switchServerConnectButton.setTooltipText(I18n.get(MusicHud.MOD_ID + ".button.connect"));
+                    Tooltip.attach(switchServerConnectButton, buttonText + "\n" + I18n.get(MusicHud.MOD_ID + ".button.connect"));
                 }
             }
-            String linkUnicode = "\uD83D\uDD17";
-            SpannableString string = new SpannableString("  " + linkUnicode + " " + buttonText);
+            SpannableString string = new SpannableString(" ");
             Image imageFromResource = ImageUtils.getImageFromResource(icon);
             if (imageFromResource != null) {
-                string.setSpan(ImageUtils.getIconSpan(imageFromResource), 2, 2 + linkUnicode.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+                string.setSpan(ImageUtils.getIconSpan(imageFromResource), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
             switchServerConnectButton.setText(string);
         } else {
@@ -801,34 +632,14 @@ public class MainFragment extends Fragment {
         }
     }
 
-    private void checkAudioPlayerStatus(StreamAudioPlayer.Status status) {
-        MusicInfoCard card = activeCard;
-        if (card != null && card.getProgressBar() != null) {
-            card.getProgressBar().setIndeterminate(status == StreamAudioPlayer.Status.BUFFERING || status == StreamAudioPlayer.Status.RETRYING);
-        }
-        updateCoverScale(true);
-    }
-
     @Override
     public void onDestroyView() {
         super.onDestroyView();
-        // Invalidate the running transition first so its end callback cannot settle stale views.
-        AnimatorSet running = cardAnimator;
-        cardAnimator = null;
-        if (running != null) {
-            running.cancel();
-        }
-        AnimatorSet scaling = coverScaleAnimator;
-        coverScaleAnimator = null;
-        if (scaling != null) {
-            scaling.cancel();
-        }
-        cardSwitching = false;
-        pendingSwitch = null;
-        activeCard = null;
-        stagedCard = null;
-        cardWrapper = null;
-        displayedDetail = null;
+        cancelNavigatorBackgroundAnimator();
+        navigatorWrapper = null;
+        sidebar = null;
+        contentRow = null;
+        routerContainer = null;
         reset();
     }
 }

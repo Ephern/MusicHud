@@ -9,6 +9,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.apache.logging.log4j.core.config.Configurator;
 
+import java.io.InputStream;
 import java.time.Duration;
 import java.util.Random;
 import java.util.concurrent.ExecutorService;
@@ -55,6 +56,19 @@ public final class MusicHud {
         LOGGER.debug("Initialized in environment: {}", currentEnvironment);
         RegistrationManager.performCommonAutoRegistration();
         initAtMillis = System.currentTimeMillis();
+    }
+
+    /**
+     * Opens a resource from the mod class path. {@link Class#getResourceAsStream(String)} only
+     * searches the calling class's module, which breaks in a NeoForge dev launch where every mod is
+     * its own module, so this asks the class loader instead.
+     */
+    public static InputStream getResourceAsStream(String path) {
+        String name = path.startsWith("/") ? path.substring(1) : path;
+        ClassLoader classLoader = MusicHud.class.getClassLoader();
+        return classLoader != null
+                ? classLoader.getResourceAsStream(name)
+                : ClassLoader.getSystemResourceAsStream(name);
     }
 
     public static long getRunningMillis() {

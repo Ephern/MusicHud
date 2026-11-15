@@ -3,6 +3,7 @@ package indi.etern.musichud.client.ui.components.buttons;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.InsetDrawable;
+import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.widget.ImageButton;
 import icyllis.modernui.widget.ImageView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
@@ -11,6 +12,7 @@ import lombok.Getter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Supplier;
+import indi.etern.musichud.client.ui.components.Tooltip;
 
 public class CycleIconButton extends ImageButton {
     @Getter
@@ -52,7 +54,7 @@ public class CycleIconButton extends ImageButton {
         int normalized = Math.floorMod(index, states.size());
         this.index = normalized;
         current = states.get(normalized);
-        setTooltipText(current.tooltip.get());
+        Tooltip.attach(this, current.tooltip.get());
         setImageDrawable(new InsetDrawable(new ScaledImageDrawable(getContext().getResources(), current.image.get(), dp(12), dp(16)), dp(3)));
     }
 
@@ -65,7 +67,7 @@ public class CycleIconButton extends ImageButton {
         this.warned = warned;
         this.warnedClickHandler = warned ? clickHandler : null;
         if (warned) {
-            setTooltipText(tooltip);
+            Tooltip.attach(this, tooltip);
             setImageDrawable(new InsetDrawable(new ScaledImageDrawable(getContext().getResources(), icon, dp(12), dp(16)), dp(3)));
         } else {
             apply(index);
@@ -77,5 +79,12 @@ public class CycleIconButton extends ImageButton {
             Supplier<Image> image,
             Runnable switchedOn,
             Runnable switchedOff) {
+    }
+
+    /** Disabled buttons must still show their tooltip, which the listener path skips. */
+    @Override
+    protected boolean dispatchHoverEvent(MotionEvent event) {
+        Tooltip.handleHover(this, event);
+        return super.dispatchHoverEvent(event);
     }
 }

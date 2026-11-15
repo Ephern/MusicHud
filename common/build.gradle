@@ -69,6 +69,9 @@ dependencies {
 
     compileOnly "org.projectlombok:lombok:$rootProject.lombok_version"
     compileOnly "org.lwjgl:lwjgl-vulkan:$rootProject.lwjgl_version"
+    // VulkanMod is not on Maven; the jar in libs/ is only needed to compile the Vulkan interop
+    // backend and is loaded at runtime from run/*/mods.
+    compileOnly files(rootProject.fileTree(dir: rootProject.file('libs'), include: 'VulkanMod*.jar'))
     compileOnly project(':processor')
     annotationProcessor "org.projectlombok:lombok:$rootProject.lombok_version"
     annotationProcessor project(':processor')
@@ -83,7 +86,7 @@ dependencies {
 
     api "dev.icyllis:modernui-core:$rootProject.modernui_version"
     api "icyllis.modernui:ModernUI-Markflow:$rootProject.modernui_version"
-    compileOnly "icyllis.modernui:ModernUI-NeoForge:26.2-$rootProject.modernui_version.+"
+    compileOnly "icyllis.modernui:ModernUI-Lumen-NeoForge:26.2-$rootProject.modernui_version.+"
 
     implementation "com.github.umjammer:jlayer:$rootProject.jlayer_version"
     implementation "org.jflac:jflac-codec:$rootProject.jflac_version"

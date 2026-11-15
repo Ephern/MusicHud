@@ -1,0 +1,31 @@
+package indi.etern.musichud.client.ui.render.text;
+
+import icyllis.modernui.mc.FontResourceManager;
+import icyllis.modernui.mc.text.TextLayoutEngine;
+import indi.etern.musichud.MusicHud;
+import net.minecraft.client.gui.Font;
+import net.minecraft.client.gui.navigation.ScreenRectangle;
+import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix3x2f;
+
+import java.util.List;
+
+public final class GradientTextRenderer {
+
+    private GradientTextRenderer() {
+    }
+
+    public static List<GradientTextRenderState> build(Font font, String text, int x, int y,
+                                                      GradientSpec gradient, float alpha,
+                                                      TextEdgeFade fade,
+                                                      @Nullable ScreenRectangle scissor, Matrix3x2f pose) {
+        try {
+            if (FontResourceManager.getInstance() instanceof TextLayoutEngine) {
+                return ModernTextGeometry.build(font, text, x, y, gradient, alpha, fade, scissor, pose);
+            }
+        } catch (Throwable t) {
+            MusicHud.getLogger(GradientTextRenderer.class).debug("Modern gradient text geometry failed", t);
+        }
+        return VanillaTextGeometry.build(font, text, x, y, gradient, alpha, fade, scissor, pose);
+    }
+}

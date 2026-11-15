@@ -10,9 +10,11 @@ import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.FrameLayout;
 import icyllis.modernui.widget.PagerAdapter;
-import icyllis.modernui.widget.TabLayout;
 import icyllis.modernui.widget.ViewPager;
 import indi.etern.musichud.MusicHud;
+import indi.etern.musichud.client.ui.components.SegmentedBar;
+import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.PanelStyle;
 import lombok.Getter;
 import lombok.NonNull;
 import net.minecraft.client.resources.language.I18n;
@@ -20,12 +22,13 @@ import net.minecraft.client.resources.language.I18n;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-public class LoginView extends FrameLayout implements ILoginView{
+public class LoginView extends FrameLayout implements ILoginView {
     @Getter
     private static LoginView instance;
     @Getter
     private final ViewPager pager;
     private final ILoginView[] loginViews = new ILoginView[2];
+    private final SegmentedBar tabBar;
 
     public LoginView(Context context) {
         super(context);
@@ -46,26 +49,40 @@ public class LoginView extends FrameLayout implements ILoginView{
             });
         }
 
-        TabLayout tabLayout = new TabLayout(context);
-        tabLayout.setElevation(dp(3));
-        tabLayout.setTabMode(TabLayout.MODE_AUTO);
-        tabLayout.setTabGravity(TabLayout.GRAVITY_CENTER);
-        tabLayout.setupWithViewPager(pager);
-        tabLayout.setBackground(null);
+        tabBar = new SegmentedBar(context);
+        tabBar.addItem(new SegmentedBar.Item("qrCode", null,
+                "/assets/music_hud/textures/gui/icons/qr_code.png",
+                I18n.get(MusicHud.MOD_ID + ".text.login.page.qrCode")));
+        tabBar.addItem(new SegmentedBar.Item("deviceCode", null,
+                "/assets/music_hud/textures/gui/icons/smartphone.png",
+                I18n.get(MusicHud.MOD_ID + ".text.login.page.deviceCode")));
+        int dp2 = dp(2);
+        PanelStyle.applyDynamically(tabBar, dp(16),
+                new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2),
+                InsetBackgroundFactory.BackdropBlur.UI_LAYER);
 
-        var lp = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        var lp = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         lp.gravity = Gravity.TOP | Gravity.CENTER_HORIZONTAL;
-        tabLayout.setLayoutParams(lp);
-        addView(tabLayout);
+        tabBar.setLayoutParams(lp);
+        addView(tabBar);
+
+        tabBar.setOnItemSelectedListener((key, index) -> pager.setCurrentItem(index, true));
+        pager.addOnPageChangeListener(new ViewPager.OnPageChangeListener() {
+            @Override
+            public void onPageSelected(int position) {
+                tabBar.setSelectedIndex(position, true);
+            }
+        });
 
         var pagerLp = new LayoutParams(MATCH_PARENT, MATCH_PARENT);
         pagerLp.gravity = Gravity.TOP;
-        pagerLp.topMargin = dp(64);
+        pagerLp.topMargin = dp(128);
         addView(pager, pagerLp);
 
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
-            public void onViewAttachedToWindow(View v) {}
+            public void onViewAttachedToWindow(View v) {
+            }
 
             @Override
             public void onViewDetachedFromWindow(View v) {
@@ -129,15 +146,6 @@ public class LoginView extends FrameLayout implements ILoginView{
         @Override
         public boolean isViewFromObject(@NonNull View view, @NonNull Object object) {
             return view == object;
-        }
-
-        @Override
-        public CharSequence getPageTitle(int position) {
-            return I18n.get(switch (position) {
-                case 0 -> MusicHud.MOD_ID + ".text.login.page.qrCode";
-                case 1 -> MusicHud.MOD_ID + ".text.login.page.deviceCode";
-                default -> "";
-            });
         }
     }
 }

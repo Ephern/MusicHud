@@ -1,11 +1,8 @@
 package indi.etern.musichud.client.audio;
 
 /**
- * Fade configuration for one direction of a playback task.
- * <p>
- * Durations are compile-time constants / deterministically derived per task so that
- * every client applies the same fade and keeps wall-clock synchronization intact
- * (fade slightly shifts the audible portion of a song, which must match across peers).
+ * Fade configuration for one direction of a playback task. Durations are deterministic per task so
+ * every client fades identically and wall-clock synchronization stays intact.
  */
 public record Fade(long durationMs, Easing easing) {
     public Fade {
