@@ -9,6 +9,7 @@ import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.dto.LyricLine;
+import indi.etern.musichud.client.ui.components.volume.VolumeUiController;
 import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
@@ -80,14 +81,18 @@ public class NowPlayingInfo {
         thread.setName("MHWorker-Lyrics-Updater");
         long generation = lyricUpdaterGeneration.get();
         while (generation == lyricUpdaterGeneration.get()) {
-            if (this.musicStartTime == null) {
+            ArrayDeque<LyricLine> allLines = this.lyricLines;
+            if (this.musicStartTime == null || allLines == null || !hasTimedLyricLines(allLines)) {
                 break;
             }
             ArrayDeque<LyricLine> lyricLines1 = this.atomicLyricLines.get();
             if (lyricLines1 == null || lyricLines1.isEmpty()) break;
             LyricLine line = lyricLines1.peek();
             if (line != null) {
-                if (line.getStartTime() != null) {
+                if (line.getType() == LyricLine.Type.UNSYNCED) {
+                    // Static lyrics have no timeline: keep them out of the highlight/HUD pipeline.
+                    lyricLines1.poll();
+                } else if (line.getStartTime() != null) {
                     if (ZonedDateTime.now().isAfter(this.musicStartTime.plus(getCallTime(line)))) {
                         lyricLines1.poll();
                         currentLyricLine = line;
@@ -139,6 +144,7 @@ public class NowPlayingInfo {
                 clientConfig.setMuted(false);
                 clientConfig.save();
                 MainFragment.refreshCoverScale();
+                VolumeUiController.getInstance().refresh();
             });
             postJmtc(() -> {
                 jmtc.setPlayingState(JMTCPlayingState.PLAYING);
@@ -150,6 +156,7 @@ public class NowPlayingInfo {
                 clientConfig.setMuted(true);
                 clientConfig.save();
                 MainFragment.refreshCoverScale();
+                VolumeUiController.getInstance().refresh();
             });
             postJmtc(() -> {
                 jmtc.setPlayingState(JMTCPlayingState.PAUSED);
@@ -160,6 +167,7 @@ public class NowPlayingInfo {
         jmtcCallbacks.onVolume = (volume) -> {
             clientConfig.forceSetSoundVolume(Math.clamp(volume.intValue() * 100L, 0, 100));
             clientConfig.save();
+            VolumeUiController.getInstance().refresh();
         };
 
         jmtc.setEnabled(true);
@@ -367,7 +375,7 @@ public class NowPlayingInfo {
 
     public void startAt(ZonedDateTime zonedDateTime) {
         musicStartTime = Objects.requireNonNullElseGet(zonedDateTime, ZonedDateTime::now);
-        if (lyricLines != null && !lyricLines.isEmpty()) {
+        if (lyricLines != null && !lyricLines.isEmpty() && hasTimedLyricLines(lyricLines)) {
             lyricUpdaterGeneration.incrementAndGet();
             Thread old = lyricUpdaterVThread;
             if (old != null) {
@@ -376,6 +384,15 @@ public class NowPlayingInfo {
             // 代际递增后总是新提交一个更新器，旧更新器检测到代际变化自行退出，避免并发消费歌词
             MusicHud.EXECUTOR.execute(lyricUpdater);
         }
+    }
+
+    private static boolean hasTimedLyricLines(Collection<LyricLine> lines) {
+        for (LyricLine line : lines) {
+            if (line.getType() == LyricLine.Type.NORMAL || line.getType() == LyricLine.Type.RHYTHM) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void callLyricsUpdateListeners(LyricLine line) {

@@ -22,7 +22,7 @@ import java.util.function.Consumer;
  * {@code max(outgoing.fadeOut, incoming.fadeIn)}; the incoming task preloads immediately and only
  * starts fading in after the outgoing one has fully faded out.
  */
-public class StreamAudioPlayer {
+public class StreamAudioPlayer {//TODO disk cache due to cdn expired time
     /** Default fade duration for the fade-in node of a task. */
     public static final long DEFAULT_FADE_IN_MS = 1000;
     /** Default fade duration for the fade-out node of a task. */

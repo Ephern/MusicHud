@@ -22,6 +22,7 @@ import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.ui.components.volume.VolumeUiController;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
@@ -207,7 +208,7 @@ public class MainFragment extends Fragment {
             root.addView(new MinecraftBackgroundView(context),
                     new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-            var base = new FrameLayout(context);
+            FrameLayout base = new FrameLayout(context);
             int dp12 = base.dp(12);
             base.setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
             root.addView(base, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -369,6 +370,7 @@ public class MainFragment extends Fragment {
                 @Override
                 public void onTransitionStart(@Nullable String fromKey, @NonNull String toKey,
                                               @NonNull RouterContainer.TransitionType type) {
+                    VolumeUiController.getInstance().dismiss();
                     // transitionTargetKey is already set, so isHomePage() resolves the incoming page.
                     updateNavigatorBackground(true);
                     if ("Home".equals(toKey)) {
@@ -417,6 +419,8 @@ public class MainFragment extends Fragment {
             updateSidebarForPage();
             updateNavigatorBackground(false);
 
+            // Added last so the volume flyout draws above every page and the docked sidebar.
+            VolumeUiController.getInstance().attachLayer(base);
             return root;
         } catch (Exception e) {
             visible = false;
@@ -445,6 +449,7 @@ public class MainFragment extends Fragment {
         if (sidebar == null) {
             return;
         }
+        VolumeUiController.getInstance().dismiss();
         if (isHomePage()) {
             setContentLeftPadding(0);
             sidebar.setMode(SidebarView.Mode.LIBRARY);
@@ -466,6 +471,7 @@ public class MainFragment extends Fragment {
         if (sidebar == null) {
             return;
         }
+        VolumeUiController.getInstance().dismiss();
         if (isHomePage()) {
             setContentLeftPadding(0);
             sidebar.setMode(SidebarView.Mode.LIBRARY, true);
@@ -534,6 +540,7 @@ public class MainFragment extends Fragment {
         if (sidebar == null) {
             return;
         }
+        VolumeUiController.getInstance().dismiss();
         if (isHomePage()) {
             // Home never shows the player page, even if the mode switch raced the page transition.
             sidebar.setMode(SidebarView.Mode.LIBRARY, true);
@@ -636,6 +643,7 @@ public class MainFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         cancelNavigatorBackgroundAnimator();
+        VolumeUiController.getInstance().detachLayer();
         navigatorWrapper = null;
         sidebar = null;
         contentRow = null;

@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.SpannableStringBuilder;
@@ -138,7 +137,7 @@ public class MusicTrackItem extends LinearLayout {
         infoRow = new LinearLayout(context);
         infoRow.setOrientation(HORIZONTAL);
         infoRow.setGravity(Gravity.CENTER_VERTICAL);
-        musicTexts.addView(infoRow);
+        musicTexts.addView(infoRow, new LayoutParams(MATCH_PARENT, dp(18)));
 
         durationText = new TextView(context);
         durationText.setTextSize(Theme.TEXT_SIZE_NORMAL);
@@ -164,10 +163,9 @@ public class MusicTrackItem extends LinearLayout {
         sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
         Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
         if (sourceIcon != null) {
-            ScaledImageDrawable drawable = new ScaledImageDrawable(context.getResources(), sourceIcon, dp(16), dp(16));
+            ScaledImageDrawable drawable = new ScaledImageDrawable(context.getResources(), sourceIcon, dp(14), dp(14));
             drawable.setAlpha(infoAlpha);
-            sourceButton.setImageDrawable(new InsetDrawable(
-                    drawable, dp(1)));
+            sourceButton.setImageDrawable(drawable);
         }
         sourceButton.setOnClickListener(view -> {
             Object tag = sourceButton.getTag();

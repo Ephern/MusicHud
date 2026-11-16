@@ -151,7 +151,9 @@ public class LyricLine implements Comparable<LyricLine> {
     }
 
     public enum Type {
-        NORMAL, META_DATA, RHYTHM
+        NORMAL, META_DATA, RHYTHM,
+        // Untimed lyrics: the whole text is rendered as one static block, never highlighted.
+        UNSYNCED
     }
 
     public record Phrase(int endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {
