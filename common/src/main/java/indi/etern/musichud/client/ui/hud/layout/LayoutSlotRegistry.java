@@ -1,8 +1,9 @@
-package indi.etern.musichud.client.ui.layout;
+package indi.etern.musichud.client.ui.hud.layout;
 
 import java.util.HashMap;
 import java.util.Map;
 
+/** Maps layout element ids to their layout target and optional custom measure function. */
 public final class LayoutSlotRegistry {
     private final Map<String, Slot> slots = new HashMap<>();
 

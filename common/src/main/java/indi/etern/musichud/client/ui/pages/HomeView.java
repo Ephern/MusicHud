@@ -58,7 +58,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
  * Home page body: the player information column on the left and the large lyric column on the
  * right. {@link #infoColumn} and {@link #staggeredLyricScrollView} are direct children so the
  * layout transition can animate the visible column itself when the lyric column disappears.
- * The play queue and idle sources live in {@link indi.etern.musichud.client.ui.components.SidebarView}.
  */
 public class HomeView extends ViewGroup {
     private static final DateTimeFormatter TIME_WITH_HOUR = DateTimeFormatter.ofPattern("HH:mm:ss");

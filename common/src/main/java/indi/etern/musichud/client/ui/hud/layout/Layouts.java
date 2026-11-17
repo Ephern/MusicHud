@@ -1,8 +1,9 @@
-package indi.etern.musichud.client.ui.layout;
+package indi.etern.musichud.client.ui.hud.layout;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/** DSL entry points for layout specs; {@link LayoutCompiler} turns them into a layout tree. */
 public final class Layouts {
     private Layouts() {
     }

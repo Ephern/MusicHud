@@ -254,7 +254,7 @@ public class SearchView extends FrameLayout {
     }
 
     private void refreshSearchMeta(int offset, List<?> result, SearchType searchType) {
-        boolean mayHasMore = result.size() == 50;// see also: IMusicApiService.searchXXX(...);
+        boolean mayHasMore = result.size() == 50; // A full page (50 results) means the server may have more.
         SearchMeta searchMeta = searchMetas.getOrDefault(searchType, new SearchMeta(searchType, searchText));
         searchMeta.nextOffset = offset + result.size();
         searchMeta.mayHasMore = mayHasMore;

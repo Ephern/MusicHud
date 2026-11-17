@@ -1,18 +1,16 @@
-package indi.etern.musichud.client.ui.hud.layout;
+package indi.etern.musichud.client.ui.hud.presentation;
 
-import indi.etern.musichud.client.ui.layout.JustifyContent;
-import indi.etern.musichud.client.ui.layout.LayoutCompiler;
-import indi.etern.musichud.client.ui.layout.LayoutNode;
-import indi.etern.musichud.client.ui.layout.LayoutSlotRegistry;
-import indi.etern.musichud.client.ui.layout.LayoutTree;
-import indi.etern.musichud.client.ui.layout.Layouts;
-import indi.etern.musichud.client.ui.layout.SizeSpec;
+import indi.etern.musichud.client.ui.hud.layout.*;
 import indi.etern.musichud.client.ui.render.SceneStyle;
 import lombok.Getter;
 
-import static indi.etern.musichud.client.ui.layout.AlignItems.CENTER;
-import static indi.etern.musichud.client.ui.layout.AlignItems.STRETCH;
+import static indi.etern.musichud.client.ui.hud.layout.AlignItems.CENTER;
+import static indi.etern.musichud.client.ui.hud.layout.AlignItems.STRETCH;
 
+/**
+ * HUD layout definition: derives element styles and sizes from the panel bounds and builds the
+ * layout tree whose nodes drive the HUD scene elements.
+ */
 @Getter
 public final class HudLayouts {
     private final SceneStyle baseStyle;

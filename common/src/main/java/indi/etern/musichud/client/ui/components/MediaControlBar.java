@@ -34,8 +34,8 @@ import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
 
 /**
- * Per-track action row shared by the Home page and the sidebar: requester avatar, volume, source,
- * like, add-to-playlist and vote-skip. Track binding is all-or-nothing so both hosts stay in sync.
+ * Per-track action row: requester avatar, volume, source, like, add-to-playlist and vote-skip.
+ * Track binding is all-or-nothing, so the row never shows actions for another track.
  */
 public class MediaControlBar extends LinearLayout {
     private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
@@ -55,8 +55,8 @@ public class MediaControlBar extends LinearLayout {
     }
 
     /**
-     * @param buttonSizeDp hit box edge in dp; the docked sidebar uses a slightly tighter row so
-     *                     the avatar, volume, source and three actions still fit its fixed width
+     * @param buttonSizeDp hit box edge in dp, chosen so the avatar, volume, source and three
+     *                     actions fit a fixed-width row
      */
     public MediaControlBar(Context context, int buttonSizeDp) {
         super(context);

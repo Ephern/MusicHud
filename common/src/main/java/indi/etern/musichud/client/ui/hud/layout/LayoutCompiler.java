@@ -1,8 +1,12 @@
-package indi.etern.musichud.client.ui.layout;
+package indi.etern.musichud.client.ui.hud.layout;
 
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Compiles a {@link LayoutSpec} into a {@link LayoutTree}, binding leaf element ids to the targets
+ * and measure functions registered in {@link LayoutSlotRegistry}.
+ */
 public final class LayoutCompiler {
     private LayoutCompiler() {
     }

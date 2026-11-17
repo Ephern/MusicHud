@@ -348,7 +348,7 @@ public class NowPlayingInfo {
         } catch (IllegalStateException ignored) {
         }
         MusicHud.EXECUTOR.submit(() -> {
-            // 补偿音频过渡
+            // Delay the HUD switch so it lands with the audio transition.
             try {
                 Thread.sleep(500);
             } catch (InterruptedException ignored) {
@@ -381,7 +381,8 @@ public class NowPlayingInfo {
             if (old != null) {
                 old.interrupt();
             }
-            // 代际递增后总是新提交一个更新器，旧更新器检测到代际变化自行退出，避免并发消费歌词
+            // Bump the generation, then always submit a fresh updater; the previous one exits on
+            // its own, so lyrics are never consumed concurrently.
             MusicHud.EXECUTOR.execute(lyricUpdater);
         }
     }

@@ -1,5 +1,10 @@
-package indi.etern.musichud.client.ui.layout;
+package indi.etern.musichud.client.ui.hud.layout;
 
+/**
+ * Size mode plus its value: pixels for {@link Mode#FIXED}, a parent fraction for
+ * {@link Mode#PERCENT}. {@link Mode#FILL} stretches to the parent; {@code AUTO} and
+ * {@link Mode#CONTENT} use the content size.
+ */
 public record SizeSpec(Mode mode, float value) {
     public enum Mode {
         AUTO,

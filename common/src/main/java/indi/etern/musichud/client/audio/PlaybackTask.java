@@ -47,9 +47,9 @@ import java.util.function.Supplier;
  * queue, worker threads and the wall-clock alignment state.
  */
 public class PlaybackTask {
-    private static final int BUFFER_COUNT = 8;
+    private static final int AL_BUFFER_COUNT = 8;
     private static final int BUFFER_SIZE = 65536;
-    private static final int AUDIO_BUFFER_CAPACITY = 60;
+    private static final int AUDIO_BUFFER_CAPACITY = 16 * 128;
     /**
      * Consecutive {@code alBufferData} failures required before permanently
      * switching a discrete stream to stereo downmix (one failure can be transient).
@@ -399,7 +399,7 @@ public class PlaybackTask {
                 }
 
                 int initialBuffers = 0;
-                while (!cancelled && !restartRequested && initialBuffers < BUFFER_COUNT * 2) {
+                while (!cancelled && !restartRequested && initialBuffers < AL_BUFFER_COUNT * 2) {
                     byte[] audioData = decoder.readChunk(BUFFER_SIZE);
                     if (audioData == null) break;
                     if (cancelled || restartRequested) break;
@@ -409,7 +409,7 @@ public class PlaybackTask {
                 }
 
                 while (!cancelled && !restartRequested) {
-                    // 保持解码器头与墙钟对齐（无论下载缓冲是否充足）
+                    // Keep the decoder head aligned with the wall clock regardless of download backlog.
                     syncPlaying();
 
                     byte[] audioData = decoder.readChunk(BUFFER_SIZE);
@@ -458,7 +458,6 @@ public class PlaybackTask {
                             truncationRetryCount, decodedMs, musicDetail.getDurationMillis());
                 }
 
-                // 下载完成
                 downloadDone = true;
                 signalBufferReady();
                 LOGGER.debug("Audio download completed");
@@ -789,14 +788,14 @@ public class PlaybackTask {
             if (cancelled || Thread.currentThread().isInterrupted()) {
                 return PlayResult.RESTARTED;
             }
-            source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
+            source = OpenAlSource.create(new OpenAlSource.Config(AL_BUFFER_COUNT, directChannels), ledger);
             source.setPcmSink(pcmSink);
         } finally {
             sourceLock.unlock();
         }
 
         boolean firstChunk = true;
-        for (int i = 0; i < BUFFER_COUNT; i++) {
+        for (int i = 0; i < AL_BUFFER_COUNT; i++) {
             byte[] audioData = pollAudio();
             if (audioData == null) break;
 
@@ -1005,7 +1004,7 @@ public class PlaybackTask {
                         }
                     }
                     int filled = source.fill(() -> takeChunk(expectedBytes, staleDropMarginBytes, bytesPerSecond),
-                            BUFFER_COUNT, format, sampleRate);
+                            AL_BUFFER_COUNT, format, sampleRate);
                     if (filled > 0) {
                         resumeIfWaiting();
                     }
@@ -1084,7 +1083,7 @@ public class PlaybackTask {
                 && ledger.prefetchBytes.get() < rebufferTargetBytes(bytesPerSecond)) {
             underrunSinceNanos = System.nanoTime();
             logUnderrunDiagnostics("underrun-started", expectedBytes, bytesPerSecond);
-            // 下载线程异常退出（非 EOF）时温和重启下载，避免永久卡 BUFFERING
+            // Restart a download thread that exited without EOF; otherwise playback stays BUFFERING forever.
             Future<?> currentDownloadFuture = downloadThreadFuture;
             if (currentDownloadFuture != null && currentDownloadFuture.isDone() && !cancelled
                     && System.currentTimeMillis() - lastDownloadRestartTimestamp > 1000) {
@@ -1439,7 +1438,7 @@ public class PlaybackTask {
         setState(PlaybackState.BUFFERING);
         bufferLock.lock();
         try {
-            while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT) {
+            while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * AL_BUFFER_COUNT) {
                 long now = System.currentTimeMillis();
                 long bytes = ledger.prefetchBytes.get();
                 if (bytes != lastBytes) {

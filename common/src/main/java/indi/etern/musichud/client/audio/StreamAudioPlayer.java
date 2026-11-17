@@ -39,11 +39,8 @@ public class StreamAudioPlayer {//TODO disk cache due to cdn expired time
     private long spectrumToken;
     private boolean spectrumMuted;
     /**
-     * Last spectrum snapshot, published by the audio/mixer thread.
-     * <p>
-     * The player monitor is held for the whole PCM decode/mix of a chunk, which blocked the render
-     * thread (audio-reactive background) for several milliseconds. Readers now take the immutable
-     * snapshot instead of the monitor; a frame of staleness is invisible for audio reactivity.
+     * Last spectrum snapshot, published by the audio/mixer thread so readers never block on the
+     * player monitor, which is held during the whole PCM decode/mix of a chunk.
      */
     private volatile SpectrumSnapshot publishedSpectrum = SpectrumSnapshot.silence(0, 0);
     private PlaybackTask currentTask;
@@ -127,7 +124,7 @@ public class StreamAudioPlayer {//TODO disk cache due to cdn expired time
         }
     }
 
-    // audible 的 pending 先淡出自然结束，避免硬取消爆音
+    // An audible pending task fades out instead of being hard-cancelled, which would click.
     private static void retirePending(PlaybackTask pending) {
         if (pending.isAudible()) {
             pending.beginFadeOut(pending.fadeOut().durationMs());

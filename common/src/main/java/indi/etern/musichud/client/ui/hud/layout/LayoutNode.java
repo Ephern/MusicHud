@@ -1,8 +1,12 @@
-package indi.etern.musichud.client.ui.layout;
+package indi.etern.musichud.client.ui.hud.layout;
 
 import lombok.Getter;
 import lombok.Setter;
 
+/**
+ * One node of the HUD layout tree. Subclasses resolve their own main and cross axis; the base holds
+ * the box style, the measured size and the optional {@link LayoutTarget} that receives the bounds.
+ */
 public abstract class LayoutNode {
     protected Insets padding = Insets.NONE;
     protected Insets margin = Insets.NONE;
@@ -15,6 +19,7 @@ public abstract class LayoutNode {
     protected float flexShrink;
     protected int overflowOrder;
     protected boolean hideOnOverflow;
+    @Getter
     protected boolean collapseWhenEmptyAndTrailing;
     protected float aspectRatio;
     protected AlignItems alignItems = AlignItems.START;
@@ -34,7 +39,7 @@ public abstract class LayoutNode {
     protected float measuredWidth;
     protected float measuredHeight;
     protected float resolvedMain;
-    protected float resolvedCross;
+    @Getter
     protected boolean collapsed;
     @Setter
     protected LayoutTarget target;
@@ -81,16 +86,8 @@ public abstract class LayoutNode {
         return measuredHeight;
     }
 
-    public boolean isCollapsed() {
-        return collapsed;
-    }
-
     public boolean isLayoutVisible() {
         return visible && !collapsed;
-    }
-
-    public boolean isCollapseWhenEmptyAndTrailing() {
-        return collapseWhenEmptyAndTrailing;
     }
 
     public void setCollapsed(boolean collapsed) {

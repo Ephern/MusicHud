@@ -93,9 +93,9 @@ public class MarqueeTextView extends ViewGroup {
     private boolean isolatedPass;
     private boolean isolationFailed;
 
-    /** Natural text width, measured in {@link #onMeasure}. */
+    /** Natural text width. */
     private int contentWidth;
-    /** Distance from one copy's origin to the next, set in {@link #onLayout}. */
+    /** Distance from one copy's origin to the next. */
     private int cycleLength = 1;
     private int lastCycleLength = -1;
     private float offset;
@@ -123,7 +123,7 @@ public class MarqueeTextView extends ViewGroup {
             copy.setSingleLine();
             copy.setHorizontalScrollBarEnabled(false);
             copy.setVerticalScrollBarEnabled(false);
-            // Pressed links dim instead of drawing the selection highlight behind the text.
+            // Pressed links are marked by their dim transition only.
             copy.setHighlightColor(0);
             addView(copy, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }

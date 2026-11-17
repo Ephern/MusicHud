@@ -47,7 +47,7 @@ public final class VolumeUiController {
     private final VolumeIconButton.Listener iconListener = new VolumeIconButton.Listener() {
         @Override
         public void onToggleMute(VolumeIconButton button) {
-            // A click is a mute action, never a reason to spawn the flyout.
+            // A click only toggles mute.
             cancelOpen();
             toggleMute();
         }
@@ -343,10 +343,7 @@ public final class VolumeUiController {
         applyVolumeState();
     }
 
-    /**
-     * Projects the controller's own state onto every icon and the flyout. The action's target is
-     * authoritative: re-reading the config on the way back desynced the icon from the audio.
-     */
+    /** Applies the controller's level and mute state to every icon and the flyout. */
     private void applyVolumeState() {
         for (VolumeIconButton button : buttons) {
             button.setLevel(level, muted);

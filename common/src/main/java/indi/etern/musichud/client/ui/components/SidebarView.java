@@ -934,7 +934,8 @@ public class SidebarView extends LinearLayout {
         }
         DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
                 FORMATTER_WITH_HOUR : FORMATTER_WITHOUT_HOUR;
-        // 兜底退出：startAt 可能因任务被取代/失败永不触发，超时后结束进度循环防泄漏
+        // Fallback exit: startAt may never fire when the task is replaced or fails, so the
+        // progress loop stops at the deadline.
         long currentTimeMillis = System.currentTimeMillis();
         long deadline = currentTimeMillis + musicDuration.toMillis() + 120_000;
         progressUpdaterStartTime = currentTimeMillis;

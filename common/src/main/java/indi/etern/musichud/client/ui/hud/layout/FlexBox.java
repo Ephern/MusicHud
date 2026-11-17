@@ -1,8 +1,12 @@
-package indi.etern.musichud.client.ui.layout;
+package indi.etern.musichud.client.ui.hud.layout;
 
 import java.util.ArrayList;
 import java.util.List;
 
+/**
+ * Single-axis flex container. Children are measured along the direction, overflowing groups shrink
+ * or hide in descending {@code overflowOrder}, and leftover main-axis space is split by flex grow.
+ */
 public class FlexBox extends LayoutNode {
     private static final float EPSILON = 0.01f;
 
@@ -57,7 +61,6 @@ public class FlexBox extends LayoutNode {
             return;
         }
 
-        float crossParent = row ? crossAvailable : crossAvailable;
         for (LayoutNode child : visibleChildren) {
             child.resolvedMain = row
                     ? resolveMainWidth(child, innerWidth, crossAvailable)

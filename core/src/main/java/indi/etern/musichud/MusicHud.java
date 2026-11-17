@@ -1,5 +1,6 @@
 package indi.etern.musichud;
 
+import indi.etern.musichud.beans.login.ClientUserDataStore;
 import indi.etern.musichud.platform.Environment;
 import indi.etern.musichud.utils.RegistrationManager;
 import lombok.Getter;
@@ -76,6 +77,7 @@ public final class MusicHud {
     }
 
     public static void onConfigLoaded() {
+        ClientUserDataStore.initialize();
         RegistrationManager.performSideAutoRegistration();
     }
 
@@ -93,14 +95,14 @@ public final class MusicHud {
                     Thread.sleep(delayBetween.toMillis());
                 }
             } catch (InterruptedException e) {
-                Thread.currentThread().interrupt(); // 恢复中断状态
+                Thread.currentThread().interrupt();
             }
         });
 
-        // 优雅关闭：停止新任务并等待现有循环结束
+        // Graceful stop: no further iterations; cancel(true) wakes the sleeping loop.
         return () -> {
             running.set(false);
-            future.cancel(true);   // 中断线程，使sleep立即返回
+            future.cancel(true);
         };
     }
 

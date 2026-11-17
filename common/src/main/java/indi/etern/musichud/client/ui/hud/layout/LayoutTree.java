@@ -1,8 +1,12 @@
-package indi.etern.musichud.client.ui.layout;
+package indi.etern.musichud.client.ui.hud.layout;
 
 import java.util.Collections;
 import java.util.Map;
 
+/**
+ * Root node plus element-id lookup of one compiled layout. {@link #measureAndArrange} skips the pass
+ * while the tree is clean and the size is unchanged.
+ */
 public final class LayoutTree {
     private final LayoutNode root;
     private final Map<String, LayoutNode> nodes;

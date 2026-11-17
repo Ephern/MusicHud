@@ -654,7 +654,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
      * #STAGGER_HEAD_STEP_MILLIS} and tail rows by {@link #STAGGER_TAIL_STEP_MILLIS}, so the timing
      * does not depend on the font size. The wave follows the scroll direction: forward keeps the
      * implicit origin above the highlight, a backward scroll mirrors it below. The offset retarget
-     * shares each row's release instant, exactly like the original implementation.
+     * shares each row's release instant.
      */
     private void calcDelays(int targetIndex, LyricLine highlighted, int targetScrollY) {
         int totalLines = lyricLineViewList.size();

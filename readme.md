@@ -220,3 +220,5 @@ Deploy separately (recommend for server)
 </details>
 
 > 实验性地，有另一个[Rust 版本的 API 服务器](https://github.com/SPlayer-Dev/ncm-api-rs)，保持了大部分 API 端点不变，但比 NodeJS 版本快得多。MusicHUD 已在 1.2.13 实现对其兼容。可以在它的 Release 页中找到二进制可执行文件。但它仍然有一些问题。使用前请考虑风险
+
+[一些思考（中文 readme 特有彩蛋）](thoughts.md)

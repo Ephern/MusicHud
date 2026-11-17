@@ -139,13 +139,29 @@ public interface ClientConfig {
 
     void setHudCornerRadius(int hudCornerRadius);
 
-    LoginCookieInfo getClientCookie();
+    boolean getUseGlobalCredentials();
 
-    void setClientCookie(LoginCookieInfo clientCookie);
+    boolean getDefaultUseGlobalCredentials();
 
-    ProfileConfigData getClientAccountConfig();
+    void setUseGlobalCredentials(boolean useGlobalCredentials);
 
-    void setClientAccountConfig(ProfileConfigData clientAccountConfig);
+    boolean isClientDataStorageInitialized();
+
+    void setClientDataStorageInitialized(boolean initialized);
+
+    /**
+     * Legacy cookie value kept only for migration into the dedicated credential file.
+     */
+    LoginCookieInfo getLegacyClientCookie();
+
+    void clearLegacyClientCookie();
+
+    /**
+     * Legacy account value kept only for migration into the dedicated account file.
+     */
+    ProfileConfigData getLegacyClientAccountConfig();
+
+    void clearLegacyClientAccountConfig();
 
     boolean getEnabledInIntegratedServer();
 

@@ -303,6 +303,7 @@ public class ApiServerDownloadDialog {
 
     private void buildDialog() {
         title = new TextView(context);
+        title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         title.setTextSize(Theme.TEXT_SIZE_LARGE);
 
         LinearLayout content = new LinearLayout(context);

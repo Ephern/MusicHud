@@ -1,7 +1,6 @@
 package indi.etern.musichud.beans.login;
 
 import indi.etern.musichud.MusicHud;
-import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.network.ByteBufCodec;
 import indi.etern.musichud.network.Codecs;
 import indi.etern.musichud.platform.Environment;
@@ -24,44 +23,28 @@ public record LoginCookieInfo(LoginType type, String rawCookie, ZonedDateTime ge
             "",
             ZonedDateTime.of(114514, 1, 9, 1, 9, 8, 10, ZoneId.systemDefault())
     );
-    private static ClientConfig clientConfig;
-    static {
-        if (MusicHud.getCurrentEnvironment().getSide() == Environment.Side.CLIENT) {
-            try {
-                clientConfig = ClientConfig.getInstance();
-            } catch (UnsupportedOperationException e) {
-                clientConfig = null;
-            }
-        }
-    }
 
     public static LoginCookieInfo clientCurrentCookie() {
-        Environment.Side side = MusicHud.getCurrentEnvironment().getSide();
-        if (side == Environment.Side.CLIENT) {
-            if (clientConfig == null) {
-                throw new IllegalStateException("\"clientConfig\" is null in client");
-            }
-            try {
-                LoginCookieInfo loginCookieInfo = clientConfig.getClientCookie();
-                if (loginCookieInfo == null
-                        || loginCookieInfo.rawCookie == null
-                        || loginCookieInfo.generateTime == null
-                        || loginCookieInfo.type == null) {
-                    return UNLOGGED;
-                }
-                return loginCookieInfo;
-            } catch (RuntimeException e) {
+        if (MusicHud.getCurrentEnvironment().getSide() != Environment.Side.CLIENT) {
+            throw new IllegalStateException("Cannot read client cookie in server");
+        }
+        try {
+            LoginCookieInfo loginCookieInfo = ClientUserDataStore.currentCookie();
+            if (loginCookieInfo == null
+                    || loginCookieInfo.rawCookie == null
+                    || loginCookieInfo.generateTime == null
+                    || loginCookieInfo.type == null) {
                 return UNLOGGED;
             }
-        } else {
-            throw new IllegalStateException("Cannot invoke \"LoginCookieInfo.getClientCookie\" in server");
+            return loginCookieInfo;
+        } catch (RuntimeException e) {
+            return UNLOGGED;
         }
     }
 
     public static void setClientCookie(LoginCookieInfo loginCookieInfo) {
         try {
-            clientConfig.setClientCookie(loginCookieInfo);
-            clientConfig.save();
+            ClientUserDataStore.saveCookie(loginCookieInfo);
             logger.info("Login cookie saved");
         } catch (RuntimeException e) {
             logger.error("Exception occurred when serializing login cookie and save", e);

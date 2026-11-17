@@ -42,11 +42,11 @@ public class MP3StreamDecoder implements AudioDecoder {
                 if (obuffer instanceof SampleBuffer buffer) {
                     short[] shortData = buffer.getBuffer();
 
-                    // 将short[]转换为byte[] (16位PCM, 小端序)
+                    // 16-bit little-endian PCM.
                     for (int i = 0; i < buffer.getBufferLength(); i++) {
                         short sample = shortData[i];
-                        output.write(sample & 0xFF);        // 低字节
-                        output.write((sample >> 8) & 0xFF); // 高字节
+                        output.write(sample & 0xFF);
+                        output.write((sample >> 8) & 0xFF);
                     }
                 }
                 bitstream.closeFrame();
