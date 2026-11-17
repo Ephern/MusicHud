@@ -50,7 +50,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class SearchView extends FrameLayout {
-    private static final int BAR_TOP_MARGIN = 12;
+    private static final int BAR_MARGIN = 12;
     @Getter
     private static SearchView instance = null;
     @Getter
@@ -159,7 +159,7 @@ public class SearchView extends FrameLayout {
 
         FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
         topBarParams.gravity = Gravity.TOP;
-        topBarParams.setMargins(0, dp(BAR_TOP_MARGIN), 0, 0);
+        topBarParams.setMargins(0, dp(BAR_MARGIN), 0, dp(BAR_MARGIN));
         // Added last: its backdrop blur samples the content recorded underneath.
         addView(topBar, topBarParams);
 
@@ -191,7 +191,7 @@ public class SearchView extends FrameLayout {
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         if (topBar != null && searchResultTabPage != null) {
             FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
-            searchResultTabPage.setContentTopInset(lp.topMargin + topBar.getMeasuredHeight());
+            searchResultTabPage.setContentTopInset(lp.topMargin + topBar.getMeasuredHeight() + lp.bottomMargin);
         }
         super.onLayout(changed, left, top, right, bottom);
     }

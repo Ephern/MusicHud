@@ -227,6 +227,7 @@
   "music_hud.text.album.type.single": "單曲",
   "music_hud.text.apiLogInfo": "API 伺服器日誌：{count} 個檔案，共 {size}",
   "music_hud.text.apiServiceVersion": "API 服務版本: {}",
+  "music_hud.text.artist": "歌手",
   "music_hud.text.artist.album": "{} 專輯",
   "music_hud.text.artist.music": "{} 單曲",
   "music_hud.text.binaryApiServerStatus.LAUNCHING": "啟動中",

@@ -7,7 +7,7 @@ import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
-import icyllis.modernui.text.style.ImageSpan;
+import icyllis.modernui.text.TextUtils;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.*;
@@ -51,20 +51,32 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class MusicCollectionDetailView extends FrameLayout implements RouterContainer.RouteAware {
     private static final MusicService musicService = MusicService.getInstance();
     private static final int COVER_SIZE = 1024;
-    private static final int BAR_TOP_MARGIN = 12;
+    private static final int BAR_MARGIN = 12;
     private static final int BAR_CORNER_RADIUS = 16;
+    private static final int PANEL_WIDTH_DP = 280;
+    private static final int PANEL_PADDING_DP = 12;
+    private static final int PANEL_MARGIN_DP = 12;
+    private static final int PANEL_GAP_DP = 12;
+    private static final int PANEL_WIDTH = PANEL_WIDTH_DP + PANEL_PADDING_DP * 2;
+    private static final int LIST_RIGHT_INSET = PANEL_WIDTH + PANEL_MARGIN_DP + PANEL_GAP_DP;
     private static final String ICON_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/list_music.png";
     private static final String ICON_LIKE_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/heart_filled.png";
     private static final String ICON_RECOMMEND_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/radio.png";
     private static final String ICON_DISC_ALBUM = "/assets/music_hud/textures/gui/icons/disc_album.png";
+    private static final String ICON_AUDIO_LINES = "/assets/music_hud/textures/gui/icons/audio_lines.png";
     private final LinearLayout topBar;
     private final ScrollView scrollView;
     private final ProgressBar progressBar;
     private final MusicVirtualizedListLayout virtualList;
     private final UrlImageView imageView;
+    private final TextView typeView;
+    private final TextView nameView;
+    private final TextView musicTrackCountView;
+    private final TextView playedCountView;
+    private final LinearLayout statsRow;
+    private final TextView extraInfoView;
     private final AtomicBoolean syncPending = new AtomicBoolean();
-    private final int imageSize = dp(128);
-    private TextView musicTrackCountView;
+    private final int imageSize = dp(PANEL_WIDTH_DP);
     private MusicCollection musicCollection;
     private Unregister tracksSyncUnregister = null;
     private Unregister updateNotifierUnregister = null;
@@ -82,183 +94,6 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
         super(context);
 
         this.musicCollection = musicCollection;
-        String collectionNameI18n = musicCollection.getNameI18nKey();
-
-        topBar = new LinearLayout(context);
-        topBar.setOrientation(LinearLayout.HORIZONTAL);
-        topBar.setClickable(true);
-
-        ImageButton backButton = new ImageButton(context);
-        String tooltipText = I18n.get(MusicHud.MOD_ID + ".button.back");
-        Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
-        if (image != null) {
-            backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), image, dp(16), dp(16)));
-        }
-        Tooltip.attach(backButton, tooltipText);
-        backButton.setOnClickListener(view -> {
-            MainFragment.getInstance().getRouterContainer().popNavigate();
-            backButton.setOnClickListener(null);
-        });
-        InsetBackgroundFactory.builder()
-                .inset(0)
-                .cornerRadius(dp(8))
-                .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
-                .build()
-                .applyBackgroundTo(backButton);
-        LinearLayout.LayoutParams backButtonParams = new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT);
-        backButtonParams.setMargins(0, 0, dp(4), 0);
-        topBar.addView(backButton, backButtonParams);
-
-        imageView = new UrlImageView(context);
-        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(imageSize, imageSize);
-        topBar.addView(imageView, imageParams);
-        imageView.setCornerRadius(dp(8));
-        loadCoverImage();
-
-        LinearLayout infoView = new LinearLayout(context);
-        infoView.setGravity(Gravity.TOP);
-        infoView.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
-        params1.setMargins(dp(16), 0, 0, 0);
-        topBar.addView(infoView, params1);
-
-        LinearLayout row1 = new LinearLayout(context);
-        row1.setOrientation(LinearLayout.HORIZONTAL);
-        row1.setBaselineAligned(false);
-        row1.setGravity(Gravity.CENTER_VERTICAL);
-        LinearLayout.LayoutParams row1Params = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        row1Params.setMargins(0, 0, 0, dp(2));
-        infoView.addView(row1, row1Params);
-
-        TextView typeText = new TextView(context);
-        typeText.setTextSize(Theme.TEXT_SIZE_LARGE);
-        typeText.setTextColor(Theme.NORMAL_TEXT_COLOR);
-        typeText.setText(I18n.get(collectionNameI18n));
-        LinearLayout.LayoutParams typeParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        typeParams.setMargins(0, 0, dp(16), 0);
-        row1.addView(typeText, typeParams);
-
-        if (musicCollection instanceof Playlist playlist) {
-            {
-                musicTrackCountView = new TextView(context);
-                musicTrackCountView.setTextSize(Theme.TEXT_SIZE_LARGE);
-                updatePlaylistTrackCountView(playlist);
-                LinearLayout.LayoutParams params3 = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
-                params3.setMargins(0, 0, dp(12), 0);
-                row1.addView(musicTrackCountView, params3);
-            }
-            {
-                TextView playedCountView = new TextView(context);
-                playedCountView.setTextSize(Theme.TEXT_SIZE_LARGE);
-                SpannableString text = new SpannableString("  " + CountFormatter.formatCount(playlist.getPlayedCount()));
-                Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/audio_lines.png");
-                if (icon != null) {
-                    ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
-                    text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                }
-                playedCountView.setText(text);
-                row1.addView(playedCountView, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
-            }
-        } else if (musicCollection instanceof Album album) {
-            {
-                musicTrackCountView = new TextView(context);
-                musicTrackCountView.setTextSize(Theme.TEXT_SIZE_LARGE);
-                updateAlbumTrackCountView(album);
-                LinearLayout.LayoutParams params3 = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
-                params3.setMargins(0, 0, dp(12), 0);
-                row1.addView(musicTrackCountView, params3);
-            }
-            String type = album.getType();
-            if (!type.isBlank()) {
-                TextView albumTypeText = new TextView(context);
-                albumTypeText.setTextSize(Theme.TEXT_SIZE_LARGE);
-                SpannableString text = new SpannableString("  " + mappedAlbumType(type));
-                Image icon = ImageUtils.getImageFromResource(ICON_DISC_ALBUM);
-                if (icon != null) {
-                    ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
-                    text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                }
-                albumTypeText.setText(text);
-                row1.addView(albumTypeText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
-            }
-        }
-        row1.addView(new View(context), new LinearLayout.LayoutParams(dp(16), MATCH_PARENT, 0));
-
-
-        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .inset(0)
-                .cornerRadius(dp(4))
-                .padding(new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
-                .build();
-        int dp28 = dp(28);
-        {
-            ImageButton refreshButton = new ImageButton(context);
-            backgroundFactory.applyBackgroundTo(refreshButton);
-            Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
-            refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            var resources = getContext().getResources();
-            Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
-            refreshButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(resources, image1, dp(12), dp(16)), dp(3)));
-            refreshButton.setOnClickListener((v) -> refreshData(true));
-            row1.addView(refreshButton, new LinearLayout.LayoutParams(dp28, dp28));
-        }
-        {
-            ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
-            backgroundFactory.applyBackgroundTo(toggleSubscribeButton);
-            row1.addView(toggleSubscribeButton, new LinearLayout.LayoutParams(dp28, dp28, 0));
-            if (musicCollection instanceof Playlist playlist) {
-                Profile current = Profile.getCurrent();
-                if (current == null || current.equals(Profile.ANONYMOUS) || playlist.getCreator().getUserId() == current.getUserId()) {
-                    toggleSubscribeButton.setVisibility(GONE);
-                } else {
-                    var subscribeState = musicService.getPlaylistSubscribeState(playlist);
-                    toggleSubscribeButton.bindState(subscribeState);
-                }
-            } else if (musicCollection instanceof Album album) {
-                var subscribeState = musicService.getAlbumSubscribeState(album);
-                toggleSubscribeButton.bindState(subscribeState);
-            }
-        }
-        {
-            var idlePlaySourceWidget = new IdlePlaySourceWidget(context, this.musicCollection, dp(28));
-            row1.addView(idlePlaySourceWidget, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-        }
-
-        TextView name = new TextView(context);
-        name.setTextSize(Theme.TEXT_SIZE_LARGER);
-        name.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-        name.setText(musicCollection.getName());
-        LinearLayout.LayoutParams params2 = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        params2.setMargins(0, 0, 0, dp(8));
-        infoView.addView(name, params2);
-
-        ScrollView descriptionScrollView = new ScrollView(context);
-        LinearLayout.LayoutParams scrollParams = new LinearLayout.LayoutParams(MATCH_PARENT, 0, 1);
-        infoView.addView(descriptionScrollView, scrollParams);
-
-        TextView extraInfo = new TextView(context);
-        extraInfo.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        extraInfo.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        extraInfo.setLayoutParams(new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-        descriptionScrollView.addView(extraInfo);
-
-        if (musicCollection instanceof Playlist playlist) {
-            extraInfo.setText(playlist.getDescription());
-        } else if (musicCollection instanceof Album album) {
-            String company = album.getCompany();
-            String artists = album.getArtists().stream()
-                    .map(Artist::getName)
-                    .reduce((a, b) -> a + " / " + b)
-                    .orElse("");
-            String alias = album.getAlias().stream()
-                    .reduce((a, b) -> a + " | " + b)
-                    .orElse("");
-            extraInfo.setText(
-                    (company.isBlank() ? "" : (company + "\n")) + artists + (alias.isBlank() ? "" : "\n" + alias)
-            );
-        }
 
         // The list fills the page and scrolls underneath the floating bar, so it is added first.
         virtualList = new MusicVirtualizedListLayout(context);
@@ -277,17 +112,141 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
 
         progressBar = new ProgressBar(context);
         FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
-        progressParams.setMargins(0, dp(32), 0, 0);
+        progressParams.setMargins(0, dp(32), dp(LIST_RIGHT_INSET), 0);
         addView(progressBar, progressParams);
 
-        PanelStyle.applyDynamically(topBar, dp(BAR_CORNER_RADIUS),
-                new InsetBackgroundFactory.Padding(dp(10), dp(8), dp(10), dp(8)),
+        LinearLayout infoPanel = new LinearLayout(context);
+        infoPanel.setOrientation(LinearLayout.VERTICAL);
+        infoPanel.setPadding(dp(PANEL_PADDING_DP), dp(PANEL_PADDING_DP), dp(PANEL_PADDING_DP), dp(PANEL_PADDING_DP));
+        PanelStyle.applyDynamically(infoPanel, dp(BAR_CORNER_RADIUS),
+                new InsetBackgroundFactory.Padding(0, 0, 0, 0),
                 InsetBackgroundFactory.BackdropBlur.UI_LAYER);
-        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+
+        imageView = new UrlImageView(context);
+        imageView.setCornerRadius(dp(8));
+        infoPanel.addView(imageView, new LinearLayout.LayoutParams(MATCH_PARENT, imageSize));
+        loadCoverImage();
+
+        nameView = new TextView(context);
+        nameView.setTextSize(Theme.TEXT_SIZE_LARGE);
+        nameView.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        nameParams.setMargins(0, dp(12), 0, 0);
+        infoPanel.addView(nameView, nameParams);
+
+        musicTrackCountView = createStatView(context);
+        playedCountView = createStatView(context);
+        statsRow = new LinearLayout(context);
+        statsRow.setOrientation(LinearLayout.HORIZONTAL);
+        statsRow.setBaselineAligned(false);
+        statsRow.setGravity(Gravity.CENTER_VERTICAL);
+        LinearLayout.LayoutParams statsRowParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        statsRowParams.setMargins(0, dp(6), 0, 0);
+        infoPanel.addView(statsRow, statsRowParams);
+        LinearLayout.LayoutParams musicTrackCountParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        musicTrackCountParams.setMargins(0, 0, dp(12), 0);
+        statsRow.addView(musicTrackCountView, musicTrackCountParams);
+        statsRow.addView(playedCountView, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+        ScrollView extraInfoScroll = new ScrollView(context);
+        extraInfoScroll.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+        LinearLayout.LayoutParams extraInfoScrollParams = new LinearLayout.LayoutParams(MATCH_PARENT, 0, 1);
+        extraInfoScrollParams.setMargins(0, dp(12), 0, 0);
+        infoPanel.addView(extraInfoScroll, extraInfoScrollParams);
+
+        extraInfoView = new TextView(context);
+        extraInfoView.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        extraInfoView.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        extraInfoScroll.addView(extraInfoView, new ScrollView.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+        FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(dp(PANEL_WIDTH), MATCH_PARENT);
+        panelParams.gravity = Gravity.TOP | Gravity.END;
+        panelParams.setMargins(0, dp(PANEL_MARGIN_DP), dp(PANEL_MARGIN_DP), dp(PANEL_MARGIN_DP));
+        addView(infoPanel, panelParams);
+
+        topBar = new LinearLayout(context);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setClickable(true);
+
+        InsetBackgroundFactory buttonBackgroundFactory = InsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .inset(dp(1))
+                .cornerRadius(dp(14))
+                .build();
+        {
+            ImageButton backButton = new ImageButton(context);
+            Tooltip.attach(backButton, I18n.get(MusicHud.MOD_ID + ".button.back"));
+            Image backIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
+            if (backIcon != null) {
+                backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), backIcon, dp(16), dp(16)));
+            }
+            backButton.setOnClickListener(view -> {
+                RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
+                if (routerContainer != null) {
+                    routerContainer.popNavigate();
+                }
+            });
+            buttonBackgroundFactory.applyBackgroundTo(backButton);
+            topBar.addView(backButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        }
+
+        typeView = new TextView(context);
+        typeView.setTextSize(Theme.TEXT_SIZE_LARGER);
+        typeView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+        typeView.setSingleLine();
+        typeView.setEllipsize(TextUtils.TruncateAt.END);
+        typeView.setMaxWidth(dp(320));
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        titleParams.setMargins(dp(4), 0, dp(4), 0);
+        topBar.addView(typeView, titleParams);
+
+        {
+            ImageButton refreshButton = new ImageButton(context);
+            buttonBackgroundFactory.applyBackgroundTo(refreshButton);
+            Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+            refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            Image refreshIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
+            if (refreshIcon != null) {
+                refreshButton.setImageDrawable(new InsetDrawable(
+                        new ScaledImageDrawable(getContext().getResources(), refreshIcon, dp(12), dp(16)), dp(3)));
+            }
+            refreshButton.setOnClickListener(view -> refreshData(true));
+            topBar.addView(refreshButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        }
+        {
+            ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
+            buttonBackgroundFactory.applyBackgroundTo(toggleSubscribeButton);
+            topBar.addView(toggleSubscribeButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+            if (musicCollection instanceof Playlist playlist) {
+                Profile current = Profile.getCurrent();
+                if (current == null || current.equals(Profile.ANONYMOUS) || playlist.getCreator().getUserId() == current.getUserId()) {
+                    toggleSubscribeButton.setVisibility(GONE);
+                } else {
+                    var subscribeState = musicService.getPlaylistSubscribeState(playlist);
+                    toggleSubscribeButton.bindState(subscribeState);
+                }
+            } else if (musicCollection instanceof Album album) {
+                var subscribeState = musicService.getAlbumSubscribeState(album);
+                toggleSubscribeButton.bindState(subscribeState);
+            }
+        }
+        {
+            var idlePlaySourceWidget = new IdlePlaySourceWidget(context, this.musicCollection, dp(40), v -> buttonBackgroundFactory);
+            topBar.addView(idlePlaySourceWidget, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        }
+
+        PanelStyle.applyDynamically(topBar, dp(BAR_CORNER_RADIUS),
+                new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)),
+                InsetBackgroundFactory.BackdropBlur.UI_LAYER);
+        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         topBarParams.gravity = Gravity.TOP;
-        topBarParams.setMargins(0, dp(BAR_TOP_MARGIN), 0, 0);
+        topBarParams.setMargins(0, dp(BAR_MARGIN), 0, dp(BAR_MARGIN));
         // Added last: its backdrop blur samples the content recorded underneath.
         addView(topBar, topBarParams);
+
+        bindInfo(musicCollection);
 
         if (musicCollection instanceof Playlist playlist) {//TODO intelligent recommendations list for like list
             collectionId = playlist.getId();
@@ -303,15 +262,16 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
     }
 
     /**
-     * The list inset equals the space the floating bar occupies, which is only known after measure.
-     * Applying it before laying children out keeps the first frame below the bar.
+     * The list inset equals the space the bar and the info panel occupy, which is only known after
+     * measure for the bar. Applying it before laying children out keeps the first frame correct.
      */
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
-        int inset = lp.topMargin + topBar.getMeasuredHeight();
-        if (scrollView.getPaddingTop() != inset) {
-            scrollView.setPadding(0, inset, 0, 0);
+        int topInset = lp.topMargin + topBar.getMeasuredHeight() + lp.bottomMargin;
+        int rightInset = dp(LIST_RIGHT_INSET);
+        if (scrollView.getPaddingTop() != topInset || scrollView.getPaddingRight() != rightInset) {
+            scrollView.setPadding(0, topInset, rightInset, 0);
         }
         super.onLayout(changed, left, top, right, bottom);
     }
@@ -379,6 +339,7 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
                     if (latest != musicCollection) {
                         musicCollection = latest;
                     }
+                    bindInfo(latest);
                     unregisterTracksSync();
                     registerTracksSync(latest);
                     syncTracksView();
@@ -538,35 +499,82 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
     private record LoadedBackground(ImageTextureData image, boolean owned) {
     }
 
-    private void updatePlaylistTrackCountView(Playlist playlist) {
-        SpannableString text = new SpannableString("  " + playlist.getMusicTrackCount());
-        String iconPath = switch (playlist.getSpecialType()) {
-            case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
-            case USER_SPECIFIC -> ICON_RECOMMEND_LIST_MUSIC;
-            default -> ICON_LIST_MUSIC;
-        };
-        Image icon = ImageUtils.getImageFromResource(iconPath);
-        if (icon != null) {
-            ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
-            text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+    private void bindInfo(MusicCollection collection) {
+        String typeLabel = I18n.get(collection.getNameI18nKey());
+        if (collection instanceof Album album) {
+            String albumType = mappedAlbumType(album.getType());
+            typeView.setText(albumType.isBlank() || albumType.equals(typeLabel)
+                    ? typeLabel
+                    : typeLabel + " " + albumType);
+        } else {
+            typeView.setText(typeLabel);
         }
-        musicTrackCountView.setText(text);
+        nameView.setText(collection.getName());
+
+        musicTrackCountView.setVisibility(GONE);
+        playedCountView.setVisibility(GONE);
+        extraInfoView.setVisibility(GONE);
+
+        if (collection instanceof Playlist playlist) {
+            int musicTrackCount = playlist.getMusicTrackCount();
+            if (musicTrackCount >= 0) {
+                String iconPath = switch (playlist.getSpecialType()) {
+                    case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
+                    case USER_SPECIFIC -> ICON_RECOMMEND_LIST_MUSIC;
+                    default -> ICON_LIST_MUSIC;
+                };
+                musicTrackCountView.setText(buildIconText(String.valueOf(musicTrackCount), iconPath));
+                musicTrackCountView.setVisibility(VISIBLE);
+            }
+            long playedCount = playlist.getPlayedCount();
+            if (playedCount >= 0) {
+                playedCountView.setText(buildIconText(CountFormatter.formatCount(playedCount), ICON_AUDIO_LINES));
+                playedCountView.setVisibility(VISIBLE);
+            }
+            String description = playlist.getDescription();
+            if (!description.isBlank()) {
+                extraInfoView.setText(description);
+                extraInfoView.setVisibility(VISIBLE);
+            }
+        } else if (collection instanceof Album album) {
+            int musicTrackCount = Math.max(album.getMusicTrackCount(), album.getMusicDetails().size());
+            if (musicTrackCount > 0) {
+                musicTrackCountView.setText(buildIconText(String.valueOf(musicTrackCount), ICON_DISC_ALBUM));
+                musicTrackCountView.setVisibility(VISIBLE);
+            }
+            String company = album.getCompany();
+            String artists = album.getArtists().stream()
+                    .map(Artist::getName)
+                    .reduce((a, b) -> a + " / " + b)
+                    .orElse("");
+            String alias = album.getAlias().stream()
+                    .reduce((a, b) -> a + " | " + b)
+                    .orElse("");
+            String extraInfo = (company.isBlank() ? "" : (company + "\n")) + artists
+                    + (alias.isBlank() ? "" : "\n" + alias);
+            if (!extraInfo.isBlank()) {
+                extraInfoView.setText(extraInfo);
+                extraInfoView.setVisibility(VISIBLE);
+            }
+        }
+        statsRow.setVisibility(musicTrackCountView.getVisibility() == VISIBLE
+                || playedCountView.getVisibility() == VISIBLE ? VISIBLE : GONE);
     }
 
-    private void updateAlbumTrackCountView(Album album) {
-        int musicTrackCount = Math.max(album.getMusicTrackCount(), album.getMusicDetails().size());
-        if (musicTrackCount <= 0) {
-            musicTrackCountView.setVisibility(GONE);
-            return;
-        }
-        musicTrackCountView.setVisibility(VISIBLE);
-        SpannableString text = new SpannableString("  " + musicTrackCount);
-        Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/disc_album.png");
+    private TextView createStatView(Context context) {
+        TextView view = new TextView(context);
+        view.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        view.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        return view;
+    }
+
+    private SpannableString buildIconText(String text, String iconPath) {
+        SpannableString value = new SpannableString("  " + text);
+        Image icon = ImageUtils.getImageFromResource(iconPath);
         if (icon != null) {
-            ImageSpan iconSpan = ImageUtils.getIconSpan(icon);
-            text.setSpan(iconSpan, 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+            value.setSpan(ImageUtils.getIconSpan(icon), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
-        musicTrackCountView.setText(text);
+        return value;
     }
 
     private void refreshData(boolean ignoreCache) {
@@ -582,15 +590,9 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
                     Collection<MusicDetail> musicDetails = result.musicDetails();
                     MusicCollection musicCollection1 = result.musicCollection();
                     this.musicCollection = musicCollection1;
+                    bindInfo(musicCollection1);
                     loadCoverImage();
                     syncBackground();
-                    if (musicTrackCountView != null) {
-                        if (musicCollection1 instanceof Album album) {
-                            updateAlbumTrackCountView(album);
-                        } else if (musicCollection1 instanceof Playlist playlist) {
-                            updatePlaylistTrackCountView(playlist);
-                        }
-                    }
                     progressBar.setVisibility(View.GONE);
                     virtualList.resetItems(musicDetails instanceof ObservableSequencedSet<MusicDetail> observable
                             ? observable.snapshot()
@@ -627,6 +629,7 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
     private void syncTracksView() {
         MusicCollection collection = musicCollection;
         if (collection == null) return;
+        bindInfo(collection);
         SequencedSet<MusicDetail> musicDetails = collection.getMusicDetails();
         if (musicDetails instanceof ObservableSequencedSet<MusicDetail> tracks) {
             syncTracksList(tracks);

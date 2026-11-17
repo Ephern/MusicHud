@@ -226,6 +226,7 @@
   "music_hud.text.album.type.single": "Single",
   "music_hud.text.apiLogInfo": "API server logs: {count} files, {size}",
   "music_hud.text.apiServiceVersion": "API Service Version: {}",
+  "music_hud.text.artist": "Artist",
   "music_hud.text.artist.album": "Album: {} items",
   "music_hud.text.artist.music": "Music: {} items",
   "music_hud.text.binaryApiServerStatus.LAUNCHING": "Launching",

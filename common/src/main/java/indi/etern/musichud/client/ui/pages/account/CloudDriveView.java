@@ -227,7 +227,7 @@ public class CloudDriveView extends FrameLayout {
                 InsetBackgroundFactory.BackdropBlur.UI_LAYER);
         FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         topBarParams.gravity = Gravity.TOP;
-        topBarParams.setMargins(0, dp(12), 0, 0);
+        topBarParams.setMargins(0, dp(12), 0, dp(12));
         // Added last so its backdrop blur samples the list painted underneath.
         addView(topBar, topBarParams);
 
@@ -263,7 +263,7 @@ public class CloudDriveView extends FrameLayout {
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
-        int inset = lp.topMargin + topBar.getMeasuredHeight();
+        int inset = lp.topMargin + topBar.getMeasuredHeight() + lp.bottomMargin;
         if (scrollView.getPaddingTop() != inset) {
             scrollView.setPadding(0, inset, 0, 0);
         }

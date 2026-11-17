@@ -80,7 +80,7 @@ public class ConfigView extends LinearLayout {
         view.setLayoutTransition(baseTransition);
         scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-        view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(32)));
+        view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(20)));
 
         var commonCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
         new PreferencesFragment.BooleanOption(context,

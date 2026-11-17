@@ -221,9 +221,7 @@ public class MainFragment extends Fragment {
             routerContainer = new RouterContainer(context);
             routerContainer.setAnimationStyle(RouterContainer.AnimationStyle.SCALE_FADE_ROOT);
             routerContainer.setAnimationDuration(300);
-            var routerParams = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
-            routerParams.setMargins(routerContainer.dp(32), 0, routerContainer.dp(32), 0);
-            contentRow.addView(routerContainer, routerParams);
+            contentRow.addView(routerContainer, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
 
             sidebar = new SidebarView(context);
             sidebar.setVisibility(View.GONE);

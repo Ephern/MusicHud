@@ -42,10 +42,6 @@ import java.util.Map;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-/**
- * Full-screen account play-history page with three tabs (songs / albums / playlists).
- * Opened from {@link AccountView} through {@link RouterContainer#pushNavigate(View)}.
- */
 public class PlayHistoryView extends FrameLayout {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
     private final LinearLayout topBar;
@@ -149,7 +145,7 @@ public class PlayHistoryView extends FrameLayout {
 
         FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         topBarParams.gravity = Gravity.TOP;
-        topBarParams.setMargins(0, dp(12), 0, 0);
+        topBarParams.setMargins(0, dp(12), 0, dp(12));
         // Added last so its backdrop blur samples the pager painted underneath.
         addView(topBar, topBarParams);
     }
@@ -161,7 +157,7 @@ public class PlayHistoryView extends FrameLayout {
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
-        int inset = lp.topMargin + topBar.getMeasuredHeight();
+        int inset = lp.topMargin + topBar.getMeasuredHeight() + lp.bottomMargin;
         if (pager != null && pager.getAdapter() instanceof HistoryPagerAdapter adapter) {
             adapter.setContentInsetTop(inset);
         }
