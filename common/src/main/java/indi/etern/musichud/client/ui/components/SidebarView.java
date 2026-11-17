@@ -1040,7 +1040,7 @@ public class SidebarView extends LinearLayout {
             nextToPlayRow.setVisibility(GONE);
             nextToPlayRow.setMinimumHeight(dp96);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(margin, dp(16), margin, 0);
+            params1.setMargins(margin, dp(10), margin, 0);
             scrollViewContainer.addView(nextToPlayRow, params1);
 
             LinearLayout nextToPlayHeader = new LinearLayout(context);
@@ -1085,7 +1085,7 @@ public class SidebarView extends LinearLayout {
             queueRow.setOrientation(VERTICAL);
             queueRow.setMinimumHeight(dp96);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(margin, dp(16), margin, 0);
+            params1.setMargins(margin, dp(10), margin, 0);
             scrollViewContainer.addView(queueRow, params1);
 
             TextView queueTitle = new TextView(context);
@@ -1419,9 +1419,6 @@ public class SidebarView extends LinearLayout {
         MusicDetail musicDetail = musicTrace.value();
         MusicTrackItem musicListItem = new MusicTrackItem(getContext());
         musicListItem.bindData(musicTrace);
-        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        layoutParams.setMargins(0, 0, 0, dp(4));
-
         LocalPlayer player = Minecraft.getInstance().player;
         if (player != null && musicDetail.getPusherInfo().playerUUID().equals(player.getUUID())) {
             musicListItem.addActionButton(
@@ -1429,7 +1426,8 @@ public class SidebarView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".button.remove"),
                     v -> musicService.sendRemoveMusicFromQueue(item));
         }
-        musicListItem.setLayoutParams(layoutParams);
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        layoutParams.setMargins(0, 0, 0, dp(10));
         playQueueView.addView(musicListItem, layoutParams);
     }
 

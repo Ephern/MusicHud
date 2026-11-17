@@ -4,6 +4,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.decoder.*;
+import indi.etern.musichud.client.audio.source.SpoolBuffer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
@@ -37,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Consumer;
@@ -47,9 +49,11 @@ import java.util.function.Supplier;
  * queue, worker threads and the wall-clock alignment state.
  */
 public class PlaybackTask {
-    private static final int AL_BUFFER_COUNT = 8;
+    private static final int BUFFER_COUNT = 8;
     private static final int BUFFER_SIZE = 65536;
-    private static final int AUDIO_BUFFER_CAPACITY = 16 * 128;
+    /** In-memory PCM look-ahead; 16 MiB is ~22 s @ 24-bit 96 kHz stereo, ~95 s @ 16-bit 44.1 kHz. */
+    private static final int AUDIO_BUFFER_BUDGET_BYTES = 16 * 1024 * 1024;
+    private static final int AUDIO_BUFFER_CAPACITY = Math.max(64, AUDIO_BUFFER_BUDGET_BYTES / BUFFER_SIZE);
     /**
      * Consecutive {@code alBufferData} failures required before permanently
      * switching a discrete stream to stereo downmix (one failure can be transient).
@@ -85,6 +89,10 @@ public class PlaybackTask {
      * resource URL before its decoded content is accepted as-is.
      */
     private static final int MAX_TRUNCATION_RETRIES = 3;
+    /** Serve audio from a disk spool; {@code -Dmusic_hud.debug.audioSpool=false} streams one connection instead. */
+    private static final boolean AUDIO_SPOOL_ENABLED =
+            !"false".equalsIgnoreCase(System.getProperty("music_hud.debug.audioSpool"));
+    private static final int SPOOL_INPUT_BUFFER_SIZE = 64 * 1024;
     private static final Logger LOGGER = MusicHud.getLogger(PlaybackTask.class);
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
@@ -185,7 +193,11 @@ public class PlaybackTask {
     private volatile Future<?> downloadThreadFuture;
     private volatile Future<?> playThreadFuture;
     private long lastJmtcTickMs = 0;
-    private MusicResourceInfo musicResourceInfo;
+    /** Resolved resource (url/quality/size); replaced wholesale, never mutated in place. */
+    private final AtomicReference<MusicResourceInfo> resourceInfo =
+            new AtomicReference<>(MusicResourceInfo.NONE);
+    /** Disk-backed network buffer. */
+    private volatile SpoolBuffer audioSpool;
     private Unregister scrobbleOnQuitUnregister;
     private volatile boolean scrobbled = false;
     /** Guards {@link #submitThreads()}: a preloaded task must not start its workers twice. */
@@ -312,6 +324,7 @@ public class PlaybackTask {
         gate.countDown();
         startFuture.completeExceptionally(new CancellationException("Playback task cancelled"));
         cleanup();
+        releaseSpool();
         finishFuture.complete(null);
     }
 
@@ -344,14 +357,16 @@ public class PlaybackTask {
         int truncationRetryCount = 0;
         boolean forceSync = serverStartTime != null;
         boolean forceResourceRefresh = false;
-        musicResourceInfo = MusicResourceInfo.NONE;
+        resourceInfo.set(MusicResourceInfo.NONE);
         while (!cancelled && !restartRequested) {
             int trial = localRetryCount + 1;
             try {
-                if (forceResourceRefresh || musicResourceInfo == null || musicResourceInfo.equals(MusicResourceInfo.NONE) || localRetryCount % 3 == 0) {
+                MusicResourceInfo resource = resourceInfo.get();
+                if (forceResourceRefresh || resource == null || resource.equals(MusicResourceInfo.NONE)
+                        || localRetryCount % 3 == 0) {
                     forceResourceRefresh = false;
-                    musicResourceInfo = getCurrentMusicResourceInfo(clientConfig.getPrimaryChosenQuality(), musicResourceInfo).get();
-                    if (musicResourceInfo == null) {
+                    resource = getCurrentMusicResourceInfo(clientConfig.getPrimaryChosenQuality(), resource).get();
+                    if (resource == null) {
                         try {
                             Thread.sleep(500);
                         } catch (InterruptedException ie) {
@@ -359,12 +374,13 @@ public class PlaybackTask {
                         }
                         continue;
                     }
+                    resourceInfo.set(resource);
                     if (cancelled || restartRequested) return;
                 }
 
                 LOGGER.debug("Starting audio download (attempt {})", trial);
 
-                AudioDecoder decoder = loadAudioDecoder(musicResourceInfo.getUrl(), musicResourceInfo.getType());
+                AudioDecoder decoder = loadAudioDecoder(resource.getUrl(), resource.getType());
                 if (cancelled || restartRequested) {
                     try {
                         decoder.close();
@@ -399,7 +415,7 @@ public class PlaybackTask {
                 }
 
                 int initialBuffers = 0;
-                while (!cancelled && !restartRequested && initialBuffers < AL_BUFFER_COUNT * 2) {
+                while (!cancelled && !restartRequested && initialBuffers < BUFFER_COUNT * 2) {
                     byte[] audioData = decoder.readChunk(BUFFER_SIZE);
                     if (audioData == null) break;
                     if (cancelled || restartRequested) break;
@@ -430,7 +446,11 @@ public class PlaybackTask {
                 // still play what exists after a few attempts.
                 long decodedMs = decodedMillis(decoder);
                 if (streamLooksTruncated(decoder)) {
-                    if (truncationRetryCount < MAX_TRUNCATION_RETRIES) {
+                    SpoolBuffer spool = audioSpool;
+                    if (spool != null && spool.isComplete()) {
+                        LOGGER.warn("Audio object is shorter than its metadata (decoded ~{} ms of {} ms), accepting it",
+                                decodedMs, musicDetail.getDurationMillis());
+                    } else if (truncationRetryCount < MAX_TRUNCATION_RETRIES) {
                         truncationRetryCount++;
                         localRetryCount++;
                         LOGGER.warn("Audio stream ended early: decoded ~{} ms of {} ms, retrying with a fresh resource (truncation retry {}/{})",
@@ -453,9 +473,10 @@ public class PlaybackTask {
                             return;
                         }
                         continue;
+                    } else {
+                        LOGGER.warn("Audio stream still short after {} truncation retries, accepting decoded content (~{} ms of {} ms)",
+                                truncationRetryCount, decodedMs, musicDetail.getDurationMillis());
                     }
-                    LOGGER.warn("Audio stream still short after {} truncation retries, accepting decoded content (~{} ms of {} ms)",
-                            truncationRetryCount, decodedMs, musicDetail.getDurationMillis());
                 }
 
                 downloadDone = true;
@@ -788,14 +809,14 @@ public class PlaybackTask {
             if (cancelled || Thread.currentThread().isInterrupted()) {
                 return PlayResult.RESTARTED;
             }
-            source = OpenAlSource.create(new OpenAlSource.Config(AL_BUFFER_COUNT, directChannels), ledger);
+            source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
             source.setPcmSink(pcmSink);
         } finally {
             sourceLock.unlock();
         }
 
         boolean firstChunk = true;
-        for (int i = 0; i < AL_BUFFER_COUNT; i++) {
+        for (int i = 0; i < BUFFER_COUNT; i++) {
             byte[] audioData = pollAudio();
             if (audioData == null) break;
 
@@ -1004,7 +1025,7 @@ public class PlaybackTask {
                         }
                     }
                     int filled = source.fill(() -> takeChunk(expectedBytes, staleDropMarginBytes, bytesPerSecond),
-                            AL_BUFFER_COUNT, format, sampleRate);
+                            BUFFER_COUNT, format, sampleRate);
                     if (filled > 0) {
                         resumeIfWaiting();
                     }
@@ -1438,7 +1459,7 @@ public class PlaybackTask {
         setState(PlaybackState.BUFFERING);
         bufferLock.lock();
         try {
-            while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * AL_BUFFER_COUNT) {
+            while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT) {
                 long now = System.currentTimeMillis();
                 long bytes = ledger.prefetchBytes.get();
                 if (bytes != lastBytes) {
@@ -1485,6 +1506,7 @@ public class PlaybackTask {
             LOGGER.warn("Pre-cleanup step failed, finishing task anyway", e);
         }
         cleanup();
+        releaseSpool();
         // Complete the finish future FIRST: its listener promotes any pending task
         // and updates the global status. Broadcasting FINISHED before that would
         // briefly set the global status to IDLE even though a successor is waiting.
@@ -1507,13 +1529,14 @@ public class PlaybackTask {
     }
 
     private void sendScrobbleOptionally() {
-        if (musicDetail != null && !MusicDetail.NONE.equals(musicDetail) && musicResourceInfo != null && !musicResourceInfo.equals(MusicResourceInfo.NONE)) {
-            Quality quality = musicResourceInfo.getQuality();
+        MusicResourceInfo resource = resourceInfo.get();
+        if (musicDetail != null && !MusicDetail.NONE.equals(musicDetail) && !resource.equals(MusicResourceInfo.NONE)) {
+            Quality quality = resource.getQuality();
             if (quality != Quality.NONE) {
                 int durationSec = musicDetail.getDurationMillis() / 1000;
                 int playedSec = serverStartTime == null ? durationSec : Math.toIntExact(Duration.between(serverStartTime, ZonedDateTime.now()).toSeconds());
                 if (playedSec >= SCROBBLE_MIN_PLAY_DURATION_SEC) {
-                    clientNetworkService.sendToServer(new ScrobbleMessage(musicDetail.getId(), playedSec, durationSec, musicResourceInfo.getBitrate(), quality, musicTrace.source()));
+                    clientNetworkService.sendToServer(new ScrobbleMessage(musicDetail.getId(), playedSec, durationSec, resource.getBitrate(), quality, musicTrace.source()));
                 }
             }
         }
@@ -1571,6 +1594,52 @@ public class PlaybackTask {
         }
     }
 
+    /** The task's audio spool. */
+    private SpoolBuffer audioSpool() {
+        SpoolBuffer current = audioSpool;
+        if (current != null && current.isUsable()) return current;
+        if (current != null) {
+            current.close();
+            audioSpool = null;
+        }
+        MusicResourceInfo info = resourceInfo.get();
+        if (info.equals(MusicResourceInfo.NONE) || info.getUrl().isEmpty()) return null;
+        SpoolBuffer opened = SpoolBuffer.open(info.getUrl(), info.getSize(), this::refreshSpoolUrl,
+                "track-" + musicDetail.getId() + "-" + info.getQuality().name());
+        audioSpool = opened;
+        return opened;
+    }
+
+    private String refreshSpoolUrl(String staleUrl) {
+        MusicResourceInfo previous = resourceInfo.get();
+        String retryFor = previous.getUrl().isEmpty() ? (staleUrl == null ? "" : staleUrl) : previous.getUrl();
+        try {
+            MusicResourceInfo refreshed = RequestResponseManager.send(
+                            new GetMusicResourceRequest(musicDetail.getId(), clientConfig.getPrimaryChosenQuality(), retryFor),
+                            GetMusicResourceResponse.class,
+                            Duration.ofSeconds(10))
+                    .thenApply(GetMusicResourceResponse::getMusicResourceInfo)
+                    .get(15, TimeUnit.SECONDS);
+            if (refreshed == null || refreshed.equals(MusicResourceInfo.NONE) || refreshed.getUrl().isEmpty()) {
+                return null;
+            }
+            resourceInfo.set(refreshed);
+            LOGGER.info("Refreshed the audio resource url for the spool");
+            return refreshed.getUrl();
+        } catch (Exception e) {
+            LOGGER.warn("Failed to refresh the audio resource url: {}", e.toString());
+            return null;
+        }
+    }
+
+    private void releaseSpool() {
+        SpoolBuffer spool = audioSpool;
+        audioSpool = null;
+        if (spool != null) {
+            spool.close();
+        }
+    }
+
     @SneakyThrows
     private AudioDecoder getAudioDecoder(FormatType formatType, BufferedInputStream inputStream) {
         boolean useFloat32 = OpenAlSource.isFloat32Supported();
@@ -1587,12 +1656,20 @@ public class PlaybackTask {
     }
 
     private AudioDecoder loadAudioDecoder(String urlString, FormatType formatType) throws URISyntaxException, IOException {
-        URL url = new URI(urlString).toURL();
-        HttpURLConnection connection = (HttpURLConnection) url.openConnection();
-        connection.setConnectTimeout(5000);
-        connection.setReadTimeout(10000);
-        InputStream inputStream = connection.getInputStream();
-        BufferedInputStream bufferedStream = new BufferedInputStream(inputStream, 8192);
+        InputStream inputStream;
+        BufferedInputStream bufferedStream;
+        SpoolBuffer spool = AUDIO_SPOOL_ENABLED ? audioSpool() : null;
+        if (spool != null) {
+            inputStream = spool.openStream();
+            bufferedStream = new BufferedInputStream(inputStream, SPOOL_INPUT_BUFFER_SIZE);
+        } else {
+            URL url = new URI(urlString).toURL();
+            HttpURLConnection connection = (HttpURLConnection) url.openConnection();
+            connection.setConnectTimeout(5000);
+            connection.setReadTimeout(10000);
+            inputStream = connection.getInputStream();
+            bufferedStream = new BufferedInputStream(inputStream, 8192);
+        }
 
         try {
             if (formatType != FormatType.AUTO) {
@@ -1625,13 +1702,13 @@ public class PlaybackTask {
                         GetMusicResourceResponse.class,
                         Duration.ofSeconds(10))
                 .thenCompose(response -> {
-                    MusicResourceInfo resourceInfo = response.getMusicResourceInfo();
-                    if (resourceInfo == MusicResourceInfo.NONE) {
+                    MusicResourceInfo resolved = response.getMusicResourceInfo();
+                    if (resolved == MusicResourceInfo.NONE) {
                         ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                         setState(PlaybackState.ERROR);
                         return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
                     }
-                    return CompletableFuture.completedFuture(resourceInfo);
+                    return CompletableFuture.completedFuture(resolved);
                 }).exceptionallyCompose(e -> {
                     ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
                     setState(PlaybackState.ERROR);

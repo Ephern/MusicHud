@@ -124,14 +124,14 @@ public final class ClientDataFileStore {
         return Files.isRegularFile(path);
     }
 
-    private static void restrictFilePermissions(Path path) {
+    static void restrictFilePermissions(Path path) {
         try {
             Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rw-------"));
         } catch (UnsupportedOperationException | IOException ignored) {
         }
     }
 
-    private static void restrictDirectoryPermissions(Path path) {
+    static void restrictDirectoryPermissions(Path path) {
         try {
             Files.setPosixFilePermissions(path, PosixFilePermissions.fromString("rwx------"));
         } catch (UnsupportedOperationException | IOException ignored) {

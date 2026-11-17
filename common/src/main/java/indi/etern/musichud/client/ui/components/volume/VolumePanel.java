@@ -27,7 +27,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
  */
 public final class VolumePanel extends FrameLayout {
     private static final int WIDTH_DP = 20;
-    private static final int HEIGHT_DP = 132;
+    private static final int HEIGHT_DP = 96;
     private static final int CONTENT_PADDING_DP = 6;
     private static final int ANCHOR_GAP_DP = 4;
     private static final int EDGE_MARGIN_DP = 8;

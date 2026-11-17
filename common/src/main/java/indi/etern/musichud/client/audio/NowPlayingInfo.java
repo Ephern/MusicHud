@@ -17,6 +17,7 @@ import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.lyrics.FullLineLyricParser;
 import indi.etern.musichud.client.utils.lyrics.WordByWordLyricParser;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.utils.TempService;
 import io.github.selemba1000.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -71,8 +72,7 @@ public class NowPlayingInfo {
     @Getter
     private volatile LyricLine currentLyricLine;
     private volatile Thread lyricUpdaterVThread;
-    private Path tempDirectory;
-    private Path albumImagesTempDirectory;
+    private TempService.Session tempSession;
     private Path lastTempFile;
 
     private final Runnable lyricUpdater = () -> {
@@ -243,18 +243,10 @@ public class NowPlayingInfo {
                 } catch (Exception e) {
                     logger.warn("Failed to delete last JMTC album image", e);
                 }
+                lastTempFile = null;
             }
-            if (tempDirectory == null) {
-                try {
-                    tempDirectory = Files.createTempDirectory("MusicHUD_");
-                    tempDirectory.toFile().deleteOnExit();
-                    albumImagesTempDirectory = tempDirectory.resolve("albums");
-                    Files.createDirectories(albumImagesTempDirectory);
-                } catch (Exception e) {
-                    logger.warn("Failed to create album temp directory", e);
-                }
-            }
-            if (picUrl.startsWith("http")) {
+            Path albumImagesTempDirectory = albumImagesTempDirectory();
+            if (picUrl.startsWith("http") && albumImagesTempDirectory != null) {
                 try {
                     String suffix = "png";
                     String[] splits = picUrl.split("\\.");
@@ -262,11 +254,11 @@ public class NowPlayingInfo {
                         suffix = splits[splits.length - 1];
                     }
                     lastTempFile = Files.createTempFile(albumImagesTempDirectory, "", "." + suffix);
-                    lastTempFile.toFile().deleteOnExit();
+                    URI target = lastTempFile.toUri();
                     artUri = ImageUtils.downloadAsync(picUrl, (url, inputStream) -> {
                         try {
                             Files.copy(inputStream, lastTempFile, StandardCopyOption.REPLACE_EXISTING);
-                            return lastTempFile.toUri();
+                            return target;
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
@@ -276,10 +268,12 @@ public class NowPlayingInfo {
                 }
             } else {
                 try {
+                    if (albumImagesTempDirectory == null) {
+                        throw new IOException("Temporary storage unavailable");
+                    }
                     Path iconPath = albumImagesTempDirectory.resolve("MusicHUD_Icon.png");
                     if (!Files.exists(iconPath)) {
                         Files.createFile(iconPath);
-                        iconPath.toFile().deleteOnExit();
                         try (InputStream iconStream = MusicHud.getResourceAsStream("/assets/music_hud/icon.png")) {
                             if (iconStream != null) {
                                 Files.copy(iconStream, iconPath, StandardCopyOption.REPLACE_EXISTING);
@@ -295,6 +289,21 @@ public class NowPlayingInfo {
                 onReady.accept(artUri);
             }
         });
+    }
+
+    private Path albumImagesTempDirectory() {
+        TempService.Session session = tempSession;
+        if (session == null || session.isClosed()) {
+            session = TempService.shared();
+            tempSession = session;
+        }
+        if (session == null) return null;
+        try {
+            return session.albumDirectory();
+        } catch (Exception e) {
+            logger.warn("Failed to create album temp directory", e);
+            return null;
+        }
     }
 
     private Duration getCallTime(LyricLine line) {
