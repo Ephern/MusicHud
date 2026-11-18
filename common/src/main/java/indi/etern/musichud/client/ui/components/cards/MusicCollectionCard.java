@@ -56,7 +56,7 @@ public class MusicCollectionCard extends LinearLayout {
     private final boolean isPrivatePlaylistToUser;
     private final LinearLayout content;
     @Getter
-    private int imageCornerRadius = dp(8);
+    private int imageCornerRadius = dp(4);
     @Getter
     private int backgroundPadding = dp(6);
     @Getter
@@ -253,7 +253,7 @@ public class MusicCollectionCard extends LinearLayout {
         if (!isPrivatePlaylistToUser) {
             int inset = dp(1);
             InsetBackgroundFactory.builder().inset(inset)
-                    .cornerRadius(imageCornerRadius + backgroundPadding - inset * 2)
+                    .cornerRadius(imageCornerRadius + backgroundPadding - inset)
                     .padding(new InsetBackgroundFactory.Padding(backgroundPadding, backgroundPadding, backgroundPadding, backgroundPadding))
                     .build().applyBackgroundTo(this);
         } else {
@@ -299,7 +299,7 @@ public class MusicCollectionCard extends LinearLayout {
         MusicCollection collection = musicCollection;
         if (collection == null) return;
         if (!(musicCollection instanceof Playlist playlist) || playlist.getSpecialType() != PlaylistSpecialType.USER_SPECIFIC) {
-            imageView.loadUrl(collection.getImageThumbnailUrl(dp(160)));
+            imageView.loadUrl(collection.getImageThumbnailUrl(albumSize));
         }
         if (collection instanceof Playlist playlist) {
             String iconPath = switch (playlist.getSpecialType()) {

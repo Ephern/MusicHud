@@ -16,10 +16,12 @@ import lombok.Getter;
 import lombok.Setter;
 import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
+import org.apache.logging.log4j.Logger;
 
 import java.util.List;
 
 public class ClientConfigDefinition implements ClientConfig {
+    private static final Logger logger = MusicHud.getLogger(ClientConfigDefinition.class);
     public static Pair<ClientConfigDefinition, ModConfigSpec> configure;
     @Getter
     private static ClientConfigDefinition instance;
@@ -63,6 +65,8 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Integer> hudWidth;
     private final ModConfigSpec.ConfigValue<Integer> hudHeight;
     private final ModConfigSpec.ConfigValue<Integer> hudCornerRadius;
+    private final ModConfigSpec.ConfigValue<Boolean> useGlobalCredentials;
+    private final ModConfigSpec.ConfigValue<Boolean> clientDataStorageInitialized;
     private final ModConfigSpec.ConfigValue<String> clientCookie;
     private final ModConfigSpec.ConfigValue<String> clientAccountConfig;
     private final ModConfigSpec.ConfigValue<Boolean> enabledInIntegratedServer;
@@ -212,12 +216,20 @@ public class ClientConfigDefinition implements ClientConfig {
                 .comment("Hud rounded corner radius")
                 .translation(MusicHud.MOD_ID + ".config.layout.hudCornerRadius")
                 .define("hudCornerRadius", 8);
+        useGlobalCredentials = builder
+                .comment("Share login credentials across all game instances via the user home directory")
+                .translation(MusicHud.MOD_ID + ".config.credentials.useGlobal")
+                .define("useGlobalCredentials", false);
+        clientDataStorageInitialized = builder
+                .comment("Internal flag: legacy client cookie/account data was migrated out of this file")
+                .translation(MusicHud.MOD_ID + ".internal.clientDataStorageInitialized")
+                .define("clientDataStorageInitialized", false);
         clientCookie = builder
-                .comment("Client NCM cookie json")
+                .comment("Legacy client NCM cookie json, migrated to music-hud/.credentials")
                 .translation(MusicHud.MOD_ID + ".internal.clientCookie")
                 .define("clientCookie", "");
         clientAccountConfig = builder
-                .comment("Client account config json")
+                .comment("Legacy client account config json, migrated to music-hud/.credentials")
                 .translation(MusicHud.MOD_ID + ".internal.clientAccountConfig")
                 .define("clientAccountConfig", "");
         enabledInIntegratedServer = builder
@@ -560,23 +572,66 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public LoginCookieInfo getClientCookie() {
-        return JsonUtil.gson.fromJson(clientCookie.get(), LoginCookieInfo.class);
+    public boolean getUseGlobalCredentials() {
+        return useGlobalCredentials.get();
     }
 
     @Override
-    public void setClientCookie(LoginCookieInfo clientCookie) {
-        this.clientCookie.set(JsonUtil.gson.toJson(clientCookie));
+    public boolean getDefaultUseGlobalCredentials() {
+        return useGlobalCredentials.getDefault();
     }
 
     @Override
-    public ProfileConfigData getClientAccountConfig() {
-        return JsonUtil.gson.fromJson(clientAccountConfig.get(), ProfileConfigData.class);
+    public void setUseGlobalCredentials(boolean useGlobalCredentials) {
+        this.useGlobalCredentials.set(useGlobalCredentials);
     }
 
     @Override
-    public void setClientAccountConfig(ProfileConfigData clientAccountConfig) {
-        this.clientAccountConfig.set(JsonUtil.gson.toJson(clientAccountConfig));
+    public boolean isClientDataStorageInitialized() {
+        return clientDataStorageInitialized.get();
+    }
+
+    @Override
+    public void setClientDataStorageInitialized(boolean initialized) {
+        clientDataStorageInitialized.set(initialized);
+    }
+
+    @Override
+    public LoginCookieInfo getLegacyClientCookie() {
+        String json = clientCookie.get();
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return JsonUtil.gson.fromJson(json, LoginCookieInfo.class);
+        } catch (RuntimeException e) {
+            logger.warn("Failed to parse legacy client cookie: {}", e.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    @Override
+    public void clearLegacyClientCookie() {
+        clientCookie.set("");
+    }
+
+    @Override
+    public ProfileConfigData getLegacyClientAccountConfig() {
+        String json = clientAccountConfig.get();
+        if (json == null || json.isBlank()) {
+            return null;
+        }
+        try {
+            return JsonUtil.gson.fromJson(json, ProfileConfigData.class);
+        } catch (RuntimeException e) {
+            logger.warn("Failed to parse legacy client account config: {}", e.getClass().getSimpleName());
+            return null;
+        }
+    }
+
+    @Override
+    public void clearLegacyClientAccountConfig() {
+        clientAccountConfig.set("");
     }
 
     @Override

@@ -24,10 +24,8 @@ import java.lang.ref.WeakReference;
 import java.util.WeakHashMap;
 
 /**
- * Panel-styled replacement for {@code View.setTooltipText}, shown from the hover machinery we
- * drive ourselves. ModernUI's built-in tooltip takes its colours from the app theme and offers no
- * per-view hook, so this class owns the whole popup instead: the card style matches {@code Modal}
- * and the background is blurred through the current UI layer.
+ * Panel-styled tooltip shown from the hover machinery we drive ourselves. The card style matches
+ * {@code Modal}, and the background is blurred through the current UI layer.
  * <p>
  * The tooltip is a {@link WindowManager} window, which ModernUI draws inside the main
  * {@code WindowGroup} layer, so the blur drawable samples the UI underneath it.

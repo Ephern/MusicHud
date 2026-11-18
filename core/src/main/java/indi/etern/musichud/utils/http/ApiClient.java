@@ -229,7 +229,8 @@ public class ApiClient {
             connection.setRequestMethod("HEAD");
             connection.setConnectTimeout(timeoutMillis);
             connection.setReadTimeout(timeoutMillis);
-            connection.setInstanceFollowRedirects(false); // 不自动重定向
+            // A redirect is not an available endpoint; only a direct 200 passes.
+            connection.setInstanceFollowRedirects(false);
 
             int responseCode = connection.getResponseCode();
             return responseCode == HttpURLConnection.HTTP_OK;

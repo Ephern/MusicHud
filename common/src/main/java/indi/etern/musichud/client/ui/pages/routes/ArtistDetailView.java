@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.pages.routes;
 
-import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
@@ -8,6 +7,7 @@ import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.TextUtils;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.*;
@@ -46,22 +46,33 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class ArtistDetailView extends FrameLayout implements RouterContainer.RouteAware {
     private static final IClientMusicService musicService = MusicService.getInstance();
     private static final int AVATAR_SIZE = 1024;
-    private static final int BAR_TOP_MARGIN = 12;
+    private static final int BAR_MARGIN = 12;
     private static final int BAR_CORNER_RADIUS = 16;
+    private static final int PANEL_WIDTH_DP = 280;
+    private static final int PANEL_PADDING_DP = 12;
+    private static final int PANEL_MARGIN_DP = 12;
+    private static final int PANEL_GAP_DP = 12;
+    private static final int PANEL_WIDTH = PANEL_WIDTH_DP + PANEL_PADDING_DP * 2;
+    private static final int LIST_RIGHT_INSET = PANEL_WIDTH + PANEL_MARGIN_DP + PANEL_GAP_DP;
+    private static final String ICON_DISC_ALBUM = "/assets/music_hud/textures/gui/icons/disc_album.png";
+    private static final String ICON_LIST_MUSIC = "/assets/music_hud/textures/gui/icons/list_music.png";
     private final LinearLayout topBar;
     private final ScrollView scrollView;
     private final LinearLayout musicList;
     private final TextView noMoreResultText;
     private final ProgressBar loadingProgressRing;
     private final ProgressBar progressBar;
-    private final TextView productionCounts;
+    private final TextView nameView;
+    private final TextView albumCountView;
+    private final TextView musicCountView;
+    private final LinearLayout statsRow;
     private final TextView description;
     private final UrlImageView avatarImageView;
     private final InsetBackgroundFactory itemBackgroundFactory = InsetBackgroundFactory.builder()
             .cornerRadius(dp(7))
             .inset(dp(1))
             .padding(new InsetBackgroundFactory.Padding(dp(4), dp(4), dp(4), dp(4))).build();
-    private final int imageSize = dp(128);
+    private final int imageSize = dp(PANEL_WIDTH_DP);
     Artist artist;
     boolean noMoreResult = false;
     boolean loadingMore = false;
@@ -78,112 +89,6 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
         super(context);
 
         this.artist = artist;
-
-        topBar = new LinearLayout(context);
-        topBar.setClickable(true);
-        topBar.setOrientation(LinearLayout.HORIZONTAL);
-
-        ImageButton backButton = new ImageButton(context);
-        String tooltipText = I18n.get(MusicHud.MOD_ID + ".button.back");
-        Image image = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
-        if (image != null) {
-            backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), image, dp(16), dp(16)));
-        }
-        Tooltip.attach(backButton, tooltipText);
-        backButton.setOnClickListener(view -> {
-            MainFragment.getInstance().getRouterContainer().popNavigate();
-            backButton.setOnClickListener(null);
-        });
-        InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
-                .inset(0)
-                .cornerRadius(dp(8))
-                .padding(new InsetBackgroundFactory.Padding(dp(16), 0, dp(16), 0))
-                .build();
-        backgroundFactory.applyBackgroundTo(backButton);
-        LinearLayout.LayoutParams backButtonParams = new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT);
-        backButtonParams.setMargins(0, 0, dp(4), 0);
-        topBar.addView(backButton, backButtonParams);
-
-        avatarImageView = new UrlImageView(context);
-        avatarImageView.setLoading(true);
-        LinearLayout.LayoutParams imageParams = new LinearLayout.LayoutParams(imageSize, imageSize);
-        avatarImageView.setCornerRadius(dp(8));
-        topBar.addView(avatarImageView, imageParams);
-        loadAvatarImage();
-
-        LinearLayout artistInfoView = new LinearLayout(context);
-        artistInfoView.setGravity(Gravity.LEFT | Gravity.TOP);
-        artistInfoView.setOrientation(LinearLayout.VERTICAL);
-        LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
-        params1.setMargins(dp(16), 0, 0, 0);
-        topBar.addView(artistInfoView, params1);
-
-        LinearLayout row1 = new LinearLayout(context);
-        row1.setOrientation(LinearLayout.HORIZONTAL);
-        row1.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutTransition layoutTransition = new LayoutTransition();
-        layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
-        layoutTransition.enableTransitionType(LayoutTransition.APPEARING);
-        layoutTransition.enableTransitionType(LayoutTransition.DISAPPEARING);
-        row1.setLayoutTransition(layoutTransition);
-        LinearLayout.LayoutParams row1Params = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        row1Params.setMargins(0, 0, dp(32), dp(8));
-        artistInfoView.addView(row1, row1Params);
-
-        TextView name = new TextView(context);
-        name.setTextSize(Theme.TEXT_SIZE_LARGER);
-        name.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-        name.setText(artist.getName());
-        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        nameParams.setMargins(0, 0, dp(16), 0);
-        row1.addView(name, nameParams);
-
-        productionCounts = new TextView(context);
-        productionCounts.setTextSize(Theme.TEXT_SIZE_LARGE);
-        productionCounts.setTextColor(Theme.NORMAL_TEXT_COLOR);
-        productionCounts.setVisibility(GONE);
-        LinearLayout.LayoutParams productionCountsParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        productionCountsParams.setMargins(0, 0, dp(16), 0);
-        row1.addView(productionCounts, productionCountsParams);
-
-        InsetBackgroundFactory backgroundFactory1 = InsetBackgroundFactory.builder()
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .inset(0)
-                .cornerRadius(dp(4))
-                .padding(new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
-                .build();
-        int dp28 = dp(28);
-        {
-            ImageButton refreshButton = new ImageButton(context);
-            backgroundFactory1.applyBackgroundTo(refreshButton);
-            Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
-            refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            var resources = getContext().getResources();
-            Image image1 = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
-            refreshButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(resources, image1, dp(12), dp(16)), dp(3)));
-            refreshButton.setOnClickListener((v) -> {
-                loadData(true);
-            });
-            row1.addView(refreshButton, new LinearLayout.LayoutParams(dp28, dp28));
-        }
-        {
-            ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
-            backgroundFactory1.applyBackgroundTo(toggleSubscribeButton);
-            row1.addView(toggleSubscribeButton, new LinearLayout.LayoutParams(dp28, dp28, 0));
-            var subscribeState = musicService.getArtistSubscribedState(artist);
-            toggleSubscribeButton.bindState(subscribeState);
-        }
-
-        ScrollView descriptionScrollView = new ScrollView(context);
-        artistInfoView.addView(descriptionScrollView,
-                new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
-
-        description = new TextView(context);
-        description.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        description.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        description.setLayoutParams(new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-        descriptionScrollView.addView(description);
 
         // The list fills the page and scrolls underneath the floating bar, so it is added first.
         scrollView = new ScrollView(context);
@@ -231,15 +136,130 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
         progressBar = new ProgressBar(context);
         progressBar.setIndeterminate(true);
         FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT);
-        progressParams.setMargins(0, dp(32), 0, 0);
+        progressParams.setMargins(0, dp(32), dp(LIST_RIGHT_INSET), 0);
         addView(progressBar, progressParams);
 
-        PanelStyle.applyDynamically(topBar, dp(BAR_CORNER_RADIUS),
-                new InsetBackgroundFactory.Padding(dp(10), dp(8), dp(10), dp(8)),
+        LinearLayout infoPanel = new LinearLayout(context);
+        infoPanel.setOrientation(LinearLayout.VERTICAL);
+        infoPanel.setPadding(dp(PANEL_PADDING_DP), dp(PANEL_PADDING_DP), dp(PANEL_PADDING_DP), dp(PANEL_PADDING_DP));
+        PanelStyle.applyDynamically(infoPanel, dp(BAR_CORNER_RADIUS),
+                new InsetBackgroundFactory.Padding(0, 0, 0, 0),
                 InsetBackgroundFactory.BackdropBlur.UI_LAYER);
-        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+
+        avatarImageView = new UrlImageView(context);
+        avatarImageView.setLoading(true);
+        avatarImageView.setCornerRadius(dp(8));
+        infoPanel.addView(avatarImageView, new LinearLayout.LayoutParams(MATCH_PARENT, imageSize));
+        loadAvatarImage();
+
+        nameView = new TextView(context);
+        nameView.setTextSize(Theme.TEXT_SIZE_LARGE);
+        nameView.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        nameView.setText(artist.getName());
+        LinearLayout.LayoutParams nameParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        nameParams.setMargins(0, dp(12), 0, 0);
+        infoPanel.addView(nameView, nameParams);
+
+        albumCountView = createStatView(context);
+        albumCountView.setVisibility(GONE);
+        musicCountView = createStatView(context);
+        musicCountView.setVisibility(GONE);
+        statsRow = new LinearLayout(context);
+        statsRow.setOrientation(LinearLayout.HORIZONTAL);
+        statsRow.setBaselineAligned(false);
+        statsRow.setGravity(Gravity.CENTER_VERTICAL);
+        statsRow.setVisibility(GONE);
+        LinearLayout.LayoutParams statsRowParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        statsRowParams.setMargins(0, dp(6), 0, 0);
+        infoPanel.addView(statsRow, statsRowParams);
+        LinearLayout.LayoutParams albumCountParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        albumCountParams.setMargins(0, 0, dp(12), 0);
+        statsRow.addView(albumCountView, albumCountParams);
+        statsRow.addView(musicCountView, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+
+        ScrollView descriptionScroll = new ScrollView(context);
+        descriptionScroll.setScrollBarStyle(View.SCROLLBARS_INSIDE_OVERLAY);
+        LinearLayout.LayoutParams descriptionScrollParams = new LinearLayout.LayoutParams(MATCH_PARENT, 0, 1);
+        descriptionScrollParams.setMargins(0, dp(12), 0, 0);
+        infoPanel.addView(descriptionScroll, descriptionScrollParams);
+
+        description = new TextView(context);
+        description.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        description.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        description.setVisibility(GONE);
+        descriptionScroll.addView(description, new ScrollView.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+
+        FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(dp(PANEL_WIDTH), MATCH_PARENT);
+        panelParams.gravity = Gravity.TOP | Gravity.END;
+        panelParams.setMargins(0, dp(PANEL_MARGIN_DP), dp(PANEL_MARGIN_DP), dp(PANEL_MARGIN_DP));
+        addView(infoPanel, panelParams);
+
+        topBar = new LinearLayout(context);
+        topBar.setOrientation(LinearLayout.HORIZONTAL);
+        topBar.setGravity(Gravity.CENTER_VERTICAL);
+        topBar.setClickable(true);
+
+        InsetBackgroundFactory buttonBackgroundFactory = InsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .inset(dp(1))
+                .cornerRadius(dp(14))
+                .build();
+        {
+            ImageButton backButton = new ImageButton(context);
+            Tooltip.attach(backButton, I18n.get(MusicHud.MOD_ID + ".button.back"));
+            Image backIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/arrow_left.png");
+            if (backIcon != null) {
+                backButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+                backButton.setImageDrawable(new ScaledImageDrawable(getContext().getResources(), backIcon, dp(16), dp(16)));
+            }
+            backButton.setOnClickListener(view -> {
+                RouterContainer routerContainer = MainFragment.getInstance().getRouterContainer();
+                if (routerContainer != null) {
+                    routerContainer.popNavigate();
+                }
+            });
+            buttonBackgroundFactory.applyBackgroundTo(backButton);
+            topBar.addView(backButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        }
+
+        TextView typeView = new TextView(context);
+        typeView.setTextSize(Theme.TEXT_SIZE_LARGE);
+        typeView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+        typeView.setSingleLine();
+        typeView.setEllipsize(TextUtils.TruncateAt.END);
+        typeView.setMaxWidth(dp(320));
+        typeView.setText(I18n.get(MusicHud.MOD_ID + ".text.artist"));
+        LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        titleParams.setMargins(dp(4), 0, dp(4), 0);
+        topBar.addView(typeView, titleParams);
+
+        {
+            ImageButton refreshButton = new ImageButton(context);
+            buttonBackgroundFactory.applyBackgroundTo(refreshButton);
+            Tooltip.attach(refreshButton, I18n.get(MusicHud.MOD_ID + ".button.refresh"));
+            refreshButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+            Image refreshIcon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/rotate_cw.png");
+            if (refreshIcon != null) {
+                refreshButton.setImageDrawable(new InsetDrawable(
+                        new ScaledImageDrawable(getContext().getResources(), refreshIcon, dp(12), dp(16)), dp(3)));
+            }
+            refreshButton.setOnClickListener(view -> loadData(true));
+            topBar.addView(refreshButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+        }
+        {
+            ToggleSubscribeButton toggleSubscribeButton = new ToggleSubscribeButton(context);
+            buttonBackgroundFactory.applyBackgroundTo(toggleSubscribeButton);
+            topBar.addView(toggleSubscribeButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
+            var subscribeState = musicService.getArtistSubscribedState(artist);
+            toggleSubscribeButton.bindState(subscribeState);
+        }
+
+        PanelStyle.applyDynamically(topBar, dp(BAR_CORNER_RADIUS),
+                new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)),
+                InsetBackgroundFactory.BackdropBlur.UI_LAYER);
+        FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         topBarParams.gravity = Gravity.TOP;
-        topBarParams.setMargins(0, dp(BAR_TOP_MARGIN), 0, 0);
+        topBarParams.setMargins(0, dp(BAR_MARGIN), 0, dp(BAR_MARGIN));
         // Added last: its backdrop blur samples the content recorded underneath.
         addView(topBar, topBarParams);
 
@@ -251,15 +271,16 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
     }
 
     /**
-     * The list inset equals the space the floating bar occupies, which is only known after measure.
-     * Applying it before laying children out keeps the first frame below the bar.
+     * The list inset equals the space the bar and the info panel occupy, which is only known after
+     * measure for the bar. Applying it before laying children out keeps the first frame correct.
      */
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
-        int inset = lp.topMargin + topBar.getMeasuredHeight();
-        if (scrollView.getPaddingTop() != inset) {
-            scrollView.setPadding(0, inset, 0, 0);
+        int topInset = lp.topMargin + topBar.getMeasuredHeight() + lp.bottomMargin;
+        int rightInset = dp(LIST_RIGHT_INSET);
+        if (scrollView.getPaddingTop() != topInset || scrollView.getPaddingRight() != rightInset) {
+            scrollView.setPadding(0, topInset, rightInset, 0);
         }
         super.onLayout(changed, left, top, right, bottom);
     }
@@ -310,40 +331,11 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
             if (artist1 != null) {
                 ArtistDetailView.this.artist = artist1;
                 MuiModApi.postToUiThread(() -> {
-                    int musicCount = artist.getMusicCount();
-                    String albumIcon = "\uD83D\uDDB8";
-                    String musicIcon = "♫";
-                    boolean showMusicCount = musicCount > 0;
-                    int albumCount = artist.getAlbumCount();
-                    boolean showAlbumCount = albumCount > 0;
-                    String string = albumIcon + " " + albumCount + (showMusicCount ? ("  " + musicIcon + " " + musicCount) : "");
-                    SpannableString countsString = new SpannableString(string);
-
-                    if (showAlbumCount) {
-                        Image albumIconImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/disc_album.png");
-                        if (albumIconImage != null) {
-                            int start = string.indexOf(albumIcon);
-                            if (start >= 0) {
-                                countsString.setSpan(ImageUtils.getIconSpan(albumIconImage), start, start + albumIcon.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                            }
-                        }
-                    }
-                    if (showMusicCount) {
-                        Image listIconImage = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_music.png");
-                        if (listIconImage != null) {
-                            int start = string.indexOf(musicIcon);
-                            if (start >= 0) {
-                                countsString.setSpan(ImageUtils.getIconSpan(listIconImage), start, start + musicIcon.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-                            }
-                        }
-                    }
-                    if (showAlbumCount || showMusicCount) {
-                        productionCounts.setText(countsString);
-                        productionCounts.setVisibility(VISIBLE);
-                    } else {
-                        productionCounts.setVisibility(GONE);
-                    }
-                    description.setText(artist1.getDescription());
+                    nameView.setText(artist.getName());
+                    updateProductionCounts(artist);
+                    String descriptionText = artist1.getDescription();
+                    description.setText(descriptionText);
+                    description.setVisibility(descriptionText.isBlank() ? GONE : VISIBLE);
                     artistDetailLoaded = true;
                     loadAvatarImage();
                     syncBackground();
@@ -355,6 +347,37 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
                 });
             }
         }, MusicHud.EXECUTOR);
+    }
+
+    /** Statistics share one row under the name; the row hides when there is nothing to show. */
+    private void updateProductionCounts(Artist artist) {
+        int albumCount = artist.getAlbumCount();
+        albumCountView.setVisibility(albumCount > 0 ? VISIBLE : GONE);
+        if (albumCount > 0) {
+            albumCountView.setText(buildIconText(String.valueOf(albumCount), ICON_DISC_ALBUM));
+        }
+        int musicCount = artist.getMusicCount();
+        musicCountView.setVisibility(musicCount > 0 ? VISIBLE : GONE);
+        if (musicCount > 0) {
+            musicCountView.setText(buildIconText(String.valueOf(musicCount), ICON_LIST_MUSIC));
+        }
+        statsRow.setVisibility(albumCount > 0 || musicCount > 0 ? VISIBLE : GONE);
+    }
+
+    private TextView createStatView(Context context) {
+        TextView view = new TextView(context);
+        view.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        view.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        return view;
+    }
+
+    private SpannableString buildIconText(String text, String iconPath) {
+        SpannableString value = new SpannableString("  " + text);
+        Image icon = ImageUtils.getImageFromResource(iconPath);
+        if (icon != null) {
+            value.setSpan(ImageUtils.getIconSpan(icon), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        }
+        return value;
     }
 
     private void loadAvatarImage() {

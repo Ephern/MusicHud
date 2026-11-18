@@ -42,10 +42,6 @@ import java.util.Map;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
-/**
- * Full-screen account play-history page with three tabs (songs / albums / playlists).
- * Opened from {@link AccountView} through {@link RouterContainer#pushNavigate(View)}.
- */
 public class PlayHistoryView extends FrameLayout {
     private static final Duration REQUEST_TIMEOUT = Duration.ofSeconds(15);
     private final LinearLayout topBar;
@@ -84,7 +80,7 @@ public class PlayHistoryView extends FrameLayout {
         topBar.addView(backButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
         TextView title = new TextView(context);
-        title.setTextSize(Theme.TEXT_SIZE_LARGER);
+        title.setTextSize(Theme.TEXT_SIZE_LARGE);
         title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         title.setText(I18n.get(MusicHud.MOD_ID + ".button.history"));
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -149,7 +145,7 @@ public class PlayHistoryView extends FrameLayout {
 
         FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         topBarParams.gravity = Gravity.TOP;
-        topBarParams.setMargins(0, dp(12), 0, 0);
+        topBarParams.setMargins(0, dp(12), 0, dp(12));
         // Added last so its backdrop blur samples the pager painted underneath.
         addView(topBar, topBarParams);
     }
@@ -161,7 +157,7 @@ public class PlayHistoryView extends FrameLayout {
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
-        int inset = lp.topMargin + topBar.getMeasuredHeight();
+        int inset = lp.topMargin + topBar.getMeasuredHeight() + lp.bottomMargin;
         if (pager != null && pager.getAdapter() instanceof HistoryPagerAdapter adapter) {
             adapter.setContentInsetTop(inset);
         }
@@ -354,7 +350,7 @@ public class PlayHistoryView extends FrameLayout {
                 if (!(data instanceof Album album)) {
                     continue;
                 }
-                waterfall.addView(new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY, dp(160)));
+                waterfall.addView(new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY, dp(200)));
                 count++;
             }
             if (count > 0) {
@@ -376,7 +372,7 @@ public class PlayHistoryView extends FrameLayout {
                 if (!(data instanceof Playlist playlist)) {
                     continue;
                 }
-                waterfall.addView(new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY, dp(160)));
+                waterfall.addView(new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY, dp(200)));
                 count++;
             }
             if (count > 0) {

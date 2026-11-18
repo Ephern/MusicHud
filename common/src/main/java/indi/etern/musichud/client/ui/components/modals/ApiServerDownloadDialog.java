@@ -304,6 +304,7 @@ public class ApiServerDownloadDialog {
 
     private void buildDialog() {
         title = new TextView(context);
+        title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         title.setTextSize(Theme.TEXT_SIZE_LARGE);
 
         LinearLayout content = new LinearLayout(context);
@@ -445,7 +446,7 @@ public class ApiServerDownloadDialog {
 
         Button selectDirectoryButton = new Button(context);
         selectDirectoryButton.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.dir.button.select"));
-        selectDirectoryButton.setTextColor(Theme.PRIMARY_COLOR);
+        selectDirectoryButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
         selectDirectoryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         backgroundFactory.applyBackgroundTo(selectDirectoryButton);
         selectDirectoryButton.setOnClickListener(v -> {
@@ -524,7 +525,7 @@ public class ApiServerDownloadDialog {
 
         Button refreshReleaseButton = new Button(context);
         refreshReleaseButton.setText(I18n.get(MusicHud.MOD_ID + ".modal.downloadApiServer.release.refresh"));
-        refreshReleaseButton.setTextColor(Theme.PRIMARY_COLOR);
+        refreshReleaseButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
         refreshReleaseButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         backgroundFactory.applyBackgroundTo(refreshReleaseButton);
         refreshReleaseButton.setOnClickListener(v -> refreshReleaseInfo());

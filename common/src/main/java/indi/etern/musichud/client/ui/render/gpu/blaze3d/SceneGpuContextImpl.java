@@ -10,7 +10,6 @@ import com.mojang.blaze3d.platform.Window;
 import com.mojang.renderpearl.api.pipeline.UniformType;
 import com.mojang.renderpearl.api.commands.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.renderpearl.api.textures.GpuTextureView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.render.RenderStats;
 import indi.etern.musichud.client.ui.render.gpu.*;
@@ -48,9 +47,8 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     private final boolean rgba16fTargets;
     private final int generation = ++latestGeneration;
     private final Map<PipelineKey, ScenePipeline> pipelines = new HashMap<>();
-    // Uniform storages are ring buffers: a frame's uploads never overwrite the slices the previous
-    // frames' in-flight draws still reference. Rewriting a single buffer per uniform (as before)
-    // relies on driver-side buffer renaming and can stall.
+    // Uniform storages are ring buffers, so in-flight draws never see a slice overwritten by a
+    // later frame.
     private final Map<UniformKey, DynamicGpuDataStorage<UniformAdapter>> uniformStorages =
             new HashMap<>();
     private final Set<DynamicGpuDataStorage<UniformAdapter>> writtenStorages =
@@ -429,7 +427,6 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         if (!shaderSourcesReady()) {
             return PrecompileResult.NOT_READY;
         }
-        var device = RenderSystem.getDevice();
         boolean allValid = true;
         for (ScenePipelineKey key : ScenePipelineKey.values()) {
           for (SceneTextureFormat targetFormat : SceneTextureFormat.values()) {
@@ -453,12 +450,6 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         return allValid ? PrecompileResult.DONE : PrecompileResult.FAILED;
     }
 
-    /**
-     * The shader sources and the pipeline cache that can resolve mod shaders both come from the
-     * resource reload. Compiling before it falls through to the vanilla-only fallback cache, which
-     * logs a missing source for every pipeline; its post effects are the cheapest public signal
-     * that the reload was applied.
-     */
     private static boolean shaderSourcesReady() {
         Minecraft minecraft = Minecraft.getInstance();
         //noinspection ConstantValue

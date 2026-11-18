@@ -260,7 +260,7 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
         }
         notifications.forEach(Runnable::run);
         if (needSave) {
-            profileConfigData.saveToConfig();
+            profileConfigData.save();
         }
         schedulePush(idlePlaySource);
     }
@@ -383,7 +383,7 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
         }
         notifications.forEach(Runnable::run);
         if (configChanged) {
-            profileConfigData.saveToConfig();
+            profileConfigData.save();
         }
         if (keptUnconfirmed) {
             fireLoadError(idlePlaySource);
@@ -470,7 +470,7 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
             fireLoadErrorCleared(clearedError);
         }
         if (removed) {
-            profileConfigData.saveToConfig();
+            profileConfigData.save();
             clientNetworkService.sendToServer(new RemoveFromIdlePlaySourceMessage(idlePlaySource));
         }
     }
@@ -674,7 +674,7 @@ public class LocalIdlePlaySourceState extends AbstractIdlePlaySourceLayerState {
         }
         notifications.forEach(Runnable::run);
         if (configChanged) {
-            profileConfigData.saveToConfig();
+            profileConfigData.save();
         }
         if (cleared != null) {
             fireLoadErrorCleared(cleared);

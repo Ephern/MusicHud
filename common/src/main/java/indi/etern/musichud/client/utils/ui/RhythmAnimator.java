@@ -76,13 +76,18 @@ public class RhythmAnimator extends ValueAnimator {
         }
     }
 
+    @Override
+    public void start() {
+        // A replayed row still carries the previous run's fade-out alpha.
+        row.setAlpha(1f);
+        super.start();
+    }
+
     private void handleBreatheAndFadeIn(long playTime) {
-        if (playTime >= FADE_IN_DELAY_MS) {
-            float alphaFrac = Math.clamp(
-                    (playTime - FADE_IN_DELAY_MS) / (float) FADE_IN_DURATION_MS, 0f, 1f);
-            float currentAlpha = mainText.getAlpha();
-            mainText.setAlpha(currentAlpha + (1 - currentAlpha) * Easing.EASE_OUT_QUAD.getInterpolation(alphaFrac));
-        }
+        // Pure function of playTime: no per-frame feedback, so the curve stays frame-rate independent.
+        float alphaFrac = Math.clamp(
+                (playTime - FADE_IN_DELAY_MS) / (float) FADE_IN_DURATION_MS, 0f, 1f);
+        mainText.setAlpha(Easing.EASE_OUT_QUAD.getInterpolation(alphaFrac));
         float scale = computeBreathingScale(playTime);
         row.setScaleX(scale);
         row.setScaleY(scale);

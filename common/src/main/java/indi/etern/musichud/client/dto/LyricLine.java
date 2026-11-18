@@ -135,7 +135,7 @@ public class LyricLine implements Comparable<LyricLine> {
         }
     }
 
-    // 二分查找第一个结束时间 > playedDuration 的短语索引
+    // First phrase whose end time is after playedDuration.
     public int binarySearchPhraseIndex(Duration playedDuration) {
         List<Phrase> phrases = getPhrases();
         int low = 0, high = phrases.size();
@@ -147,11 +147,13 @@ public class LyricLine implements Comparable<LyricLine> {
                 high = mid;
             }
         }
-        return low; // 返回第一个大于 playedDuration 的索引，可能等于 size()
+        return low; // May equal size() when the playhead is past the last phrase.
     }
 
     public enum Type {
-        NORMAL, META_DATA, RHYTHM
+        NORMAL, META_DATA, RHYTHM,
+        // Untimed lyrics: the whole text is rendered as one static block, never highlighted.
+        UNSYNCED
     }
 
     public record Phrase(int endOffset, Duration endTime, int durationMillis, List<HighlightSpan> spans) {

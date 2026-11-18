@@ -27,6 +27,7 @@ import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.services.LoginService;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
+import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.modals.Modal;
 import indi.etern.musichud.client.ui.components.UrlImageView;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
@@ -58,8 +59,8 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
         super(context);
         setScaleType(ScaleType.CENTER);
         normalTooltip = I18n.get(MusicHud.MOD_ID + ".button.modifyMusicTrackPlaylist");
-        setTooltipText(normalTooltip);
-        Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_plus.png");
+        Tooltip.attach(this, normalTooltip);
+        Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/bookmark.png");
         if (icon != null) {
             var resources = getContext().getResources();
             setImageDrawable(new ScaledImageDrawable(resources, icon, dp(16), dp(16)));
@@ -77,10 +78,10 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
     private void updateLoginState(boolean loggedIn) {
         if (loggedIn) {
             setEnabled(true);
-            setTooltipText(normalTooltip);
+            Tooltip.attach(this, normalTooltip);
         } else {
             setEnabled(false);
-            setTooltipText(I18n.get(MusicHud.MOD_ID + ".text.loginRequired"));
+            Tooltip.attach(this, I18n.get(MusicHud.MOD_ID + ".text.loginRequired"));
         }
     }
 

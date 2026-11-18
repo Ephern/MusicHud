@@ -6,6 +6,7 @@ import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.View;
 import icyllis.modernui.widget.*;
@@ -65,7 +66,7 @@ public class AccountView extends LinearLayout {
             }
             long id = playlist.getId();
             elementMap.computeIfAbsent(new ElementKey(Playlist.class, id), (key) -> {
-                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY, dp(160));
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), playlist, PusherInfo.EMPTY, dp(200));
                 card.setTag(id);
                 mySubscribedPlaylistCards.addView(card);
                 return card;
@@ -79,7 +80,7 @@ public class AccountView extends LinearLayout {
             }
             long id = album.getId();
             elementMap.computeIfAbsent(new ElementKey(Album.class, id), (key) -> {
-                MusicCollectionCard card = new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY, dp(160));
+                MusicCollectionCard card = new MusicCollectionCard(getContext(), album, PusherInfo.EMPTY, dp(200));
                 card.setTag(id);
                 albumCards.addView(card);
                 return card;
@@ -104,7 +105,6 @@ public class AccountView extends LinearLayout {
 
     public AccountView(Context context) {
         super(context);
-//        refresh(false);
         instance = this;
         addOnAttachStateChangeListener(new OnAttachStateChangeListener() {
             @Override
@@ -338,7 +338,8 @@ public class AccountView extends LinearLayout {
 
             TextView myPlaylistsText = new TextView(context);
             myPlaylistsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            myPlaylistsText.setTextSize(Theme.TEXT_SIZE_LARGE);
+            myPlaylistsText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            myPlaylistsText.setTextStyle(TextPaint.BOLD);
             myPlaylistsText.setText(I18n.get(MusicHud.MOD_ID + ".text.myPlaylists"));
             LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             titleParam.setMargins(0, 0, 0, dp(16));
@@ -357,7 +358,8 @@ public class AccountView extends LinearLayout {
 
             TextView subscribedPlaylistsText = new TextView(context);
             subscribedPlaylistsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            subscribedPlaylistsText.setTextSize(Theme.TEXT_SIZE_LARGE);
+            subscribedPlaylistsText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            subscribedPlaylistsText.setTextStyle(TextPaint.BOLD);
             subscribedPlaylistsText.setText(I18n.get(MusicHud.MOD_ID + ".text.mySubscribedPlaylists"));
             LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             titleParam.setMargins(0, 0, 0, dp(16));
@@ -376,7 +378,8 @@ public class AccountView extends LinearLayout {
 
             TextView subscribedAlbumsText = new TextView(context);
             subscribedAlbumsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            subscribedAlbumsText.setTextSize(Theme.TEXT_SIZE_LARGE);
+            subscribedAlbumsText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            subscribedAlbumsText.setTextStyle(TextPaint.BOLD);
             subscribedAlbumsText.setText(I18n.get(MusicHud.MOD_ID + ".text.myAlbums"));
             LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             titleParam.setMargins(0, 0, 0, dp(16));
@@ -395,7 +398,8 @@ public class AccountView extends LinearLayout {
 
             TextView artistText = new TextView(context);
             artistText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            artistText.setTextSize(Theme.TEXT_SIZE_LARGE);
+            artistText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            artistText.setTextStyle(TextPaint.BOLD);
             artistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myArtists"));
             LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             titleParam.setMargins(0, 0, 0, dp(16));
@@ -416,7 +420,7 @@ public class AccountView extends LinearLayout {
                 Playlist likeList = categoryPlaylists.getLikeList();
                 if (likeList != null && likeList.getId() != -1) {
                     elementMap.computeIfAbsent(new ElementKey(Playlist.class, likeList.getId()), key -> {
-                        MusicCollectionCard card = new MusicCollectionCard(context, likeList, PusherInfo.EMPTY, dp(160));
+                        MusicCollectionCard card = new MusicCollectionCard(context, likeList, PusherInfo.EMPTY, dp(200));
                         card.setTag(likeList.getId());
                         myPlaylistCards.addView(card);
                         return card;
@@ -424,7 +428,7 @@ public class AccountView extends LinearLayout {
                 }
                 ObservableSequencedSet<Playlist> createdPlaylist = categoryPlaylists.getCreatedPlaylist();
                 createdPlaylist.forEach(playlist -> elementMap.computeIfAbsent(new ElementKey(Playlist.class, playlist.getId()), key -> {
-                    MusicCollectionCard card = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY, dp(160));
+                    MusicCollectionCard card = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY, dp(200));
                     card.setTag(playlist.getId());
                     myPlaylistCards.addView(card);
                     return card;

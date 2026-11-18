@@ -5,10 +5,8 @@ import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.text.SpannableString;
-import icyllis.modernui.text.Spanned;
+import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.MotionEvent;
@@ -26,13 +24,8 @@ import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
-import indi.etern.musichud.client.ui.components.buttons.ModifyPlaylistTrackModalButton;
-import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButton;
-import indi.etern.musichud.client.ui.components.buttons.VoteSkipButton;
 import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
-import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
-import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
@@ -87,9 +80,6 @@ public class SidebarView extends LinearLayout {
     private static final int NEXT_TO_PLAY_ANIM_DURATION_MS =
             Math.round(NEXT_TO_PLAY_INTERPOLATOR.getDuration() * 1000);
     private static final float NEXT_TO_PLAY_MIN_SCALE = 0.95f;
-    private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
-    private static final int ACTION_ICON_DP = 16;
-    private static final int PUSHER_PADDING_DP = 8;
 
     // Morph springs use normalized positions: 0 = expanded player, 1 = compact library header.
     private static final float MORPH_TIME_SCALE = 1f;
@@ -139,12 +129,7 @@ public class SidebarView extends LinearLayout {
     private StaggeredLyricScrollView lyricsScrollView;
     private MusicInfoCard activeCard;
     private MusicInfoCard stagedCard;
-    private LinearLayout buttonsLayout;
-    private ToggleTrackLikeStateButton likeButton;
-    private ModifyPlaylistTrackModalButton addToPlaylistButton;
-    private VoteSkipButton skipCurrentButton;
-    private PusherWidget pusherWidget;
-    private ImageButton sourceButton;
+    private MediaControlBar mediaControlBar;
     private AnimatorSet cardAnimator;
     private AnimatorSet coverScaleAnimator;
     private boolean cardSwitching;
@@ -745,51 +730,8 @@ public class SidebarView extends LinearLayout {
         actionsRow.setGravity(Gravity.START | Gravity.CENTER_VERTICAL);
         sideContent.addView(actionsRow, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-        buttonsLayout = new LinearLayout(context);
-        buttonsLayout.setOrientation(HORIZONTAL);
-        LayoutTransition layoutTransition = new LayoutTransition();
-//        layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
-        LayoutTransitionReflow.attach(layoutTransition);
-        buttonsLayout.setLayoutTransition(layoutTransition);
-        buttonsLayout.setGravity(Gravity.START);
-        actionsRow.addView(buttonsLayout, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-        {
-            InsetBackgroundFactory buttonsBackground = InsetBackgroundFactory.builder()
-                    .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                    .cornerRadius(dp(4)).build();
-            int buttonSize = dp(36);
-
-            pusherWidget = new PusherWidget(context);
-            pusherWidget.setVisibility(GONE);
-            buttonsBackground.applyBackgroundTo(pusherWidget);
-            int pusherPadding = dp(PUSHER_PADDING_DP);
-            pusherWidget.setPadding(pusherPadding, pusherPadding, pusherPadding, pusherPadding);
-            buttonsLayout.addView(pusherWidget, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-
-            int iconSize = dp(ACTION_ICON_DP);
-            sourceButton = new ImageButton(context);
-            sourceButton.setVisibility(GONE);
-            sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
-            if (sourceIcon != null) {
-                sourceButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(
-                        context.getResources(), sourceIcon, iconSize, iconSize), dp(1)));
-            }
-            sourceButton.setOnClickListener(this::onSourceClick);
-            buttonsBackground.applyBackgroundTo(sourceButton);
-            buttonsLayout.addView(sourceButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-
-            likeButton = new ToggleTrackLikeStateButton(context);
-            buttonsBackground.applyBackgroundTo(likeButton);
-            buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-            addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
-            buttonsBackground.applyBackgroundTo(addToPlaylistButton);
-            buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-            skipCurrentButton = new VoteSkipButton(context);
-            buttonsBackground.applyBackgroundTo(skipCurrentButton);
-            buttonsLayout.addView(skipCurrentButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-        }
-        buttonsLayout.setVisibility(GONE);
+        mediaControlBar = new MediaControlBar(context, 34);
+        actionsRow.addView(mediaControlBar, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
         sideContentTransition = new LayoutTransition();
         sideContentTransition.enableTransitionType(LayoutTransition.CHANGING);
@@ -799,6 +741,7 @@ public class SidebarView extends LinearLayout {
         lyricsScrollView = new StaggeredLyricScrollView(context);
         lyricsScrollView.setMainLyricSize(Theme.SIDEBAR_MAIN_LYRIC_SIZE);
         lyricsScrollView.setSubLyricSize(Theme.SIDEBAR_SUB_LYRIC_SIZE);
+        lyricsScrollView.setPlainLyricSize(Theme.TEXT_SIZE_LARGE);
 
         stagedCard.bind(Traceable.of(MusicDetail.NONE), availableWidth);
     }
@@ -835,95 +778,9 @@ public class SidebarView extends LinearLayout {
                 lyricsScrollView.clearLyrics();
             }
         }
-        updateActionButtons(displayedDetail);
+        mediaControlBar.bind(displayedTrace);
         checkNextToPlay(nextToPlayTrace);
         updateLyricsVisibility();
-    }
-
-    /** Binds the sidebar action row to the track that is actually displayed. */
-    private void updateActionButtons(MusicDetail detail) {
-        if (buttonsLayout == null) {
-            return;
-        }
-        if (detail == null || detail.equals(MusicDetail.NONE)) {
-            buttonsLayout.setVisibility(GONE);
-            likeButton.bindMusicList(null);
-            addToPlaylistButton.bindMusicDetail(null);
-            bindPusher(null);
-            bindSource(null);
-            return;
-        }
-        skipCurrentButton.reset();
-        likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(detail).currentUsersLikeList());
-        addToPlaylistButton.bindMusicDetail(detail);
-        bindPusher(detail);
-        bindSource(displayedTrace == null ? null : displayedTrace.source());
-        buttonsLayout.setVisibility(VISIBLE);
-    }
-
-    private void bindPusher(MusicDetail detail) {
-        PusherInfo pusherInfo = detail == null ? null : detail.getPusherInfo();
-        if (pusherInfo == null || PusherInfo.EMPTY.equals(pusherInfo)) {
-            pusherWidget.clear();
-            pusherWidget.setVisibility(GONE);
-        } else {
-            pusherWidget.bind(pusherInfo);
-            pusherWidget.setVisibility(VISIBLE);
-        }
-    }
-
-    private void bindSource(SourceMeta source) {
-        if (source == null) {
-            sourceButton.setTag(null);
-            sourceButton.setVisibility(GONE);
-            Tooltip.attach(sourceButton, null);
-            return;
-        }
-        sourceButton.setTag(source);
-        sourceButton.setVisibility(VISIBLE);
-        Tooltip.attach(sourceButton, buildSourceLabel(source));
-    }
-
-    private void onSourceClick(View view) {
-        Object tag = sourceButton.getTag();
-        if (!(tag instanceof SourceMeta sourceMeta)) {
-            return;
-        }
-        Class<?> type = sourceMeta.type();
-        if (!MusicCollection.class.isAssignableFrom(type)) {
-            return;
-        }
-        Context context = getContext();
-        //noinspection unchecked
-        MusicService.getInstance()
-                .loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
-                .thenAccept(collection -> MuiModApi.postToUiThread(() -> {
-                    RouterContainer router = MainFragment.getInstance().getRouterContainer();
-                    if (router != null) {
-                        router.pushNavigate(new MusicCollectionDetailView(context, collection));
-                    }
-                }));
-    }
-
-    private static SpannableString buildSourceLabel(SourceMeta source) {
-        SpannableString text = new SpannableString("    " + source.name());
-        String iconPath = Album.class.isAssignableFrom(source.type())
-                ? "/assets/music_hud/textures/gui/icons/disc_album.png"
-                : "/assets/music_hud/textures/gui/icons/list_music.png";
-        Image icon = ImageUtils.getImageFromResource(iconPath);
-        if (icon != null) {
-            text.setSpan(ImageUtils.getIconSpan(icon), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        String playModeIconPath = switch (source.playMode()) {
-            case RANDOM -> "/assets/music_hud/textures/gui/icons/shuffle.png";
-            case SEQUENTIAL -> "/assets/music_hud/textures/gui/icons/repeat.png";
-            case INTELLIGENT -> "/assets/music_hud/textures/gui/icons/heart_pulse.png";
-        };
-        Image modeIcon = ImageUtils.getImageFromResource(playModeIconPath);
-        if (modeIcon != null) {
-            text.setSpan(ImageUtils.getIconSpan(modeIcon), 2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        return text;
     }
 
     private static boolean isSameMusic(MusicDetail a, MusicDetail b) {
@@ -1029,7 +886,7 @@ public class SidebarView extends LinearLayout {
                 startCardSwitch(pending);
             }
         }
-        updateActionButtons(displayedDetail);
+        mediaControlBar.bind(displayedTrace);
     }
 
     private static boolean isCoverExpanded() {
@@ -1078,7 +935,8 @@ public class SidebarView extends LinearLayout {
         }
         DateTimeFormatter formatter = musicDuration.toHoursPart() >= 1 ?
                 FORMATTER_WITH_HOUR : FORMATTER_WITHOUT_HOUR;
-        // 兜底退出：startAt 可能因任务被取代/失败永不触发，超时后结束进度循环防泄漏
+        // Fallback exit: startAt may never fire when the task is replaced or fails, so the
+        // progress loop stops at the deadline.
         long currentTimeMillis = System.currentTimeMillis();
         long deadline = currentTimeMillis + musicDuration.toMillis() + 120_000;
         progressUpdaterStartTime = currentTimeMillis;
@@ -1118,9 +976,7 @@ public class SidebarView extends LinearLayout {
     }
 
     private static boolean notAbsoluteMusicLyric() {
-        Queue<LyricLine> lines = nowPlayingInfo.getLyricLines();
-        return lines != null && !lines.isEmpty()
-                && lines.stream().filter(l -> l.getType() == LyricLine.Type.NORMAL).count() > 1;
+        return StaggeredLyricScrollView.hasDisplayableLyrics(nowPlayingInfo.getLyricLines());
     }
 
     public void updateLyricsVisibility() {
@@ -1178,12 +1034,14 @@ public class SidebarView extends LinearLayout {
         scrollViewContainer.setLayoutTransition(transition);
 
         int dp24 = dp(24);
+        int dp96 = dp(96);
         {
             nextToPlayRow = new LinearLayout(context);
             nextToPlayRow.setOrientation(VERTICAL);
             nextToPlayRow.setVisibility(GONE);
+            nextToPlayRow.setMinimumHeight(dp96);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(margin, dp(16), margin, 0);
+            params1.setMargins(margin, dp(10), margin, 0);
             scrollViewContainer.addView(nextToPlayRow, params1);
 
             LinearLayout nextToPlayHeader = new LinearLayout(context);
@@ -1195,7 +1053,8 @@ public class SidebarView extends LinearLayout {
 
             TextView nextToPlayTitle = new TextView(context);
             nextToPlayTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            nextToPlayTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+            nextToPlayTitle.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            nextToPlayTitle.setTextStyle(TextPaint.BOLD);
             nextToPlayTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.nextToPlay"));
             nextToPlayHeader.addView(nextToPlayTitle, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
@@ -1226,8 +1085,9 @@ public class SidebarView extends LinearLayout {
         {
             queueRow = new LinearLayout(context);
             queueRow.setOrientation(VERTICAL);
+            queueRow.setMinimumHeight(dp96);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-            params1.setMargins(margin, dp(16), margin, 0);
+            params1.setMargins(margin, dp(10), margin, 0);
             scrollViewContainer.addView(queueRow, params1);
 
             TextView queueTitle = new TextView(context);
@@ -1235,7 +1095,8 @@ public class SidebarView extends LinearLayout {
             queueTitle.setTextAlignment(TEXT_ALIGNMENT_CENTER);
             queueTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             queueTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.playQueue"));
-            queueTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+            queueTitle.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            queueTitle.setTextStyle(TextPaint.BOLD);
             queueTitle.setSingleLine();
             queueRow.addView(queueTitle, new LayoutParams(WRAP_CONTENT, dp24));
 
@@ -1260,7 +1121,8 @@ public class SidebarView extends LinearLayout {
 
             TextView clientIdlePlaySourceViewTitle = new TextView(context);
             clientIdlePlaySourceViewTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            clientIdlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+            clientIdlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            clientIdlePlaySourceViewTitle.setTextStyle(TextPaint.BOLD);
             clientIdlePlaySourceViewTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySources"));
             Tooltip.attach(clientIdlePlaySourceViewTitle, I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
             LinearLayout.LayoutParams clientTitleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -1334,7 +1196,7 @@ public class SidebarView extends LinearLayout {
         checkIdlePlaySources(serverIdlePlaySources, serverIdlePlaySourceView);
 
         Queue<QueueItem> queue = musicService.getMusicQueue();
-        checkQueue(queue);
+        checkQueueVisibility(queue);
         // Snapshot before iterating: the client queue is a plain ArrayDeque mutated on network
         // threads and its iterator is fail-fast
         for (QueueItem item : List.copyOf(queue)) {
@@ -1394,7 +1256,7 @@ public class SidebarView extends LinearLayout {
         idlePlaySourceCardMap.put(key, child);
     }
 
-    private void checkQueue(Queue<QueueItem> queue) {
+    private void checkQueueVisibility(Queue<QueueItem> queue) {
         if (queue.isEmpty()) {
             queueRow.setVisibility(GONE);
             checkNextToPlay(NowPlayingInfo.getInstance().getNextToPlayMusic());
@@ -1410,7 +1272,7 @@ public class SidebarView extends LinearLayout {
         if (targetView.getVisibility() != visibility) {
             targetView.post(() -> targetView.setVisibility(visibility));
         }
-        checkQueue(musicService.getMusicQueue());
+        checkQueueVisibility(musicService.getMusicQueue());
     }
 
     private void checkNextToPlay(Traceable<MusicDetail> nextIdle) {
@@ -1561,9 +1423,6 @@ public class SidebarView extends LinearLayout {
         MusicDetail musicDetail = musicTrace.value();
         MusicTrackItem musicListItem = new MusicTrackItem(getContext());
         musicListItem.bindData(musicTrace);
-        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
-        layoutParams.setMargins(0, 0, 0, dp(4));
-
         LocalPlayer player = Minecraft.getInstance().player;
         if (player != null && musicDetail.getPusherInfo().playerUUID().equals(player.getUUID())) {
             musicListItem.addActionButton(
@@ -1571,7 +1430,8 @@ public class SidebarView extends LinearLayout {
                     I18n.get(MusicHud.MOD_ID + ".button.remove"),
                     v -> musicService.sendRemoveMusicFromQueue(item));
         }
-        musicListItem.setLayoutParams(layoutParams);
+        LinearLayout.LayoutParams layoutParams = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        layoutParams.setMargins(0, 0, 0, dp(10));
         playQueueView.addView(musicListItem, layoutParams);
     }
 
@@ -1590,14 +1450,14 @@ public class SidebarView extends LinearLayout {
         serverAddRegister = musicService.getIdlePlaySourceState().external().onAdd(serverAddListener);
         serverRemoveRegister = musicService.getIdlePlaySourceState().external().onRemove(serverRemoveListener);
         musicQueuePushListener = item -> MuiModApi.postToUiThread(() -> {
+            checkQueueVisibility(musicService.getMusicQueue());
             addMusicQueueItem(item, playQueueListView);
-            checkQueue(musicService.getMusicQueue());
         });
         musicQueueRemoveListener = (removeIndex, item) -> MuiModApi.postToUiThread(() -> {
+            checkQueueVisibility(musicService.getMusicQueue());
             if (removeIndex >= 0 && removeIndex < playQueueListView.getChildCount()) {
                 playQueueListView.removeViewAt(removeIndex);
             }
-            checkQueue(musicService.getMusicQueue());
         });
         musicService.getMusicQueuePushListeners().add(musicQueuePushListener);
         musicService.getMusicQueueRemoveListeners().add(musicQueueRemoveListener);
