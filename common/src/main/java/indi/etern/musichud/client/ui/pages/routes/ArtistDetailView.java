@@ -223,7 +223,7 @@ public class ArtistDetailView extends FrameLayout implements RouterContainer.Rou
         }
 
         TextView typeView = new TextView(context);
-        typeView.setTextSize(Theme.TEXT_SIZE_LARGER);
+        typeView.setTextSize(Theme.TEXT_SIZE_LARGE);
         typeView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         typeView.setSingleLine();
         typeView.setEllipsize(TextUtils.TruncateAt.END);

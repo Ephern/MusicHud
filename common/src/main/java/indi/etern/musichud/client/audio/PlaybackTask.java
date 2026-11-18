@@ -490,7 +490,7 @@ public class PlaybackTask {
                 if (restartRequested || cancelled) return;
                 String message = e.getMessage();
                 if (e instanceof SocketException && "Closed by interrupt".equals(message)) return;
-                LOGGER.error("Download error (attempt {})\n{} : {}", trial, e.getClass().getName(), message);
+                LOGGER.error("Download error (attempt {})", trial, e);
                 if (e.getCause() instanceof TimeoutException || (message != null && (message.contains("Timeout") || message.contains("timeout")))) {
                     message = I18n.get(MusicHud.MOD_ID + ".error.cause.timeout");
                 }

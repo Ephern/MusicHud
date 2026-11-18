@@ -38,7 +38,7 @@ public class MP3StreamDecoder implements AudioDecoder {
                     initialized = true;
                 }
 
-                Obuffer obuffer = decoder.decodeFrame(header, bitstream);
+                OBuffer obuffer = decoder.decodeFrame(header, bitstream);
                 if (obuffer instanceof SampleBuffer buffer) {
                     short[] shortData = buffer.getBuffer();
 

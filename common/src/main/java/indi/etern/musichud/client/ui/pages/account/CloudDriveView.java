@@ -155,7 +155,7 @@ public class CloudDriveView extends FrameLayout {
         topBar.addView(backButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
         TextView title = new TextView(context);
-        title.setTextSize(Theme.TEXT_SIZE_LARGER);
+        title.setTextSize(Theme.TEXT_SIZE_LARGE);
         title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         title.setText(I18n.get(MusicHud.MOD_ID + ".button.cloud"));
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);

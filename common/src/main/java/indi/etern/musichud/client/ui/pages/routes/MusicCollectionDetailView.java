@@ -193,7 +193,7 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
         }
 
         typeView = new TextView(context);
-        typeView.setTextSize(Theme.TEXT_SIZE_LARGER);
+        typeView.setTextSize(Theme.TEXT_SIZE_LARGE);
         typeView.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         typeView.setSingleLine();
         typeView.setEllipsize(TextUtils.TruncateAt.END);
@@ -505,7 +505,7 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
             String albumType = mappedAlbumType(album.getType());
             typeView.setText(albumType.isBlank() || albumType.equals(typeLabel)
                     ? typeLabel
-                    : typeLabel + " " + albumType);
+                    : typeLabel + " - " + albumType);
         } else {
             typeView.setText(typeLabel);
         }

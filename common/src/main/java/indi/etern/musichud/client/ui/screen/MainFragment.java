@@ -216,9 +216,13 @@ public class MainFragment extends Fragment {
             // Everything except the floating control bar keeps its original row arrangement.
             contentRow = new LinearLayout(context);
             contentRow.setOrientation(LinearLayout.HORIZONTAL);
+            // Allow the account shelves to draw into the sidebar padding and outside the router.
+            contentRow.setClipChildren(false);
+            contentRow.setClipToPadding(false);
             base.addView(contentRow, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             routerContainer = new RouterContainer(context);
+            routerContainer.setClipChildren(false);
             routerContainer.setAnimationStyle(RouterContainer.AnimationStyle.SCALE_FADE_ROOT);
             routerContainer.setAnimationDuration(300);
             contentRow.addView(routerContainer, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));

@@ -6,6 +6,7 @@ import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.mc.MuiModApi;
+import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.view.Gravity;
 import icyllis.modernui.view.MeasureSpec;
 import icyllis.modernui.view.MotionEvent;
@@ -1052,7 +1053,8 @@ public class SidebarView extends LinearLayout {
 
             TextView nextToPlayTitle = new TextView(context);
             nextToPlayTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            nextToPlayTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+            nextToPlayTitle.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            nextToPlayTitle.setTextStyle(TextPaint.BOLD);
             nextToPlayTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.nextToPlay"));
             nextToPlayHeader.addView(nextToPlayTitle, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
 
@@ -1093,7 +1095,8 @@ public class SidebarView extends LinearLayout {
             queueTitle.setTextAlignment(TEXT_ALIGNMENT_CENTER);
             queueTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
             queueTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.playQueue"));
-            queueTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+            queueTitle.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            queueTitle.setTextStyle(TextPaint.BOLD);
             queueTitle.setSingleLine();
             queueRow.addView(queueTitle, new LayoutParams(WRAP_CONTENT, dp24));
 
@@ -1118,7 +1121,8 @@ public class SidebarView extends LinearLayout {
 
             TextView clientIdlePlaySourceViewTitle = new TextView(context);
             clientIdlePlaySourceViewTitle.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            clientIdlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_LARGE);
+            clientIdlePlaySourceViewTitle.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            clientIdlePlaySourceViewTitle.setTextStyle(TextPaint.BOLD);
             clientIdlePlaySourceViewTitle.setText(I18n.get(MusicHud.MOD_ID + ".text.idlePlaySources"));
             Tooltip.attach(clientIdlePlaySourceViewTitle, I18n.get(MusicHud.MOD_ID + ".text.idlePlaySourcesDescription"));
             LinearLayout.LayoutParams clientTitleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);

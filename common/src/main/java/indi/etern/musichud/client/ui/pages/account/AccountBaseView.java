@@ -71,7 +71,9 @@ public class AccountBaseView extends LinearLayout {
             LinearLayout view = new LinearLayout(context);
             view.setOrientation(LinearLayout.VERTICAL);
             view.setGravity(Gravity.CENTER_HORIZONTAL);
-            scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params.setMargins(dp(16), 0, dp(16), 0);
+            scrollView.addView(view, params);
 
             if (status == Status.UNAVAILABLE) {
                 view.setGravity(Gravity.CENTER);
