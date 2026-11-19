@@ -41,7 +41,7 @@ import java.util.Set;
 /**
  * Single-line marquee built from two real text copies: the leading one scrolls out while the
  * trailing one follows after a gap, so the wrap is seamless and every segment keeps its own
- * click and hover behaviour. The text is one {@link TextView} per copy, so spans such as
+ * click and hover behavior. The text is one {@link TextView} per copy, so spans such as
  * {@code ClickableSpan} keep working; they dim while hovered or pressed.
  * <p>
  * Scrolling is an integer {@link #scrollTo(int, int)} on this container (what the framework's hit
@@ -172,6 +172,11 @@ public class MarqueeTextView extends ViewGroup {
     public void setTextSize(float size) {
         leading.setTextSize(size);
         trailing.setTextSize(size);
+    }
+
+    public void setTextStyle(@TextPaint.TextStyle int style) {
+        leading.setTextStyle(style);
+        trailing.setTextStyle(style);
     }
 
     public void setGravity(int gravity) {
@@ -500,7 +505,7 @@ public class MarqueeTextView extends ViewGroup {
     }
 
     @Override
-    protected void onWindowVisibilityChanged(int visibility) {
+    protected void onWindowVisibilityChanged(@Visibility int visibility) {
         super.onWindowVisibilityChanged(visibility);
         if (visibility == VISIBLE) {
             updateLoopState();

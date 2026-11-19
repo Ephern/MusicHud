@@ -76,10 +76,7 @@ public class MainFragment extends Fragment {
     private LinearLayout contentRow;
     private LinearLayout navigatorWrapper;
     private ValueAnimator navigatorBackgroundAnimator;
-    /**
-     * Mode remembered for non-Home pages; Home always shows the library.
-     */
-    private SidebarView.Mode otherPageMode = SidebarView.Mode.PLAYER;
+    private SidebarView.Mode otherPageMode = SidebarView.Mode.LIBRARY;
 
     private MainFragment() {
     }
@@ -156,13 +153,6 @@ public class MainFragment extends Fragment {
         }
     }
 
-    public static void refreshLyricsSidebarVisibility() {
-        MainFragment target = instance;
-        if (target != null && target.visible && target.sidebar != null) {
-            target.sidebar.updateLyricsVisibility();
-        }
-    }
-
     public static @NonNull MainFragment getInstance() {
         if (instance == null) {
             synchronized (MainFragment.class) {
@@ -172,11 +162,6 @@ public class MainFragment extends Fragment {
             }
         }
         return instance;
-    }
-
-    private static boolean hasMusic() {
-        MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-        return detail != null && !detail.equals(MusicDetail.NONE);
     }
 
     private void applyMusic(Traceable<MusicDetail> musicDetailTrace, Traceable<MusicDetail> nextToPlayTrace,
@@ -236,8 +221,6 @@ public class MainFragment extends Fragment {
                 sidebarParams.setMargins(dp12, base.dp(64), 0, dp12);
                 base.addView(sidebar, sidebarParams);
             }
-            otherPageMode = hasMusic() ? SidebarView.Mode.PLAYER : SidebarView.Mode.LIBRARY;
-
             {
                 LinearLayout controlBar = new LinearLayout(context);
                 var params = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);

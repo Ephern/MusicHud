@@ -217,6 +217,7 @@ public class AccountView extends LinearLayout {
             nickName.setSingleLine(true);
             nickName.setTextSize(Theme.TEXT_SIZE_LARGER);
             nickName.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
+            nickName.setTextStyle(TextPaint.BOLD);
             nickName.setText(currentProfile.getNickname());
             LayoutParams nameLayoutParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             nameLayoutParams.setMargins(0, 0, 0, dp(2));
@@ -245,12 +246,6 @@ public class AccountView extends LinearLayout {
             id.setText(Long.toString(currentProfile.getUserId()));
             line2.addView(id);
         }
-//        {
-//            LinearLayout buttonsLayout1 = new LinearLayout(context);
-//            buttonsLayout1.setOrientation(LinearLayout.HORIZONTAL);
-//            buttonsLayout1.setGravity(Gravity.CENTER_VERTICAL);
-//            topBarLine1.addView(buttonsLayout1);
-//        }
 
         LinearLayout buttons = new LinearLayout(context);
         buttons.setOrientation(LinearLayout.HORIZONTAL);
@@ -338,7 +333,7 @@ public class AccountView extends LinearLayout {
 
             TextView myPlaylistsText = new TextView(context);
             myPlaylistsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            myPlaylistsText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            myPlaylistsText.setTextSize(Theme.TEXT_SIZE_LARGE);
             myPlaylistsText.setTextStyle(TextPaint.BOLD);
             myPlaylistsText.setText(I18n.get(MusicHud.MOD_ID + ".text.myPlaylists"));
             LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -358,7 +353,7 @@ public class AccountView extends LinearLayout {
 
             TextView subscribedPlaylistsText = new TextView(context);
             subscribedPlaylistsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            subscribedPlaylistsText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            subscribedPlaylistsText.setTextSize(Theme.TEXT_SIZE_LARGE);
             subscribedPlaylistsText.setTextStyle(TextPaint.BOLD);
             subscribedPlaylistsText.setText(I18n.get(MusicHud.MOD_ID + ".text.mySubscribedPlaylists"));
             LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -378,7 +373,7 @@ public class AccountView extends LinearLayout {
 
             TextView subscribedAlbumsText = new TextView(context);
             subscribedAlbumsText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            subscribedAlbumsText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            subscribedAlbumsText.setTextSize(Theme.TEXT_SIZE_LARGE);
             subscribedAlbumsText.setTextStyle(TextPaint.BOLD);
             subscribedAlbumsText.setText(I18n.get(MusicHud.MOD_ID + ".text.myAlbums"));
             LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -398,7 +393,7 @@ public class AccountView extends LinearLayout {
 
             TextView artistText = new TextView(context);
             artistText.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
-            artistText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            artistText.setTextSize(Theme.TEXT_SIZE_LARGE);
             artistText.setTextStyle(TextPaint.BOLD);
             artistText.setText(I18n.get(MusicHud.MOD_ID + ".text.myArtists"));
             LayoutParams titleParam = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);

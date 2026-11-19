@@ -88,7 +88,6 @@
   "music_hud.config.common.disableVanillaMusicWhilePlaying": "播放時停用原版音樂",
   "music_hud.config.common.enable": "啟用 Music HUD",
   "music_hud.config.common.enableHud": "啟用 HUD",
-  "music_hud.config.common.enableLyricsSidebar": "在介面中顯示歌詞側邊欄",
   "music_hud.config.common.enableMarqueeText": "啟用 HUD 內文字溢出時的走馬燈動畫",
   "music_hud.config.common.solidBackground": "純色背景",
   "music_hud.config.common.solidBackgroundAlpha": "純色背景不透明度 (0~1)",

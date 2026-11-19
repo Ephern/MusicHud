@@ -47,9 +47,10 @@ public class QRLoginView extends LinearLayout implements ILoginView {
         textView1.setLayoutParams(params1);
 
         urlImageView = new UrlImageView(context);
-        LayoutParams imageParams = new LayoutParams(dp(160), dp(160));
+        LayoutParams imageParams = new LayoutParams(dp(200), dp(200));
         imageParams.setMargins(0, dp(32), 0, 0);
         urlImageView.setLayoutParams(imageParams);
+        urlImageView.setCornerRadius(dp(8));
 
         loginButton = new Button(context);
         loginButton.setTextColor(Theme.NORMAL_TEXT_COLOR);

@@ -343,7 +343,7 @@ public class PlayHistoryView extends FrameLayout {
             }
             progressBar.setVisibility(GONE);
             WaterfallLayout waterfall = new WaterfallLayout(getContext());
-            waterfall.setRowMinWidth(dp(174));
+            waterfall.setRowMinWidth(dp(200 + 14));
             int count = 0;
             for (PlayRecord<Album> record : records) {
                 Object data = record.getData();
@@ -365,7 +365,7 @@ public class PlayHistoryView extends FrameLayout {
             }
             progressBar.setVisibility(GONE);
             WaterfallLayout waterfall = new WaterfallLayout(getContext());
-            waterfall.setRowMinWidth(dp(174));
+            waterfall.setRowMinWidth(dp(200 + 14));
             int count = 0;
             for (PlayRecord<Playlist> record : records) {
                 Object data = record.getData();
