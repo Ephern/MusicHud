@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.pages.account;
 
-import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
@@ -25,6 +24,7 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.CloudTrackItem;
+import indi.etern.musichud.client.ui.components.LinearProgressBar;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.modals.Modal;
@@ -61,10 +61,9 @@ public class CloudDriveView extends FrameLayout {
     private final Map<Long, CloudTrackInfo> serverTracks = new LinkedHashMap<>();
     private final Set<Long> presentedResolvedIds = new HashSet<>();
     private final Set<Long> scheduledCompletion = new HashSet<>();
-    private final ProgressBar usageBar;
+    private final LinearProgressBar usageBar;
     private final LinearLayout usageInfo;
     private final TextView usageText;
-    private final int usageBarWidth;
     private Set<Long> lastEntryIds = Set.of();
 
     private boolean loading;
@@ -206,8 +205,8 @@ public class CloudDriveView extends FrameLayout {
             topBar.addView(usageDivider, dividerParams);
         }
         {
-            usageBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
-            usageBarWidth = dp(160);
+            usageBar = new LinearProgressBar(context, Theme.mediaProgressStyle());
+            int usageBarWidth = dp(160);
             usageBar.setMax(usageBarWidth);
             LinearLayout.LayoutParams usageBarParams = new LinearLayout.LayoutParams(usageBarWidth, WRAP_CONTENT);
             usageBarParams.setMargins(dp(12), 0, dp(8), 0);
@@ -322,7 +321,7 @@ public class CloudDriveView extends FrameLayout {
                     CloudTracksPage page = result.extraData();
                     long usedBytes = page.usedBytes();
                     long maxBytes = page.maxBytes();
-                    usageBar.setProgress((int) (usedBytes * usageBarWidth / maxBytes));
+                    usageBar.setProgressFraction((float) usedBytes / maxBytes);
                     usageText.setText(ByteUnitFormatter.formatSize(usedBytes) + " / " + ByteUnitFormatter.formatSize(maxBytes));
                     usageInfo.setVisibility(VISIBLE);
 

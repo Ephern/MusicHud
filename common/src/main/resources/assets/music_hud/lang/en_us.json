@@ -88,7 +88,6 @@
   "music_hud.config.common.disableVanillaMusicWhilePlaying": "Disable vanilla music while playing",
   "music_hud.config.common.enable": "Enable Music HUD",
   "music_hud.config.common.enableHud": "Enable HUD",
-  "music_hud.config.common.enableLyricsSidebar": "Show lyrics sidebar in GUI",
   "music_hud.config.common.enableMarqueeText": "Enable marquee animation when text overflows in HUD",
   "music_hud.config.common.solidBackground": "Solid background",
   "music_hud.config.common.solidBackgroundAlpha": "Solid background opacity (0~1)",

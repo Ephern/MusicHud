@@ -7,11 +7,7 @@ import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.TextPaint;
-import icyllis.modernui.view.Gravity;
-import icyllis.modernui.view.MeasureSpec;
-import icyllis.modernui.view.MotionEvent;
-import icyllis.modernui.view.View;
-import icyllis.modernui.view.ViewGroup;
+import icyllis.modernui.view.*;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.IdlePlaySource;
@@ -27,13 +23,7 @@ import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.Easing;
-import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
-import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
-import indi.etern.musichud.client.utils.ui.PanelStyle;
-import indi.etern.musichud.client.utils.ui.SpringInterpolator;
-import indi.etern.musichud.client.utils.ui.SpringValue;
-import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.client.utils.ui.*;
 import indi.etern.musichud.interfaces.Unregister;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
@@ -95,7 +85,6 @@ public class SidebarView extends LinearLayout {
     private static final float MORPH_SETTLE_EPSILON = 1e-3f;
     private static final float MORPH_SETTLE_VELOCITY = 0.05f;
 
-    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final MusicService musicService = MusicService.getInstance();
     private static final Logger LOGGER = MusicHud.getLogger(SidebarView.class);
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
@@ -107,7 +96,7 @@ public class SidebarView extends LinearLayout {
     private boolean visible;
     private AnimatorSet panelAnimator;
     @Getter
-    private Mode mode = Mode.PLAYER;
+    private Mode mode = Mode.LIBRARY;
     private final CollapsibleHeader headerContainer;
     private final LowerPageViewport lowerViewport;
     private LinearLayout sideContent;
@@ -593,9 +582,7 @@ public class SidebarView extends LinearLayout {
      * the lyrics nor the library list reflows while the viewport grows or shrinks with the header.
      */
     private void prepareLowerAnimation(float target) {
-        boolean targetShowsLyrics = target < 0.5f
-                && clientConfig.getEnableLyricsSidebar()
-                && notAbsoluteMusicLyric();
+        boolean targetShowsLyrics = target < 0.5f && notAbsoluteMusicLyric();
         boolean lyricsVisibleNow = lyricsScrollView.getVisibility() == VISIBLE;
         if (targetShowsLyrics) {
             lyricsScrollView.setVisibility(VISIBLE);
@@ -719,7 +706,7 @@ public class SidebarView extends LinearLayout {
         cardWrapper.addView(activeCard, new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         cardWrapper.addView(stagedCard, new FrameLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         stagedCard.setVisibility(INVISIBLE);
-        stagedCard.setTranslationX(availableWidth);
+        stagedCard.setTranslationY(dp(64));
         stagedCard.setAlpha(0f);
         stagedCard.getAlbumImage().setScaleX(CARD_COVER_MIN_SCALE);
         stagedCard.getAlbumImage().setScaleY(CARD_COVER_MIN_SCALE);
@@ -795,7 +782,6 @@ public class SidebarView extends LinearLayout {
      * seam never gaps; album covers scale uniformly between {@link #CARD_COVER_MIN_SCALE} and 1.
      */
     private void startCardSwitch(Traceable<MusicDetail> musicDetailTrace) {
-        int width = sideWidth;
         cardSwitching = true;
         if (coverScaleAnimator != null) {
             coverScaleAnimator.cancel();
@@ -805,22 +791,22 @@ public class SidebarView extends LinearLayout {
 
         // Prepare the incoming card off-screen right; visible before bind so image lazy-load triggers.
         stagedCard.setVisibility(VISIBLE);
-        stagedCard.setTranslationX(width);
+        stagedCard.setTranslationY(dp(64));
         stagedCard.setAlpha(0f);
         stagedCard.setMorph(coverSpring.getValue(), textXSpring.getValue(), textYSpring.getValue());
         UrlImageView activeAlbumImageView = activeCard.getAlbumImage();
         UrlImageView stagedAlbumImageView = stagedCard.getAlbumImage();
         stagedAlbumImageView.setScaleX(CARD_COVER_MIN_SCALE);
         stagedAlbumImageView.setScaleY(CARD_COVER_MIN_SCALE);
-        stagedCard.bind(musicDetailTrace, width);
+        stagedCard.bind(musicDetailTrace, sideWidth);
 
-        ObjectAnimator outX = ObjectAnimator.ofFloat(activeCard, View.TRANSLATION_X, 0f, -width);
+        ObjectAnimator outX = ObjectAnimator.ofFloat(activeCard, View.TRANSLATION_Y, 0f, -dp(64));
         ObjectAnimator outA = ObjectAnimator.ofFloat(activeCard, View.ALPHA, 1f, 0f);
         ObjectAnimator outSx = ObjectAnimator.ofFloat(activeAlbumImageView, View.SCALE_X,
                 activeAlbumImageView.getScaleX(), CARD_COVER_MIN_SCALE);
         ObjectAnimator outSy = ObjectAnimator.ofFloat(activeAlbumImageView, View.SCALE_Y,
                 activeAlbumImageView.getScaleY(), CARD_COVER_MIN_SCALE);
-        ObjectAnimator inX = ObjectAnimator.ofFloat(stagedCard, View.TRANSLATION_X, width, 0f);
+        ObjectAnimator inX = ObjectAnimator.ofFloat(stagedCard, View.TRANSLATION_Y, dp(64), 0f);
         ObjectAnimator inA = ObjectAnimator.ofFloat(stagedCard, View.ALPHA, 0f, 1f);
         ObjectAnimator inSx = ObjectAnimator.ofFloat(stagedAlbumImageView, View.SCALE_X,
                 CARD_COVER_MIN_SCALE, targetCoverScale);
@@ -856,14 +842,14 @@ public class SidebarView extends LinearLayout {
 
         MusicInfoCard oldCard = activeCard;
         oldCard.setVisibility(INVISIBLE);
-        oldCard.setTranslationX(0f);
+        oldCard.setTranslationY(0f);
         oldCard.setAlpha(0f);
         oldCard.getAlbumImage().setScaleX(1f);
         oldCard.getAlbumImage().setScaleY(1f);
 
         activeCard = stagedCard;
         stagedCard = oldCard;
-        activeCard.setTranslationX(0f);
+        activeCard.setTranslationY(0f);
         activeCard.setAlpha(1f);
         activeCard.setVisibility(VISIBLE);
         displayedDetail = newDetail;
@@ -989,9 +975,7 @@ public class SidebarView extends LinearLayout {
     }
 
     private boolean shouldShowLyrics() {
-        return mode == Mode.PLAYER
-                && clientConfig.getEnableLyricsSidebar()
-                && notAbsoluteMusicLyric();
+        return mode == Mode.PLAYER && notAbsoluteMusicLyric();
     }
 
     private void applyLyricsVisibility(boolean show) {
@@ -1034,12 +1018,12 @@ public class SidebarView extends LinearLayout {
         scrollViewContainer.setLayoutTransition(transition);
 
         int dp24 = dp(24);
-        int dp96 = dp(96);
+        int dp100 = dp(100);
         {
             nextToPlayRow = new LinearLayout(context);
             nextToPlayRow.setOrientation(VERTICAL);
             nextToPlayRow.setVisibility(GONE);
-            nextToPlayRow.setMinimumHeight(dp96);
+            nextToPlayRow.setMinimumHeight(dp100);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params1.setMargins(margin, dp(10), margin, 0);
             scrollViewContainer.addView(nextToPlayRow, params1);
@@ -1085,7 +1069,7 @@ public class SidebarView extends LinearLayout {
         {
             queueRow = new LinearLayout(context);
             queueRow.setOrientation(VERTICAL);
-            queueRow.setMinimumHeight(dp96);
+            queueRow.setMinimumHeight(dp100);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             params1.setMargins(margin, dp(10), margin, 0);
             scrollViewContainer.addView(queueRow, params1);
@@ -1116,7 +1100,7 @@ public class SidebarView extends LinearLayout {
             clientIdlePlaySourceView.setOrientation(VERTICAL);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             int marginOffset = cardPadding + dp(1);
-            params1.setMargins(margin - marginOffset, dp(16), margin - marginOffset, 0);
+            params1.setMargins(margin - marginOffset, 0, margin - marginOffset, 0);
             scrollViewContainer.addView(clientIdlePlaySourceView, params1);
 
             TextView clientIdlePlaySourceViewTitle = new TextView(context);
@@ -1145,7 +1129,7 @@ public class SidebarView extends LinearLayout {
             serverIdlePlaySourceView.setOrientation(VERTICAL);
             LayoutParams params1 = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
             int marginOffset = cardPadding + dp(1);
-            params1.setMargins(margin - marginOffset, dp(16), margin - marginOffset, 0);
+            params1.setMargins(margin - marginOffset, 0, margin - marginOffset, 0);
             serverIdlePlaySourceView.setLayoutParams(params1);
             scrollViewContainer.addView(serverIdlePlaySourceView, params1);
 
@@ -1248,7 +1232,7 @@ public class SidebarView extends LinearLayout {
 
     private void addInternal(IdlePlaySource idlePlaySource, MusicCollection musicCollection,
                              ViewGroup targetView, CardKey key) {
-        MusicCollectionCard child = new MusicCollectionCard(getContext(), musicCollection, idlePlaySource.getPusherInfo(), dp(56));
+        MusicCollectionCard child = new MusicCollectionCard(getContext(), musicCollection, idlePlaySource.getPusherInfo(), dp(58));
         child.setImageCornerRadius(dp(4));
         child.setBackgroundPadding(cardPadding);
         child.setOrientation(HORIZONTAL);

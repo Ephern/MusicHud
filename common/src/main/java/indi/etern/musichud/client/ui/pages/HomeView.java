@@ -210,6 +210,7 @@ public class HomeView extends ViewGroup {
             name = new MarqueeTextView(context);
             name.setTextSize(Theme.TEXT_SIZE_LARGE);
             name.setTextColor(Theme.NORMAL_TEXT_COLOR);
+            name.setTextStyle(TextPaint.BOLD);
             texts.addView(name, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         }
         {
@@ -237,7 +238,7 @@ public class HomeView extends ViewGroup {
         {
             played = new TextView(context);
             played.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            played.setTextColor(Theme.THIRDERY_TEXT_COLOR);
+            played.setTextColor(Theme.TERTIARY_TEXT_COLOR);
             LinearLayout.LayoutParams playedParams =
                     new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             playedParams.setMargins(0, dp(8), 0, 0);
@@ -247,7 +248,7 @@ public class HomeView extends ViewGroup {
         {
             total = new TextView(context);
             total.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            total.setTextColor(Theme.THIRDERY_TEXT_COLOR);
+            total.setTextColor(Theme.TERTIARY_TEXT_COLOR);
             LinearLayout.LayoutParams totalParams =
                     new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             totalParams.setMargins(0, dp(8), 0, 0);
@@ -454,7 +455,7 @@ public class HomeView extends ViewGroup {
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                builder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                builder.setSpan(new ForegroundColorSpan(Theme.TERTIARY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
@@ -485,7 +486,7 @@ public class HomeView extends ViewGroup {
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                builder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                builder.setSpan(new ForegroundColorSpan(Theme.TERTIARY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
