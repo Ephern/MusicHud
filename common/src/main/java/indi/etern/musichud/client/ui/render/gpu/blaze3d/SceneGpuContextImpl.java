@@ -245,7 +245,9 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         samplerScratch.clear();
         for (SceneSamplerBinding binding : draw.samplers()) {
             samplerScratch.put(binding.name(), new SceneNativePassRenderer.BoundTexture(
-                    SceneTextureAdapters.view(binding.texture()), SceneSamplers.linearClampSingleLevel()));
+                    SceneTextureAdapters.view(binding.texture()),
+                    binding.sampling() == SceneSampling.NEAREST
+                            ? SceneSamplers.nearestClamp() : SceneSamplers.linearClampSingleLevel()));
         }
         return samplerScratch;
     }

@@ -327,7 +327,13 @@ public class UrlImageView extends FrameLayout {
      * with downsample up to targetW x targetH
      */
     public void loadUrl(String urlString, int targetW, int targetH) {
-        if (urlString != null && urlString.equals(currentURLString)
+        if (urlString == null || urlString.isBlank()) {
+            urlString = ImageUtils.coverPlaceholder();
+            if (urlString == null) {
+                return;
+            }
+        }
+        if (urlString.equals(currentURLString)
                 && targetW == loadTargetW && targetH == loadTargetH
                 && (hasLoadedImage || loadFuture != null)) {
             // Same URL and size: the row was rebound, the texture is already correct.
