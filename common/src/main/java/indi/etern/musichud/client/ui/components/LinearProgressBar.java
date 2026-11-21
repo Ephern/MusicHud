@@ -31,8 +31,12 @@ public class LinearProgressBar extends ProgressBar {
     }
 
     public void setProgressFraction(float fraction) {
+        setProgressFraction(fraction, false);
+    }
+
+    public void setProgressFraction(float fraction, boolean animate) {
         progress = Math.round(Math.clamp(fraction, 0f, 1f) * MAX);
-        setProgress(progress);
+        setProgress(progress, animate);
     }
 
     @Override

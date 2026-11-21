@@ -82,7 +82,7 @@ public class LoginService implements IClientLoginService {
                 if (loginResult.success()) {
                     ProfileConfigData profileConfigData = ProfileConfigData.getInstance();
                     profileConfigData.setProfile(profile);
-                    profileConfigData.saveToConfig();
+                    profileConfigData.save();
                     MuiModApi.postToUiThread(accountBaseView::refresh);
                 } else {
                     MuiModApi.postToUiThread(() -> {
@@ -216,7 +216,7 @@ public class LoginService implements IClientLoginService {
                                         && clientConfig.getBlackList().stream().noneMatch(i -> Pattern.matches(i, currentServer.ip)))
                                         || (connectServerFilterType == AutoConnectServerFilterType.WHITE_LIST
                                         && clientConfig.getWhiteList().stream().anyMatch(i -> Pattern.matches(i, currentServer.ip)))) {
-                                    IConnectionManager.getInstance().connectToExternalServer();
+                                    IConnectionManager.getInstance().autoConnectToExternalServer();
                                 } else {
                                     IConnectionManager.getInstance().launchIsolated();
                                 }

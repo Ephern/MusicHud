@@ -15,7 +15,6 @@ public class SearchArtistResultView extends FlexWrapLayout {
 
     public SearchArtistResultView(Context context) {
         super(context);
-//        setRowMinWidth(dp(128));
         instance = this;
         refresh();
     }

@@ -46,7 +46,6 @@ public class JsonUtil {
                         return;
                     }
                     Enum<?> enumValue = (Enum<?>) value;
-                    // 如果是 IntegerCodeEnum，输出数字代码
                     if (value instanceof IntegerCodeEnum codeEnum) {
                         out.value(codeEnum.getCode());
                     } else if (value instanceof AliasEnum aliasEnum) {
@@ -64,7 +63,7 @@ public class JsonUtil {
                             return null;
                         case STRING:
                             String input = in.nextString();
-                            // 忽略大小写匹配 name
+                            // Aliases match exactly; enum names match case-insensitively.
                             for (Enum<?> constant : enumConstants) {
                                 if (constant instanceof AliasEnum aliasEnum && aliasEnum.getAlias().equals(input)) {
                                     //noinspection unchecked
@@ -79,7 +78,7 @@ public class JsonUtil {
                             return null;
                         case NUMBER:
                             int code = in.nextInt();
-                            // 优先匹配 IntegerCodeEnum 的 code
+                            // IntegerCodeEnum matches by code; other enums fall back to ordinal.
                             for (Enum<?> constant : enumConstants) {
                                 if (constant instanceof IntegerCodeEnum) {
                                     if (((IntegerCodeEnum) constant).getCode() == code) {

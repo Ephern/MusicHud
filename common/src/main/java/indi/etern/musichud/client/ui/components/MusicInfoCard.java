@@ -46,7 +46,7 @@ public class MusicInfoCard extends ViewGroup {
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static final DateTimeFormatter timeFormatterWithHour = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final DateTimeFormatter timeFormatterWithoutHour = DateTimeFormatter.ofPattern("mm:ss");
-    private static final int COMPACT_COVER_DP = 56;
+    private static final int COMPACT_COVER_DP = 58;
     private static final int COMPACT_GAP_DP = 8;
     private static final int PROGRESS_TOP_GAP_DP = 4;
     private static final int PROGRESS_HEIGHT_DP = 4;
@@ -85,6 +85,7 @@ public class MusicInfoCard extends ViewGroup {
         titleText = new MarqueeTextView(context);
         titleText.setTextSize(Theme.TEXT_SIZE_LARGE);
         titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        titleText.setTextStyle(TextPaint.BOLD);
         titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
         musicInfo.addView(titleText, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
@@ -265,7 +266,7 @@ public class MusicInfoCard extends ViewGroup {
         }
     }
 
-    public void bind(Traceable<MusicDetail> musicDetailTrace, int sideWidth) {
+    public void bind(Traceable<MusicDetail> musicDetailTrace, int imageSize) {
         if (musicDetailTrace == null || musicDetailTrace.value() == null || musicDetailTrace.value().equals(MusicDetail.NONE)) {
             albumImage.loadUrl(ImageUtils.coverPlaceholder());
             titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
@@ -280,7 +281,7 @@ public class MusicInfoCard extends ViewGroup {
             MusicDetail musicDetail = musicDetailTrace.value();
             titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
             Album album = musicDetail.getAlbum();
-            albumImage.loadUrl(album.getPicUrl(), sideWidth, sideWidth);
+            albumImage.loadUrl(album.getPicUrl(), imageSize, imageSize);
             titleText.setText(musicDetail.getName());
             Context context = ModernUI.getInstance();
             SpannableStringBuilder artistsBuilder = new SpannableStringBuilder();
@@ -310,7 +311,7 @@ public class MusicInfoCard extends ViewGroup {
                         }
                     }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 } else {
-                    artistsBuilder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                    artistsBuilder.setSpan(new ForegroundColorSpan(Theme.TERTIARY_TEXT_COLOR),
                             start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
                 }
             }
