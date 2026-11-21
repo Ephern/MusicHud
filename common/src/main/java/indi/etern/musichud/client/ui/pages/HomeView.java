@@ -32,6 +32,7 @@ import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.shadow.BlurShadowDrawable;
 import indi.etern.musichud.client.ui.shadow.BlurShadowSpec;
+import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.connection.ConnectionStateMachine;
@@ -261,7 +262,7 @@ public class HomeView extends ViewGroup {
 
         albumImage = new UrlImageView(context);
         albumImage.setCornerRadius(dp(8));
-        albumImage.loadUrl(MusicHud.ICON_BASE64);
+        albumImage.loadUrl(ImageUtils.coverPlaceholder());
 
         coverContainer = new FrameLayout(context);
         coverContainer.addView(albumImage, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
