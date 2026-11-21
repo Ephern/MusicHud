@@ -10,6 +10,7 @@ import indi.etern.musichud.client.ui.render.gpu.SceneIndexedDraw;
 import indi.etern.musichud.client.ui.render.gpu.SceneMesh;
 import indi.etern.musichud.client.ui.render.gpu.ScenePipelineKey;
 import indi.etern.musichud.client.ui.render.gpu.SceneSamplerBinding;
+import indi.etern.musichud.client.ui.render.gpu.SceneSampling;
 import indi.etern.musichud.client.ui.render.gpu.SceneTextureFormat;
 import indi.etern.musichud.client.ui.render.gpu.SceneUniformBinding;
 import indi.etern.musichud.client.ui.render.interop.SceneInterop;
@@ -21,6 +22,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.opengl.GL11;
+import org.lwjgl.opengl.GL12;
 import org.lwjgl.opengl.GL13;
 import org.lwjgl.opengl.GL20;
 
@@ -175,6 +177,7 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
             int unit = unit(binding.name());
             GlStateManager._activeTexture(GL13.GL_TEXTURE0 + unit);
             GlStateManager._bindTexture(textureId(binding.texture()));
+            applySampling(binding.sampling());
             int location = program.getUniformOrSamplerLocation(binding.name());
             if (location >= 0) GL20.glUniform1i(location, unit);
         }
@@ -185,6 +188,15 @@ public final class LegacySceneGpuContext implements SceneGpuContext {
             }
             RenderStats.addUniformNanos(System.nanoTime() - start);
         }
+    }
+
+    /** The filter is global GL texture state here, so it is restated for every binding. */
+    private static void applySampling(SceneSampling sampling) {
+        int filter = sampling == SceneSampling.NEAREST ? GL11.GL_NEAREST : GL11.GL_LINEAR;
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MIN_FILTER, filter);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_MAG_FILTER, filter);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_S, GL12.GL_CLAMP_TO_EDGE);
+        GlStateManager._texParameter(GL11.GL_TEXTURE_2D, GL11.GL_TEXTURE_WRAP_T, GL12.GL_CLAMP_TO_EDGE);
     }
 
     private void uploadUniform(HudShaderProgram program, String name,

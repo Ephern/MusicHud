@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.hud.renderer;
 
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.platform.Window;
-import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundData;
 import indi.etern.musichud.client.ui.hud.metadata.BackgroundImages;
 import indi.etern.musichud.client.ui.hud.metadata.DynamicStatusUniform;
@@ -15,7 +14,6 @@ import indi.etern.musichud.client.ui.render.SceneStyle;
 import indi.etern.musichud.client.ui.render.gpu.ArtworkDownsampleCache;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuContext;
 import indi.etern.musichud.client.ui.render.gpu.SceneGpuTexture;
-import indi.etern.musichud.client.ui.render.gpu.legacy.GlTextureSampling;
 import indi.etern.musichud.client.ui.render.gpu.legacy.LegacyTextureRefs;
 import indi.etern.musichud.client.ui.render.pipeline.SceneRenderPipelines;
 import indi.etern.musichud.client.ui.render.pipeline.SceneTextureSetup;
@@ -23,7 +21,6 @@ import indi.etern.musichud.client.utils.image.ImageTextureData;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
-import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 public class AlbumImageRenderer implements RenderLayer {
@@ -90,15 +87,8 @@ public class AlbumImageRenderer implements RenderLayer {
             return null;
         }
         float guiScale = guiScale();
-        // A source smaller than its slot is magnified and cannot gain detail: nearest keeps it crisp
-        // instead of smearing the texels, while a larger source is minified and needs linear.
         float targetWidth = hudStyle.getWidth() * guiScale;
         float targetHeight = hudStyle.getHeight() * guiScale;
-        if (pixels.getWidth() <= targetWidth && pixels.getHeight() <= targetHeight) {
-            GlTextureSampling.ensureNearest(texture);
-        } else {
-            GlTextureSampling.ensureLinear(texture);
-        }
         return artworkCache.get(gpu, source, LegacyTextureRefs.of(texture),
                 pixels.getWidth(), pixels.getHeight(), targetWidth, targetHeight);
     }
@@ -119,9 +109,13 @@ public class AlbumImageRenderer implements RenderLayer {
         return getIcon();
     }
 
-    private @NotNull ImageTextureData getIcon() {
+    private @Nullable ImageTextureData getIcon() {
         if (icon == null) {
-            icon = ImageUtils.loadBase64(MusicHud.ICON_BASE64);
+            String placeholder = ImageUtils.coverPlaceholder();
+            if (placeholder == null) {
+                return null;
+            }
+            icon = ImageUtils.loadBase64(placeholder);
         }
         return icon;
     }

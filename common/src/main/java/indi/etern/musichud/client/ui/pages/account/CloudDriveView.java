@@ -430,7 +430,13 @@ public class CloudDriveView extends FrameLayout {
         List<Artist> artists = artistName == null || artistName.isBlank()
                 ? List.of()
                 : List.of(new Artist(-1, artistName, "", 0, 0, "", List.of(), 0));
-        String cover = task.getCoverDataUri() != null ? task.getCoverDataUri() : MusicHud.ICON_BASE64;
+        String cover = task.getCoverDataUri();
+        if (cover == null) {
+            cover = ImageUtils.coverPlaceholder();
+        }
+        if (cover == null) {
+            cover = "";
+        }
         Album album = new Album(0, task.getAlbum() == null ? "" : task.getAlbum(), cover, "", "", 0,
                 new ObservableSequencedSet<>(0), new LinkedHashSet<>(), new LinkedHashSet<>());
         return new CloudTrackInfo(MusicDetail.of(displayId, task.getSong(), task.getDurationMillis(), artists, album), "", 0);

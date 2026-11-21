@@ -5,6 +5,7 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.render.gpu.ScenePipelineKey;
 import indi.etern.musichud.client.ui.render.gpu.SceneSamplerBinding;
+import indi.etern.musichud.client.ui.render.gpu.SceneSampling;
 import indi.etern.musichud.client.ui.render.gpu.SceneUniformBinding;
 import indi.etern.musichud.client.ui.render.pipeline.HudPipelineSpec;
 import indi.etern.musichud.client.ui.render.pipeline.ScenePipeline;
@@ -162,8 +163,14 @@ final class VulkanModScenePipeline implements ScenePipeline {
             if (imageIdx < 0) {
                 throw new IllegalArgumentException("Unsupported sampler: " + binding.name());
             }
-            net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(imageIdx,
-                    texture.getVulkanImage());
+            net.vulkanmod.vulkan.texture.VulkanImage image = texture.getVulkanImage();
+            // VulkanMod keeps the filter on the image's sampler; single level, so maxLod stays 0.
+            long sampler = net.vulkanmod.vulkan.texture.SamplerManager.getSampler(
+                    true, binding.sampling() == SceneSampling.LINEAR, 0);
+            if (image.getSampler() != sampler) {
+                image.setSampler(sampler);
+            }
+            net.vulkanmod.vulkan.texture.VTextureSelector.bindTexture(imageIdx, image);
         }
     }
 

@@ -6,9 +6,8 @@ import com.google.common.cache.Weigher;
 import com.mojang.blaze3d.platform.NativeImage;
 import com.mojang.blaze3d.systems.RenderSystem;
 import icyllis.arc3d.core.ColorSpaces;
-import icyllis.modernui.annotation.NonNull;
-import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.core.Context;
+import icyllis.modernui.core.Core;
 import icyllis.modernui.graphics.Bitmap;
 import icyllis.modernui.graphics.BitmapFactory;
 import icyllis.modernui.graphics.Canvas;
@@ -16,6 +15,7 @@ import icyllis.modernui.graphics.Image;
 import icyllis.modernui.graphics.drawable.Drawable;
 import icyllis.modernui.graphics.drawable.ImageDrawable;
 import icyllis.modernui.graphics.text.FontMetricsInt;
+import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.mc.UIManager;
 import icyllis.modernui.text.TextPaint;
 import icyllis.modernui.text.style.DynamicDrawableSpan;
@@ -23,11 +23,13 @@ import icyllis.modernui.text.style.ImageSpan;
 import indi.etern.musichud.MusicHud;
 import lombok.AccessLevel;
 import lombok.Getter;
+import lombok.NonNull;
 import lombok.SneakyThrows;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -53,6 +55,7 @@ import static indi.etern.musichud.MusicHud.getLogger;
 
 public class ImageUtils {
     private static final Logger LOGGER = getLogger(ImageUtils.class);
+    private static volatile String coverPlaceholder;
 
     private static final int DEFAULT_MAX_CONCURRENT_DOWNLOADS = 40;
     public static final int CANONICAL_MAX = 2048;
@@ -730,6 +733,29 @@ public class ImageUtils {
         }
     }
 
+    /**
+     * Data URI of the bundled large icon, for placeholders drawn at cover size; {@code null} when
+     * the resource is missing.
+     */
+    public static @Nullable String coverPlaceholder() {
+        String cached = coverPlaceholder;
+        if (cached != null) {
+            return cached;
+        }
+        try (InputStream stream = MusicHud.getResourceAsStream("/assets/music_hud/icon.png")) {
+            if (stream == null) {
+                return null;
+            }
+            String uri = "data:image/png;base64,"
+                    + Base64.getEncoder().encodeToString(stream.readAllBytes());
+            coverPlaceholder = uri;
+            return uri;
+        } catch (IOException failure) {
+            LOGGER.debug("While reading the cover placeholder icon", failure);
+            return null;
+        }
+    }
+
     @NotNull
     private static ImageTextureData getImageTextureData(String data, Bitmap source) {
         // Convert off-thread; only the upload needs the render thread.
@@ -800,7 +826,17 @@ public class ImageUtils {
         return cachedIconImageMap.computeIfAbsent(resourceName, (s) -> {
             try (InputStream iconResourceStream = MusicHud.getResourceAsStream(s)) {
                 if (iconResourceStream != null) {
-                    return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                    if (Core.isOnUiThread()) {
+                        return Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream));
+                    } else {
+                        CompletableFuture<Image> future = new CompletableFuture<>();
+                        MuiModApi.postToUiThread(() -> {
+                            try {
+                                future.complete(Image.createTextureFromBitmap(BitmapFactory.decodeStream(iconResourceStream)));
+                            } catch (Exception ignored) {}
+                        });
+                        return future.get();
+                    }
                 } else {
                     return null;
                 }
