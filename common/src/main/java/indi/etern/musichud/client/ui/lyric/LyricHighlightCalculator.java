@@ -7,7 +7,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Renderer-agnostic karaoke sweep shared by the lyric view and the HUD lyric renderer. A word-by-word
+ * Renderer-agnostic karaoke sweep. A word-by-word
  * line is one monotone cubic spline over its phrase starts (PCHIP tangents), which stays monotone on
  * very uneven timings where a natural cubic spline overshoots and pins the sweep. The result is a
  * fractional character offset; pixel mapping stays in each renderer.

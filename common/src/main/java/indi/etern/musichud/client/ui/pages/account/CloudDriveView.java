@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.pages.account;
 
-import icyllis.modernui.R;
 import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
@@ -25,6 +24,7 @@ import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.ToastUtil;
 import indi.etern.musichud.client.ui.components.CloudTrackItem;
+import indi.etern.musichud.client.ui.components.LinearProgressBar;
 import indi.etern.musichud.client.ui.components.RouterContainer;
 import indi.etern.musichud.client.ui.components.Tooltip;
 import indi.etern.musichud.client.ui.components.modals.Modal;
@@ -63,10 +63,9 @@ public class CloudDriveView extends FrameLayout {
     private final Map<Long, CloudTrackInfo> serverTracks = new LinkedHashMap<>();
     private final Set<Long> presentedResolvedIds = new HashSet<>();
     private final Set<Long> scheduledCompletion = new HashSet<>();
-    private final ProgressBar usageBar;
+    private final LinearProgressBar usageBar;
     private final LinearLayout usageInfo;
     private final TextView usageText;
-    private final int usageBarWidth;
     private Set<Long> lastEntryIds = Set.of();
 
     private boolean loading;
@@ -155,7 +154,7 @@ public class CloudDriveView extends FrameLayout {
         topBar.addView(backButton, new LinearLayout.LayoutParams(dp(40), dp(40)));
 
         TextView title = new TextView(context);
-        title.setTextSize(Theme.TEXT_SIZE_LARGER);
+        title.setTextSize(Theme.TEXT_SIZE_LARGE);
         title.setTextColor(Theme.EMPHASIZE_TEXT_COLOR);
         title.setText(I18n.get(MusicHud.MOD_ID + ".button.cloud"));
         LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -208,8 +207,8 @@ public class CloudDriveView extends FrameLayout {
             topBar.addView(usageDivider, dividerParams);
         }
         {
-            usageBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
-            usageBarWidth = dp(160);
+            usageBar = new LinearProgressBar(context, Theme.mediaProgressStyle());
+            int usageBarWidth = dp(160);
             usageBar.setMax(usageBarWidth);
             LinearLayout.LayoutParams usageBarParams = new LinearLayout.LayoutParams(usageBarWidth, WRAP_CONTENT);
             usageBarParams.setMargins(dp(12), 0, dp(8), 0);
@@ -227,7 +226,7 @@ public class CloudDriveView extends FrameLayout {
                 InsetBackgroundFactory.BackdropBlur.UI_LAYER);
         FrameLayout.LayoutParams topBarParams = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
         topBarParams.gravity = Gravity.TOP;
-        topBarParams.setMargins(0, dp(12), 0, 0);
+        topBarParams.setMargins(0, dp(12), 0, dp(12));
         // Added last so its backdrop blur samples the list painted underneath.
         addView(topBar, topBarParams);
 
@@ -263,7 +262,7 @@ public class CloudDriveView extends FrameLayout {
     @Override
     protected void onLayout(boolean changed, int left, int top, int right, int bottom) {
         FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) topBar.getLayoutParams();
-        int inset = lp.topMargin + topBar.getMeasuredHeight();
+        int inset = lp.topMargin + topBar.getMeasuredHeight() + lp.bottomMargin;
         if (scrollView.getPaddingTop() != inset) {
             scrollView.setPadding(0, inset, 0, 0);
         }
@@ -324,7 +323,7 @@ public class CloudDriveView extends FrameLayout {
                     CloudTracksPage page = result.extraData();
                     long usedBytes = page.usedBytes();
                     long maxBytes = page.maxBytes();
-                    usageBar.setProgress((int) (usedBytes * usageBarWidth / maxBytes));
+                    usageBar.setProgressFraction((float) usedBytes / maxBytes);
                     usageText.setText(ByteUnitFormatter.formatSize(usedBytes) + " / " + ByteUnitFormatter.formatSize(maxBytes));
                     usageInfo.setVisibility(VISIBLE);
 

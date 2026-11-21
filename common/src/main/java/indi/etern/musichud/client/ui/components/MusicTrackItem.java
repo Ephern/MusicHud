@@ -2,7 +2,6 @@ package indi.etern.musichud.client.ui.components;
 
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
 import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.SpannableStringBuilder;
@@ -51,7 +50,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class MusicTrackItem extends LinearLayout {
-    public static final int imageSize = 56;
+    public static final int imageSize = 58;
     private static final int COMPACT_MAX_WIDTH_DP = 400;
     /** Wide enough to keep the arrangement stable when the width sits on the threshold. */
     private static final int COMPACT_EXIT_WIDTH_DP = 416;
@@ -72,8 +71,11 @@ public class MusicTrackItem extends LinearLayout {
     private UrlImageView albumImageView;
     private MarqueeTextView musicName;
     private TextView feeLabel;
-    private MarqueeTextView row2;
     private LinearLayout row1;
+    private MarqueeTextView row2;
+    private LinearLayout row3;
+    @Getter
+    private LinearLayout infoRow;
     private TextView durationText;
     @Setter
     @Getter
@@ -88,8 +90,6 @@ public class MusicTrackItem extends LinearLayout {
     private ModifyPlaylistTrackModalButton addToPlaylistButton;
     private ImageButton sourceButton;
     private TextView playRecordTimeText;
-    @Getter
-    private LinearLayout infoRow;
     private boolean compact;
     private InsetBackgroundFactory normalActionButtonBackground;
     private InsetBackgroundFactory compactActionButtonBackground;
@@ -135,10 +135,15 @@ public class MusicTrackItem extends LinearLayout {
         row2.setMovementMethod(LinkMovementMethod.getInstance());
         musicTexts.addView(row2, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
+        row3 = new LinearLayout(context);
+        row3.setOrientation(HORIZONTAL);
+        row3.setGravity(Gravity.CENTER_VERTICAL);
+        musicTexts.addView(row3, new LayoutParams(MATCH_PARENT, dp(22)));
+
         infoRow = new LinearLayout(context);
         infoRow.setOrientation(HORIZONTAL);
         infoRow.setGravity(Gravity.CENTER_VERTICAL);
-        musicTexts.addView(infoRow);
+        row3.addView(infoRow, new ViewGroup.LayoutParams(WRAP_CONTENT, MATCH_PARENT));
 
         durationText = new TextView(context);
         durationText.setTextSize(Theme.TEXT_SIZE_NORMAL);
@@ -158,16 +163,50 @@ public class MusicTrackItem extends LinearLayout {
         params1.setMargins(0, 0, dp(12), 0);
         infoRow.addView(feeLabel, params1);
 
-        float infoAlpha = 0.44f;
+        playRecordTimeText = new TextView(context);
+        playRecordTimeText.setSingleLine(true);
+        playRecordTimeText.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        playRecordTimeText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        playRecordTimeText.setVisibility(GONE);
+        LayoutParams recordTimeParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        infoRow.addView(playRecordTimeText, recordTimeParams);
+
+        row3.addView(new View(context), new LayoutParams(0, MATCH_PARENT, 1));
+
+        buttonsLayout = new LinearLayout(context);
+        buttonsLayout.setOrientation(HORIZONTAL);
+        buttonsLayout.setGravity(Gravity.CENTER_VERTICAL);
+        LayoutParams buttonsLayoutParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0);
+        buttonsLayoutParams.setMargins(0, 0, dp(10), 0);
+        addView(buttonsLayout, buttonsLayoutParams);
+
+        int dp2 = dp(2);
+        normalActionButtonBackground = InsetBackgroundFactory.builder()
+                .inset(dp(ACTION_NORMAL_INSET_DP))
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .cornerRadius(dp(ACTION_NORMAL_CORNER_DP))
+                .build();
+        compactActionButtonBackground = InsetBackgroundFactory.builder()
+                .inset(dp(ACTION_COMPACT_INSET_DP))
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .padding(new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2))
+                .cornerRadius(dp(ACTION_COMPACT_CORNER_DP))
+                .build();
+
+        pusherWidget = new PusherWidget(context);
+        pusherWidget.setPadding(dp2, dp2, dp2, dp2);
+        pusherWidget.setVisibility(GONE);
+        pusherWidget.setFallbackIconSize(dp(ACTION_ICON_DP));
+        buttonsLayout.addView(pusherWidget);
+
         sourceButton = new ImageButton(context);
         sourceButton.setVisibility(View.GONE);
         sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
+        applyActionButtonStyle(sourceButton);
         Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
         if (sourceIcon != null) {
-            ScaledImageDrawable drawable = new ScaledImageDrawable(context.getResources(), sourceIcon, dp(16), dp(16));
-            drawable.setAlpha(infoAlpha);
-            sourceButton.setImageDrawable(new InsetDrawable(
-                    drawable, dp(1)));
+            ScaledImageDrawable drawable = new ScaledImageDrawable(context.getResources(), sourceIcon, dp(14), dp(14));
+            sourceButton.setImageDrawable(drawable);
         }
         sourceButton.setOnClickListener(view -> {
             Object tag = sourceButton.getTag();
@@ -183,50 +222,7 @@ public class MusicTrackItem extends LinearLayout {
                 }
             }
         });
-
-        int dp2 = dp(2);
-        InsetBackgroundFactory.builder()
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .padding(new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2))
-                .cornerRadius(sourceButton.dp(4)).build().applyBackgroundTo(sourceButton);
-        LayoutParams params3 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        params3.setMargins(0, 0, dp(2), 0);
-        infoRow.addView(sourceButton, params3);
-
-        pusherWidget = new PusherWidget(context);
-        pusherWidget.setVisibility(GONE);
-        pusherWidget.setFallbackIconSize(dp(ACTION_ICON_DP));
-        pusherWidget.setFallbackIconAlpha(infoAlpha);
-        LayoutParams params2 = new LayoutParams(dp(16), dp(16));
-        params2.setMargins(0, 0, dp(12), 0);
-        infoRow.addView(pusherWidget, params2);
-
-        playRecordTimeText = new TextView(context);
-        playRecordTimeText.setSingleLine(true);
-        playRecordTimeText.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        playRecordTimeText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
-        playRecordTimeText.setVisibility(GONE);
-        LayoutParams recordTimeParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-        infoRow.addView(playRecordTimeText, recordTimeParams);
-
-        buttonsLayout = new LinearLayout(context);
-        buttonsLayout.setOrientation(HORIZONTAL);
-        buttonsLayout.setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams buttonsLayoutParams = new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0);
-        buttonsLayoutParams.setMargins(0, 0, dp(10), 0);
-        addView(buttonsLayout, buttonsLayoutParams);
-
-        normalActionButtonBackground = InsetBackgroundFactory.builder()
-                .inset(dp(ACTION_NORMAL_INSET_DP))
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .cornerRadius(dp(ACTION_NORMAL_CORNER_DP))
-                .build();
-        compactActionButtonBackground = InsetBackgroundFactory.builder()
-                .inset(dp(ACTION_COMPACT_INSET_DP))
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .cornerRadius(dp(ACTION_COMPACT_CORNER_DP))
-                .padding(new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2))
-                .build();
+        buttonsLayout.addView(sourceButton);
 
         addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
         applyActionButtonStyle(addToPlaylistButton);
@@ -246,14 +242,6 @@ public class MusicTrackItem extends LinearLayout {
         super.onMeasure(widthMeasureSpec, heightMeasureSpec);
     }
 
-    /**
-     * Decided by the measure pass only: layout animations report interpolated sizes, and reacting to
-     * them rearranges the item, which changes its height and restarts the animation. The width keeps
-     * a dead zone so a width on the threshold cannot flip the arrangement back and forth.
-     * <p>
-     * Applying here, before {@code super.onMeasure}, means this very pass already measures the new
-     * arrangement, so it does not depend on a later layout pass (which transitions can suppress).
-     */
     private void updateCompact(int width) {
         if (width <= 0) {
             return;
@@ -273,21 +261,22 @@ public class MusicTrackItem extends LinearLayout {
      * the name so the title row stays one line high.
      */
     private void applyResponsiveLayout() {
-        if (row1 == null || buttonsLayout == null) {
+        if (row3 == null || buttonsLayout == null) {
             return;
         }
-        ViewGroup target = compact ? row1 : this;
+        if (compact) {
+            musicName.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        } else {
+            musicName.setTextSize(Theme.TEXT_SIZE_LARGE);
+        }
+        ViewGroup target = compact ? row3 : this;
         if (buttonsLayout.getParent() != target) {
-            detachActionButtons();
+            if (buttonsLayout.getParent() instanceof ViewGroup parent) {
+                parent.removeView(buttonsLayout);
+            }
             target.addView(buttonsLayout, actionButtonsContainerParams(compact));
         }
         applyActionButtonMetrics();
-    }
-
-    private void detachActionButtons() {
-        if (buttonsLayout.getParent() instanceof ViewGroup parent) {
-            parent.removeView(buttonsLayout);
-        }
     }
 
     private LinearLayout.LayoutParams actionButtonsContainerParams(boolean compactLayout) {
@@ -446,7 +435,7 @@ public class MusicTrackItem extends LinearLayout {
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                metaBuilder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                metaBuilder.setSpan(new ForegroundColorSpan(Theme.TERTIARY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
@@ -476,7 +465,7 @@ public class MusicTrackItem extends LinearLayout {
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                metaBuilder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                metaBuilder.setSpan(new ForegroundColorSpan(Theme.TERTIARY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }

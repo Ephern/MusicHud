@@ -340,7 +340,6 @@ public class UrlImageView extends FrameLayout {
         pendingUrl = urlString;
         hasLoadedImage = false;
 
-        // 如果已经可见,立即加载
         if (isAttachedToWindow && isVisibleInScrollContainer()) {
             checkVisibilityAndLoad();
         }
@@ -520,13 +519,12 @@ public class UrlImageView extends FrameLayout {
         progressRing.setVisibility(GONE);
         errorLayout.setVisibility(GONE);
         setLoading(false);
-        // 清除残留图片, 防止旧图在淡入动画结束后重新可见
+        // Drop leftover bitmaps so a finished fade cannot reveal the previous image again.
         imageView.setImageDrawable(null);
         nextImageView.setImageDrawable(null);
         imageView.setAlpha(0);
         nextImageView.setAlpha(0);
 
-        // 清除延迟加载状态
         currentURLString = null;
         pendingUrl = null;
         hasLoadedImage = false;

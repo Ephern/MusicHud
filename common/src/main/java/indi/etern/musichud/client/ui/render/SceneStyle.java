@@ -1,6 +1,6 @@
 package indi.etern.musichud.client.ui.render;
 
-import indi.etern.musichud.client.ui.layout.LayoutTarget;
+import indi.etern.musichud.client.ui.hud.layout.LayoutTarget;
 import indi.etern.musichud.client.ui.render.pipeline.DirtyMarker;
 import indi.etern.musichud.client.ui.render.pipeline.SceneUniform;
 import indi.etern.musichud.client.ui.render.pipeline.Std140Sizes;

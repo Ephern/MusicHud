@@ -22,6 +22,7 @@ import indi.etern.musichud.client.dto.LyricLine;
 import indi.etern.musichud.client.services.ConnectionManager;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
+import indi.etern.musichud.client.ui.components.volume.VolumeUiController;
 import indi.etern.musichud.client.ui.pages.ConfigView;
 import indi.etern.musichud.client.ui.pages.HomeView;
 import indi.etern.musichud.client.ui.pages.account.AccountBaseView;
@@ -75,10 +76,7 @@ public class MainFragment extends Fragment {
     private LinearLayout contentRow;
     private LinearLayout navigatorWrapper;
     private ValueAnimator navigatorBackgroundAnimator;
-    /**
-     * Mode remembered for non-Home pages; Home always shows the library.
-     */
-    private SidebarView.Mode otherPageMode = SidebarView.Mode.PLAYER;
+    private SidebarView.Mode otherPageMode = SidebarView.Mode.LIBRARY;
 
     private MainFragment() {
     }
@@ -155,13 +153,6 @@ public class MainFragment extends Fragment {
         }
     }
 
-    public static void refreshLyricsSidebarVisibility() {
-        MainFragment target = instance;
-        if (target != null && target.visible && target.sidebar != null) {
-            target.sidebar.updateLyricsVisibility();
-        }
-    }
-
     public static @NonNull MainFragment getInstance() {
         if (instance == null) {
             synchronized (MainFragment.class) {
@@ -171,11 +162,6 @@ public class MainFragment extends Fragment {
             }
         }
         return instance;
-    }
-
-    private static boolean hasMusic() {
-        MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
-        return detail != null && !detail.equals(MusicDetail.NONE);
     }
 
     private void applyMusic(Traceable<MusicDetail> musicDetailTrace, Traceable<MusicDetail> nextToPlayTrace,
@@ -207,7 +193,7 @@ public class MainFragment extends Fragment {
             root.addView(new MinecraftBackgroundView(context),
                     new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
-            var base = new FrameLayout(context);
+            FrameLayout base = new FrameLayout(context);
             int dp12 = base.dp(12);
             base.setLayoutParams(new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
             root.addView(base, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
@@ -215,14 +201,16 @@ public class MainFragment extends Fragment {
             // Everything except the floating control bar keeps its original row arrangement.
             contentRow = new LinearLayout(context);
             contentRow.setOrientation(LinearLayout.HORIZONTAL);
+            // Allow the account shelves to draw into the sidebar padding and outside the router.
+            contentRow.setClipChildren(false);
+            contentRow.setClipToPadding(false);
             base.addView(contentRow, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
             routerContainer = new RouterContainer(context);
+            routerContainer.setClipChildren(false);
             routerContainer.setAnimationStyle(RouterContainer.AnimationStyle.SCALE_FADE_ROOT);
             routerContainer.setAnimationDuration(300);
-            var routerParams = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
-            routerParams.setMargins(routerContainer.dp(32), 0, routerContainer.dp(32), 0);
-            contentRow.addView(routerContainer, routerParams);
+            contentRow.addView(routerContainer, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
 
             sidebar = new SidebarView(context);
             sidebar.setVisibility(View.GONE);
@@ -233,8 +221,6 @@ public class MainFragment extends Fragment {
                 sidebarParams.setMargins(dp12, base.dp(64), 0, dp12);
                 base.addView(sidebar, sidebarParams);
             }
-            otherPageMode = hasMusic() ? SidebarView.Mode.PLAYER : SidebarView.Mode.LIBRARY;
-
             {
                 LinearLayout controlBar = new LinearLayout(context);
                 var params = new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
@@ -369,6 +355,7 @@ public class MainFragment extends Fragment {
                 @Override
                 public void onTransitionStart(@Nullable String fromKey, @NonNull String toKey,
                                               @NonNull RouterContainer.TransitionType type) {
+                    VolumeUiController.getInstance().dismiss();
                     // transitionTargetKey is already set, so isHomePage() resolves the incoming page.
                     updateNavigatorBackground(true);
                     if ("Home".equals(toKey)) {
@@ -417,6 +404,8 @@ public class MainFragment extends Fragment {
             updateSidebarForPage();
             updateNavigatorBackground(false);
 
+            // Added last so the volume flyout draws above every page and the docked sidebar.
+            VolumeUiController.getInstance().attachLayer(base);
             return root;
         } catch (Exception e) {
             visible = false;
@@ -445,6 +434,7 @@ public class MainFragment extends Fragment {
         if (sidebar == null) {
             return;
         }
+        VolumeUiController.getInstance().dismiss();
         if (isHomePage()) {
             setContentLeftPadding(0);
             sidebar.setMode(SidebarView.Mode.LIBRARY);
@@ -466,6 +456,7 @@ public class MainFragment extends Fragment {
         if (sidebar == null) {
             return;
         }
+        VolumeUiController.getInstance().dismiss();
         if (isHomePage()) {
             setContentLeftPadding(0);
             sidebar.setMode(SidebarView.Mode.LIBRARY, true);
@@ -534,6 +525,7 @@ public class MainFragment extends Fragment {
         if (sidebar == null) {
             return;
         }
+        VolumeUiController.getInstance().dismiss();
         if (isHomePage()) {
             // Home never shows the player page, even if the mode switch raced the page transition.
             sidebar.setMode(SidebarView.Mode.LIBRARY, true);
@@ -636,6 +628,7 @@ public class MainFragment extends Fragment {
     public void onDestroyView() {
         super.onDestroyView();
         cancelNavigatorBackgroundAnimator();
+        VolumeUiController.getInstance().detachLayer();
         navigatorWrapper = null;
         sidebar = null;
         contentRow = null;

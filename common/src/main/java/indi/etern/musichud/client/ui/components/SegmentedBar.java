@@ -32,7 +32,7 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 /**
- * Segmented control with a sliding indicator, used by both the top navigation bar and in-page tabs.
+ * Segmented control with a sliding indicator and one selected item.
  * Purely presentational: user clicks are reported to the listener, and programmatic selection never
  * emits an event, so the owner of the content (router or pager) stays the single source of truth.
  */

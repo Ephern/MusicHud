@@ -714,7 +714,7 @@ public class ApiServerEndpointsMeta {
                 Set.of("limit"/*default:30*/,
                         "offset",
                         "type"
-                        /* 1: 单曲, 10: 专辑, 100: 歌手, 1000: 歌单, 1002: 用户, 1004: MV, 1006: 歌词, 1009: 电台, 1014: 视频, 1018:综合, 2000:声音 */),
+                        /* 1: song, 10: album, 100: artist, 1000: playlist, 1002: user, 1004: MV, 1006: lyric, 1009: radio, 1014: video, 1018: comprehensive, 2000: voice */),
                 true,
                 false,
                 false,

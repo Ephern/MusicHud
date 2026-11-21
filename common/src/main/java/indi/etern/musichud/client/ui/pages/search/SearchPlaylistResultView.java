@@ -17,7 +17,7 @@ public class SearchPlaylistResultView extends WaterfallLayout {
     public SearchPlaylistResultView(Context context) {
         super(context);
         instance = this;
-        setRowMinWidth(dp(174));
+        setRowMinWidth(dp(200 + 14));
         refresh();
     }
 
@@ -48,7 +48,7 @@ public class SearchPlaylistResultView extends WaterfallLayout {
     }
 
     private void addItem(Context context, Playlist playlist) {
-        MusicCollectionCard child = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY, dp(160));
+        MusicCollectionCard child = new MusicCollectionCard(context, playlist, PusherInfo.EMPTY, dp(200));
         addView(child);
     }
 }

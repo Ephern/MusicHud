@@ -17,6 +17,7 @@ import icyllis.modernui.view.MotionEvent;
 import icyllis.modernui.view.View;
 import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.LinearLayout;
+import icyllis.modernui.widget.TextView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.MusicDetail;
 import indi.etern.musichud.client.audio.NowPlayingInfo;
@@ -138,6 +139,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     @Getter
     @Setter
     private int subLyricSize = Theme.SUB_LYRIC_SIZE;
+    @Getter
+    @Setter
+    private int plainLyricSize = Theme.TEXT_SIZE_LARGER;
     private View topSpacer;
     private View bottomSpacer;
     @Getter
@@ -188,6 +192,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     private volatile MusicDetail musicDetail;
     // Lyrics collection currently built into the container; only assigned on successful build.
     private Collection<LyricLine> currentLyrics;
+    // Untimed lyrics are rendered as one static TextView instead of per-line rows.
+    @Nullable
+    private TextView plainTextView;
+    private boolean plainTextMode;
     private boolean pendingResyncToCurrent;
     // True while a finger is on the view; programmatic/layout scroll changes must not count as manual.
     private boolean pointerDown;
@@ -336,22 +344,40 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
         currentLyrics = lyrics;
         topSpacer = null;
         bottomSpacer = null;
+        plainTextView = null;
+        plainTextMode = false;
 
         if (lyrics == null) return;
         Context context = getContext();
-        topSpacer = new View(context);
-        container.addView(topSpacer, new LayoutParams(0, 0));
+        if (isStaticLyrics(lyrics)) {
+            plainTextMode = true;
+            if (!hasDisplayableLyrics(lyrics)) {
+                return;
+            }
+            // No update loop runs in this mode, so clear the previous song's scroll residual here.
+            justHighlightedLyricLine = null;
+            container.setTranslationY(0f);
+            TextView textView = new TextView(context);
+            textView.setText(joinStaticLyrics(lyrics));
+            textView.setTextSize(plainLyricSize);
+            textView.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            container.addView(textView, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            plainTextView = textView;
+        } else {
+            topSpacer = new View(context);
+            container.addView(topSpacer, new LayoutParams(0, 0));
 
-        for (LyricLine line : lyrics) {
-            LyricLineView row = new LyricLineView(context, line, mainLyricSize, subLyricSize);
-            container.addView(row);
-            lyricLines.put(line, row);
-            lyricLineViewList.add(row);
-            rows.add(new RowWave(row));
+            for (LyricLine line : lyrics) {
+                LyricLineView row = new LyricLineView(context, line, mainLyricSize, subLyricSize);
+                container.addView(row);
+                lyricLines.put(line, row);
+                lyricLineViewList.add(row);
+                rows.add(new RowWave(row));
+            }
+
+            bottomSpacer = new View(context);
+            container.addView(bottomSpacer, new LayoutParams(MATCH_PARENT, 0));
         }
-
-        bottomSpacer = new View(context);
-        container.addView(bottomSpacer, new LayoutParams(MATCH_PARENT, 0));
 
         post(() -> {
             requestLayout();
@@ -363,6 +389,51 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             }
             post(this::resyncToCurrentLyric);
         });
+    }
+
+    private static boolean isStaticLyrics(Collection<LyricLine> lyrics) {
+        if (lyrics.isEmpty()) {
+            return false;
+        }
+        for (LyricLine line : lyrics) {
+            if (line.getType() == LyricLine.Type.NORMAL || line.getType() == LyricLine.Type.RHYTHM) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Shared emptiness rule for every lyric surface: timed lyrics need more than one normal line,
+     * untimed ones need more than one body line (credits alone are an instrumental track).
+     */
+    public static boolean hasDisplayableLyrics(@Nullable Collection<LyricLine> lyrics) {
+        if (lyrics == null || lyrics.isEmpty()) {
+            return false;
+        }
+        int normalLines = 0;
+        int unsyncedBodyLines = 0;
+        for (LyricLine line : lyrics) {
+            if (line.getType() == LyricLine.Type.NORMAL) {
+                normalLines++;
+            } else if (line.getType() == LyricLine.Type.UNSYNCED && !line.getText().isEmpty()) {
+                unsyncedBodyLines++;
+            }
+        }
+        return normalLines > 1 || (normalLines == 0 && unsyncedBodyLines > 1);
+    }
+
+    private static String joinStaticLyrics(Collection<LyricLine> lyrics) {
+        StringBuilder builder = new StringBuilder();
+        boolean first = true;
+        for (LyricLine line : lyrics) {
+            if (!first) {
+                builder.append('\n');
+            }
+            builder.append(line.getText());
+            first = false;
+        }
+        return builder.toString();
     }
 
     public void clearLyrics() {
@@ -378,20 +449,24 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
             return;
         }
         pendingResyncToCurrent = false;
-        LyricLine current = nowPlayingInfo.getCurrentLyricLine();
-        if (current != null) {
-            LyricLineView target = lyricLines.get(current);
-            if (target != null) {
-                justHighlightedLyricLine = current;
-                jumpToLyric(target);
-                target.emphasize();
-            } else {
+        if (plainTextMode) {
+            jumpToTop();
+        } else {
+            LyricLine current = nowPlayingInfo.getCurrentLyricLine();
+            if (current != null) {
+                LyricLineView target = lyricLines.get(current);
+                if (target != null) {
+                    justHighlightedLyricLine = current;
+                    jumpToLyric(target);
+                    target.emphasize();
+                } else {
+                    jumpToTop();
+                }
+            } else if (!lyricLines.isEmpty()) {
                 jumpToTop();
             }
-        } else if (!lyricLines.isEmpty()) {
-            jumpToTop();
+            startUpdateLoop();
         }
-        startUpdateLoop();
 
         ObjectAnimator alpha = ObjectAnimator.ofFloat(this, View.ALPHA, 0, 1f);
         alpha.setDuration(300);
@@ -579,7 +654,7 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
      * #STAGGER_HEAD_STEP_MILLIS} and tail rows by {@link #STAGGER_TAIL_STEP_MILLIS}, so the timing
      * does not depend on the font size. The wave follows the scroll direction: forward keeps the
      * implicit origin above the highlight, a backward scroll mirrors it below. The offset retarget
-     * shares each row's release instant, exactly like the original implementation.
+     * shares each row's release instant.
      */
     private void calcDelays(int targetIndex, LyricLine highlighted, int targetScrollY) {
         int totalLines = lyricLineViewList.size();
@@ -699,6 +774,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     private void startUpdateLoop() {
+        // Static text has nothing to animate; per-frame work would only invalidate the view.
+        if (plainTextMode) {
+            return;
+        }
         if (!continueUpdate) {
             continueUpdate = true;
             scrollFinished = false;
@@ -1069,6 +1148,10 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
 
     /** 1 = anchor-based fade (auto), 0 = manual-scroll fade. */
     private float fadeAutoWeight() {
+        if (plainTextMode) {
+            // No highlight anchor: keep the same fade bands the user sees while manually scrolling.
+            return 0f;
+        }
         long elapsed = MuiModApi.getElapsedTime();
         if (scrollStatus == ScrollStatus.MANUAL) {
             long sinceStart = elapsed - lastUserStartScrollTime;
@@ -1158,6 +1241,9 @@ public class StaggeredLyricScrollView extends ClampingScrollView {
     }
 
     public void refreshLinesStyle() {
+        if (plainTextView != null) {
+            plainTextView.setTextSize(plainLyricSize);
+        }
         lyricLineViewList.forEach(LyricLineView::refreshSubLyricLine);
         post(() -> recenter(true));
     }

@@ -367,7 +367,8 @@ public class RouterContainer extends FrameLayout {
             throw new IllegalArgumentException("Page not registered: " + key);
         }
 
-        // 去重：已有到同一目标的过渡正在进行/排队时，忽略重复导航，避免打断并造成自过渡闪烁
+        // Ignore a duplicate navigation while the same target is transitioning or already pending,
+        // so the page cannot interrupt itself and flicker.
         if (isTransitioning && (key.equals(transitionTargetKey) || key.equals(pendingNavigationKey))) {
             return;
         }
@@ -553,7 +554,7 @@ public class RouterContainer extends FrameLayout {
             exitSet.addListener(new AnimatorListener() {
                 @Override
                 public void onAnimationEnd(@NonNull Animator animation) {
-                    // SERIAL：钩子须在删除旧视图、添加新视图的前一帧触发（旧页离场结束后）
+                    // SERIAL: fire the hook after the outgoing animation, in the frame before the swap.
                     fireBeforeSwap(fromKey, toKey, type);
                     hideView(finalFromPage);
                     post(() -> runEnter(finalFromPage, toPage, toKey, enterAnims));
@@ -562,7 +563,8 @@ public class RouterContainer extends FrameLayout {
             exitSet.start();
             currentAnimation = exitSet;
         } else {
-            // CROSS：第一帧触发钩子并让旧视图开始淡出，addView 推迟到下一帧
+            // CROSS: fire the hook on the first frame and start the exit fade; addView waits for
+            // the next frame.
             fireBeforeSwap(fromKey, toKey, type);
             if (!exitAnims.isEmpty()) {
                 AnimatorSet exitSet = new AnimatorSet();

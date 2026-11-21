@@ -45,21 +45,18 @@ public class DynamicIntegerOption extends AdaptiveIntegerOption {
         if (slider == null) {
             return;
         }
-        // 保存父容器和位置
+        // The discrete style depends on the step count, so the bar is rebuilt instead of resized.
         ViewGroup parent = (ViewGroup) slider.getParent();
         assert parent != null;
         int index = parent.indexOfChild(slider);
         ViewGroup.LayoutParams params = slider.getLayoutParams();
 
-        // 移除旧滑块
         parent.removeView(slider);
 
-        // 更新范围
         minValue = newMinValue;
         maxValue = newMaxValue;
         stepSize = newStepSize;
 
-        // 创建新滑块
         int newSteps = (newMaxValue - newMinValue) / newStepSize;
         slider = new SeekBar(parent.getContext(), null, null,
                 newSteps <= 10 ? R.style.Widget_Material3_SeekBar_Discrete_Slider
@@ -68,17 +65,14 @@ public class DynamicIntegerOption extends AdaptiveIntegerOption {
         slider.setUserAnimationEnabled(true);
         slider.setMax(newSteps);
 
-        // 设置当前值
         int currentValue = getter.get();
         int clampedValue = MathUtil.clamp(currentValue, newMinValue, newMaxValue);
         int newProgress = (clampedValue - newMinValue) / newStepSize;
         slider.setProgress(newProgress);
         slider.setOnSeekBarChangeListener(this);
 
-        // 重新添加到父容器
         parent.addView(slider, index, params);
 
-        // 更新输入框
         input.setText(Integer.toString(clampedValue));
     }
 

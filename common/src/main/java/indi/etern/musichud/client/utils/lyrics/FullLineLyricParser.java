@@ -19,6 +19,7 @@ import java.util.regex.Pattern;
 public class FullLineLyricParser {
     private static final Pattern mainPattern = Pattern.compile("((?:\\[[0-9:.]+])+)(.*)");
     private static final Pattern timestampPattern = Pattern.compile("\\[([0-9:.]+)]");
+    private static final Pattern lrcTagPattern = Pattern.compile("^\\[[a-zA-Z#]+:.*]$");
     private static final DateTimeFormatter TIME_FORMATTER = new DateTimeFormatterBuilder()
             .appendPattern("HH:mm:ss")
             .appendFraction(java.time.temporal.ChronoField.MILLI_OF_SECOND, 1, 3, true)
@@ -51,6 +52,9 @@ public class FullLineLyricParser {
                 lyricLine.setText(lyricLine.getText() + "\n" + lyricString);
             }
         });
+        if (map.values().stream().noneMatch(line -> line.getType() == LyricLine.Type.NORMAL)) {
+            return buildUnsyncedLines(lyric, musicDetail.getDurationMillis());
+        }
         matchLine(translatedLyric, (metaData) -> {
             Duration startTime = metaData.startTime;
             LyricLine lyricLine = map.get(startTime);
@@ -142,6 +146,77 @@ public class FullLineLyricParser {
             lastLyricLine.setDuration(Duration.ofMillis(musicDetail.getDurationMillis()).minus(lastLyricLine.getStartTime()));
         }
         return lyricLines;
+    }
+
+    static ArrayDeque<LyricLine> buildUnsyncedLines(String lyric, long durationMillis) {
+        Duration duration = Duration.ofMillis(durationMillis);
+        List<LyricLine> lines = new ArrayList<>();
+        boolean lastLineIsMetaData = false;
+        for (String rawLine : lyric.split("\\R")) {
+            String line = collapseSpaces(rawLine);
+            if (line.isEmpty()) {
+                addBlankLine(lines, duration);
+                continue;
+            }
+            if (line.contains("\"tx\"")) {
+                for (MetaInfoLine metaInfoLine : RegexJsonExtractor.extractJsonObjectsSafely(line, MetaInfoLine.class)) {
+                    String text = metaInfoLine.getText();
+                    if (text != null) {
+                        String normalized = collapseSpaces(text);
+                        if (!normalized.isEmpty()) {
+                            lines.add(LyricLine.builder()
+                                    .type(LyricLine.Type.META_DATA)
+                                    .startTime(Duration.ZERO)
+                                    .duration(duration)
+                                    .text(normalized)
+                                    .build());
+                        }
+                    }
+                }
+                lastLineIsMetaData = true;
+                continue;
+            }
+            if (lrcTagPattern.matcher(line).matches()) {
+                continue;
+            }
+            String content = collapseSpaces(timestampPattern.matcher(line).replaceAll(""));
+            if (content.isEmpty()) {
+                continue;
+            }
+            if (lastLineIsMetaData) {
+                addBlankLine(lines, duration);
+                lastLineIsMetaData = false;
+            }
+            lines.add(LyricLine.builder()
+                    .type(LyricLine.Type.UNSYNCED)
+                    .startTime(Duration.ZERO)
+                    .duration(duration)
+                    .text(content)
+                    .build());
+        }
+        while (!lines.isEmpty() && isBlankLine(lines.getLast())) {
+            lines.removeLast();
+        }
+        return new ArrayDeque<>(lines);
+    }
+
+    private static void addBlankLine(List<LyricLine> lines, Duration duration) {
+        if (!lines.isEmpty() && !isBlankLine(lines.getLast())) {
+            lines.add(LyricLine.builder()
+                    .type(LyricLine.Type.UNSYNCED)
+                    .startTime(Duration.ZERO)
+                    .duration(duration)
+                    .text("")
+                    .build());
+        }
+    }
+
+    private static boolean isBlankLine(LyricLine line) {
+        return line.getType() == LyricLine.Type.UNSYNCED && line.getText().isEmpty();
+    }
+
+    private static String collapseSpaces(String value) {
+        return value.replace('\u00A0', ' ').replaceAll("\\s+", " ").strip();
     }
 
     static Duration parseToDuration(String timeString) {

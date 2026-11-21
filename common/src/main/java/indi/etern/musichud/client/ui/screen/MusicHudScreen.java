@@ -127,9 +127,6 @@ public class MusicHudScreen extends Screen implements MuiScreen {
                     new VanillaSceneGraphics(gr),
                     context -> {
                         if (!BACKGROUND_RENDERER.renderFluidBackground(context, backgroundStyle)) {
-                            // Once the fade-in is over, keep the last baked background: a single
-                            // failed frame must not flash black. The published target is read
-                            // without wrapping it, since wrapping requires the UI thread.
                             boolean keepLast = progress >= 1f
                                     && MinecraftBackgroundTexture.published() != null;
                             if (!keepLast) {
@@ -159,9 +156,6 @@ public class MusicHudScreen extends Screen implements MuiScreen {
 
     @Override
     public void render(@NonNull GuiGraphics gr, int mouseX, int mouseY, float deltaTick) {
-        // 1.21.1 never invokes Screen#renderBackground for us here: vanilla only calls it
-        // from screen implementations, and Modern UI (MuiScreen) does not either.
-        // Without this call the fluid background is skipped and hudOccluded never updates.
         renderBackground(gr, mouseX, mouseY, deltaTick);
         mHost.render(gr, mouseX, mouseY, deltaTick);
     }

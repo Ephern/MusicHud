@@ -71,7 +71,9 @@ public class AccountBaseView extends LinearLayout {
             LinearLayout view = new LinearLayout(context);
             view.setOrientation(LinearLayout.VERTICAL);
             view.setGravity(Gravity.CENTER_HORIZONTAL);
-            scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
+            LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params.setMargins(dp(16), 0, dp(16), 0);
+            scrollView.addView(view, params);
 
             if (status == Status.UNAVAILABLE) {
                 view.setGravity(Gravity.CENTER);
@@ -131,7 +133,7 @@ public class AccountBaseView extends LinearLayout {
 
         retryButton = new Button(context);
         retryButton.setText(I18n.get(MusicHud.MOD_ID + ".button.retry"));
-        retryButton.setTextColor(Theme.PRIMARY_COLOR);
+        retryButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
         retryButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         backgroundFactory.applyBackgroundTo(retryButton);
         retryButton.setOnClickListener(v -> {
@@ -145,7 +147,7 @@ public class AccountBaseView extends LinearLayout {
 
         logoutButton = new Button(context);
         logoutButton.setText(I18n.get(MusicHud.MOD_ID + ".button.logout"));
-        logoutButton.setTextColor(Theme.PRIMARY_COLOR);
+        logoutButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
         logoutButton.setTextSize(Theme.TEXT_SIZE_NORMAL);
         backgroundFactory.applyBackgroundTo(logoutButton);
         logoutButton.setOnClickListener(v -> {
