@@ -38,6 +38,10 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
         if (width < 1 || height < 1) {
             return null;
         }
+        // A magnified source cannot gain detail: nearest keeps its texels crisp instead of
+        // smearing them, while a minified source needs linear to avoid aliasing.
+        SceneSampling sampling = sourceWidth <= targetWidth && sourceHeight <= targetHeight
+                ? SceneSampling.NEAREST : SceneSampling.LINEAR;
         if (owner != gpu) {
             releaseAll();
             owner = gpu;
@@ -47,7 +51,8 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
         if (cached != null) {
             return cached;
         }
-        SceneGpuTexture result = downsample(gpu, source, sourceWidth, sourceHeight, width, height);
+        SceneGpuTexture result = downsample(gpu, source, sourceWidth, sourceHeight, width, height,
+                sampling);
         if (result == null) {
             return null;
         }
@@ -58,7 +63,7 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
 
     private @Nullable SceneGpuTexture downsample(SceneGpuContext gpu, SceneTextureRef source,
                                                  int sourceWidth, int sourceHeight,
-                                                 int width, int height) {
+                                                 int width, int height, SceneSampling sampling) {
         SceneTextureRef current = source;
         int currentWidth = sourceWidth;
         int currentHeight = sourceHeight;
@@ -71,7 +76,8 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
                 if (step == null) {
                     return null;
                 }
-                if (!pass(gpu, step, current, currentWidth, currentHeight, nextWidth, nextHeight)) {
+                if (!pass(gpu, step, current, currentWidth, currentHeight, nextWidth, nextHeight,
+                        sampling)) {
                     return null;
                 }
                 current = step;
@@ -80,7 +86,7 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
             }
             SceneGpuTexture result = gpu.createRenderTarget("MusicHud artwork", width, height,
                     SceneTextureFormat.RGBA8);
-            if (!pass(gpu, result, current, currentWidth, currentHeight, width, height)) {
+            if (!pass(gpu, result, current, currentWidth, currentHeight, width, height, sampling)) {
                 gpu.release(result);
                 return null;
             }
@@ -94,13 +100,14 @@ public final class ArtworkDownsampleCache implements AutoCloseable {
 
     @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean pass(SceneGpuContext gpu, SceneGpuTexture target, SceneTextureRef source,
-                                int sourceWidth, int sourceHeight, int width, int height) {
+                                int sourceWidth, int sourceHeight, int width, int height,
+                                SceneSampling sampling) {
         float spanX = Math.max(1f, sourceWidth / (float) width);
         float spanY = Math.max(1f, sourceHeight / (float) height);
         try {
             gpu.draw(new SceneDraw(target,
                     gpu.pipeline(ScenePipelineKey.SCENE_ARTWORK_DOWNSAMPLE, target.actualFormat()),
-                    List.of(new SceneSamplerBinding("Sampler0", source)),
+                    List.of(new SceneSamplerBinding("Sampler0", source, sampling)),
                     List.of(new SceneUniformBinding(DownsampleUniform.UBO_NAME,
                             new DownsampleUniform(1f / sourceWidth, 1f / sourceHeight, spanX, spanY)))));
             return true;

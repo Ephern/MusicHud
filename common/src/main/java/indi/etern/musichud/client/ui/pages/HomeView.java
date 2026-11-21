@@ -412,7 +412,10 @@ public class HomeView extends ViewGroup {
     }
 
     private void bindIdle() {
-        albumImage.loadUrl(MusicHud.ICON_BASE64);
+        String placeholder = ImageUtils.coverPlaceholder();
+        if (placeholder != null) {
+            albumImage.loadUrl(placeholder);
+        }
         updateCoverScale(false);
         name.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         name.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
