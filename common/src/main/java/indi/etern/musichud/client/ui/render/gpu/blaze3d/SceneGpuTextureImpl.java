@@ -42,6 +42,7 @@ public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable
     }
 
     public GpuTexture gpuTexture() {
+        if (closed) throw new IllegalStateException("Scene target is closed");
         return texture;
     }
 
