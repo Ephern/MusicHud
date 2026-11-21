@@ -10,7 +10,7 @@ import org.apache.logging.log4j.Logger;
  */
 public final class ModernUiSupport {
     public static final String DOWNLOAD_URL =
-            "https://modrinth.com/mod/modern-ui";
+            "https://www.curseforge.com/minecraft/mc-mods/modernui-lumen";
     /** Debug switch: forces the "ModernUI missing" path so the fallback UI can be inspected. */
     public static final String FORCE_MISSING_PROPERTY = "music_hud.debug.forceModernUiMissing";
 
