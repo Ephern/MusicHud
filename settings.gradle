@@ -14,7 +14,7 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = 'music_hud'
+rootProject.name = 'music_hud.plugin'
 
 include 'processor'
 include 'core'
