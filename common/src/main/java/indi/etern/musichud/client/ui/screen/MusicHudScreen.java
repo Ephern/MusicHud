@@ -151,7 +151,7 @@ public class MusicHudScreen extends Screen implements MuiScreen {
 
     @Override
     public void extractRenderState(@NonNull GuiGraphicsExtractor gr, int mouseX, int mouseY, float deltaTick) {
-        // Blur sources are committed mid-frame and consumed by UIManagerMixin before this recording.
+        // Blur sources are committed mid-frame, so their results are ready before this recording.
         mHost.render(gr, mouseX, mouseY, deltaTick);
     }
 

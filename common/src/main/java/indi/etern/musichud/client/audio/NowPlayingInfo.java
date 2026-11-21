@@ -9,6 +9,7 @@ import indi.etern.musichud.beans.music.QueueItem;
 import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.dto.LyricLine;
+import indi.etern.musichud.client.ui.components.volume.VolumeUiController;
 import indi.etern.musichud.client.ui.hud.presentation.HudPresenter;
 import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.PlayerInfoUtil;
@@ -16,6 +17,7 @@ import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.lyrics.FullLineLyricParser;
 import indi.etern.musichud.client.utils.lyrics.WordByWordLyricParser;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.utils.TempService;
 import io.github.selemba1000.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -70,8 +72,7 @@ public class NowPlayingInfo {
     @Getter
     private volatile LyricLine currentLyricLine;
     private volatile Thread lyricUpdaterVThread;
-    private Path tempDirectory;
-    private Path albumImagesTempDirectory;
+    private TempService.Session tempSession;
     private Path lastTempFile;
 
     private final Runnable lyricUpdater = () -> {
@@ -80,14 +81,18 @@ public class NowPlayingInfo {
         thread.setName("MHWorker-Lyrics-Updater");
         long generation = lyricUpdaterGeneration.get();
         while (generation == lyricUpdaterGeneration.get()) {
-            if (this.musicStartTime == null) {
+            ArrayDeque<LyricLine> allLines = this.lyricLines;
+            if (this.musicStartTime == null || allLines == null || !hasTimedLyricLines(allLines)) {
                 break;
             }
             ArrayDeque<LyricLine> lyricLines1 = this.atomicLyricLines.get();
             if (lyricLines1 == null || lyricLines1.isEmpty()) break;
             LyricLine line = lyricLines1.peek();
             if (line != null) {
-                if (line.getStartTime() != null) {
+                if (line.getType() == LyricLine.Type.UNSYNCED) {
+                    // Static lyrics have no timeline: keep them out of the highlight/HUD pipeline.
+                    lyricLines1.poll();
+                } else if (line.getStartTime() != null) {
                     if (ZonedDateTime.now().isAfter(this.musicStartTime.plus(getCallTime(line)))) {
                         lyricLines1.poll();
                         currentLyricLine = line;
@@ -139,6 +144,7 @@ public class NowPlayingInfo {
                 clientConfig.setMuted(false);
                 clientConfig.save();
                 MainFragment.refreshCoverScale();
+                VolumeUiController.getInstance().refresh();
             });
             postJmtc(() -> {
                 jmtc.setPlayingState(JMTCPlayingState.PLAYING);
@@ -150,6 +156,7 @@ public class NowPlayingInfo {
                 clientConfig.setMuted(true);
                 clientConfig.save();
                 MainFragment.refreshCoverScale();
+                VolumeUiController.getInstance().refresh();
             });
             postJmtc(() -> {
                 jmtc.setPlayingState(JMTCPlayingState.PAUSED);
@@ -160,6 +167,7 @@ public class NowPlayingInfo {
         jmtcCallbacks.onVolume = (volume) -> {
             clientConfig.forceSetSoundVolume(Math.clamp(volume.intValue() * 100L, 0, 100));
             clientConfig.save();
+            VolumeUiController.getInstance().refresh();
         };
 
         jmtc.setEnabled(true);
@@ -235,18 +243,10 @@ public class NowPlayingInfo {
                 } catch (Exception e) {
                     logger.warn("Failed to delete last JMTC album image", e);
                 }
+                lastTempFile = null;
             }
-            if (tempDirectory == null) {
-                try {
-                    tempDirectory = Files.createTempDirectory("MusicHUD_");
-                    tempDirectory.toFile().deleteOnExit();
-                    albumImagesTempDirectory = tempDirectory.resolve("albums");
-                    Files.createDirectories(albumImagesTempDirectory);
-                } catch (Exception e) {
-                    logger.warn("Failed to create album temp directory", e);
-                }
-            }
-            if (picUrl.startsWith("http")) {
+            Path albumImagesTempDirectory = albumImagesTempDirectory();
+            if (picUrl.startsWith("http") && albumImagesTempDirectory != null) {
                 try {
                     String suffix = "png";
                     String[] splits = picUrl.split("\\.");
@@ -254,11 +254,11 @@ public class NowPlayingInfo {
                         suffix = splits[splits.length - 1];
                     }
                     lastTempFile = Files.createTempFile(albumImagesTempDirectory, "", "." + suffix);
-                    lastTempFile.toFile().deleteOnExit();
+                    URI target = lastTempFile.toUri();
                     artUri = ImageUtils.downloadAsync(picUrl, (url, inputStream) -> {
                         try {
                             Files.copy(inputStream, lastTempFile, StandardCopyOption.REPLACE_EXISTING);
-                            return lastTempFile.toUri();
+                            return target;
                         } catch (IOException e) {
                             throw new RuntimeException(e);
                         }
@@ -268,10 +268,12 @@ public class NowPlayingInfo {
                 }
             } else {
                 try {
+                    if (albumImagesTempDirectory == null) {
+                        throw new IOException("Temporary storage unavailable");
+                    }
                     Path iconPath = albumImagesTempDirectory.resolve("MusicHUD_Icon.png");
                     if (!Files.exists(iconPath)) {
                         Files.createFile(iconPath);
-                        iconPath.toFile().deleteOnExit();
                         try (InputStream iconStream = MusicHud.getResourceAsStream("/assets/music_hud/icon.png")) {
                             if (iconStream != null) {
                                 Files.copy(iconStream, iconPath, StandardCopyOption.REPLACE_EXISTING);
@@ -287,6 +289,21 @@ public class NowPlayingInfo {
                 onReady.accept(artUri);
             }
         });
+    }
+
+    private Path albumImagesTempDirectory() {
+        TempService.Session session = tempSession;
+        if (session == null || session.isClosed()) {
+            session = TempService.shared();
+            tempSession = session;
+        }
+        if (session == null) return null;
+        try {
+            return session.albumDirectory();
+        } catch (Exception e) {
+            logger.warn("Failed to create album temp directory", e);
+            return null;
+        }
     }
 
     private Duration getCallTime(LyricLine line) {
@@ -340,7 +357,7 @@ public class NowPlayingInfo {
         } catch (IllegalStateException ignored) {
         }
         MusicHud.EXECUTOR.submit(() -> {
-            // 补偿音频过渡
+            // Delay the HUD switch so it lands with the audio transition.
             try {
                 Thread.sleep(500);
             } catch (InterruptedException ignored) {
@@ -367,15 +384,25 @@ public class NowPlayingInfo {
 
     public void startAt(ZonedDateTime zonedDateTime) {
         musicStartTime = Objects.requireNonNullElseGet(zonedDateTime, ZonedDateTime::now);
-        if (lyricLines != null && !lyricLines.isEmpty()) {
+        if (lyricLines != null && !lyricLines.isEmpty() && hasTimedLyricLines(lyricLines)) {
             lyricUpdaterGeneration.incrementAndGet();
             Thread old = lyricUpdaterVThread;
             if (old != null) {
                 old.interrupt();
             }
-            // 代际递增后总是新提交一个更新器，旧更新器检测到代际变化自行退出，避免并发消费歌词
+            // Bump the generation, then always submit a fresh updater; the previous one exits on
+            // its own, so lyrics are never consumed concurrently.
             MusicHud.EXECUTOR.execute(lyricUpdater);
         }
+    }
+
+    private static boolean hasTimedLyricLines(Collection<LyricLine> lines) {
+        for (LyricLine line : lines) {
+            if (line.getType() == LyricLine.Type.NORMAL || line.getType() == LyricLine.Type.RHYTHM) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void callLyricsUpdateListeners(LyricLine line) {

@@ -377,9 +377,8 @@ public class MusicPlayerServerService {
     /**
      * Blocks until one of the loading sources completes or the deadline passes.
      * <p>
-     * An interrupt is propagated instead of being swallowed and re-asserted: re-asserting left the
-     * flag set, so the caller looped straight back into the same blocking call and spun on the flag
-     * until the deadline. The pusher validates the request when it handles the exception.
+     * An interrupt is propagated to the caller, which validates the request when it handles the
+     * exception.
      */
     private static void awaitAnyLoading(List<SelectableSource> loadingSources, long waitDeadline)
             throws InterruptedException {
@@ -1007,7 +1006,7 @@ public class MusicPlayerServerService {
     @Setter
     private class CurrentVoteInfo {
         final Set<UUID> votedPlayers = new CopyOnWriteArraySet<>();
-        MusicDetail musicDetail = MusicDetail.NONE;   // 不再为 null
+        MusicDetail musicDetail = MusicDetail.NONE;   // Never null; NONE marks no current track.
         float voteRate;
 
         public synchronized void vote(long id, UUID playerUUID) {

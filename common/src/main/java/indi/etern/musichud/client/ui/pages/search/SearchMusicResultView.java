@@ -34,6 +34,7 @@ public class SearchMusicResultView extends LinearLayout {
         super(context);
         instance = this;
         setOrientation(LinearLayout.VERTICAL);
+        setPadding(dp(64), 0, dp(64), 0);
         refresh();
     }
 

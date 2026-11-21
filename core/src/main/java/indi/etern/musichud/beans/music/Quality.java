@@ -9,10 +9,9 @@ import indi.etern.musichud.utils.IClientDistUtil;
 
 public enum Quality implements AliasEnum {
     /**
-     * 传参 → 文档 / 实际音质：
-     * sky=沉浸环绕声, jymaster=超清母带 Master, dolby=臻音全景声 Audio Vivid,
-     * jyeffect=高清臻音 Spatial Audio, hires=Hi-Res, lossless=无损 SQ,
-     * exhigh=极高 HQ, higher=较高(弃用), standard=标准
+     * NetEase quality code → documented label:
+     * sky=Surround Audio, jymaster=Master, dolby=Audio Vivid, jyeffect=Spatial Audio,
+     * hires=Hi-Res, lossless=SQ, exhigh=HQ, higher=deprecated, standard=Standard
      */
     STANDARD, HIGHER, EX_HIGH, LOSSLESS, HIRES, JY_EFFECT, DOLBY, JY_MASTER, SKY, NONE;
 

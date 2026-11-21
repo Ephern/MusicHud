@@ -56,6 +56,9 @@ public class ConnectionManager implements IConnectionManager {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final long TOGGLE_DEBOUNCE_DELAY_MILLIS = 300;
     private static final Duration CONNECT_TIMEOUT = Duration.ofSeconds(3);
+    private static final int AUTO_CONNECT_MAX_ATTEMPTS = 3;
+    /** The first retry follows a timed-out attempt immediately; later retries wait this long. */
+    private static final long AUTO_CONNECT_RETRY_DELAY_MILLIS = 3000;
     private static volatile ConnectionManager instance;
     private final AtomicInteger toggleVersion = new AtomicInteger(0);
     private final AtomicInteger connectGeneration = new AtomicInteger(0);
@@ -81,31 +84,79 @@ public class ConnectionManager implements IConnectionManager {
 
     @Override
     public synchronized void connectToExternalServer() {
+        startConnectSequence(1);
+    }
+
+    @Override
+    public synchronized void autoConnectToExternalServer() {
+        startConnectSequence(AUTO_CONNECT_MAX_ATTEMPTS);
+    }
+
+    private void startConnectSequence(int maxAttempts) {
         if (clientConfig.getEnable() && ConnectionStateMachine.enterConnecting()) {
             lastMode = LastMode.EXTERNAL;
-            clientNetworkService.sendToServer(new ConnectRequest(Version.current));
-            scheduleConnectTimeoutFallback();
+            sendConnectRequest(1, maxAttempts);
         }
     }
 
-    private void scheduleConnectTimeoutFallback() {
+    /**
+     * Sends one ConnectRequest and arms its timeout. A timeout starts the next attempt
+     * (immediately for the first retry, after a delay for later ones); once the attempts are
+     * spent the client falls back to isolated mode.
+     */
+    private void sendConnectRequest(int attempt, int maxAttempts) {
         int generation = connectGeneration.incrementAndGet();
+        clientNetworkService.sendToServer(new ConnectRequest(Version.current));
         MusicHud.EXECUTOR.execute(() -> {
-            try {
-                Thread.sleep(CONNECT_TIMEOUT.toMillis());
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
+            if (!sleepMillis(CONNECT_TIMEOUT.toMillis())) {
                 return;
             }
             synchronized (ConnectionManager.this) {
-                if (generation == connectGeneration.get()
-                        && ConnectionStateMachine.getState() == ConnectionState.CONNECTING) {
-                    logger.warn("No ConnectResponse within {}, falling back to isolated mode", CONNECT_TIMEOUT);
+                // Superseded by a response, a newer attempt, or a state change.
+                if (generation != connectGeneration.get()
+                        || ConnectionStateMachine.getState() != ConnectionState.CONNECTING) {
+                    return;
+                }
+                if (attempt >= maxAttempts) {
+                    logger.warn("No ConnectResponse within {} in {} attempt(s), falling back to isolated mode",
+                            CONNECT_TIMEOUT, maxAttempts);
                     launchIsolated();
                     ConnectionStateMachine.recordResult(new ConnectAttemptResult(ConnectOutcome.TIMEOUT, null));
+                    return;
                 }
+                int nextAttempt = attempt + 1;
+                long delayMillis = attempt == 1 ? 0 : AUTO_CONNECT_RETRY_DELAY_MILLIS;
+                logger.info("No ConnectResponse within {} (attempt {}/{}), retrying",
+                        CONNECT_TIMEOUT, attempt, maxAttempts);
+                if (delayMillis == 0) {
+                    sendConnectRequest(nextAttempt, maxAttempts);
+                    return;
+                }
+                MusicHud.EXECUTOR.execute(() -> {
+                    // Sleep outside the lock, then re-validate: the sequence may have been
+                    // cancelled meanwhile.
+                    if (!sleepMillis(delayMillis)) {
+                        return;
+                    }
+                    synchronized (ConnectionManager.this) {
+                        if (generation == connectGeneration.get()
+                                && ConnectionStateMachine.getState() == ConnectionState.CONNECTING) {
+                            sendConnectRequest(nextAttempt, maxAttempts);
+                        }
+                    }
+                });
             }
         });
+    }
+
+    private static boolean sleepMillis(long millis) {
+        try {
+            Thread.sleep(millis);
+            return true;
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        }
     }
 
     @Override
@@ -199,6 +250,9 @@ public class ConnectionManager implements IConnectionManager {
         // Invalidate any pending debounced toggle task so it cannot act after the player
         // has left the server/world (e.g. start isolated mode from the main menu).
         toggleVersion.incrementAndGet();
+        // Also cancel the in-flight connect sequence and initial-state requests, otherwise a
+        // pending retry would fall back to isolated mode while no world is loaded.
+        connectGeneration.incrementAndGet();
     }
 
     @Override

@@ -41,7 +41,7 @@ import java.util.Set;
 /**
  * Single-line marquee built from two real text copies: the leading one scrolls out while the
  * trailing one follows after a gap, so the wrap is seamless and every segment keeps its own
- * click and hover behaviour. The text is one {@link TextView} per copy, so spans such as
+ * click and hover behavior. The text is one {@link TextView} per copy, so spans such as
  * {@code ClickableSpan} keep working; they dim while hovered or pressed.
  * <p>
  * Scrolling is an integer {@link #scrollTo(int, int)} on this container (what the framework's hit
@@ -93,9 +93,9 @@ public class MarqueeTextView extends ViewGroup {
     private boolean isolatedPass;
     private boolean isolationFailed;
 
-    /** Natural text width, measured in {@link #onMeasure}. */
+    /** Natural text width. */
     private int contentWidth;
-    /** Distance from one copy's origin to the next, set in {@link #onLayout}. */
+    /** Distance from one copy's origin to the next. */
     private int cycleLength = 1;
     private int lastCycleLength = -1;
     private float offset;
@@ -123,7 +123,7 @@ public class MarqueeTextView extends ViewGroup {
             copy.setSingleLine();
             copy.setHorizontalScrollBarEnabled(false);
             copy.setVerticalScrollBarEnabled(false);
-            // Pressed links dim instead of drawing the selection highlight behind the text.
+            // Pressed links are marked by their dim transition only.
             copy.setHighlightColor(0);
             addView(copy, new LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT));
         }
@@ -172,6 +172,11 @@ public class MarqueeTextView extends ViewGroup {
     public void setTextSize(float size) {
         leading.setTextSize(size);
         trailing.setTextSize(size);
+    }
+
+    public void setTextStyle(@TextPaint.TextStyle int style) {
+        leading.setTextStyle(style);
+        trailing.setTextStyle(style);
     }
 
     public void setGravity(int gravity) {
@@ -500,7 +505,7 @@ public class MarqueeTextView extends ViewGroup {
     }
 
     @Override
-    protected void onWindowVisibilityChanged(int visibility) {
+    protected void onWindowVisibilityChanged(@Visibility int visibility) {
         super.onWindowVisibilityChanged(visibility);
         if (visibility == VISIBLE) {
             updateLoopState();

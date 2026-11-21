@@ -15,6 +15,7 @@ public class RegexJsonExtractor {
         boolean inString = false;
         boolean escaped = false;
 
+        // Braces inside string literals and escapes do not affect nesting.
         for (int i = 0; i < input.length(); i++) {
             char c = input.charAt(i);
 
@@ -27,16 +28,15 @@ public class RegexJsonExtractor {
             } else if (!inString) {
                 if (c == '{') {
                     if (braceCount == 0) {
-                        start = i; // 记录开始位置
+                        start = i;
                     }
                     braceCount++;
                 } else if (c == '}') {
                     braceCount--;
                     if (braceCount == 0 && start != -1) {
-                        // 找到完整的JSON对象
                         String jsonStr = input.substring(start, i + 1);
                         jsonStrings.add(jsonStr);
-                        start = -1; // 重置
+                        start = -1;
                     }
                 }
             }

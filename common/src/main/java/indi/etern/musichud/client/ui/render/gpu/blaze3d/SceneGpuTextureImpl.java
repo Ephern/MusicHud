@@ -40,8 +40,8 @@ public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable
         return view;
     }
 
-    /** Raw game texture, used by the interop backends. */
     public GpuTexture gpuTexture() {
+        if (closed) throw new IllegalStateException("Scene target is closed");
         return texture;
     }
 
@@ -74,7 +74,7 @@ public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable
         return actualFormat;
     }
 
-    /** Approximate VRAM footprint of this target, used by the debug render statistics. */
+    /** Approximate VRAM footprint of this target, in bytes. */
     long byteSize() {
         return (long) width() * height() * (actualFormat == SceneTextureFormat.RGBA16F ? 8L : 4L);
     }

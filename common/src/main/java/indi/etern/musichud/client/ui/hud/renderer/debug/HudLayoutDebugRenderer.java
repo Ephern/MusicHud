@@ -1,8 +1,8 @@
 package indi.etern.musichud.client.ui.hud.renderer.debug;
 
-import indi.etern.musichud.client.ui.hud.layout.HudLayouts;
-import indi.etern.musichud.client.ui.layout.FlexBox;
-import indi.etern.musichud.client.ui.layout.LayoutNode;
+import indi.etern.musichud.client.ui.hud.presentation.HudLayouts;
+import indi.etern.musichud.client.ui.hud.layout.FlexBox;
+import indi.etern.musichud.client.ui.hud.layout.LayoutNode;
 import indi.etern.musichud.client.ui.render.RenderLayer;
 import indi.etern.musichud.client.ui.render.SceneRenderContext;
 import indi.etern.musichud.client.ui.render.SceneStyle;
