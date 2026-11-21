@@ -7,13 +7,17 @@ import java.util.Objects;
 /**
  * Binds a texture to a named sampler slot of a scene pipeline.
  * <p>
- * Filtering and address mode are properties of the bound texture (the render backend applies
- * {@code LINEAR}/{@code CLAMP_TO_EDGE} when the scene target is allocated), so no per-binding
- * sampler state exists in the version-neutral API.
+ * Backends without sampler objects (the texture's filter is global state) apply the mode before
+ * every draw, so a texture sampled by several passes in one frame cannot leak its filter.
  */
-public record SceneSamplerBinding(String name, SceneTextureRef texture) {
+public record SceneSamplerBinding(String name, SceneTextureRef texture, SceneSampling sampling) {
     public SceneSamplerBinding {
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(texture, "texture");
+        Objects.requireNonNull(sampling, "sampling");
+    }
+
+    public SceneSamplerBinding(String name, SceneTextureRef texture) {
+        this(name, texture, SceneSampling.LINEAR);
     }
 }

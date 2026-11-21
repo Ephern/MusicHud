@@ -669,17 +669,17 @@ public class ImageUtils {
     }
 
     /**
-     * Data URI of the bundled large icon, for placeholders drawn at cover size; the 16x16
-     * {@link MusicHud#ICON_BASE64} is unreadable once scaled up.
+     * Data URI of the bundled large icon, for placeholders drawn at cover size; {@code null} when
+     * the resource is missing.
      */
-    public static String coverPlaceholder() {
+    public static @Nullable String coverPlaceholder() {
         String cached = coverPlaceholder;
         if (cached != null) {
             return cached;
         }
         try (InputStream stream = MusicHud.getResourceAsStream("/assets/music_hud/icon.png")) {
             if (stream == null) {
-                return MusicHud.ICON_BASE64;
+                return null;
             }
             String uri = "data:image/png;base64,"
                     + Base64.getEncoder().encodeToString(stream.readAllBytes());
@@ -687,7 +687,7 @@ public class ImageUtils {
             return uri;
         } catch (IOException failure) {
             LOGGER.debug("While reading the cover placeholder icon", failure);
-            return MusicHud.ICON_BASE64;
+            return null;
         }
     }
 
