@@ -101,8 +101,8 @@ public final class SceneCoverWarpProcedural implements AutoCloseable {
         }
         long index = ProceduralWarpCycle.index(time, startTime);
         if (index != cycleIndex) {
-            // Never build the next preset here: fitting it costs a full set of mesh evaluations
-            // (hundreds of microseconds to several milliseconds). It is prefetched one cycle ahead.
+            // Fitting the next preset costs a full set of mesh evaluations, so it is prefetched
+            // one cycle ahead.
             ProceduralWarpTargets.Target next = preparedTarget;
             preparedTarget = null;
             currentTarget = next != null ? next : ProceduralWarpTargets.defaultTarget();

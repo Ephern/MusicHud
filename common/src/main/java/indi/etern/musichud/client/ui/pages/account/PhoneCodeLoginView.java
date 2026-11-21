@@ -76,7 +76,7 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
 
         TextView plus = new TextView(context);
         plus.setTextSize(Theme.TEXT_SIZE_LARGE);
-        plus.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+        plus.setTextColor(Theme.NORMAL_TEXT_COLOR);
         plus.setText("+");
         plus.setTextAlignment(TEXT_ALIGNMENT_CENTER);
         LayoutParams params2 = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
@@ -85,6 +85,8 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
 
         phoneRegionInput = new EditText(context, null, R.attr.editTextStyle);
         phoneRegionInput.setTextAlignment(TEXT_ALIGNMENT_VIEW_START);
+        phoneRegionInput.setTextSize(Theme.TEXT_SIZE_LARGE);
+        phoneRegionInput.setTextColor(Theme.NORMAL_TEXT_COLOR);
         phoneRegionInput.setLayoutParams(new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
         phoneRegionInput.setSingleLine();
         phoneRegionInput.setText("86");
@@ -92,19 +94,13 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
 
         phoneTextInput = new EditText(context, null, R.attr.editTextOutlinedStyle);
         phoneTextInput.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+        phoneTextInput.setTextSize(Theme.TEXT_SIZE_LARGE);
+        phoneTextInput.setTextColor(Theme.NORMAL_TEXT_COLOR);
         phoneTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".field.hint.phone"));
         phoneTextInput.setSingleLine();
         LayoutParams params = new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1);
         params.setMargins(0, 0, 0, dp(2));
         layout1.addView(phoneTextInput, params);
-
-        codeTextInput = new EditText(context, null, R.attr.editTextOutlinedStyle);
-        codeTextInput.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
-        codeTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".field.hint.code"));
-        codeTextInput.setSingleLine();
-        LayoutParams codeP = new LayoutParams(0, WRAP_CONTENT, 1);
-        codeP.setMargins(0, 0, 0, dp(2));
-        layout2.addView(codeTextInput, codeP);
 
         var bf1 = InsetBackgroundFactory.builder()
                 .padding(new InsetBackgroundFactory.Padding(dp(8), dp(8), dp(8), dp(8)))
@@ -114,9 +110,8 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
         sendCodeButton = new Button(context);
         bf1.applyBackgroundTo(sendCodeButton);
         sendCodeButton.setText(I18n.get(MusicHud.MOD_ID + ".button.sendCode"));
-        LayoutParams params3 = new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0);
-        params3.setMargins(dp(8), 0, 0, 0);
-        sendCodeButton.setLayoutParams(params3);
+        sendCodeButton.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        sendCodeButton.setTextSize(Theme.TEXT_SIZE_LARGE);
         sendCodeButton.setOnClickListener((v) -> {
                 int regionCode;
                 try {
@@ -174,7 +169,17 @@ public class PhoneCodeLoginView extends LinearLayout implements ILoginView {
                             }, Duration.ZERO, Duration.ofSeconds(1));
                         });
         });
-        layout2.addView(sendCodeButton);
+        LayoutParams params3 = new LayoutParams(WRAP_CONTENT, MATCH_PARENT, 0);
+        params3.setMargins(dp(8), 0, 0, 0);
+        layout1.addView(sendCodeButton, params3);
+
+        codeTextInput = new EditText(context, null, R.attr.editTextOutlinedStyle);
+        codeTextInput.setTextSize(Theme.TEXT_SIZE_LARGE);
+        codeTextInput.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        codeTextInput.setTextAlignment(TEXT_ALIGNMENT_TEXT_START);
+        codeTextInput.setHint(I18n.get(MusicHud.MOD_ID + ".field.hint.code"));
+        codeTextInput.setSingleLine();
+        layout2.addView(codeTextInput, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
         Button loginButton = new Button(context);
         loginButton.setText(I18n.get(MusicHud.MOD_ID + ".button.login"));

@@ -69,7 +69,8 @@ public class ToggleTrackLikeStateButton extends ToggleIconButton {
         }
         IMusicTrackState.IPlaylistSubState ps = playlistSubState;
         if (ps == null) {
-            // 解绑时重置勾选状态与未决的防抖任务, 避免上一曲目的状态残留
+            // Reset the checked state and the pending debounce so the previous track's state cannot
+            // leak into the next binding.
             setChecked(false);
             toggleVersion.incrementAndGet();
             setEnabled(true);

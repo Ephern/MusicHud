@@ -4,7 +4,7 @@ import com.mojang.blaze3d.platform.Window;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.Theme;
-import indi.etern.musichud.client.ui.hud.layout.HudLayouts;
+import indi.etern.musichud.client.ui.hud.presentation.HudLayouts;
 import indi.etern.musichud.client.ui.hud.metadata.ProgressBarData;
 import indi.etern.musichud.client.ui.hud.metadata.SceneRenderData;
 import indi.etern.musichud.client.ui.hud.presentation.BackgroundState;

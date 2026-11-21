@@ -125,7 +125,7 @@ public class ImageUtils {
         int oldMax = maxConcurrentDownloads;
         maxConcurrentDownloads = maxDownloads;
 
-        // 重新创建 Semaphore
+        // Adjust the shared semaphore in place; in-flight downloads keep their permits.
         int diff = maxDownloads - oldMax;
         if (diff > 0) {
             downloadSemaphore.release(diff);

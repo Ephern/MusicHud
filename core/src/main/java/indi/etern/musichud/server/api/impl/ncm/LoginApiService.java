@@ -429,7 +429,7 @@ public class LoginApiService implements ILoginApiService {
                         )
                 );
             }
-        } else if (loginCookieInfo.type() != LoginType.ANONYMOUS) {
+        } else {
             try {
                 Profile profile = loadUserProfile(player, loginCookieInfo);
                 serverNetworkService.sendToPlayer(player,
@@ -444,9 +444,6 @@ public class LoginApiService implements ILoginApiService {
                 handleLoginExceptions(player, e);
             }
         }
-        // No immediate idle-source snapshot for the same reason as sendSuccessLoginResultTo:
-        // the recipient re-pushes its own sources after the login result and fetches the
-        // other players' view via GetInitialStateRequest.
     }
 
     record ValidationCodeRequest(int ctcode, long phone) {

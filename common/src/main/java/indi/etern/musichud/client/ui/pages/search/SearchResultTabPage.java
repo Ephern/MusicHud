@@ -41,7 +41,6 @@ public class SearchResultTabPage extends FrameLayout {
             pager.setFocusableInTouchMode(true);
             pager.setKeyboardNavigationCluster(true);
 
-            // 添加进入动画
             OneShotPreDrawListener.add(pager, () -> {
                 //noinspection UnstableApiUsage
                 var animator = ObjectAnimator.ofFloat(pager,
@@ -127,7 +126,7 @@ public class SearchResultTabPage extends FrameLayout {
 
         @Override
         public int getCount() {
-            return 4; // 页面数量
+            return 4; // Must match the number of SearchType values.
         }
 
         @NonNull

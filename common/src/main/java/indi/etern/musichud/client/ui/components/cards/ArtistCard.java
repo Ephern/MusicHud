@@ -16,10 +16,11 @@ import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 
+import static icyllis.modernui.view.ViewGroup.LayoutParams.MATCH_PARENT;
 import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 
 public class ArtistCard extends LinearLayout {
-    public static final int imageSize = 100;
+    public static final int imageSize = 140;
     private final InsetBackgroundFactory backgroundFactory = InsetBackgroundFactory.builder()
             .cornerRadius(dp(12))
             .inset(dp(1))
@@ -37,7 +38,7 @@ public class ArtistCard extends LinearLayout {
     private void initView(Context context) {
         setOrientation(VERTICAL);
         setGravity(Gravity.CENTER_VERTICAL);
-        LayoutParams layoutParams = new LayoutParams(dp(120), WRAP_CONTENT);
+        LayoutParams layoutParams = new LayoutParams(dp(imageSize + 20), WRAP_CONTENT);
         setLayoutParams(layoutParams);
 
         albumImage = new UrlImageView(context);
@@ -52,15 +53,16 @@ public class ArtistCard extends LinearLayout {
         artistName = new TextView(context);
         artistName.setSingleLine(false);
         artistName.setMaxLines(4);
-        artistName.setMaxWidth(dp(100));
-        artistName.setTextSize(Theme.TEXT_SIZE_LARGE);
+        artistName.setTextSize(Theme.TEXT_SIZE_NORMAL);
         artistName.setTextColor(Theme.NORMAL_TEXT_COLOR);
         artistName.setTextAlignment(TEXT_ALIGNMENT_CENTER);
-        texts.addView(artistName);
+        LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+        params.setMargins(0, dp(4), 0, 0);
+        texts.addView(artistName, params);
 
         productionsCounts = new TextView(context);
         productionsCounts.setTextSize(Theme.TEXT_SIZE_NORMAL);
-        productionsCounts.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        productionsCounts.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         productionsCounts.setTextAlignment(TEXT_ALIGNMENT_CENTER);
         texts.addView(productionsCounts);
 

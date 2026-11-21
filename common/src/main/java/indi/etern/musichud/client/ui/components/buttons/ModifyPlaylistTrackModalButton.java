@@ -49,10 +49,10 @@ public class ModifyPlaylistTrackModalButton extends ImageButton {
 
     public ModifyPlaylistTrackModalButton(Context context) {
         super(context);
-        setScaleType(ScaleType.CENTER);
+        setScaleType(ScaleType.CENTER_INSIDE);
         normalTooltip = I18n.get(MusicHud.MOD_ID + ".button.modifyMusicTrackPlaylist");
         Tooltip.attach(this, normalTooltip);
-        Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/list_plus.png");
+        Image icon = ImageUtils.getImageFromResource("/assets/music_hud/textures/gui/icons/bookmark.png");
         if (icon != null) {
             var resources = getContext().getResources();
             setImageDrawable(new ScaledImageDrawable(resources, icon, dp(16), dp(16)));

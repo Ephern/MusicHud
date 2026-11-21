@@ -32,6 +32,7 @@ import net.minecraft.client.resources.language.I18n;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 public class IdlePlaySourceWidget extends LinearLayout {
     private final IIdlePlaySourceLayerState layer = MusicService.getInstance().getIdlePlaySourceState().local();
@@ -63,6 +64,15 @@ public class IdlePlaySourceWidget extends LinearLayout {
     };
 
     public IdlePlaySourceWidget(Context context, MusicCollection collection, int buttonSize) {
+        this(context, collection, buttonSize, (view) -> InsetBackgroundFactory.builder()
+                .backgroundColor(Theme.GHOST_BUTTON_STATES)
+                .inset(0)
+                .cornerRadius(view.dp(4))
+                .padding(new InsetBackgroundFactory.Padding(view.dp(2), view.dp(2), view.dp(2), view.dp(2)))
+                .build());
+    }
+
+    public IdlePlaySourceWidget(Context context, MusicCollection collection, int buttonSize, Function<IdlePlaySourceWidget, InsetBackgroundFactory> backgroundFactorySupplier) {
         super(context);
         this.collection = collection;
         this.modeState = layer.collection(collection, PlayMode.RANDOM);
@@ -70,12 +80,7 @@ public class IdlePlaySourceWidget extends LinearLayout {
         setOrientation(HORIZONTAL);
         setGravity(Gravity.CENTER_VERTICAL);
 
-        var backgroundFactory = InsetBackgroundFactory.builder()
-                .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                .inset(0)
-                .cornerRadius(dp(4))
-                .padding(new InsetBackgroundFactory.Padding(dp(2), dp(2), dp(2), dp(2)))
-                .build();
+        InsetBackgroundFactory backgroundFactory = backgroundFactorySupplier.apply(this);
 
         toggleButton = new ToggleIdlePlaySourceButton(context);
         backgroundFactory.applyBackgroundTo(toggleButton);

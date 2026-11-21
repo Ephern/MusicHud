@@ -359,17 +359,14 @@ public class BackgroundRenderer implements RenderLayer, TrackArtworkStore.Holder
     }
 
     /**
-     * The GUI background can be baked into a texture and drawn at the bottom of the ModernUI layer,
-     * which makes it visible to in-layer backdrop blurs. Falls back to the Blaze3D GUI element when
-     * no consumer is attached or the bake fails.
+     * Bakes the GUI background into a texture at the bottom of the ModernUI layer, where in-layer
+     * backdrop blurs can sample it. Returns false when the bake is unavailable or fails.
      */
     private boolean submitOrPublishBackground(SceneRenderContext context, SceneGpuContext gpu,
                                               SceneGpuContext.MainColorSource source, SceneStyle style,
                                               SceneGpuTexture texture, boolean applyColorAdjust,
                                               float blackOverlay, float fluidScale) {
         if (target == BackgroundTarget.GUI) {
-            // The GUI background only exists inside the ModernUI layer; there is no Blaze3D
-            // fallback element anymore.
             return bakeForLayer(gpu, source, style, texture,
                     applyColorAdjust, blackOverlay, fluidScale);
         }
