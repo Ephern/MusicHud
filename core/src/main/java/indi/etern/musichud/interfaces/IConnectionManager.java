@@ -30,7 +30,16 @@ public interface IConnectionManager {
 
     Version getServerVersion();
 
+    /**
+     * Starts a single connect attempt; used for user-initiated connections.
+     */
     void connectToExternalServer();
+
+    /**
+     * Starts a connect sequence that retries the handshake before falling back to isolated mode;
+     * used where the connection is established automatically (auto-connect on join).
+     */
+    void autoConnectToExternalServer();
 
     void launchIsolated();
 

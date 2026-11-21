@@ -11,7 +11,6 @@ import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.textures.GpuTextureView;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.render.RenderStats;
 import indi.etern.musichud.client.ui.render.gpu.*;
@@ -48,9 +47,8 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
     private final boolean rgba16fTargets;
     private final int generation = ++latestGeneration;
     private final Map<PipelineKey, ScenePipeline> pipelines = new HashMap<>();
-    // Uniform storages are ring buffers: a frame's uploads never overwrite the slices the previous
-    // frames' in-flight draws still reference. Rewriting a single buffer per uniform (as before)
-    // relies on driver-side buffer renaming and can stall.
+    // Uniform storages are ring buffers, so in-flight draws never see a slice overwritten by a
+    // later frame.
     private final Map<UniformKey, DynamicUniformStorage<UniformAdapter>> uniformStorages =
             new HashMap<>();
     private final Set<DynamicUniformStorage<UniformAdapter>> writtenStorages =

@@ -150,7 +150,6 @@ public class LyricHighlightTextView extends TextView {
             return;
         }
 
-        // PERFORMING 状态
         Layout layout = getLayout();
         if (layout == null) return;
 
@@ -275,8 +274,8 @@ public class LyricHighlightTextView extends TextView {
     }
 
     /**
-     * Draws only the durable-phrase bloom mask. The base SDR line is intentionally not drawn:
-     * the mask is blurred and composited as a glow, while the visible text stays sharp.
+     * Draws only the durable-phrase bloom mask. The mask is blurred and composited as a glow;
+     * the visible sharp text is drawn by the normal child path.
      */
     public void drawBloomMask(@NonNull Canvas canvas) {
         if (status != HighlightStatus.PERFORMING) {

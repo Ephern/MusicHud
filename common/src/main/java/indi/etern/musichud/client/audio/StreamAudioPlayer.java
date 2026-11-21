@@ -22,7 +22,7 @@ import java.util.function.Consumer;
  * {@code max(outgoing.fadeOut, incoming.fadeIn)}; the incoming task preloads immediately and only
  * starts fading in after the outgoing one has fully faded out.
  */
-public class StreamAudioPlayer {
+public class StreamAudioPlayer {//TODO disk cache due to cdn expired time
     /** Default fade duration for the fade-in node of a task. */
     public static final long DEFAULT_FADE_IN_MS = 1000;
     /** Default fade duration for the fade-out node of a task. */
@@ -39,11 +39,8 @@ public class StreamAudioPlayer {
     private long spectrumToken;
     private boolean spectrumMuted;
     /**
-     * Last spectrum snapshot, published by the audio/mixer thread.
-     * <p>
-     * The player monitor is held for the whole PCM decode/mix of a chunk, which blocked the render
-     * thread (audio-reactive background) for several milliseconds. Readers now take the immutable
-     * snapshot instead of the monitor; a frame of staleness is invisible for audio reactivity.
+     * Last spectrum snapshot, published by the audio/mixer thread so readers never block on the
+     * player monitor, which is held during the whole PCM decode/mix of a chunk.
      */
     private volatile SpectrumSnapshot publishedSpectrum = SpectrumSnapshot.silence(0, 0);
     private PlaybackTask currentTask;
@@ -127,7 +124,7 @@ public class StreamAudioPlayer {
         }
     }
 
-    // audible 的 pending 先淡出自然结束，避免硬取消爆音
+    // An audible pending task fades out instead of being hard-cancelled, which would click.
     private static void retirePending(PlaybackTask pending) {
         if (pending.isAudible()) {
             pending.beginFadeOut(pending.fadeOut().durationMs());

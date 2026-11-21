@@ -58,8 +58,8 @@ public final class TrackArtworkStore {
     }
 
     /**
-     * Closes every retired artwork that nothing references anymore. Render thread, once per frame;
-     * cheaps out immediately while nothing is retiring.
+     * Closes every retired artwork that nothing references. Render thread, once per frame; returns
+     * immediately while nothing is retiring.
      */
     public void sweep() {
         List<TrackArtwork> ready = null;

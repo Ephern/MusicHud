@@ -1,6 +1,5 @@
 package indi.etern.musichud.client.ui.components;
 
-import icyllis.modernui.R;
 import icyllis.modernui.core.Context;
 import icyllis.modernui.graphics.Image;
 import icyllis.modernui.text.SpannableString;
@@ -35,7 +34,7 @@ public class CloudTrackItem extends LinearLayout {
 
     private final MusicTrackItem musicItem;
     private final LinearLayout statusStrip;
-    private final ProgressBar progressBar;
+    private final LinearProgressBar progressBar;
     private final TextView statusText;
     private final ImageButton actionButton;
     private final ImageButton removeButton;
@@ -91,7 +90,7 @@ public class CloudTrackItem extends LinearLayout {
         stripParams.setMargins(dp(16), 0, dp(10), 0);
         musicItem.addView(statusStrip, 2, stripParams);
 
-        progressBar = new ProgressBar(context, null, R.attr.progressBarStyleHorizontal);
+        progressBar = new LinearProgressBar(context, Theme.mediaProgressStyle());
         progressBar.setIndeterminate(false);
         statusStrip.addView(progressBar, new LinearLayout.LayoutParams(0, WRAP_CONTENT, 1));
 
@@ -160,9 +159,7 @@ public class CloudTrackItem extends LinearLayout {
             case COMPLETED -> {
                 musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
-                long total = task == null ? 0 : Math.max(task.getFileSize(), 1);
-                progressBar.setMax((int) Math.min(Integer.MAX_VALUE, total));
-                progressBar.setProgress((int) Math.min(Integer.MAX_VALUE, total), false);
+                progressBar.setProgressFraction(1);
                 progressBar.setIndeterminate(false);
                 statusText.setText(I18n.get(MusicHud.MOD_ID + ".text.cloudUploadDone"));
                 Tooltip.attach(statusText, null);
@@ -174,9 +171,8 @@ public class CloudTrackItem extends LinearLayout {
                 statusStrip.setVisibility(VISIBLE);
                 long total = task == null ? 0 : task.getFileSize();
                 long done = task == null ? 0 : task.getBytesUploaded();
-                int max = Math.clamp(total, 1, Integer.MAX_VALUE);
-                progressBar.setMax(max);
-                progressBar.setProgress((int) Math.min(max, done), true);
+                float progress = (float) done / total;
+                progressBar.setProgressFraction(progress, true);
                 progressBar.setIndeterminate(false);
                 statusText.setText(total > 0 ? (done * 100 / total) + "%" : "");
                 Tooltip.attach(statusText, null);
@@ -187,9 +183,7 @@ public class CloudTrackItem extends LinearLayout {
             case MATCHING -> {
                 musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
-                long total = task == null ? 0 : Math.max(task.getFileSize(), 1);
-                progressBar.setMax((int) Math.min(Integer.MAX_VALUE, total));
-                progressBar.setProgress((int) Math.min(Integer.MAX_VALUE, total), false);
+                progressBar.setProgressFraction(1);
                 progressBar.setIndeterminate(true);
                 String hint = task == null ? "" : task.getErrorMessage();
                 boolean uncertain = hint != null && !hint.isBlank();
@@ -201,8 +195,7 @@ public class CloudTrackItem extends LinearLayout {
             case QUEUED -> {
                 musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
-                progressBar.setMax(1);
-                progressBar.setProgress(0, false);
+                progressBar.setProgressFraction(0);
                 progressBar.setIndeterminate(false);
                 statusText.setText(I18n.get(MusicHud.MOD_ID + ".text.cloudUploadQueued"));
                 Tooltip.attach(statusText, null);
@@ -212,8 +205,7 @@ public class CloudTrackItem extends LinearLayout {
             case FAILED, CANCELLED -> {
                 musicItem.setActionButtonsVisible(false);
                 statusStrip.setVisibility(VISIBLE);
-                progressBar.setMax(1);
-                progressBar.setProgress(0, false);
+                progressBar.setProgressFraction(0);
                 progressBar.setIndeterminate(false);
                 String message = task == null ? "" : task.getErrorMessage();
                 SpannableString spannableString = new SpannableString(

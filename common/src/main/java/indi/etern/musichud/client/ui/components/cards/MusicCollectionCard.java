@@ -55,8 +55,10 @@ public class MusicCollectionCard extends LinearLayout {
     private final int albumSize;
     private final boolean isPrivatePlaylistToUser;
     private final LinearLayout content;
+    private final FlexWrapLayout row1;
+    private final LinearLayout row2;
     @Getter
-    private int imageCornerRadius = dp(8);
+    private int imageCornerRadius = dp(4);
     @Getter
     private int backgroundPadding = dp(6);
     @Getter
@@ -112,11 +114,11 @@ public class MusicCollectionCard extends LinearLayout {
         content.setOrientation(VERTICAL);
         addView(content, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 1f));
         {
-            FlexWrapLayout row1 = new FlexWrapLayout(context);
+            row1 = new FlexWrapLayout(context);
             row1.setLineGravity(Gravity.TOP);
             content.addView(row1, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-            LinearLayout row2 = new LinearLayout(context);
+            row2 = new LinearLayout(context);
             row2.setOrientation(HORIZONTAL);
             row2.setBaselineAligned(false);
             row2.setGravity(Gravity.TOP);
@@ -130,6 +132,7 @@ public class MusicCollectionCard extends LinearLayout {
             if (musicCollection instanceof Playlist playlist) {
                 {
                     musicTrackCountView = new TextView(context);
+                    musicTrackCountView.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                     musicTrackCountView.setTextSize(Theme.TEXT_SIZE_NORMAL);
                     String iconPath = switch (playlist.getSpecialType()) {
                         case LIKE_LIST -> ICON_LIKE_LIST_MUSIC;
@@ -143,6 +146,7 @@ public class MusicCollectionCard extends LinearLayout {
                 }
                 {
                     playedCountView = new TextView(context);
+                    playedCountView.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                     playedCountView.setTextSize(Theme.TEXT_SIZE_NORMAL);
                     playedCountView.setText(buildIconText(CountFormatter.formatCount(playlist.getPlayedCount()), ICON_AUDIO_LINES));
                     texts.addView(playedCountView, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
@@ -150,6 +154,7 @@ public class MusicCollectionCard extends LinearLayout {
             } else if (musicCollection instanceof Album album) {
                 {
                     musicTrackCountView = new TextView(context);
+                    musicTrackCountView.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                     musicTrackCountView.setTextSize(Theme.TEXT_SIZE_NORMAL);
                     musicTrackCountView.setText(buildIconText(String.valueOf(album.getMusicTrackCount()), ICON_DISC_ALBUM));
                     LayoutParams params1 = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0);
@@ -159,6 +164,7 @@ public class MusicCollectionCard extends LinearLayout {
                 String type = album.getType();
                 if (!type.isBlank()) {
                     albumTypeView = new TextView(context);
+                    albumTypeView.setTextColor(Theme.SECONDARY_TEXT_COLOR);
                     albumTypeView.setTextSize(Theme.TEXT_SIZE_NORMAL);
                     albumTypeView.setText(buildIconText(mappedAlbumType(type), ICON_LAYOUT_GRID));
                     texts.addView(albumTypeView, new LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
@@ -202,6 +208,7 @@ public class MusicCollectionCard extends LinearLayout {
             nameView.setTextColor(Theme.NORMAL_TEXT_COLOR);
             nameView.setSingleLine(false);
             nameView.setMaxLines(4);
+            nameView.setMinLines(2);
             isPrivatePlaylistToUser = musicCollection instanceof Playlist playlist && playlist.getPrivacy() == Privacy.PRIVATE
                     && !playlist.getCreator().equals(profileConfigData.getProfile());
             LayoutParams params1 = new LayoutParams(0, WRAP_CONTENT, 1);
@@ -253,7 +260,7 @@ public class MusicCollectionCard extends LinearLayout {
         if (!isPrivatePlaylistToUser) {
             int inset = dp(1);
             InsetBackgroundFactory.builder().inset(inset)
-                    .cornerRadius(imageCornerRadius + backgroundPadding - inset * 2)
+                    .cornerRadius(imageCornerRadius + backgroundPadding - inset)
                     .padding(new InsetBackgroundFactory.Padding(backgroundPadding, backgroundPadding, backgroundPadding, backgroundPadding))
                     .build().applyBackgroundTo(this);
         } else {
@@ -281,6 +288,14 @@ public class MusicCollectionCard extends LinearLayout {
         boolean horizontal = getOrientation() == HORIZONTAL;
         content.setMinimumWidth(horizontal ? 0 : albumSize);
         content.setMinimumHeight(horizontal ? albumSize : dp(54));
+        content.removeAllViews();
+        if (horizontal) {
+            content.addView(row2);
+            content.addView(row1);
+        } else {
+            content.addView(row1);
+            content.addView(row2);
+        }
         setLayoutParams(new LayoutParams(
                 horizontal ? WRAP_CONTENT : albumSize + 2 * (backgroundPadding + dp(1)),
                 WRAP_CONTENT));
@@ -299,7 +314,7 @@ public class MusicCollectionCard extends LinearLayout {
         MusicCollection collection = musicCollection;
         if (collection == null) return;
         if (!(musicCollection instanceof Playlist playlist) || playlist.getSpecialType() != PlaylistSpecialType.USER_SPECIFIC) {
-            imageView.loadUrl(collection.getImageThumbnailUrl(dp(160)));
+            imageView.loadUrl(collection.getImageThumbnailUrl(albumSize));
         }
         if (collection instanceof Playlist playlist) {
             String iconPath = switch (playlist.getSpecialType()) {

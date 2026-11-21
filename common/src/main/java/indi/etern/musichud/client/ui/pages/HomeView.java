@@ -6,10 +6,7 @@ import icyllis.modernui.animation.ObjectAnimator;
 import icyllis.modernui.annotation.NonNull;
 import icyllis.modernui.core.Choreographer;
 import icyllis.modernui.core.Context;
-import icyllis.modernui.graphics.Image;
-import icyllis.modernui.graphics.drawable.InsetDrawable;
 import icyllis.modernui.mc.MuiModApi;
-import icyllis.modernui.text.SpannableString;
 import icyllis.modernui.text.SpannableStringBuilder;
 import icyllis.modernui.text.Spanned;
 import icyllis.modernui.text.TextPaint;
@@ -27,13 +24,8 @@ import indi.etern.musichud.client.audio.NowPlayingInfo;
 import indi.etern.musichud.client.audio.PlaybackTask;
 import indi.etern.musichud.client.audio.StreamAudioPlayer;
 import indi.etern.musichud.client.dto.LyricLine;
-import indi.etern.musichud.client.services.music.MusicService;
 import indi.etern.musichud.client.ui.Theme;
 import indi.etern.musichud.client.ui.components.*;
-import indi.etern.musichud.client.ui.components.buttons.ModifyPlaylistTrackModalButton;
-import indi.etern.musichud.client.ui.components.buttons.ToggleTrackLikeStateButton;
-import indi.etern.musichud.client.ui.components.buttons.VoteSkipButton;
-import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.ui.layouts.FlexWrapLayout;
 import indi.etern.musichud.client.ui.pages.routes.ArtistDetailView;
 import indi.etern.musichud.client.ui.pages.routes.MusicCollectionDetailView;
@@ -41,7 +33,6 @@ import indi.etern.musichud.client.ui.screen.MainFragment;
 import indi.etern.musichud.client.ui.shadow.BlurShadowDrawable;
 import indi.etern.musichud.client.ui.shadow.BlurShadowSpec;
 import indi.etern.musichud.client.utils.image.ImageUtils;
-import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
 import indi.etern.musichud.client.utils.ui.SpringInterpolator;
 import indi.etern.musichud.connection.ConnectionStateMachine;
@@ -68,10 +59,8 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
  * Home page body: the player information column on the left and the large lyric column on the
  * right. {@link #infoColumn} and {@link #staggeredLyricScrollView} are direct children so the
  * layout transition can animate the visible column itself when the lyric column disappears.
- * The play queue and idle sources live in {@link indi.etern.musichud.client.ui.components.SidebarView}.
  */
 public class HomeView extends ViewGroup {
-    private static final String ICON_SOURCE = "/assets/music_hud/textures/gui/icons/square_arrow_out_up_right.png";
     private static final DateTimeFormatter TIME_WITH_HOUR = DateTimeFormatter.ofPattern("HH:mm:ss");
     private static final DateTimeFormatter TIME_WITHOUT_HOUR = DateTimeFormatter.ofPattern("mm:ss");
 
@@ -89,11 +78,8 @@ public class HomeView extends ViewGroup {
     private static final int INFO_COVER_GAP_DP = 28;
     /** Width and height are coupled through the content height; a few passes settle it. */
     private static final int INFO_FIT_PASSES = 4;
-    private static final int BUTTON_SIZE_DP = 36;
-    private static final int ACTION_ICON_DP = 16;
-    private static final int PUSHER_PADDING_DP = 8;
     /** The action row moves onto its own line above this share of the available width. */
-    private static final float BUTTONS_WRAP_RATIO = 0.4f;
+    private static final float BUTTONS_WRAP_RATIO = 0.5f;
     private static final float COVER_MIN_SCALE = 0.8f;
     private static final int COVER_SCALE_DURATION_MS = 350;
     private static final int LAYOUT_TRANSITION_DURATION = 350;
@@ -116,15 +102,10 @@ public class HomeView extends ViewGroup {
     private BlurShadowDrawable coverShadow;
     private MarqueeTextView name;
     private MarqueeTextView artistsAndAlbum;
-    private ImageButton sourceButton;
-    private PusherWidget pusherWidget;
     private LinearProgressBar progressBar;
     private TextView played;
     private TextView total;
-    private LinearLayout buttonsLayout;
-    private ToggleTrackLikeStateButton likeButton;
-    private ModifyPlaylistTrackModalButton addToPlaylistButton;
-    private VoteSkipButton skipCurrentButton;
+    private MediaControlBar mediaControlBar;
 
     private final AtomicInteger progressUpdaterToken = new AtomicInteger();
     private AnimatorSet coverScaleAnimator;
@@ -206,15 +187,10 @@ public class HomeView extends ViewGroup {
         }
         name = null;
         artistsAndAlbum = null;
-        sourceButton = null;
-        pusherWidget = null;
         progressBar = null;
         played = null;
         total = null;
-        buttonsLayout = null;
-        likeButton = null;
-        addToPlaylistButton = null;
-        skipCurrentButton = null;
+        mediaControlBar = null;
         staggeredLyricScrollView = null;
     }
 
@@ -234,6 +210,7 @@ public class HomeView extends ViewGroup {
             name = new MarqueeTextView(context);
             name.setTextSize(Theme.TEXT_SIZE_LARGE);
             name.setTextColor(Theme.NORMAL_TEXT_COLOR);
+            name.setTextStyle(TextPaint.BOLD);
             texts.addView(name, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         }
         {
@@ -244,50 +221,9 @@ public class HomeView extends ViewGroup {
             texts.addView(artistsAndAlbum, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         }
 
-        buttonsLayout = new LinearLayout(context);
-        LayoutTransition layoutTransition = new LayoutTransition();
-        LayoutTransitionReflow.attach(layoutTransition);
-        buttonsLayout.setLayoutTransition(layoutTransition);
-        buttonsLayout.setOrientation(LinearLayout.HORIZONTAL);
-        buttonsLayout.setGravity(Gravity.START);
-        buttonsLayout.setVisibility(GONE);
-        {
-            InsetBackgroundFactory buttonsBackground = InsetBackgroundFactory.builder()
-                    .backgroundColor(Theme.GHOST_BUTTON_STATES)
-                    .cornerRadius(dp(4)).build();
-            int buttonSize = dp(BUTTON_SIZE_DP);
-
-            pusherWidget = new PusherWidget(context);
-            pusherWidget.setVisibility(GONE);
-            buttonsBackground.applyBackgroundTo(pusherWidget);
-            int pusherPadding = dp(PUSHER_PADDING_DP);
-            pusherWidget.setPadding(pusherPadding, pusherPadding, pusherPadding, pusherPadding);
-            buttonsLayout.addView(pusherWidget, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-
-            sourceButton = new ImageButton(context);
-            sourceButton.setVisibility(GONE);
-            sourceButton.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
-            Image sourceIcon = ImageUtils.getImageFromResource(ICON_SOURCE);
-            if (sourceIcon != null) {
-                sourceButton.setImageDrawable(new InsetDrawable(new ScaledImageDrawable(
-                        context.getResources(), sourceIcon, dp(ACTION_ICON_DP), dp(ACTION_ICON_DP)), dp(1)));
-            }
-            sourceButton.setOnClickListener(this::onSourceClick);
-            buttonsBackground.applyBackgroundTo(sourceButton);
-            buttonsLayout.addView(sourceButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-
-            likeButton = new ToggleTrackLikeStateButton(context);
-            buttonsBackground.applyBackgroundTo(likeButton);
-            buttonsLayout.addView(likeButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-            addToPlaylistButton = new ModifyPlaylistTrackModalButton(context);
-            buttonsBackground.applyBackgroundTo(addToPlaylistButton);
-            buttonsLayout.addView(addToPlaylistButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-            skipCurrentButton = new VoteSkipButton(context);
-            buttonsBackground.applyBackgroundTo(skipCurrentButton);
-            buttonsLayout.addView(skipCurrentButton, new LinearLayout.LayoutParams(buttonSize, buttonSize));
-        }
-        row1.addView(buttonsLayout, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
-        row1.setWrapThresholdRatio(buttonsLayout, BUTTONS_WRAP_RATIO);
+        mediaControlBar = new MediaControlBar(context);
+        row1.addView(mediaControlBar, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+        row1.setWrapThresholdRatio(mediaControlBar, BUTTONS_WRAP_RATIO);
 
         progressBar = new LinearProgressBar(context, Theme.mediaProgressStyle());
         progressBar.setProgressFraction(0f);
@@ -302,7 +238,7 @@ public class HomeView extends ViewGroup {
         {
             played = new TextView(context);
             played.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            played.setTextColor(Theme.THIRDERY_TEXT_COLOR);
+            played.setTextColor(Theme.TERTIARY_TEXT_COLOR);
             LinearLayout.LayoutParams playedParams =
                     new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             playedParams.setMargins(0, dp(8), 0, 0);
@@ -312,7 +248,7 @@ public class HomeView extends ViewGroup {
         {
             total = new TextView(context);
             total.setTextSize(Theme.TEXT_SIZE_NORMAL);
-            total.setTextColor(Theme.THIRDERY_TEXT_COLOR);
+            total.setTextColor(Theme.TERTIARY_TEXT_COLOR);
             LinearLayout.LayoutParams totalParams =
                     new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
             totalParams.setMargins(0, dp(8), 0, 0);
@@ -412,27 +348,6 @@ public class HomeView extends ViewGroup {
         }
     }
 
-    private void onSourceClick(View view) {
-        Object tag = sourceButton.getTag();
-        if (!(tag instanceof SourceMeta sourceMeta)) {
-            return;
-        }
-        Class<?> type = sourceMeta.type();
-        if (!MusicCollection.class.isAssignableFrom(type)) {
-            return;
-        }
-        Context context = getContext();
-        //noinspection unchecked
-        MusicService.getInstance()
-                .loadMusicCollectionDetail(sourceMeta.id(), (Class<? extends MusicCollection>) type)
-                .thenAccept(collection -> MuiModApi.postToUiThread(() -> {
-                    RouterContainer router = MainFragment.getInstance().getRouterContainer();
-                    if (router != null) {
-                        router.pushNavigate(new MusicCollectionDetailView(context, collection));
-                    }
-                }));
-    }
-
     public void switchMusic(@Nullable Traceable<MusicDetail> musicDetail, @Nullable Queue<LyricLine> lyricLines) {
         MuiModApi.postToUiThread(() -> {
             bindMusic(musicDetail);
@@ -459,16 +374,7 @@ public class HomeView extends ViewGroup {
     }
 
     private static boolean hasNormalLyrics(@Nullable Collection<LyricLine> lines) {
-        if (lines == null || lines.isEmpty()) {
-            return false;
-        }
-        int normalLines = 0;
-        for (LyricLine line : lines) {
-            if (line.getType() == LyricLine.Type.NORMAL && ++normalLines > 1) {
-                return true;
-            }
-        }
-        return false;
+        return StaggeredLyricScrollView.hasDisplayableLyrics(lines);
     }
 
     private void bindMusic(@Nullable Traceable<MusicDetail> trace) {
@@ -493,26 +399,6 @@ public class HomeView extends ViewGroup {
         name.setText(detail.getName());
         artistsAndAlbum.setText(buildMetaText(detail));
 
-        PusherInfo pusherInfo = detail.getPusherInfo();
-        if (pusherInfo == null || PusherInfo.EMPTY.equals(pusherInfo)) {
-            pusherWidget.clear();
-            pusherWidget.setVisibility(GONE);
-        } else {
-            pusherWidget.bind(pusherInfo);
-            pusherWidget.setVisibility(VISIBLE);
-        }
-
-        SourceMeta source = trace.source();
-        if (source != null) {
-            sourceButton.setTag(source);
-            sourceButton.setVisibility(VISIBLE);
-            Tooltip.attach(sourceButton, buildSourceLabel(source));
-        } else {
-            sourceButton.setTag(null);
-            sourceButton.setVisibility(GONE);
-            Tooltip.attach(sourceButton, null);
-        }
-
         Duration duration = Duration.of(detail.getDurationMillis(), ChronoUnit.MILLIS);
         DateTimeFormatter formatter = formatterFor(duration);
         total.setText(formatter.format(LocalTime.MIDNIGHT.plusSeconds(duration.toSeconds())));
@@ -521,7 +407,7 @@ public class HomeView extends ViewGroup {
         progressBar.setProgressFraction(nowPlayingInfo.getProgressRate());
         applyAudioStatus(StreamAudioPlayer.getInstance().getStatus());
 
-        updateActionButtons(detail);
+        mediaControlBar.bind(trace);
         startProgressUpdater(detail, formatter, duration);
     }
 
@@ -531,19 +417,12 @@ public class HomeView extends ViewGroup {
         name.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         name.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
         artistsAndAlbum.setText("");
-        pusherWidget.clear();
-        pusherWidget.setVisibility(GONE);
-        sourceButton.setTag(null);
-        sourceButton.setVisibility(GONE);
-        Tooltip.attach(sourceButton, null);
+        mediaControlBar.bind(null);
         progressBar.setIndeterminate(false);
         progressBar.setProgressFraction(0f);
         progressBar.setVisibility(GONE);
         played.setText("");
         total.setText("");
-        buttonsLayout.setVisibility(GONE);
-        likeButton.bindMusicList(null);
-        addToPlaylistButton.bindMusicDetail(null);
         progressUpdaterToken.incrementAndGet();
     }
 
@@ -576,7 +455,7 @@ public class HomeView extends ViewGroup {
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                builder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                builder.setSpan(new ForegroundColorSpan(Theme.TERTIARY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
@@ -607,48 +486,11 @@ public class HomeView extends ViewGroup {
                     }
                 }, start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             } else {
-                builder.setSpan(new ForegroundColorSpan(Theme.THIRDERY_TEXT_COLOR),
+                builder.setSpan(new ForegroundColorSpan(Theme.TERTIARY_TEXT_COLOR),
                         start, end, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
             }
         }
         return builder;
-    }
-
-    private static SpannableString buildSourceLabel(SourceMeta source) {
-        SpannableString text = new SpannableString("    " + source.name());
-        String iconPath = Album.class.isAssignableFrom(source.type())
-                ? "/assets/music_hud/textures/gui/icons/disc_album.png"
-                : "/assets/music_hud/textures/gui/icons/list_music.png";
-        Image icon = ImageUtils.getImageFromResource(iconPath);
-        if (icon != null) {
-            text.setSpan(ImageUtils.getIconSpan(icon), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        String playModeIconPath = switch (source.playMode()) {
-            case RANDOM -> "/assets/music_hud/textures/gui/icons/shuffle.png";
-            case SEQUENTIAL -> "/assets/music_hud/textures/gui/icons/repeat.png";
-            case INTELLIGENT -> "/assets/music_hud/textures/gui/icons/heart_pulse.png";
-        };
-        Image modeIcon = ImageUtils.getImageFromResource(playModeIconPath);
-        if (modeIcon != null) {
-            text.setSpan(ImageUtils.getIconSpan(modeIcon), 2, 3, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-        }
-        return text;
-    }
-
-    private void updateActionButtons(@Nullable MusicDetail detail) {
-        if (buttonsLayout == null) {
-            return;
-        }
-        if (detail == null || detail.equals(MusicDetail.NONE)) {
-            buttonsLayout.setVisibility(GONE);
-            likeButton.bindMusicList(null);
-            addToPlaylistButton.bindMusicDetail(null);
-            return;
-        }
-        skipCurrentButton.reset();
-        likeButton.bindMusicList(MusicService.getInstance().getMusicTrackState(detail).currentUsersLikeList());
-        addToPlaylistButton.bindMusicDetail(detail);
-        buttonsLayout.setVisibility(VISIBLE);
     }
 
     private static DateTimeFormatter formatterFor(Duration duration) {

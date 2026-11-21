@@ -20,7 +20,7 @@ public class Theme {
     public static final int EMPHASIZE_TEXT_COLOR = 0xFFFFFFFF;
     public static final int NORMAL_TEXT_COLOR = 0xE0FFFFFF;
     public static final int SECONDARY_TEXT_COLOR = 0x70FFFFFF;
-    public static final int THIRDERY_TEXT_COLOR = 0x40FFFFFF;
+    public static final int TERTIARY_TEXT_COLOR = 0x40FFFFFF;
 
     public static final int ERROR_TEXT_COLOR = 0xFFFF4F4F;
     public static final int WARN_TEXT_COLOR = 0xFFFFB04F;
@@ -76,7 +76,6 @@ public class Theme {
             }
     );
 
-    public static final int TEXT_SIZE_SMALL = 10;
     public static final int TEXT_SIZE_NORMAL = 12;
     public static final int TEXT_SIZE_LARGE = 15;
     public static final int TEXT_SIZE_LARGER = 18;

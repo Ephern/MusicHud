@@ -15,6 +15,7 @@ import icyllis.modernui.view.ViewGroup;
 import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
+import indi.etern.musichud.beans.login.ClientUserDataStore;
 import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.beans.option.ScrobbleOption;
@@ -31,6 +32,7 @@ import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
 import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
+import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.ServerConfig;
 import indi.etern.musichud.server.api.ApiProvider;
 import indi.etern.musichud.server.api.ApiServerManager;
@@ -79,7 +81,7 @@ public class ConfigView extends LinearLayout {
         view.setLayoutTransition(baseTransition);
         scrollView.addView(view, new LayoutParams(MATCH_PARENT, WRAP_CONTENT));
 
-        view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(32)));
+        view.addView(new View(context), new LayoutParams(MATCH_PARENT, dp(20)));
 
         var commonCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.common"));
         new PreferencesFragment.BooleanOption(context,
@@ -95,13 +97,6 @@ public class ConfigView extends LinearLayout {
                         connectionManager.disconnect();
                     }
                 })
-                .create(commonCategory);
-        new PreferencesFragment.BooleanOption(context,
-                I18n.get(MusicHud.MOD_ID + ".config.common.enableLyricsSidebar"),
-                clientConfig::getEnableLyricsSidebar,
-                clientConfig::setEnableLyricsSidebar)
-                .setDefaultValue(clientConfig.getDefaultEnableLyricsSidebar())
-                .setOnChanged(MainFragment::refreshLyricsSidebarVisibility)
                 .create(commonCategory);
         new PreferencesFragment.BooleanOption(context,
                 I18n.get(MusicHud.MOD_ID + ".config.common.showTranslatedCnLyrics"),
@@ -128,15 +123,6 @@ public class ConfigView extends LinearLayout {
                 clientConfig::getMixWithVanillaSoundVolume,
                 clientConfig::setMixWithVanillaSoundVolume)
                 .setDefaultValue(clientConfig.getDefaultMixWithVanillaSoundVolume())
-                .setOnChanged(MainFragment::refreshCoverScale)
-                .create(commonCategory);
-        new AdaptiveIntegerOption(
-                context,
-                I18n.get(MusicHud.MOD_ID + ".config.common.soundVolume"),
-                clientConfig::getSoundVolume,
-                clientConfig::setSoundVolume)
-                .setRange(0, 100)
-                .setDefaultValue(clientConfig.getDefaultSoundVolume())
                 .setOnChanged(MainFragment::refreshCoverScale)
                 .create(commonCategory);
         new AdaptiveIntegerOption(
@@ -241,6 +227,111 @@ public class ConfigView extends LinearLayout {
         });
         commonCategory.addView(openHudConfigButton, new LayoutParams(MATCH_PARENT, dp(40)));
         view.addView(commonCategory);
+
+        var credentialsCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.credentials"));
+        {
+            TextView credentialsPath = new TextView(context);
+            credentialsPath.setTextSize(Theme.TEXT_SIZE_NORMAL);
+            credentialsPath.setTextColor(Theme.SECONDARY_TEXT_COLOR);
+            Runnable refreshCredentialsPath = () -> credentialsPath.setText(
+                    I18n.get(MusicHud.MOD_ID + ".config.credentials.path")
+                            .replace("{path}", ClientUserDataStore.activeDirectory().toString()));
+            refreshCredentialsPath.run();
+
+            final Switch[] toggleSwitch = {null};
+            final boolean[] suppressToggle = {false};
+            final Consumer<Boolean> setToggleSilently = checked -> {
+                Switch switchView = toggleSwitch[0];
+                if (switchView == null) {
+                    return;
+                }
+                suppressToggle[0] = true;
+                try {
+                    switchView.setChecked(checked);
+                } finally {
+                    suppressToggle[0] = false;
+                }
+            };
+
+            var globalCredentialsOption = new PreferencesFragment.BooleanOption(
+                    context,
+                    I18n.get(MusicHud.MOD_ID + ".config.credentials.useGlobal"),
+                    clientConfig::getUseGlobalCredentials,
+                    enabled -> {
+                        if (suppressToggle[0]) {
+                            return;
+                        }
+                        if (enabled) {
+                            if (!ClientUserDataStore.setGlobalStorageEnabled(true, false)) {
+                                setToggleSilently.accept(false);
+                                return;
+                            }
+                            refreshCredentialsPath.run();
+                            if (ConnectionStateMachine.getState()
+                                    == ConnectionStateMachine.ConnectionState.CONNECTED) {
+                                IClientLoginService.getInstance().loginToServer();
+                            }
+                        } else if (!ClientUserDataStore.globalCredentialsExist()) {
+                            if (ClientUserDataStore.setGlobalStorageEnabled(false, false)) {
+                                refreshCredentialsPath.run();
+                            } else {
+                                setToggleSilently.accept(true);
+                            }
+                        } else {
+                            showClearGlobalCredentialsModal(context,
+                                    () -> {
+                                        if (ClientUserDataStore.setGlobalStorageEnabled(false, true)) {
+                                            refreshCredentialsPath.run();
+                                        } else {
+                                            setToggleSilently.accept(true);
+                                        }
+                                    },
+                                    () -> {
+                                        if (ClientUserDataStore.setGlobalStorageEnabled(false, false)) {
+                                            refreshCredentialsPath.run();
+                                        } else {
+                                            setToggleSilently.accept(true);
+                                        }
+                                    },
+                                    () -> setToggleSilently.accept(true));
+                        }
+                    });
+            globalCredentialsOption.setDefaultValue(clientConfig.getDefaultUseGlobalCredentials());
+            LinearLayout toggleRow = globalCredentialsOption.create(credentialsCategory);
+            toggleSwitch[0] = toggleRow.findViewById(R.id.button1);
+
+            LinearLayout credentialsInfoRow = new LinearLayout(context);
+            credentialsInfoRow.setOrientation(LinearLayout.HORIZONTAL);
+            credentialsInfoRow.setGravity(Gravity.LEFT);
+            credentialsInfoRow.setVerticalGravity(Gravity.CENTER);
+            credentialsInfoRow.setMinimumHeight(dp(40));
+            LayoutParams params = new LayoutParams(MATCH_PARENT, WRAP_CONTENT);
+            params.setMargins(dp(6), 0, dp(6), 0);
+            credentialsCategory.addView(credentialsInfoRow, params);
+
+            Button openCredentialsDirButton = new Button(context);
+            openCredentialsDirButton.setText(I18n.get(MusicHud.MOD_ID + ".button.openCredentialsDir"));
+            openCredentialsDirButton.setTextColor(Theme.PRIMARY_COLOR);
+            openCredentialsDirButton.setTextSize(14);
+            InsetBackgroundFactory credentialsDirBackground = InsetBackgroundFactory.builder()
+                    .inset(0).cornerRadius(dp(4))
+                    .padding(new InsetBackgroundFactory.Padding(dp(8), dp(4), dp(8), dp(4))).build();
+            credentialsDirBackground.applyBackgroundTo(openCredentialsDirButton);
+            openCredentialsDirButton.setOnClickListener(v -> {
+                Path dir = ClientUserDataStore.activeDirectory();
+                try {
+                    Files.createDirectories(dir);
+                } catch (IOException ignored) {
+                }
+                Util.getPlatform().openFile(dir.toFile());
+            });
+
+            credentialsInfoRow.addView(credentialsPath, new LayoutParams(MATCH_PARENT, WRAP_CONTENT, 1));
+            LayoutParams openButtonParams = new LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            openButtonParams.setMargins(dp(8), 0, 0, 0);
+            credentialsInfoRow.addView(openCredentialsDirButton, openButtonParams);
+        }
+        view.addView(credentialsCategory);
 
         var multiplayerCategory = createPanelCategory(view, I18n.get(MusicHud.MOD_ID + ".config.category.externalServer"));
         new PreferencesFragment.BooleanOption(
@@ -658,6 +749,48 @@ public class ConfigView extends LinearLayout {
         PanelStyle.applyDynamically(category, category.dp(12), null,
                 InsetBackgroundFactory.BackdropBlur.NONE);
         return category;
+    }
+
+    private static void showClearGlobalCredentialsModal(Context context, Runnable onDelete, Runnable onKeep, Runnable onCancel) {
+        TextView title = new TextView(context);
+        title.setTextSize(Theme.TEXT_SIZE_LARGER);
+        title.setText(I18n.get(MusicHud.MOD_ID + ".modal.clearGlobalCredentials.title"));
+
+        LinearLayout content = new LinearLayout(context);
+        content.setOrientation(LinearLayout.VERTICAL);
+        TextView message = new TextView(context);
+        message.setTextSize(Theme.TEXT_SIZE_NORMAL);
+        message.setTextColor(Theme.NORMAL_TEXT_COLOR);
+        message.setText(I18n.get(MusicHud.MOD_ID + ".modal.clearGlobalCredentials.warning")
+                .replace("{path}", ClientUserDataStore.globalPath().toAbsolutePath().toString()));
+        content.addView(message);
+
+        final boolean[] decided = {false};
+        Modal modal = new Modal(context, title, content,
+                new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearGlobalCredentials.button1"),
+                        (button, m) -> {
+                            decided[0] = true;
+                            onDelete.run();
+                            m.dismiss();
+                        }),
+                new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearGlobalCredentials.button2"),
+                        (button, m) -> {
+                            decided[0] = true;
+                            onKeep.run();
+                            m.dismiss();
+                        }),
+                new Modal.ActionButton(I18n.get(MusicHud.MOD_ID + ".modal.clearGlobalCredentials.button3"),
+                        (button, m) -> {
+                            decided[0] = true;
+                            onCancel.run();
+                            m.dismiss();
+                        }));
+        modal.setOnDismissListener(() -> {
+            if (!decided[0]) {
+                onCancel.run();
+            }
+        });
+        modal.show();
     }
 
     private void refreshPanelStyles() {
