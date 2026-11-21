@@ -13,7 +13,6 @@ import java.util.OptionalInt;
 public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable {
     private final SceneTextureFormat format;
     private final SceneTextureFormat actualFormat;
-    private final int glTextureId;
     private final GpuTexture texture;
     private final GpuTextureView view;
     private boolean closed;
@@ -32,7 +31,6 @@ public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable
         }
         this.format = format;
         this.actualFormat = allocated.actualFormat();
-        this.glTextureId = allocated.glTextureId();
         this.texture = allocated.texture();
         this.view = allocated.view();
     }
@@ -42,8 +40,7 @@ public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable
         return view;
     }
 
-    GpuTexture texture() {
-        if (closed) throw new IllegalStateException("Scene target is closed");
+    public GpuTexture gpuTexture() {
         return texture;
     }
 
@@ -74,11 +71,6 @@ public final class SceneGpuTextureImpl implements SceneGpuTexture, AutoCloseable
     @Override
     public SceneTextureFormat actualFormat() {
         return actualFormat;
-    }
-
-    /** Native OpenGL texture name, only meaningful for the GL interop backend. */
-    public int glTextureId() {
-        return glTextureId;
     }
 
     /** Approximate VRAM footprint of this target, in bytes. */
