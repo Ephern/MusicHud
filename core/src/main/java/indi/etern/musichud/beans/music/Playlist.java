@@ -48,7 +48,7 @@ public class Playlist implements MusicCollection {
     @Getter
     long playedCount;
     String coverImgId_str = "";
-    String coverImgUrl = MusicHud.ICON_BASE64;
+    String coverImgUrl = "";
     PlaylistSpecialType specialType;
     Profile creator = Profile.ANONYMOUS;
     Privacy privacy = Privacy.PUBLIC;
@@ -202,7 +202,7 @@ public class Playlist implements MusicCollection {
             playlist.id = id;
             playlist.name = "Private Playlist";
             playlist.coverImgId = -1;
-            playlist.coverImgUrl = MusicHud.ICON_BASE64;
+            playlist.coverImgUrl = "";
             playlist.specialType = PlaylistSpecialType.NORMAL;
             playlist.playedCount = -1;
             playlist.musicTrackCount = -1;
