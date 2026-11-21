@@ -7,6 +7,9 @@ import com.mojang.blaze3d.shaders.ShaderType;
 import com.mojang.blaze3d.shaders.UniformType;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.textures.AddressMode;
+import com.mojang.blaze3d.textures.FilterMode;
+import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import indi.etern.musichud.MusicHud;
@@ -244,9 +247,17 @@ public final class SceneGpuContextImpl implements SceneGpuContext {
         // context only ever draws on the render thread.
         samplerScratch.clear();
         for (SceneSamplerBinding binding : draw.samplers()) {
+            sample(binding.sampling(), SceneTextureAdapters.texture(binding.texture()));
             samplerScratch.put(binding.name(), SceneTextureAdapters.view(binding.texture()));
         }
         return samplerScratch;
+    }
+
+    /** This version has no sampler objects, so the filter is texture state and must be set per draw. */
+    private static void sample(SceneSampling sampling, GpuTexture texture) {
+        texture.setTextureFilter(sampling == SceneSampling.NEAREST
+                ? FilterMode.NEAREST : FilterMode.LINEAR, false);
+        texture.setAddressMode(AddressMode.CLAMP_TO_EDGE);
     }
 
     private Map<String, GpuBufferSlice> uniforms(SceneDraw draw) {

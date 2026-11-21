@@ -49,7 +49,6 @@ import static icyllis.modernui.view.ViewGroup.LayoutParams.WRAP_CONTENT;
 public class MainFragment extends Fragment {
     private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final ConnectionManager connectionManager = ConnectionManager.getInstance();
-    private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static final String PAGE_HOME = "Home";
     private static final String ICON_LIBRARY = "/assets/music_hud/textures/gui/icons/square_library.png";
     private static final String ICON_TURNTABLE = "/assets/music_hud/textures/gui/icons/turntable.png";
@@ -206,15 +205,21 @@ public class MainFragment extends Fragment {
             contentRow.setClipToPadding(false);
             base.addView(contentRow, new FrameLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
 
+            boolean inGame = Minecraft.getInstance().player != null;
+
             routerContainer = new RouterContainer(context);
             routerContainer.setClipChildren(false);
             routerContainer.setAnimationStyle(RouterContainer.AnimationStyle.SCALE_FADE_ROOT);
             routerContainer.setAnimationDuration(300);
-            contentRow.addView(routerContainer, new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
+            LinearLayout.LayoutParams params1 = new LinearLayout.LayoutParams(0, MATCH_PARENT, 1);
+            if (!inGame) {
+                params1.setMargins(routerContainer.dp(128), 0, routerContainer.dp(128), 0);
+            }
+            contentRow.addView(routerContainer, params1);
 
-            sidebar = new SidebarView(context);
-            sidebar.setVisibility(View.GONE);
-            {
+            if (inGame) {
+                sidebar = new SidebarView(context);
+                sidebar.setVisibility(View.GONE);
                 FrameLayout.LayoutParams sidebarParams =
                         new FrameLayout.LayoutParams(sidebar.getPanelWidth(), MATCH_PARENT);
                 sidebarParams.gravity = Gravity.TOP | Gravity.START;
@@ -284,7 +289,7 @@ public class MainFragment extends Fragment {
                     }
                     {
                         NavigatorWidget navigator = new NavigatorWidget(context, routerContainer);
-                        if (Minecraft.getInstance().player != null) {//in game
+                        if (inGame) {
                             var homeNav = navigator.createNavigationPage("Home", "/assets/music_hud/textures/gui/icons/house.png",
                                     I18n.get(MusicHud.MOD_ID + ".text.page.home"), HomeView::new);
                             var searchNav = navigator.createNavigationPage("Search", "/assets/music_hud/textures/gui/icons/search.png",
@@ -299,6 +304,7 @@ public class MainFragment extends Fragment {
                             var settingsNav = navigator.createNavigationPage("Settings", "/assets/music_hud/textures/gui/icons/settings.png",
                                     I18n.get(MusicHud.MOD_ID + ".text.page.setting"), ConfigView::new);
                             settingsNav.select();
+                            navigatorWrapper.setVisibility(View.GONE);
                         }
                         navigatorWrapper.addView(navigator, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
                     }
