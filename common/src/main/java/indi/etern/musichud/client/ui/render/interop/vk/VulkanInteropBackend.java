@@ -42,9 +42,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
  * Vulkan bridge between arc3d and the game's render device. Both APIs use the same {@code VkDevice},
  * so a texture is shared by wrapping its {@code VkImage}; blaze3d keeps every texture in
  * {@code VK_IMAGE_LAYOUT_GENERAL}, which is what the wrapper advertises to arc3d.
- * <p>
- * Only export is supported: blaze3d's {@code VulkanGpuTexture} allocates its image through VMA and
- * has no wrap constructor, so an arc3d image cannot become a game texture.
  */
 @SuppressWarnings("UnstableApiUsage")
 public final class VulkanInteropBackend implements SceneInteropBackend {
