@@ -53,6 +53,8 @@ public final class SceneBlurSlot {
     private InteropSource source;
     private icyllis.arc3d.engine.Image sourceKey;
     private final PublishedSceneTexture published = new PublishedSceneTexture();
+    private boolean loggedCapabilityFailure;
+    private boolean loggedSourceFailure;
     @Getter
     private volatile boolean disabled;
     /** Scale of the published result: 1, 2 or 4. Consumers use it to map the image to the row. */
@@ -114,6 +116,12 @@ public final class SceneBlurSlot {
         if (image == null || disabled || !interop.canImport() || !interop.canExport()
                 || outWidth < 1 || outHeight < 1 || !(sigma > 0f)) {
             if (image != null) {
+                if (!loggedCapabilityFailure && !disabled
+                        && (!interop.canImport() || !interop.canExport())) {
+                    loggedCapabilityFailure = true;
+                    LOGGER.warn("Backdrop blur disabled: interop cannot share textures ({})",
+                            interop);
+                }
                 image.unref();
             }
             return;
@@ -233,6 +241,10 @@ public final class SceneBlurSlot {
         try {
             input = useSource(image);
             if (input == null) {
+                if (!loggedSourceFailure) {
+                    loggedSourceFailure = true;
+                    LOGGER.warn("Backdrop blur disabled: cannot import the blur source");
+                }
                 return;
             }
             SceneInterop.beginRead(input);

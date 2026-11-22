@@ -17,15 +17,15 @@ import org.lwjgl.vulkan.VkImageSubresourceRange;
  * Image layout transitions for textures arc3d rendered into.
  * <p>
  * blaze3d never barriers (every game texture lives in {@code VK_IMAGE_LAYOUT_GENERAL} from
- * allocation on), so the first blaze3d pass that samples an arc3d target has to fix the layout
- * itself. The barrier is submitted on the game's queue ahead of that pass, which Vulkan orders by
- * submission.
+ * allocation on) and binds samplers with a GENERAL descriptor, so the first blaze3d pass that
+ * samples an arc3d target has to fix the layout itself. The barrier is submitted on the game's
+ * queue ahead of that pass, which Vulkan orders by submission.
  */
 final class VulkanImageBarrier {
     private VulkanImageBarrier() {
     }
 
-    static void transitionToSampled(VulkanDevice device, long image, int oldLayout) {
+    static void transitionToGeneral(VulkanDevice device, long image, int oldLayout) {
         VulkanCommandPool pool = new VulkanCommandPool(device, device.graphicsQueue());
         try {
             VkCommandBuffer commandBuffer = pool.allocateBuffer();
@@ -38,7 +38,7 @@ final class VulkanImageBarrier {
                 VkImageMemoryBarrier.Buffer barrier =
                         VkImageMemoryBarrier.calloc(1, stack).sType$Default();
                 barrier.oldLayout(oldLayout);
-                barrier.newLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+                barrier.newLayout(VK10.VK_IMAGE_LAYOUT_GENERAL);
                 barrier.srcQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED);
                 barrier.dstQueueFamilyIndex(VK10.VK_QUEUE_FAMILY_IGNORED);
                 barrier.image(image);

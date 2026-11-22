@@ -41,6 +41,8 @@ public final class LayerBackdropBlurDrawable extends Drawable {
     private float alpha = 1f;
     private boolean failed;
     private boolean released;
+    private boolean loggedLayerFailure;
+    private boolean loggedSnapshotFailure;
 
     public LayerBackdropBlurDrawable(int cornerRadius, int blurRadius) {
         this.cornerRadius = Math.max(0, cornerRadius);
@@ -122,6 +124,10 @@ public final class LayerBackdropBlurDrawable extends Drawable {
         }
         Surface layer = SceneCanvasLayer.resolve(arc.getCanvas());
         if (!(layer instanceof GraniteSurface)) {
+            if (!loggedLayerFailure) {
+                loggedLayerFailure = true;
+                LOGGER.warn("Drop blur: cannot resolve the UI layer surface");
+            }
             return;
         }
         Rect2i device = new Rect2i();
@@ -159,6 +165,10 @@ public final class LayerBackdropBlurDrawable extends Drawable {
             }
             Image snapshot = SceneCanvasLayer.snapshot(layer, left, top, right, bottom);
             if (snapshot == null) {
+                if (!loggedSnapshotFailure) {
+                    loggedSnapshotFailure = true;
+                    LOGGER.warn("Drop blur: snapshot of the UI layer failed");
+                }
                 return;
             }
             try {

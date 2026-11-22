@@ -59,6 +59,7 @@ public final class VulkanInteropBackend implements SceneInteropBackend {
     private final AtomicBoolean contextFailureLogged = new AtomicBoolean();
     private final AtomicBoolean castFailureLogged = new AtomicBoolean();
     private final AtomicBoolean importFailureLogged = new AtomicBoolean();
+    private final AtomicBoolean aliasFailureLogged = new AtomicBoolean();
 
     private VulkanInteropBackend() {
     }
@@ -99,17 +100,19 @@ public final class VulkanInteropBackend implements SceneInteropBackend {
             GpuTexture alias = VulkanTextureAlias.create(device, handle, width, height,
                     GpuFormat.RGBA8_UNORM);
             if (alias == null) {
+                if (aliasFailureLogged.compareAndSet(false, true)) {
+                    LOGGER.warn("Scene interop: cannot alias an arc3d image as a game texture");
+                }
                 image.unref();
                 return null;
             }
             GpuTextureView view = device.createTextureView(alias, 0, 1);
-            // arc3d leaves a rendered target as a color attachment; blaze3d samples without
-            // barriers, so the layout has to be fixed before that pass runs.
+            // blaze3d samples every texture with a GENERAL descriptor and never barriers, so arc3d
+            // has to leave the image in that layout before the game pass runs.
             int layout = vulkanImage.getVulkanMutableState().getImageLayout();
-            if (layout != VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-                VulkanImageBarrier.transitionToSampled(device, handle, layout);
-                vulkanImage.getVulkanMutableState()
-                        .setImageLayout(VK10.VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+            if (layout != VK10.VK_IMAGE_LAYOUT_GENERAL) {
+                VulkanImageBarrier.transitionToGeneral(device, handle, layout);
+                vulkanImage.getVulkanMutableState().setImageLayout(VK10.VK_IMAGE_LAYOUT_GENERAL);
             }
             return new Source(view, alias, vulkanImage, width, height);
         } catch (Throwable failure) {
