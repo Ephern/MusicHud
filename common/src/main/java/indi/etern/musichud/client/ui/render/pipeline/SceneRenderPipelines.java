@@ -8,8 +8,17 @@ import com.mojang.blaze3d.vertex.VertexFormat;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.client.ui.render.gpu.blaze3d.VanillaScenePipeline;
 import net.minecraft.resources.ResourceLocation;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.Collections;
+import java.util.IdentityHashMap;
+import java.util.List;
+import java.util.Set;
 
 public class SceneRenderPipelines {
+    private static final Set<RenderPipeline> SCENE_UNIFORM_PIPELINES =
+            Collections.newSetFromMap(new IdentityHashMap<>());
+
     public static final RenderPipeline.Snippet MATRICES_PROJECTION_SNIPPET =
             RenderPipeline.builder()
                     .withUniform("DynamicTransforms", UniformType.UNIFORM_BUFFER)
@@ -73,6 +82,14 @@ public class SceneRenderPipelines {
                 .withUniform("MHDynamicStatus", UniformType.UNIFORM_BUFFER)
                 .withVertexFormat(DefaultVertexFormat.POSITION_COLOR, VertexFormat.Mode.QUADS)
                 .build());
+        for (ScenePipeline pipeline : List.of(SOLID_BACKGROUND, FLUID_BACKGROUND, ROUNDED_ALBUM, PROGRESS_BAR)) {
+            SCENE_UNIFORM_PIPELINES.add(((VanillaScenePipeline) pipeline).renderPipeline());
+        }
+    }
+
+    /** True when {@code pipeline} declares this mod's own uniform buffers. */
+    public static boolean usesSceneUniforms(@Nullable RenderPipeline pipeline) {
+        return pipeline != null && SCENE_UNIFORM_PIPELINES.contains(pipeline);
     }
 
     private static ScenePipeline wrap(String name, RenderPipeline pipeline) {

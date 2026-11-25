@@ -28,6 +28,8 @@ public class MusicHudMixinPlugin implements IMixinConfigPlugin {
             }
         }
         if (mixinClassName.contains("ScreenMixin") || mixinClassName.contains("GuiRendererSceneMixin")
+                || mixinClassName.contains("GuiRendererDrawAccessor")
+                || mixinClassName.contains("GameRendererSceneAccessor")
                 || mixinClassName.contains("UIManagerMixin")) {
             return modernUiAvailable();
         }

@@ -5,6 +5,8 @@
   "compatibilityLevel": "JAVA_21",
   "plugin": "indi.etern.musichud.mixin.MusicHudMixinPlugin",
   "client": [
+    "GameRendererSceneAccessor",
+    "GuiRendererDrawAccessor",
     "GuiRendererSceneMixin",
     "ModernUiGuardMixin",
     "ReactiveMusicCompatMixin",

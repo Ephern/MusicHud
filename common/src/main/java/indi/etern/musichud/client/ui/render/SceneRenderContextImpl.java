@@ -4,6 +4,7 @@ import com.mojang.blaze3d.buffers.GpuBufferSlice;
 import com.mojang.blaze3d.systems.GpuDevice;
 import com.mojang.blaze3d.systems.RenderPass;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.pipeline.RenderPipeline;
 import com.mojang.blaze3d.textures.GpuTexture;
 import com.mojang.blaze3d.textures.GpuTextureView;
 import com.mojang.blaze3d.textures.TextureFormat;
@@ -15,11 +16,15 @@ import indi.etern.musichud.client.ui.render.text.GradientSpec;
 import indi.etern.musichud.client.ui.render.text.GradientTextRenderer;
 import indi.etern.musichud.client.ui.render.text.GradientTextRenderState;
 import indi.etern.musichud.client.ui.render.text.TextEdgeFade;
+import indi.etern.musichud.mixin.GameRendererSceneAccessor;
 import lombok.Getter;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.navigation.ScreenRectangle;
 import net.minecraft.client.gui.render.TextureSetup;
+import net.minecraft.client.gui.render.state.GuiRenderState;
 import net.minecraft.client.renderer.DynamicUniformStorage;
+import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix3x2f;
@@ -28,6 +33,7 @@ import java.nio.ByteBuffer;
 import java.util.*;
 
 public class SceneRenderContextImpl implements SceneRenderContext {
+    private static final Logger LOGGER = MusicHud.getLogger(SceneRenderContextImpl.class);
     private static final RenderStateUtil UNIFORM_WRITER = new RenderStateUtil();
     @Getter
     private static SceneRenderContext current;
@@ -47,6 +53,8 @@ public class SceneRenderContextImpl implements SceneRenderContext {
     private final Deque<ScreenRectangle> scissorStack = new ArrayDeque<>();
 
     private SceneGraphics graphics;
+    private @Nullable RenderPass defaultBoundPass;
+    private final Set<RenderPipeline> warnedPipelines = Collections.newSetFromMap(new IdentityHashMap<>());
     private long frameTimeMillis;
     private long frameTimeNanos;
 
@@ -59,6 +67,8 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         elements.clear();
         scissorStack.clear();
         this.graphics = graphics;
+        defaultBoundPass = null;
+        warnedPipelines.clear();
         frameTimeMillis = System.currentTimeMillis();
         frameTimeNanos = System.nanoTime();
     }
@@ -82,13 +92,22 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         elementSlices.clear();
         defaultSlices.clear();
         scissorStack.clear();
-        // Only a storage written this frame needs its ring advanced; advancing a cold one would just
-        // create and close a fence every frame for a layer no one draws.
+        defaultBoundPass = null;
+        warnedPipelines.clear();
         for (DynamicUniformStorage<UniformAdapter> storage : writtenStorages) {
             storage.endFrame();
         }
         writtenStorages.clear();
         RenderRuntime.getInstance().processPendingGpuRecreate();
+    }
+
+    /** True for the main GUI render state; nested renderers render their own. */
+    public boolean ownsState(@Nullable GuiRenderState state) {
+        if (state == null) return false;
+        Minecraft minecraft = Minecraft.getInstance();
+        //noinspection ConstantValue
+        if (minecraft == null || minecraft.gameRenderer == null) return false;
+        return state == ((GameRendererSceneAccessor) minecraft.gameRenderer).music_hud$guiRenderState();
     }
 
     @Override
@@ -192,23 +211,29 @@ public class SceneRenderContextImpl implements SceneRenderContext {
         }
     }
 
-    public void bindAllUniforms(RenderPass pass) {
+    /** Falls back to the per-name defaults for draws whose element was not recorded this frame. */
+    public void bindDrawUniforms(@Nullable RenderPass pass, @Nullable TextureSetup textureSetup,
+                                 @Nullable RenderPipeline pipeline) {
         if (pass == null) return;
-        for (Map.Entry<String, GpuBufferSlice> entry : defaultSlices.entrySet()) {
-            pass.setUniform(entry.getKey(), entry.getValue());
+        Map<String, GpuBufferSlice> slices = textureSetup == null ? null : elementSlices.get(textureSetup);
+        if (slices != null && !slices.isEmpty()) {
+            for (Map.Entry<String, GpuBufferSlice> entry : slices.entrySet()) {
+                pass.setUniform(entry.getKey(), entry.getValue());
+            }
+            return;
         }
-    }
-
-    @FunctionalInterface
-    public interface UniformUploader {
-        void upload(String uboName, GpuBufferSlice slice);
-    }
-
-    public void bindElementUniforms(RenderPass pass, TextureSetup textureSetup, UniformUploader uploader) {
-        Map<String, GpuBufferSlice> slices = elementSlices.get(textureSetup);
-        if (slices == null) return;
-        for (Map.Entry<String, GpuBufferSlice> entry : slices.entrySet()) {
-            uploader.upload(entry.getKey(), entry.getValue());
+        if (!SceneRenderPipelines.usesSceneUniforms(pipeline)) return;
+        if (defaultBoundPass != pass) {
+            defaultBoundPass = pass;
+            for (Map.Entry<String, GpuBufferSlice> entry : defaultSlices.entrySet()) {
+                pass.setUniform(entry.getKey(), entry.getValue());
+            }
+        }
+        if (warnedPipelines.add(pipeline)) {
+            LOGGER.warn("Scene pipeline {} drew without per-element uniforms (per-pass defaults: {});"
+                            + " the frame state was probably cleared by another GUI renderer",
+                    pipeline.getLocation(), defaultSlices.size(),
+                    new IllegalStateException("No per-element scene uniforms for this draw"));
         }
     }
 
