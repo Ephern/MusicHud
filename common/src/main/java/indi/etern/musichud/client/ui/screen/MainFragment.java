@@ -1,5 +1,6 @@
 package indi.etern.musichud.client.ui.screen;
 
+import icyllis.modernui.animation.LayoutTransition;
 import icyllis.modernui.annotation.Nullable;
 import icyllis.modernui.animation.ValueAnimator;
 import icyllis.modernui.fragment.Fragment;
@@ -30,6 +31,7 @@ import indi.etern.musichud.client.ui.pages.search.SearchView;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.Easing;
 import indi.etern.musichud.client.utils.ui.InsetBackgroundFactory;
+import indi.etern.musichud.client.utils.ui.LayoutTransitionReflow;
 import indi.etern.musichud.client.utils.ui.PanelStyle;
 import indi.etern.musichud.connection.ConnectionStateMachine;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -76,6 +78,7 @@ public class MainFragment extends Fragment {
     private LinearLayout navigatorWrapper;
     private ValueAnimator navigatorBackgroundAnimator;
     private SidebarView.Mode otherPageMode = SidebarView.Mode.LIBRARY;
+    private LinearLayout connectLayout;
 
     private MainFragment() {
     }
@@ -237,6 +240,10 @@ public class MainFragment extends Fragment {
                 {
                     navigatorWrapper = new LinearLayout(context);
                     navigatorWrapper.setOrientation(LinearLayout.HORIZONTAL);
+                    LayoutTransition layoutTransition = new LayoutTransition();
+                    layoutTransition.enableTransitionType(LayoutTransition.CHANGING);
+                    LayoutTransitionReflow.attach(layoutTransition);
+                    navigatorWrapper.setLayoutTransition(layoutTransition);
                     int dp2 = navigatorWrapper.dp(2);
                     PanelStyle.applyDynamically(navigatorWrapper, navigatorWrapper.dp(16),
                             new InsetBackgroundFactory.Padding(dp2, dp2, dp2, dp2),
@@ -309,6 +316,10 @@ public class MainFragment extends Fragment {
                         navigatorWrapper.addView(navigator, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
                     }
                     {
+                        connectLayout = new LinearLayout(context);
+                        connectLayout.setOrientation(LinearLayout.HORIZONTAL);
+                        navigatorWrapper.addView(connectLayout, new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT));
+
                         View divider = new View(context);
                         ShapeDrawable dividerBg = new ShapeDrawable();
                         dividerBg.setShape(ShapeDrawable.VLINE);
@@ -317,9 +328,8 @@ public class MainFragment extends Fragment {
                         divider.setBackground(dividerBg);
                         LinearLayout.LayoutParams dividerParams = new LinearLayout.LayoutParams(divider.dp(1), MATCH_PARENT);
                         dividerParams.setMargins(divider.dp(2), divider.dp(8), divider.dp(2), divider.dp(8));
-                        navigatorWrapper.addView(divider, dividerParams);
-                    }
-                    {
+                        connectLayout.addView(divider, dividerParams);
+
                         switchServerConnectButton = new Button(context) {
                             @Override
                             protected boolean dispatchHoverEvent(@NotNull MotionEvent event) {
@@ -335,7 +345,7 @@ public class MainFragment extends Fragment {
                         switchServerConnectButton.setWidth(switchServerConnectButton.dp(40));
                         switchServerConnectButton.setHeight(switchServerConnectButton.dp(40));
 
-                        navigatorWrapper.addView(switchServerConnectButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+                        connectLayout.addView(switchServerConnectButton, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
                         refreshServerConnectStatus();
                     }
                 }
@@ -578,8 +588,8 @@ public class MainFragment extends Fragment {
     }
 
     private void refreshServerConnectStatus() {
-        if (Minecraft.getInstance().player != null) {
-            switchServerConnectButton.setVisibility(View.VISIBLE);
+        if (Minecraft.getInstance().player != null && clientConfig.getEnable()) {
+            connectLayout.setVisibility(View.VISIBLE);
             boolean singlePlayer = Minecraft.getInstance().getCurrentServer() == null;
             String buttonText = "";
             String icon = "";
@@ -626,7 +636,7 @@ public class MainFragment extends Fragment {
             }
             switchServerConnectButton.setText(string);
         } else {
-            switchServerConnectButton.setVisibility(View.GONE);
+            connectLayout.setVisibility(View.GONE);
         }
     }
 

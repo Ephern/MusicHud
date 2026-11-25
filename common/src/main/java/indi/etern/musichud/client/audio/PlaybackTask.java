@@ -32,6 +32,7 @@ import java.net.*;
 import java.nio.ByteBuffer;
 import java.time.Duration;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -51,6 +52,15 @@ import java.util.function.Supplier;
 public class PlaybackTask {
     private static final int BUFFER_COUNT = 8;
     private static final int BUFFER_SIZE = 65536;
+    /** Device-side queue target; absorbs client hitches without moving the content clock. */
+    private static final long DEVICE_QUEUE_TARGET_MS = 3000;
+    private static final int MIN_DEVICE_BUFFERS = BUFFER_COUNT;
+    private static final int MAX_DEVICE_BUFFERS = 48;
+    /** Deficit beyond which playback is realigned in one step instead of dropped chunk by chunk. */
+    private static final long RESYNC_THRESHOLD_MS = 300;
+    private static final long RESYNC_FADE_IN_MS = 150;
+    /** One-shot play-worker stall for verifying queue headroom: {@code -Dmusic_hud.debug.stallMs}. */
+    private static final long DEBUG_STALL_MS = Long.getLong("music_hud.debug.stallMs", 0);
     /** In-memory PCM look-ahead; 16 MiB is ~22 s @ 24-bit 96 kHz stereo, ~95 s @ 16-bit 44.1 kHz. */
     private static final int AUDIO_BUFFER_BUDGET_BYTES = 16 * 1024 * 1024;
     private static final int AUDIO_BUFFER_CAPACITY = Math.max(64, AUDIO_BUFFER_BUDGET_BYTES / BUFFER_SIZE);
@@ -59,7 +69,6 @@ public class PlaybackTask {
      * switching a discrete stream to stereo downmix (one failure can be transient).
      */
     private static final int DISCRETE_REJECTION_CONFIRMATIONS = 2;
-    private static final long STALE_DROP_MARGIN_MS = 500;
     private static final long PLAYBACK_STALL_LOG_MS = 500;
     private static final long PLAY_LOOP_SLEEP_MS = 40;
     private static final long INITIAL_BUFFER_WAIT_SLEEP_MS = 50;
@@ -157,6 +166,9 @@ public class PlaybackTask {
     private volatile AudioDecoder currentDecoder;
     private int lastDecoderFormat = -1;
     private int lastDecoderSampleRate = -1;
+    /** Buffer slots of the current source, sized so it holds about {@link #DEVICE_QUEUE_TARGET_MS}. */
+    private volatile int deviceBufferCount = BUFFER_COUNT;
+    private boolean debugStallInjected = false;
     /** Consecutive upload failures; reset on a successful prefill. */
     private int discreteRejectionCount = 0;
     /** Rebuilds a dead source at full gain instead of restarting the fade-in. */
@@ -640,6 +652,28 @@ public class PlaybackTask {
         return Math.min(byDuration, byCapacity);
     }
 
+    /** Buffer slots that hold about {@link #DEVICE_QUEUE_TARGET_MS} of the decoder's output. */
+    private static int deviceBufferCountFor(@Nullable AudioDecoder decoder) {
+        int frameBytes = decoder != null ? OpenAlSource.bytesPerSample(decoder.getFormat()) : 4;
+        int sampleRate = decoder != null ? decoder.getSampleRate() : 44100;
+        long bytesPerTarget = (long) sampleRate * frameBytes * DEVICE_QUEUE_TARGET_MS / 1000;
+        long slots = (bytesPerTarget + BUFFER_SIZE - 1) / BUFFER_SIZE;
+        return Math.clamp(slots, MIN_DEVICE_BUFFERS, MAX_DEVICE_BUFFERS);
+    }
+
+    /**
+     * Prefetch needed before playback starts: the recovery target plus a full device queue,
+     * so filling the source does not consume the whole safety margin.
+     */
+    private long initialPrefetchBytes() {
+        AudioDecoder decoder = currentDecoder;
+        int frameBytes = decoder != null ? OpenAlSource.bytesPerSample(decoder.getFormat()) : 4;
+        int sampleRate = decoder != null ? decoder.getSampleRate() : 44100;
+        long deviceQueueBytes = (long) deviceBufferCountFor(decoder) * BUFFER_SIZE;
+        return Math.max((long) BUFFER_SIZE * BUFFER_COUNT,
+                rebufferTargetBytes((long) sampleRate * frameBytes) + deviceQueueBytes);
+    }
+
     private void syncPlaying() {
         if (serverStartTime == null || currentDecoder == null) return;
         int bytesPerSample = OpenAlSource.bytesPerSample(currentDecoder.getFormat());
@@ -653,13 +687,16 @@ public class PlaybackTask {
         }
 
         boolean skipped = false;
+        long maxRequest = (long) BUFFER_SIZE / bytesPerSample * bytesPerSample;
         while (!cancelled && !restartRequested) {
             long millis = Duration.between(serverStartTime, ZonedDateTime.now()).toMillis();
             long skipBytes = millis * bytesPerSecond / 1000;
-            if (ledger.decodedBytes.get() > skipBytes - bytesPerSample) {
-                break;
-            }
-            byte[] chunk = currentDecoder.readChunk(Math.max(0, skipBytes - ledger.decodedBytes.get()));
+            long remaining = skipBytes - ledger.decodedBytes.get();
+            // Never ask for a partial frame: a byte-slicing decoder would leave
+            // its stream mid-frame and corrupt everything decoded afterwards.
+            long request = remaining / bytesPerSample * bytesPerSample;
+            if (request <= 0) break;
+            byte[] chunk = currentDecoder.readChunk(Math.min(request, maxRequest));
             if (chunk == null) break;
             ledger.decodedBytes.addAndGet(chunk.length);
             skipped = true;
@@ -799,6 +836,8 @@ public class PlaybackTask {
         // The decoder may not exist yet at the top of this method (the downloader
         // does a network round-trip first), so configure the source only now that
         // the real stream format is known.
+        int bufferSlots = deviceBufferCountFor(currentDecoder);
+        deviceBufferCount = bufferSlots;
         OpenAlSource.DirectChannels directChannels = OpenAlSource.directChannelsFor(format);
         sourceLock.lock();
         try {
@@ -809,14 +848,14 @@ public class PlaybackTask {
             if (cancelled || Thread.currentThread().isInterrupted()) {
                 return PlayResult.RESTARTED;
             }
-            source = OpenAlSource.create(new OpenAlSource.Config(BUFFER_COUNT, directChannels), ledger);
+            source = OpenAlSource.create(new OpenAlSource.Config(bufferSlots, directChannels), ledger);
             source.setPcmSink(pcmSink);
         } finally {
             sourceLock.unlock();
         }
 
         boolean firstChunk = true;
-        for (int i = 0; i < BUFFER_COUNT; i++) {
+        for (int i = 0; i < bufferSlots; i++) {
             byte[] audioData = pollAudio();
             if (audioData == null) break;
 
@@ -825,10 +864,10 @@ public class PlaybackTask {
                 // Anchor the absolute content position to the wall clock; the
                 // downloader already skipped the decoder to it via syncPlaying().
                 if (serverStartTime != null && currentDecoder != null) {
-                    long bytesPerSecond = (long) currentDecoder.getSampleRate()
-                            * OpenAlSource.bytesPerSample(currentDecoder.getFormat());
+                    int frameBytes = OpenAlSource.bytesPerSample(currentDecoder.getFormat());
+                    long bytesPerSecond = (long) currentDecoder.getSampleRate() * frameBytes;
                     long anchoredBytes = Math.max(0, Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000);
-                    ledger.anchor(anchoredBytes);
+                    ledger.anchor(anchoredBytes - anchoredBytes % frameBytes);
                 }
             }
 
@@ -960,16 +999,22 @@ public class PlaybackTask {
                         long bytesPerSecond = (long) (currentDecoder != null ? currentDecoder.getSampleRate() : 44100) * bytesPerSample;
                         long expected = Duration.between(wallStart, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
                         LOGGER.info("Playback thread stalled for {} ms (GC STW / scheduling pause?)" +
-                                        " [content={} ms expected={} ms bufferedChunks={} sourceQueued={} playing={} state={}]",
+                                        " [content={} ms expected={} ms bufferedChunks={} sourceQueued={}/{} playing={} state={}]",
                                 stallMs,
                                 ledger.fedBytes.get() * 1000L / bytesPerSecond, expected * 1000L / bytesPerSecond,
                                 bufferedChunks(),
-                                source != null ? source.queuedCount() : -1,
+                                source != null ? source.queuedCount() : -1, deviceBufferCount,
                                 source != null && source.isPlaying(),
                                 state);
                     }
                 }
                 lastIterationNanos = iterationNow;
+
+                if (DEBUG_STALL_MS > 0 && !debugStallInjected && state == PlaybackState.PLAYING) {
+                    debugStallInjected = true;
+                    LOGGER.info("Debug: stalling the play worker for {} ms", DEBUG_STALL_MS);
+                    Thread.sleep(DEBUG_STALL_MS);
+                }
 
                 long jmtcNow = System.currentTimeMillis();
                 if (jmtcNow - lastJmtcTickMs >= 1000) {
@@ -988,8 +1033,13 @@ public class PlaybackTask {
 
                 int bytesPerSample = currentDecoder != null ? OpenAlSource.bytesPerSample(currentDecoder.getFormat()) : 4;
                 long bytesPerSecond = (long) (currentDecoder != null ? currentDecoder.getSampleRate() : 44100) * bytesPerSample;
-                Supplier<Long> expectedBytes = () -> Duration.between(wallStart, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
-                long staleDropMarginBytes = STALE_DROP_MARGIN_MS * bytesPerSecond / 1000;
+                // Keep the wall-clock position frame-aligned so it stays
+                // comparable with the frame-aligned fed position.
+                Supplier<Long> expectedBytes = () -> {
+                    long bytes = Duration.between(wallStart, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000;
+                    return bytes - bytes % bytesPerSample;
+                };
+                long resyncThresholdBytes = RESYNC_THRESHOLD_MS * bytesPerSecond / 1000;
                 int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
                 int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
 
@@ -1002,30 +1052,29 @@ public class PlaybackTask {
                             ledger.prefetchBytes.get() * 1000L / bytesPerSecond, REBUFFER_TARGET_MS);
                 } else if (!starving && rebuffering) {
                     rebuffering = false;
-                    Long bytes = expectedBytes.get();
                     if (underrunSinceNanos >= 0) {
                         underrunSinceNanos = -1;
-                        logUnderrunDiagnostics("underrun-recovered", bytes, bytesPerSecond);
-                    }
-                    if (ledger.fedBytes.get() < bytes) {
-                        ledger.fedBytes.set(bytes);
+                        logUnderrunDiagnostics("underrun-recovered", expectedBytes.get(), bytesPerSecond);
                     }
                     LOGGER.info("Playback rebuffering complete: {} ms buffered",
                             ledger.prefetchBytes.get() * 1000L / bytesPerSecond);
                 }
+
+                long deficitBytes = expectedBytes.get() - playedContentBytes();
+                boolean hasContent = ledger.queuedBytes.get() > 0 || ledger.prefetchBytes.get() > 0;
+                if (!rebuffering && !ending && hasContent && deficitBytes > resyncThresholdBytes
+                        && ledger.decodedBytes.get() > expectedBytes.get()) {
+                    resyncToWallClock(deficitBytes, bytesPerSecond);
+                    continue;
+                }
+
                 if (!rebuffering) {
-                    if (sourceEmpty) {
-                        Long bytes = expectedBytes.get();
-                        if (underrunSinceNanos >= 0) {
-                            underrunSinceNanos = -1;
-                            logUnderrunDiagnostics("underrun-recovered", bytes, bytesPerSecond);
-                        }
-                        if (ledger.fedBytes.get() < bytes) {
-                            ledger.fedBytes.set(bytes);
-                        }
+                    if (sourceEmpty && underrunSinceNanos >= 0) {
+                        underrunSinceNanos = -1;
+                        logUnderrunDiagnostics("underrun-recovered", expectedBytes.get(), bytesPerSecond);
                     }
-                    int filled = source.fill(() -> takeChunk(expectedBytes, staleDropMarginBytes, bytesPerSecond),
-                            BUFFER_COUNT, format, sampleRate);
+                    int filled = source.fill(() -> takeChunk(expectedBytes, bytesPerSecond),
+                            deviceBufferCount, format, sampleRate);
                     if (filled > 0) {
                         resumeIfWaiting();
                     }
@@ -1045,47 +1094,61 @@ public class PlaybackTask {
         return LoopExitReason.INTERRUPTED;
     }
 
-    /** Take a chunk for OpenAL, applying stale-drop and underrun policy. */
-    private byte @Nullable [] takeChunk(Supplier<Long> expectedBytes, long staleDropMarginBytes, long bytesPerSecond) {
-        // Account for any decoder fast-forward first: it is an exact jump, not a
-        // lag to be approximated by the margin heuristic below.
+    /** Take the next chunk for OpenAL; wall-clock realignment happens in {@link #mainLoop}. */
+    private byte @Nullable [] takeChunk(Supplier<Long> expectedBytes, long bytesPerSecond) {
+        // Apply a decoder fast-forward first: it is an exact content jump.
         dropToSyncTarget();
-        if (underrunSinceNanos >= 0) {
-            underrunSinceNanos = -1;
-            Long bytes = expectedBytes.get();
-            if (ledger.fedBytes.get() < bytes) {
-                ledger.fedBytes.set(bytes);
-            }
-            logUnderrunDiagnostics("underrun-recovered", bytes, bytesPerSecond);
-            byte[] data = pollAudio();
-            if (data == null) {
-                if (!downloadDone) {
-                    underrunSinceNanos = System.nanoTime();
-                    logUnderrunDiagnostics("underrun-started", bytes, bytesPerSecond);
-                }
-                return null;
+        byte[] data = pollAudio();
+        if (data != null) {
+            if (underrunSinceNanos >= 0) {
+                underrunSinceNanos = -1;
+                logUnderrunDiagnostics("underrun-recovered", expectedBytes.get(), bytesPerSecond);
             }
             return data;
         }
-        byte[] data = pollAudio();
-        // Below the recovery target we are (or are about to be) starving: dropping
-        // here would skip live audio and accelerate the underrun. Play what we have
-        // instead; the pre-buffer handles the rest.
-        boolean healthy = ledger.prefetchBytes.get() >= rebufferTargetBytes(bytesPerSecond);
-        if (healthy) {
-            while (data != null && ledger.fedBytes.get() < expectedBytes.get() - staleDropMarginBytes) {
-                // Drop stale chunks and advance fedBytes (overwriting would collapse the
-                // position and mark the whole queue stale).
-                ledger.fedBytes.addAndGet(data.length);
-                logStaleDrop(data.length, bytesPerSecond);
-                data = pollAudio();
-            }
-        }
-        if (data == null && !downloadDone && underrunSinceNanos < 0) {
+        if (!downloadDone && underrunSinceNanos < 0) {
             underrunSinceNanos = System.nanoTime();
             logUnderrunDiagnostics("underrun-started", expectedBytes.get(), bytesPerSecond);
         }
-        return data;
+        return null;
+    }
+
+    /** Audible content position: already played bytes plus what is still buffered in the source. */
+    private long playedContentBytes() {
+        long queuedStart = Math.max(0, ledger.fedBytes.get() - ledger.queuedBytes.get());
+        OpenAlSource current = source;
+        if (current == null) return queuedStart;
+        long playedInQueue = current.playedQueueBytes();
+        return playedInQueue < 0 ? queuedStart : queuedStart + playedInQueue;
+    }
+
+    /**
+     * Re-aligns playback with the wall clock in one step: the audio that should already have
+     * played is dropped (including the unplayed tail of the device queue), then the source is
+     * restarted with a short fade-in. Avoids bleeding audible skips for seconds after a hitch.
+     */
+    private void resyncToWallClock(long deficitBytes, long bytesPerSecond) {
+        OpenAlSource current = source;
+        if (current == null) return;
+        long contentStart = Math.max(0, ledger.fedBytes.get() - ledger.queuedBytes.get());
+        LOGGER.info("Playback is {} ms behind the wall clock, resyncing the source",
+                deficitBytes * 1000L / bytesPerSecond);
+        current.unqueueAll();
+        List<PlaybackLedger.LedgerEntry> unplayed = ledger.drainQueue();
+        ledger.anchor(contentStart);
+        restoreUnplayed(unplayed);
+        syncSkipBoundary.set(0);
+        syncSkipTarget.set(0);
+        dropStaleToWallClock();
+        current.setGain(0);
+        lastSetGain = 0;
+        underrunSinceNanos = -1;
+        rebuffering = false;
+        if (!ending) {
+            fadeStartNanos = System.nanoTime();
+            fadeDurationMs = RESYNC_FADE_IN_MS;
+            setState(PlaybackState.FADING_IN);
+        }
     }
 
     private void resumeIfWaiting() {
@@ -1235,7 +1298,14 @@ public class PlaybackTask {
             }
             clearAudio();
             resetSyncAccounting();
-            ledger.prefetchBytes.set(0);
+            // The flush zeroed the fed position; the downloader fast-forwards the new
+            // stream to the wall clock, so re-anchor there instead of implying 0 ms.
+            if (serverStartTime != null) {
+                int frameBytes = OpenAlSource.bytesPerSample(format);
+                long bytesPerSecond = (long) sampleRate * frameBytes;
+                long bytes = Math.max(0, Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000);
+                ledger.anchor(bytes - bytes % frameBytes);
+            }
         }
     }
 
@@ -1265,7 +1335,14 @@ public class PlaybackTask {
 
         LOGGER.warn("Discrete multichannel buffer rejected by OpenAL device, falling back to stereo downmix", e);
         synchronized (decoder) {
+            int previousFrameBytes = OpenAlSource.bytesPerSample(decoder.getFormat());
             decoder.fallbackToDownmix();
+            int currentFrameBytes = OpenAlSource.bytesPerSample(decoder.getFormat());
+            if (previousFrameBytes > 0 && previousFrameBytes != currentFrameBytes) {
+                // decodedBytes measures an output-byte position; convert it so it
+                // keeps denoting the same duration in the downmixed format.
+                ledger.decodedBytes.updateAndGet(bytes -> bytes / previousFrameBytes * currentFrameBytes);
+            }
             clearAudio();
             resetSyncAccounting();
             lastDecoderFormat = -1;
@@ -1316,8 +1393,13 @@ public class PlaybackTask {
         }
         source = null;
         ledger.anchor(contentStart);
+        long bufferedBytes = ledger.prefetchBytes.get();
         resetSyncAccounting();
         restoreUnplayed(unplayed);
+        // resetSyncAccounting() zeroed the enqueue counter while the prefetch
+        // buffer still holds pre-recovery audio; restore it so a later skip
+        // boundary stays in the same byte space as polledBytes.
+        enqueuedBytes.addAndGet(bufferedBytes);
         underrunSinceNanos = -1;
         lastDecoderFormat = -1;
         lastDecoderSampleRate = -1;
@@ -1336,6 +1418,7 @@ public class PlaybackTask {
         if (unplayed.isEmpty()) return;
         int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
         int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
+        List<byte[]> recovered = new ArrayList<>(unplayed.size());
         for (PlaybackLedger.LedgerEntry entry : unplayed) {
             if (entry.format() != format || entry.sampleRate() != sampleRate) {
                 continue;
@@ -1343,9 +1426,13 @@ public class PlaybackTask {
             ByteBuffer pcm = entry.pcm();
             byte[] data = new byte[pcm.remaining()];
             pcm.duplicate().get(data);
-            recoveredHead.addLast(data);
+            recovered.add(data);
             ledger.prefetchBytes.addAndGet(data.length);
             enqueuedBytes.addAndGet(data.length);
+        }
+        // Recovered PCM is older than everything still buffered, so it must lead the head.
+        for (int i = recovered.size() - 1; i >= 0; i--) {
+            recoveredHead.addFirst(recovered.get(i));
         }
         signalBufferReady();
     }
@@ -1416,6 +1503,9 @@ public class PlaybackTask {
                 pollAudio();
                 recoveredHead.addFirst(trimmed);
                 ledger.prefetchBytes.addAndGet(trimmed.length);
+                // pollAudio() counted the whole chunk, but the trimmed tail stays
+                // buffered and will be polled again.
+                polledBytes.addAndGet(-trimmed.length);
                 ledger.fedBytes.addAndGet(drop);
 //                droppedBytes += drop;
 //                droppedChunks++;
@@ -1459,7 +1549,7 @@ public class PlaybackTask {
         setState(PlaybackState.BUFFERING);
         bufferLock.lock();
         try {
-            while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < (long) BUFFER_SIZE * BUFFER_COUNT) {
+            while (!cancelled && !downloadDone && ledger.prefetchBytes.get() < initialPrefetchBytes()) {
                 long now = System.currentTimeMillis();
                 long bytes = ledger.prefetchBytes.get();
                 if (bytes != lastBytes) {

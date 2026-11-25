@@ -257,13 +257,15 @@ public class WavStreamDecoder implements AudioDecoder {
             return null;
         }
         long remaining = dataSize - bytesRead;
-        // Scale the raw read by the frame-size ratio so the converted chunk
-        // stays near maxSize (downmix shrinks Nch->stereo, 24/32-bit
-        // resampling shrinks, float32 output expands).
-        long inputTarget = Math.max(1, maxSize * inputFrameBytes / Math.max(1, outputFrameBytes));
-        long toRead = Math.min(inputTarget, remaining);
-        if (toRead > Integer.MAX_VALUE) {
-            toRead = Integer.MAX_VALUE;
+        // Quantize both the request and the raw read to whole frames: slicing the
+        // source stream on a non-frame boundary shifts every later read and
+        // scrambles channels (e.g. 65536 is not a multiple of a 5.1 16-bit frame).
+        long requestedFrames = Math.max(1, maxSize / Math.max(1, outputFrameBytes));
+        long maxFrames = Integer.MAX_VALUE / inputFrameBytes;
+        long frames = Math.min(Math.min(requestedFrames, maxFrames), remaining / inputFrameBytes);
+        long toRead = frames * inputFrameBytes;
+        if (toRead <= 0) {
+            return null;
         }
         byte[] buffer = new byte[(int) toRead];
         try {
@@ -276,10 +278,12 @@ public class WavStreamDecoder implements AudioDecoder {
                 read += r;
             }
             bytesRead += read;
-            if (read == 0) {
+            // A short read at a corrupt EOF must not emit a partial frame either.
+            int alignedRead = read - read % inputFrameBytes;
+            if (alignedRead <= 0) {
                 return null;
             }
-            byte[] result = read < buffer.length ? trim(buffer, read) : buffer;
+            byte[] result = alignedRead < buffer.length ? trim(buffer, alignedRead) : buffer;
             if (channelMixer != null) {
                 result = channelMixer.resample(result);
             }

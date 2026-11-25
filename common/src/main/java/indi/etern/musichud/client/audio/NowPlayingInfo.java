@@ -476,7 +476,7 @@ public class NowPlayingInfo {
         return Objects.requireNonNullElse(nextToPlayIdleMusic, Traceable.of(MusicDetail.NONE));
     }
 
-    public void stop() {
+    public void stop(boolean resetPresentation) {
         lyricUpdaterGeneration.incrementAndGet();
         if (lyricUpdaterVThread != null) {
             lyricUpdaterVThread.interrupt();
@@ -493,5 +493,11 @@ public class NowPlayingInfo {
             jmtc.setPlayingState(JMTCPlayingState.CLOSED);
             jmtc.updateDisplay();
         });
+        if (resetPresentation) {
+            HudPresenter presenter = HudPresenter.getActiveInstance();
+            if (presenter != null) {
+                presenter.switchMusic(MusicDetail.NONE);
+            }
+        }
     }
 }

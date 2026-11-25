@@ -1,6 +1,7 @@
 package indi.etern.musichud.client.audio;
 
 import indi.etern.musichud.MusicHud;
+import lombok.Getter;
 import org.apache.logging.log4j.Logger;
 import org.jetbrains.annotations.Nullable;
 import org.lwjgl.openal.AL;
@@ -13,6 +14,7 @@ import org.lwjgl.openal.SOFTDirectChannelsRemix;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.ArrayDeque;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -182,7 +184,8 @@ public final class OpenAlSource implements AutoCloseable {
     /** Reload generation at creation; a mismatch means the context was rebuilt. */
     private final long contextGeneration;
     private int source = 0;
-    private int roundRobinIndex = 0;
+    /** Buffer ids that are detached from the source and free for reuse. */
+    private final ArrayDeque<Integer> detached = new ArrayDeque<>();
     private long lastSampleOffset = -1;
     private volatile PcmSink pcmSink;
 
@@ -209,6 +212,7 @@ public final class OpenAlSource implements AutoCloseable {
     }
 
     /** Whether this source still belongs to the live OpenAL context. */
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     public boolean isContextCurrent() {
         return source != 0 && contextGeneration == SoundEngineState.getReloadGeneration();
     }
@@ -224,6 +228,7 @@ public final class OpenAlSource implements AutoCloseable {
                 if (buffers[i] == 0) {
                     throw new SourceInvalidException("Failed to create OpenAL buffer");
                 }
+                detached.addLast(buffers[i]);
             }
             clearStaleALError();
             AL10.alSourcei(source, AL10.AL_SOURCE_RELATIVE, AL10.AL_TRUE);
@@ -247,6 +252,7 @@ public final class OpenAlSource implements AutoCloseable {
                     buffers[i] = 0;
                 }
             }
+            detached.clear();
             throw e;
         }
     }
@@ -259,7 +265,7 @@ public final class OpenAlSource implements AutoCloseable {
         }
     }
 
-    /** Fill the queue from the supplier (buffer pool round-robin); returns chunks queued. */
+    /** Fill the queue from the supplier; returns chunks queued. */
     public int fill(AudioChunkSupplier supplier, int maxSlots, int format, int sampleRate) {
         // Skip uploads while the context is half-dead during a reload.
         if (SoundEngineState.getCurrent() == SoundEngineState.LOADING) {
@@ -267,45 +273,47 @@ public final class OpenAlSource implements AutoCloseable {
         }
         checkSourceValid();
         clearStaleALError();
-        if (queuedCount() == 0) {
-            return fillEmpty(supplier, maxSlots, format, sampleRate);
-        }
-        int slots = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
-        checkQueryALError("alGetSourcei-Processed");
         int filled = 0;
-        for (int i = 0; i < slots && filled < maxSlots; i++) {
+        // Re-attach buffers left over from an earlier dry refill first, so the source
+        // always regains its full pool instead of shrinking after an underrun.
+        while (!detached.isEmpty() && filled < maxSlots) {
+            byte[] data = supplier.next();
+            if (data == null) return filled;
+            Integer bufferId = detached.pollFirst();
+            if (bufferId == null) break;
+            queueData(bufferId, data, format, sampleRate);
+            filled++;
+        }
+        while (filled < maxSlots) {
+            int slots = AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
+            checkQueryALError("alGetSourcei-Processed");
+            if (slots <= 0) break;
+            // Acquire data before unqueueing: unqueueing without a replacement detaches
+            // the buffer id, and only this method can re-attach processed buffers.
+            byte[] data = supplier.next();
+            if (data == null) break;
             int[] buffer = new int[1];
             clearStaleALError();
             AL10.alSourceUnqueueBuffers(source, buffer);
             checkALError("alSourceUnqueueBuffers");
             ledger.removeHead();
-            byte[] data = supplier.next();
-            if (data == null) break;
             queueData(buffer[0], data, format, sampleRate);
             filled++;
         }
         return filled;
     }
 
-    private int fillEmpty(AudioChunkSupplier supplier, int maxSlots, int format, int sampleRate) {
-        int filled = 0;
-        while (filled < maxSlots) {
-            byte[] data = supplier.next();
-            if (data == null) break;
-            queueChunk(data, format, sampleRate);
-            filled++;
-        }
-        if (filled > 0) {
-            play();
-        }
-        return filled;
-    }
-
     public void queueChunk(byte[] data, int format, int sampleRate) {
         checkSourceValid();
-        int bufferId = buffers[roundRobinIndex];
-        roundRobinIndex = (roundRobinIndex + 1) % buffers.length;
-        queueData(bufferId, data, format, sampleRate);
+        queueData(takeFreeBuffer(), data, format, sampleRate);
+    }
+
+    private int takeFreeBuffer() {
+        Integer bufferId = detached.pollFirst();
+        if (bufferId == null) {
+            throw new IllegalStateException("No free OpenAL buffer in the source pool");
+        }
+        return bufferId;
     }
 
     private void queueData(int bufferId, byte[] data, int format, int sampleRate) {
@@ -400,23 +408,37 @@ public final class OpenAlSource implements AutoCloseable {
         if (window.hasRemaining()) sink.onPcm(new PcmChunk(window, head.format(), head.sampleRate(), firstFrame, appliedGain, captureNanos));
     }
 
-    public void flush() {
+    /** Stop the source and detach every buffer, leaving the ledger queue to the caller. */
+    public void unqueueAll() {
         checkSourceValid();
         clearStaleALError();
         AL10.alSourceStop(source);
-        checkALError("alSourceStop-Flush");
+        checkALError("alSourceStop-UnqueueAll");
         clearStaleALError();
         int queued = AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
-        checkQueryALError("alGetSourcei-Queued-Flush");
+        checkQueryALError("alGetSourcei-Queued-UnqueueAll");
         for (int i = 0; i < queued; i++) {
             int[] buffer = new int[1];
             clearStaleALError();
             AL10.alSourceUnqueueBuffers(source, buffer);
-            checkALError("alSourceUnqueueBuffers-Flush");
+            checkALError("alSourceUnqueueBuffers-UnqueueAll");
         }
-        ledger.resetQueue();
-        roundRobinIndex = 0;
+        resetBufferPool();
         lastSampleOffset = -1;
+    }
+
+    public void flush() {
+        unqueueAll();
+        ledger.resetQueue();
+    }
+
+    private void resetBufferPool() {
+        detached.clear();
+        for (int id : buffers) {
+            if (id != 0) {
+                detached.addLast(id);
+            }
+        }
     }
 
     public void play() {
@@ -437,9 +459,8 @@ public final class OpenAlSource implements AutoCloseable {
 
     public SourcePcmClock.Reading getPcmClock() { return lastPcmClock; }
 
+    @Getter
     private volatile float appliedGain = 1;
-
-    public float getAppliedGain() { return appliedGain; }
 
     public void setGain(float gain) {
         checkSourceValid();
@@ -464,6 +485,25 @@ public final class OpenAlSource implements AutoCloseable {
     public int queuedCount() {
         checkSourceValid();
         return AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
+    }
+
+    /**
+     * Bytes already consumed from the attached queue. {@code AL_SAMPLE_OFFSET} is
+     * queue-relative (processed buffers included), so no per-buffer bookkeeping is needed.
+     * Returns -1 when the position is unknown.
+     */
+    public long playedQueueBytes() {
+        if (source == 0) return -1;
+        PlaybackLedger.LedgerEntry head = ledger.peekFirst();
+        if (head == null || head.sampleCount() <= 0) return 0;
+        int state = AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE);
+        // A stopped streaming source reports offset 0 but has consumed the whole queue.
+        if (state == AL10.AL_STOPPED) return ledger.queuedBytes.get();
+        if (state == AL10.AL_INITIAL) return 0;
+        int offset = AL10.alGetSourcei(source, AL11.AL_SAMPLE_OFFSET);
+        if (offset < 0) return -1;
+        int frameBytes = head.bytes() / head.sampleCount();
+        return Math.min((long) offset * frameBytes, ledger.queuedBytes.get());
     }
 
     public static int bytesPerSample(int format) {
@@ -522,6 +562,7 @@ public final class OpenAlSource implements AutoCloseable {
                 buffers[i] = 0;
             }
         }
+        detached.clear();
     }
 
     /**

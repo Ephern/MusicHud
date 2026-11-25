@@ -24,6 +24,7 @@ import indi.etern.musichud.client.ui.components.cards.MusicCollectionCard;
 import indi.etern.musichud.client.ui.drawable.ScaledImageDrawable;
 import indi.etern.musichud.client.utils.image.ImageUtils;
 import indi.etern.musichud.client.utils.ui.*;
+import indi.etern.musichud.interfaces.ClientConfig;
 import indi.etern.musichud.interfaces.Unregister;
 import lombok.Getter;
 import net.minecraft.client.Minecraft;
@@ -86,6 +87,7 @@ public class SidebarView extends LinearLayout {
     private static final float MORPH_SETTLE_VELOCITY = 0.05f;
 
     private static final MusicService musicService = MusicService.getInstance();
+    private static final ClientConfig clientConfig = ClientConfig.getInstance();
     private static final Logger LOGGER = MusicHud.getLogger(SidebarView.class);
     private static final NowPlayingInfo nowPlayingInfo = NowPlayingInfo.getInstance();
     private static final AtomicInteger progressUpdaterToken = new AtomicInteger(0);
@@ -1012,7 +1014,6 @@ public class SidebarView extends LinearLayout {
         scrollViewContainer.setOrientation(VERTICAL);
         libraryPage.addView(scrollViewContainer, new LinearLayout.LayoutParams(MATCH_PARENT, MATCH_PARENT));
         LayoutTransition transition = new LayoutTransition();
-        transition.setAnimateParentHierarchy(false);
         transition.enableTransitionType(LayoutTransition.CHANGING);
         LayoutTransitionReflow.attach(transition);
         scrollViewContainer.setLayoutTransition(transition);
@@ -1163,6 +1164,13 @@ public class SidebarView extends LinearLayout {
         idlePlaySourceCardMap.clear();
         clientIdlePlaySourceCardsList.removeAllViews();
         serverIdlePlaySourceCardsList.removeAllViews();
+        if (!clientConfig.getEnable()) {
+            clientIdlePlaySourceView.setVisibility(GONE);
+            serverIdlePlaySourceView.setVisibility(GONE);
+            queueRow.setVisibility(GONE);
+            applyNextToPlay(false, null);
+            return;
+        }
         localPlayer = Minecraft.getInstance().player;
 
         clientIdlePlaySources.forEach(idlePlaySource -> {
@@ -1194,6 +1202,9 @@ public class SidebarView extends LinearLayout {
     }
 
     private void addIdlePlaySourceTo(IdlePlaySource idlePlaySource, ViewGroup targetView, boolean local) {
+        if (!clientConfig.getEnable()) {
+            return;
+        }
         CardKey key = CardKey.of(local, idlePlaySource);
         MusicCollection musicCollection = idlePlaySource.getMusicCollection();
         if (MusicCollections.isUsable(musicCollection)) {
@@ -1232,6 +1243,9 @@ public class SidebarView extends LinearLayout {
 
     private void addInternal(IdlePlaySource idlePlaySource, MusicCollection musicCollection,
                              ViewGroup targetView, CardKey key) {
+        if (!clientConfig.getEnable()) {
+            return;
+        }
         MusicCollectionCard child = new MusicCollectionCard(getContext(), musicCollection, idlePlaySource.getPusherInfo(), dp(58));
         child.setImageCornerRadius(dp(4));
         child.setBackgroundPadding(cardPadding);
@@ -1241,6 +1255,11 @@ public class SidebarView extends LinearLayout {
     }
 
     private void checkQueueVisibility(Queue<QueueItem> queue) {
+        if (!clientConfig.getEnable()) {
+            queueRow.setVisibility(GONE);
+            applyNextToPlay(false, null);
+            return;
+        }
         if (queue.isEmpty()) {
             queueRow.setVisibility(GONE);
             checkNextToPlay(NowPlayingInfo.getInstance().getNextToPlayMusic());
@@ -1252,7 +1271,7 @@ public class SidebarView extends LinearLayout {
     }
 
     private void checkIdlePlaySources(Set<IdlePlaySource> idlePlaySources, View targetView) {
-        int visibility = idlePlaySources.isEmpty() ? GONE : VISIBLE;
+        int visibility = clientConfig.getEnable() && !idlePlaySources.isEmpty() ? VISIBLE : GONE;
         if (targetView.getVisibility() != visibility) {
             targetView.post(() -> targetView.setVisibility(visibility));
         }
@@ -1260,6 +1279,10 @@ public class SidebarView extends LinearLayout {
     }
 
     private void checkNextToPlay(Traceable<MusicDetail> nextIdle) {
+        if (!clientConfig.getEnable()) {
+            applyNextToPlay(false, null);
+            return;
+        }
         Queue<QueueItem> musicQueue = musicService.getMusicQueue();
         boolean hasIdlePlaySources = !musicService.getIdlePlaySourceState().local().getSources().isEmpty()
                 || !musicService.getIdlePlaySourceState().external().getSources().isEmpty();

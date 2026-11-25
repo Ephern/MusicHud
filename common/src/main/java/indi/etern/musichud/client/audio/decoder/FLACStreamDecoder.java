@@ -16,7 +16,6 @@ public class FLACStreamDecoder implements AudioDecoder {
     private final FLACDecoder decoder;
     private final BufferedInputStream inputStream;
     private final int sampleRate;
-    private final int inputBytesPerSample;
     private final int inputFrameBytes;
     private final int bitsPerSample;
     private final int sourceChannels;
@@ -29,10 +28,8 @@ public class FLACStreamDecoder implements AudioDecoder {
     private volatile IResampler channelMixer;
     private volatile IResampler bitDepthResampler;
     private volatile boolean discreteAttempt;
-
-    public FLACStreamDecoder(BufferedInputStream inputStream, boolean useFloat32) throws IOException {
-        this(inputStream, useFloat32, MultichannelMode.PREFER_DISCRETE);
-    }
+    /** Reused across frames: jFLAC over-allocates its output capacity per frame. */
+    private ByteData pcmBuffer;
 
     public FLACStreamDecoder(BufferedInputStream inputStream, boolean useFloat32, MultichannelMode mode) throws IOException {
         this.inputStream = inputStream;
@@ -48,7 +45,7 @@ public class FLACStreamDecoder implements AudioDecoder {
             int bitsPerSample = streamInfo.getBitsPerSample();
             this.sourceChannels = channels;
             this.bitsPerSample = bitsPerSample;
-            this.inputBytesPerSample = bitsPerSample / 8;
+            int inputBytesPerSample = bitsPerSample / 8;
             this.inputFrameBytes = channels * inputBytesPerSample;
 
             if (channels <= 2) {
@@ -187,12 +184,13 @@ public class FLACStreamDecoder implements AudioDecoder {
             if (frame == null)
                 break;
 
-            ByteData byteData = decoder.decodeFrame(frame, null);
+            ByteData byteData = decoder.decodeFrame(frame, pcmBuffer);
             if (byteData == null)
                 break;
+            // decodeFrame returns a fresh buffer when the reused one is too small.
+            pcmBuffer = byteData;
 
-            byte[] frameData = byteData.getData();
-            output.write(frameData, 0, byteData.getLen());
+            output.write(byteData.getData(), 0, byteData.getLen());
         }
 
         if (output.size() == 0) return null;

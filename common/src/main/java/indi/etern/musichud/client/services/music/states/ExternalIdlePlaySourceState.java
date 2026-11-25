@@ -52,7 +52,15 @@ public class ExternalIdlePlaySourceState extends AbstractIdlePlaySourceLayerStat
     }
 
     @Override
-    public void reset() {
+    public synchronized void reset() {
+        if (sources.isEmpty()) {
+            return;
+        }
+        List<IdlePlaySource> removed = List.copyOf(sources);
         sources.clear();
+        for (IdlePlaySource source : removed) {
+            notifyChange(source);
+            notifyRemove(source);
+        }
     }
 }

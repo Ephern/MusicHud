@@ -22,8 +22,8 @@ import indi.etern.musichud.interfaces.IClientLoginService;
 import indi.etern.musichud.interfaces.IConnectionManager;
 import indi.etern.musichud.network.IClientNetworkService;
 import indi.etern.musichud.network.RequestResponseManager;
-import indi.etern.musichud.network.payloads.pushMessages.c2s.LogoutMessage;
 import indi.etern.musichud.network.payloads.pushMessages.c2s.ConfirmConnectMessage;
+import indi.etern.musichud.network.payloads.pushMessages.c2s.LogoutMessage;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectRequest;
 import indi.etern.musichud.network.payloads.requestResponseCycle.ConnectResponse;
 import indi.etern.musichud.network.payloads.requestResponseCycle.GetInitialStateRequest;
@@ -62,6 +62,7 @@ public class ConnectionManager implements IConnectionManager {
     private static volatile ConnectionManager instance;
     private final AtomicInteger toggleVersion = new AtomicInteger(0);
     private final AtomicInteger connectGeneration = new AtomicInteger(0);
+    private final IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
     private double lastPressTime;
     private volatile LastMode lastMode = LastMode.NONE;
     @Getter
@@ -149,6 +150,7 @@ public class ConnectionManager implements IConnectionManager {
         });
     }
 
+    @SuppressWarnings("BooleanMethodIsAlwaysInverted")
     private static boolean sleepMillis(long millis) {
         try {
             Thread.sleep(millis);
@@ -194,18 +196,24 @@ public class ConnectionManager implements IConnectionManager {
             clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         }
         ConnectionStateMachine.enterDisconnected();
+        MusicService.getInstance().getIdlePlaySourceState().external().reset();
         launchIsolated();
     }
 
     @Override
     public synchronized void disconnect() {
+        disconnectInternal(true);
+    }
+
+    private synchronized void disconnectInternal(boolean resetPresentation) {
         // Send before switching the state so the network channel is still used in multiplayer
         // (after the transition the payload would fall back to the local loopback branch).
         clientNetworkService.sendToServer(LogoutMessage.MESSAGE);
         ConnectionStateMachine.enterDisconnected();
         MusicService.resetCurrentMusicStatus(false);
-        NowPlayingInfo.getInstance().stop();
+        NowPlayingInfo.getInstance().stop(resetPresentation);
         StreamAudioPlayer.getInstance().stop();
+        MusicService.getInstance().getIdlePlaySourceState().external().reset();
         connectGeneration.incrementAndGet();
     }
 
@@ -225,7 +233,7 @@ public class ConnectionManager implements IConnectionManager {
                 if (clientConfig.getEnableIsolatedMode()) {
                     switchToIsolate();
                 } else {
-                    disconnect();
+                    disconnectInternal(false);
                 }
             });
             return true;
@@ -293,9 +301,7 @@ public class ConnectionManager implements IConnectionManager {
 
     @Override
     public void connectAsPrevious() {
-        // Restore the last connection mode instead of guessing from the current state
-        // (e.g. after re-enabling the mod, the state is always DISCONNECTED).
-        if (lastMode == LastMode.EXTERNAL) {
+        if (lastMode == LastMode.EXTERNAL || clientDistUtil.inIntegratedServer()) {
             IConnectionManager.getInstance().connectToExternalServer();
         } else {
             IConnectionManager.getInstance().launchIsolated();
@@ -305,7 +311,6 @@ public class ConnectionManager implements IConnectionManager {
     @Override
     public synchronized void onConnectResponse(ConnectResponse payload) {
         this.serverVersion = payload.serverVersion();
-        IClientDistUtil clientDistUtil = IClientDistUtil.getInstance();
         IClientLoginService clientLoginService = IClientLoginService.getInstance();
         if (ConnectionStateMachine.getState() == ConnectionState.CONNECTING
                 && payload.accepted() && Version.compatibleWith(payload.serverVersion())) {
@@ -323,7 +328,7 @@ public class ConnectionManager implements IConnectionManager {
                     && clientConfig.getEnableIsolatedMode()) {
                 // Stop leftover isolated-mode playback before switching to server tracks.
                 MusicService.resetCurrentMusicStatus(false);
-                NowPlayingInfo.getInstance().stop();
+                NowPlayingInfo.getInstance().stop(false);
                 StreamAudioPlayer.getInstance().stop();
             }
             // Arm the local layer's !loaded guard BEFORE ConfirmConnect: the server answers

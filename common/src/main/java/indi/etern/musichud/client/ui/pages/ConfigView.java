@@ -89,12 +89,12 @@ public class ConfigView extends LinearLayout {
                 clientConfig::setEnable)
                 .setDefaultValue(clientConfig.getDefaultEnable())
                 .setOnChanged(() -> {
-                    MuiModApi.postToUiThread(MainFragment::refresh);
                     if (clientConfig.getEnable()) {
                         connectionManager.connectAsPrevious();
                     } else {
                         connectionManager.disconnect();
                     }
+                    MuiModApi.postToUiThread(MainFragment::refresh);
                 })
                 .create(commonCategory);
         new PreferencesFragment.BooleanOption(context,
