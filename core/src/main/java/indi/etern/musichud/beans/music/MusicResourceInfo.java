@@ -54,6 +54,11 @@ public class MusicResourceInfo {
         return Objects.requireNonNullElse(url, "");
     }
 
+    /** A resolved, playable resource. The {@link #NONE} singleton and empty responses fail this check. */
+    public boolean isUsable() {
+        return this != NONE && !getUrl().isEmpty();
+    }
+
     public Quality getQuality() {
         return Objects.requireNonNullElse(quality, Quality.NONE);
     }

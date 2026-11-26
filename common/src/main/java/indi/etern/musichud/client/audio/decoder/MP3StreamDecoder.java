@@ -1,5 +1,9 @@
 package indi.etern.musichud.client.audio.decoder;
 
+import indi.etern.musichud.client.audio.info.AudioChannelLayout;
+import indi.etern.musichud.client.audio.info.AudioContainer;
+import indi.etern.musichud.client.audio.info.AudioOutputInfo;
+import indi.etern.musichud.client.audio.info.DecodedStreamInfo;
 import javazoom.jl.decoder.*;
 import lombok.SneakyThrows;
 import org.lwjgl.openal.AL10;
@@ -10,10 +14,16 @@ import java.io.ByteArrayOutputStream;
 public class MP3StreamDecoder implements AudioDecoder {
     private final Bitstream bitstream;
     private final Decoder decoder;
-    private int format;
-    private int sampleRate;
-    private int frameSize;
-    private boolean initialized = false;
+    private volatile int format;
+    private volatile int sampleRate;
+    private volatile int channels = 2;
+    private volatile int frameSize;
+    private volatile boolean initialized = false;
+    private final Object bitrateLock = new Object();
+    private long bitrateSum;
+    private long frameCount;
+    private int minBitrate = Integer.MAX_VALUE;
+    private int maxBitrate;
 
     public MP3StreamDecoder(BufferedInputStream inputStream) {
         this.bitstream = new Bitstream(inputStream);
@@ -30,9 +40,22 @@ public class MP3StreamDecoder implements AudioDecoder {
                 if (header == null) {
                     break;
                 }
+                // bitrate() is bps; bitrateInstant() exposes frame values for VBR detection.
+                int bitrate = header.bitrate();
+                int instantBitrate = header.bitrateInstant();
+                synchronized (bitrateLock) {
+                    if (bitrate > 0) {
+                        bitrateSum += bitrate;
+                        frameCount++;
+                    }
+                    if (instantBitrate > 0) {
+                        minBitrate = Math.min(minBitrate, instantBitrate);
+                        maxBitrate = Math.max(maxBitrate, instantBitrate);
+                    }
+                }
                 if (!initialized) {
                     this.sampleRate = header.frequency();
-                    int channels = header.mode() == Header.SINGLE_CHANNEL ? 1 : 2;
+                    this.channels = header.mode() == Header.SINGLE_CHANNEL ? 1 : 2;
                     this.format = channels == 1 ? AL10.AL_FORMAT_MONO16 : AL10.AL_FORMAT_STEREO16;
                     frameSize = sampleRate * channels * 16 / 8/*bitsPerSample*/;
                     initialized = true;
@@ -76,6 +99,43 @@ public class MP3StreamDecoder implements AudioDecoder {
     @Override
     public int getFrameSize() {
         return frameSize;
+    }
+
+    @Override
+    public DecodedStreamInfo getStreamInfo() {
+        if (!initialized) {
+            return null;
+        }
+        long frames;
+        long sum;
+        int min;
+        int max;
+        synchronized (bitrateLock) {
+            frames = frameCount;
+            sum = bitrateSum;
+            min = minBitrate;
+            max = maxBitrate;
+        }
+        int averageBitrate = frames == 0 ? 0 : (int) (sum / frames);
+        boolean variableBitrate = frames > 1 && min != max;
+        return new DecodedStreamInfo(
+                AudioContainer.MP3,
+                AudioChannelLayout.fromChannels(channels),
+                sampleRate,
+                channels,
+                0,
+                averageBitrate,
+                -1,
+                variableBitrate
+        );
+    }
+
+    @Override
+    public AudioOutputInfo getOutputInfo() {
+        if (!initialized) {
+            return null;
+        }
+        return AudioOutputInfo.describe(format, sampleRate, channels, false);
     }
 
     @Override

@@ -625,12 +625,12 @@ public class ApiServerEndpointsMeta {
     public static class Music {
         public static final UrlMeta<MusicApiService.GetDirectResourceUrlResponse> URL = new UrlMeta<>(
                 "/song/url/v1",
-                Set.of("id", "unblock"/*true|false*/, "level"/* standard|higher|exhigh|lossless|hires|jyeffect|sky|dolby|jymaster */),
+                Set.of("id", "unblock"/*true|false*/, "level"/* standard|higher|exhigh|lossless|hires|jyeffect|sky|dolby|vivid|jymaster */),
                 null,
                 true,
                 false,
                 false,
-                true,
+                false,
                 Set.of(200),
                 MusicApiService.GetDirectResourceUrlResponse.class);
         public static final UrlMeta<String> CHECK = new UrlMeta<>(
@@ -650,7 +650,7 @@ public class ApiServerEndpointsMeta {
                 true,
                 false,
                 false,
-                true,
+                false,
                 Set.of(200),
                 MusicApiService.GetMatchResourceUrlResponse.class);
         public static final UrlMeta<MusicApiService.MusicDetailsResponse> DETAIL = new UrlMeta<>(

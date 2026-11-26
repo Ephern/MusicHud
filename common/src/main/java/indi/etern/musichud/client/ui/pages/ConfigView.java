@@ -16,7 +16,6 @@ import icyllis.modernui.widget.*;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.ClientUserDataStore;
-import indi.etern.musichud.beans.music.Quality;
 import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.beans.option.ScrobbleOption;
 import indi.etern.musichud.client.services.ConnectionManager;
@@ -25,6 +24,7 @@ import indi.etern.musichud.client.ui.components.modals.ApiServerDownloadDialog;
 import indi.etern.musichud.client.ui.components.modals.Modal;
 import indi.etern.musichud.client.ui.components.options.AdaptiveFloatOption;
 import indi.etern.musichud.client.ui.components.options.AdaptiveIntegerOption;
+import indi.etern.musichud.client.ui.components.options.QualityPriorityOption;
 import indi.etern.musichud.client.ui.screen.HudConfigFragment;
 import indi.etern.musichud.client.ui.screen.HudConfigScreen;
 import indi.etern.musichud.client.ui.screen.MainFragment;
@@ -132,16 +132,15 @@ public class ConfigView extends LinearLayout {
                 .setRange(1, 100)
                 .setDefaultValue(clientConfig.getDefaultSoundVolumeInterval())
                 .create(commonCategory);
-        Quality[] qualities = {Quality.STANDARD, Quality.EX_HIGH, Quality.LOSSLESS, Quality.HIRES, Quality.JY_EFFECT, Quality.DOLBY, Quality.JY_MASTER, Quality.SKY};
-        List<Quality> qualitiesList = Arrays.stream(qualities).toList();
-        new PreferencesFragment.DropDownOption<>(
+        new QualityPriorityOption(
                 context,
-                I18n.get(MusicHud.MOD_ID + ".config.common.primaryChosenQuality"),
-                qualities,
-                qualitiesList::indexOf,
-                clientConfig::getPrimaryChosenQuality,
-                clientConfig::setPrimaryChosenQuality)
-                .setDefaultValue(clientConfig.getDefaultPrimaryChosenQuality())
+                clientConfig::getQualityPriority,
+                priority -> {
+                    clientConfig.setQualityPriority(priority);
+                    clientConfig.save();
+                },
+                () -> {
+                })
                 .create(commonCategory);
         MultichannelMode[] multichannelModes = {MultichannelMode.PREFER_DISCRETE, MultichannelMode.FORCE_DOWNMIX};
         List<MultichannelMode> multichannelModesList = Arrays.stream(multichannelModes).toList();

@@ -48,6 +48,12 @@ public interface IMusicApiService {
 
     MusicResourceInfo getResourceInfo(MusicDetail musicDetail, Quality quality, UUID playerUUID);
 
+    /** Official quality only; never substitutes an unblocked source. */
+    MusicResourceInfo getOfficialResourceInfo(MusicDetail musicDetail, Quality quality, UUID playerUUID);
+
+    /** Explicit unblocked source; reported quality is {@link Quality#NONE}. */
+    MusicResourceInfo getUnblockedResourceInfo(MusicDetail musicDetail, UUID playerUUID);
+
     UserCategoryPlaylists getPlayersUserPlaylists(boolean ignoreCache, UUID playerUUID);
 
     LinkedHashSet<Album> getPlayersUserSubscribedAlbums(boolean ignoreCache, UUID playerUUID);

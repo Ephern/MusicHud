@@ -4,6 +4,7 @@ import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.music.*;
 import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.decoder.*;
+import indi.etern.musichud.client.audio.info.*;
 import indi.etern.musichud.client.audio.source.SpoolBuffer;
 import indi.etern.musichud.client.interfaces.IClientEventService;
 import indi.etern.musichud.client.ui.ToastUtil;
@@ -208,6 +209,20 @@ public class PlaybackTask {
     /** Resolved resource (url/quality/size); replaced wholesale, never mutated in place. */
     private final AtomicReference<MusicResourceInfo> resourceInfo =
             new AtomicReference<>(MusicResourceInfo.NONE);
+    /** Quality of the resource request that won, used for the client-side source guess. */
+    private volatile Quality requestedQuality = Quality.NONE;
+    private volatile AudioSource audioSource = AudioSource.UNKNOWN;
+    /** Source/output metadata of the open decoder, cleared per download attempt. */
+    private volatile DecodedStreamInfo decodedStream;
+    private volatile AudioOutputInfo decodedOutput;
+    private final AtomicReference<AudioPlaybackInfo> audioInfo = new AtomicReference<>();
+    private final Set<Consumer<AudioPlaybackInfo>> audioInfoListeners = new CopyOnWriteArraySet<>();
+    private final AtomicLong audioInfoRevision = new AtomicLong();
+    private final AtomicBoolean audioInfoLogged = new AtomicBoolean();
+    /** Keeps snapshot publication ordered when download/play/spool threads publish concurrently. */
+    private final Object audioInfoLock = new Object();
+    /** Prevents a failing priority plan from showing the same toast on every retry. */
+    private volatile boolean resourceResolveErrorNotified;
     /** Disk-backed network buffer. */
     private volatile SpoolBuffer audioSpool;
     private Unregister scrobbleOnQuitUnregister;
@@ -280,6 +295,116 @@ public class PlaybackTask {
 
     public void addStateListener(Consumer<PlaybackState> listener) {
         stateListeners.add(listener);
+    }
+
+    /** Last published metadata snapshot, or {@code null} before a resource is resolved. */
+    @Nullable
+    public AudioPlaybackInfo audioInfo() {
+        return audioInfo.get();
+    }
+
+    /**
+     * Observe metadata snapshots. If a snapshot already exists it is delivered once on the
+     * caller's thread; later snapshots arrive from the download/play/spool worker threads, so
+     * consumers must dispatch UI work themselves and may drop callbacks by {@code revision}.
+     */
+    public Unregister addAudioInfoListener(Consumer<AudioPlaybackInfo> listener) {
+        audioInfoListeners.add(listener);
+        AudioPlaybackInfo current = audioInfo.get();
+        if (current != null) {
+            deliverAudioInfo(listener, current);
+        }
+        return () -> audioInfoListeners.remove(listener);
+    }
+
+    private void deliverAudioInfo(Consumer<AudioPlaybackInfo> listener, AudioPlaybackInfo snapshot) {
+        try {
+            listener.accept(snapshot);
+        } catch (Throwable t) {
+            LOGGER.warn("Audio info listener failed", t);
+        }
+    }
+
+    private void publishAudioInfo() {
+        AudioPlaybackInfo snapshot;
+        synchronized (audioInfoLock) {
+            snapshot = buildAudioInfo();
+            audioInfo.set(snapshot);
+        }
+        logAudioInfoOnce(snapshot);
+        for (Consumer<AudioPlaybackInfo> listener : audioInfoListeners) {
+            deliverAudioInfo(listener, snapshot);
+        }
+    }
+
+    private AudioPlaybackInfo buildAudioInfo() {
+        MusicResourceInfo resource = resourceInfo.get();
+        AudioStreamInfo stream = buildStreamInfo(decodedStream);
+        Quality reported = resource.getQuality().canonical();
+        Quality estimated = QualityEstimator.estimate(stream).canonical();
+        Quality effective = QualityEstimator.effective(reported, estimated, stream);
+        return new AudioPlaybackInfo(
+                audioInfoRevision.incrementAndGet(),
+                musicDetail == null ? -1 : musicDetail.getId(),
+                requestedQuality,
+                reported,
+                estimated,
+                effective,
+                QualityEstimator.isMismatch(reported, estimated, effective),
+                audioSource,
+                resource.getType(),
+                resource.getBitrate(),
+                resource.getSize(),
+                stream,
+                decodedOutput
+        );
+    }
+
+    private @Nullable AudioStreamInfo buildStreamInfo(@Nullable DecodedStreamInfo decoded) {
+        if (decoded == null) return null;
+        int declaredMs = musicDetail == null ? 0 : Math.max(0, musicDetail.getDurationMillis());
+        long durationMs = decoded.totalSamples() > 0 && decoded.sampleRate() > 0
+                ? decoded.totalSamples() * 1000L / decoded.sampleRate()
+                : declaredMs;
+        int bitrateBps = decoded.bitrateBps();
+        long sizeBytes = resourceInfo.get().getSize();
+        // Lossless containers carry no bitrate field; derive it from the object size.
+        if (bitrateBps <= 0 && durationMs > 0 && sizeBytes > 0) {
+            bitrateBps = (int) Math.min(Integer.MAX_VALUE, sizeBytes * 8000.0 / durationMs);
+        }
+        return new AudioStreamInfo(decoded.container(), decoded.channelLayout(), decoded.sampleRate(),
+                decoded.channels(), decoded.bitsPerSample(), bitrateBps, decoded.totalSamples(),
+                durationMs, decoded.variableBitrate());
+    }
+
+    private boolean updateDecoderInfo(AudioDecoder decoder) {
+        DecodedStreamInfo stream = decoder.getStreamInfo();
+        AudioOutputInfo output = decoder.getOutputInfo();
+        boolean changed = !Objects.equals(decodedStream, stream) || !Objects.equals(decodedOutput, output);
+        decodedStream = stream;
+        decodedOutput = output;
+        return changed;
+    }
+
+    private void publishResourceInfo(Quality requested, AudioSource source) {
+        requestedQuality = requested == null ? Quality.NONE : requested.canonical();
+        audioSource = source;
+        publishAudioInfo();
+    }
+
+    private void logAudioInfoOnce(AudioPlaybackInfo info) {
+        if (info.stream() == null || info.output() == null || !audioInfoLogged.compareAndSet(false, true)) {
+            return;
+        }
+        LOGGER.debug("Audio metadata resolved: name='{}', id={}, requested={}, reported={}, estimated={}, "
+                        + "effective={}, mismatch={}, source={}, reportedType={}, reportedBitrate={} bps, "
+                        + "size={} B, stream={}, output={}",
+                musicDetail == null ? "?" : musicDetail.getName(), info.musicId(),
+                info.requestedQuality().name(), info.reportedQuality().name(),
+                info.estimatedQuality().name(), info.effectiveQuality().name(),
+                info.qualityMismatch(), info.source(),
+                info.reportedType(), info.reportedBitrateBps(), info.sizeBytes(),
+                info.stream(), info.output());
     }
 
     /**
@@ -373,12 +498,19 @@ public class PlaybackTask {
         while (!cancelled && !restartRequested) {
             int trial = localRetryCount + 1;
             try {
+                decodedStream = null;
+                decodedOutput = null;
                 MusicResourceInfo resource = resourceInfo.get();
-                if (forceResourceRefresh || resource == null || resource.equals(MusicResourceInfo.NONE)
-                        || localRetryCount % 3 == 0) {
+                if (forceResourceRefresh || !resource.isUsable() || localRetryCount % 3 == 0) {
                     forceResourceRefresh = false;
-                    resource = getCurrentMusicResourceInfo(clientConfig.getPrimaryChosenQuality(), resource).get();
-                    if (resource == null) {
+                    ResolvedResource resolved = resolveResource(clientConfig.getQualityPriority(), resource);
+                    resource = resolved.info();
+                    if (!resource.isUsable()) {
+                        if (!resourceResolveErrorNotified) {
+                            resourceResolveErrorNotified = true;
+                            ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
+                            setState(PlaybackState.ERROR);
+                        }
                         try {
                             Thread.sleep(500);
                         } catch (InterruptedException ie) {
@@ -386,7 +518,9 @@ public class PlaybackTask {
                         }
                         continue;
                     }
+                    resourceResolveErrorNotified = false;
                     resourceInfo.set(resource);
+                    publishResourceInfo(resolved.requested(), resolved.source());
                     if (cancelled || restartRequested) return;
                 }
 
@@ -421,6 +555,9 @@ public class PlaybackTask {
                 resetSyncAccounting();
                 ledger.decodedBytes.set(0);
                 setState(PlaybackState.LOADING);
+                if (updateDecoderInfo(decoder)) {
+                    publishAudioInfo();
+                }
 
                 if (forceSync) {
                     syncPlaying();
@@ -434,6 +571,10 @@ public class PlaybackTask {
                     enqueueAudio(audioData);
                     ledger.decodedBytes.addAndGet(audioData.length);
                     initialBuffers++;
+                }
+                // MP3 needs the initial frames before stream info exists.
+                if (updateDecoderInfo(decoder)) {
+                    publishAudioInfo();
                 }
 
                 while (!cancelled && !restartRequested) {
@@ -1306,6 +1447,9 @@ public class PlaybackTask {
                 long bytes = Math.max(0, Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000);
                 ledger.anchor(bytes - bytes % frameBytes);
             }
+            if (updateDecoderInfo(currentDecoder)) {
+                publishAudioInfo();
+            }
         }
     }
 
@@ -1334,6 +1478,7 @@ public class PlaybackTask {
         }
 
         LOGGER.warn("Discrete multichannel buffer rejected by OpenAL device, falling back to stereo downmix", e);
+        boolean infoChanged;
         synchronized (decoder) {
             int previousFrameBytes = OpenAlSource.bytesPerSample(decoder.getFormat());
             decoder.fallbackToDownmix();
@@ -1347,6 +1492,10 @@ public class PlaybackTask {
             resetSyncAccounting();
             lastDecoderFormat = -1;
             lastDecoderSampleRate = -1;
+            infoChanged = updateDecoderInfo(decoder);
+        }
+        if (infoChanged) {
+            publishAudioInfo();
         }
         releaseSourceForRebuild();
         return true;
@@ -1620,8 +1769,8 @@ public class PlaybackTask {
 
     private void sendScrobbleOptionally() {
         MusicResourceInfo resource = resourceInfo.get();
-        if (musicDetail != null && !MusicDetail.NONE.equals(musicDetail) && !resource.equals(MusicResourceInfo.NONE)) {
-            Quality quality = resource.getQuality();
+        if (musicDetail != null && !MusicDetail.NONE.equals(musicDetail) && resource.isUsable()) {
+            Quality quality = resource.getQuality().canonical();
             if (quality != Quality.NONE) {
                 int durationSec = musicDetail.getDurationMillis() / 1000;
                 int playedSec = serverStartTime == null ? durationSec : Math.toIntExact(Duration.between(serverStartTime, ZonedDateTime.now()).toSeconds());
@@ -1693,19 +1842,22 @@ public class PlaybackTask {
             audioSpool = null;
         }
         MusicResourceInfo info = resourceInfo.get();
-        if (info.equals(MusicResourceInfo.NONE) || info.getUrl().isEmpty()) return null;
+        if (!info.isUsable()) return null;
         SpoolBuffer opened = SpoolBuffer.open(info.getUrl(), info.getSize(), this::refreshSpoolUrl,
-                "track-" + musicDetail.getId() + "-" + info.getQuality().name());
+                "track-" + musicDetail.getId() + "-" + info.getQuality().canonical().name());
         audioSpool = opened;
         return opened;
     }
 
     private String refreshSpoolUrl(String staleUrl) {
         MusicResourceInfo previous = resourceInfo.get();
+        Quality quality = previous.isUsable()
+                ? previous.getQuality().canonical()
+                : clientConfig.getQualityPriority().first();
         String retryFor = previous.getUrl().isEmpty() ? (staleUrl == null ? "" : staleUrl) : previous.getUrl();
         try {
             MusicResourceInfo refreshed = RequestResponseManager.send(
-                            new GetMusicResourceRequest(musicDetail.getId(), clientConfig.getPrimaryChosenQuality(), retryFor),
+                            new GetMusicResourceRequest(musicDetail.getId(), quality, retryFor),
                             GetMusicResourceResponse.class,
                             Duration.ofSeconds(10))
                     .thenApply(GetMusicResourceResponse::getMusicResourceInfo)
@@ -1714,6 +1866,7 @@ public class PlaybackTask {
                 return null;
             }
             resourceInfo.set(refreshed);
+            publishResourceInfo(quality, ResolvedResource.sourceOf(quality));
             LOGGER.info("Refreshed the audio resource url for the spool");
             return refreshed.getUrl();
         } catch (Exception e) {
@@ -1785,30 +1938,98 @@ public class PlaybackTask {
         }
     }
 
-    private CompletableFuture<MusicResourceInfo> getCurrentMusicResourceInfo(Quality quality, MusicResourceInfo previous) {
-        String url = previous == null || previous.getUrl() == null ? "" : previous.getUrl();
-        return RequestResponseManager.send(
-                        new GetMusicResourceRequest(musicDetail.getId(), quality, url),
-                        GetMusicResourceResponse.class,
-                        Duration.ofSeconds(10))
-                .thenCompose(response -> {
-                    MusicResourceInfo resolved = response.getMusicResourceInfo();
-                    if (resolved == MusicResourceInfo.NONE) {
-                        ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
-                        setState(PlaybackState.ERROR);
-                        return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
-                    }
-                    return CompletableFuture.completedFuture(resolved);
-                }).exceptionallyCompose(e -> {
-                    ToastUtil.show(I18n.get(MusicHud.MOD_ID + ".text.failedToLoadMusicResource"));
-                    setState(PlaybackState.ERROR);
-                    return CompletableFuture.failedFuture(new RuntimeException("Failed to load music resource"));
-                });
+    private ResolvedResource resolveResource(QualityPriority priority, MusicResourceInfo previous) {
+        // URL expiry / CDN retry: keep the actual quality instead of restarting the whole plan.
+        if (previous != null && previous.isUsable()) {
+            MusicResourceInfo refreshed = requestResource(previous.getQuality().canonical(), previous.getUrl());
+            if (refreshed != null && refreshed.isUsable()) {
+                return ResolvedResource.of(refreshed, previous.getQuality());
+            }
+        }
+
+        List<Quality> order = priority.enabledOrder();
+        List<Quality> remaining = new ArrayList<>(order);
+        int maxRequestedRank = -1;
+        long deadline = System.currentTimeMillis() + 30_000L;
+        while (!remaining.isEmpty()) {
+            if (cancelled || restartRequested || System.currentTimeMillis() > deadline) {
+                break;
+            }
+            Quality requested = remaining.removeFirst().canonical();
+            maxRequestedRank = Math.max(maxRequestedRank, requested.rank());
+            MusicResourceInfo info = requestResource(requested, "");
+            if (info == null || !info.isUsable()) {
+                continue;
+            }
+            Quality actual = info.getQuality().canonical();
+            if (actual == Quality.NONE) {
+                continue;
+            }
+            int actualRank = actual.rank();
+            int actualIndex = order.indexOf(actual);
+            int requestedRank = maxRequestedRank;
+            remaining.removeIf(candidate -> {
+                Quality canonical = candidate.canonical();
+                // The API returned `actual` for a request capped at `requestedRank`;
+                // everything between them is unavailable on the API ladder.
+                if (canonical.rank() > actualRank && canonical.rank() <= requestedRank) {
+                    return true;
+                }
+                // Once an acceptable actual is known, less preferred entries cannot improve it.
+                return actualIndex >= 0 && order.indexOf(canonical) > actualIndex;
+            });
+            if (actualIndex >= 0) {
+                // The result is in hand; remaining now only lists candidates that might beat it.
+                remaining.remove(actual);
+                if (remaining.isEmpty()) {
+                    return ResolvedResource.of(info, requested);
+                }
+            }
+        }
+
+        if (priority.allowUnblocked() && !cancelled && !restartRequested) {
+            MusicResourceInfo info = requestResource(Quality.NONE, "");
+            if (info != null && info.isUsable()) {
+                return ResolvedResource.of(info, Quality.NONE);
+            }
+        }
+        return ResolvedResource.none();
+    }
+
+    @Nullable
+    private MusicResourceInfo requestResource(Quality quality, String retryFor) {
+        try {
+            return RequestResponseManager.send(
+                            new GetMusicResourceRequest(musicDetail.getId(), quality, retryFor),
+                            GetMusicResourceResponse.class,
+                            Duration.ofSeconds(10))
+                    .thenApply(GetMusicResourceResponse::getMusicResourceInfo)
+                    .get(15, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            LOGGER.warn("Failed to request music resource (quality={}, retryFor={}): {}",
+                    quality, retryFor, e.toString());
+            return null;
+        }
     }
 
     private enum PlayResult {
         FINISHED,
         RESTARTED
+    }
+
+    private record ResolvedResource(MusicResourceInfo info, Quality requested, AudioSource source) {
+        static ResolvedResource none() {
+            return new ResolvedResource(MusicResourceInfo.NONE, Quality.NONE, AudioSource.UNKNOWN);
+        }
+
+        static ResolvedResource of(MusicResourceInfo info, Quality requested) {
+            Quality canonical = requested == null ? Quality.NONE : requested.canonical();
+            return new ResolvedResource(info, canonical, sourceOf(canonical));
+        }
+
+        static AudioSource sourceOf(Quality requested) {
+            return requested == Quality.NONE ? AudioSource.UNBLOCKED : AudioSource.OFFICIAL;
+        }
     }
 
     /** Why {@link #mainLoop} returned; only {@link #ENDED} is a natural finish. */

@@ -5,9 +5,10 @@ import indi.etern.musichud.RuntimeFlags;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
 import indi.etern.musichud.beans.music.Quality;
-import indi.etern.musichud.beans.user.ProfileConfigData;
-import indi.etern.musichud.beans.option.ScrobbleOption;
+import indi.etern.musichud.beans.music.QualityPriority;
 import indi.etern.musichud.beans.option.MultichannelMode;
+import indi.etern.musichud.beans.option.ScrobbleOption;
+import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.client.ui.render.HorizontalAlign;
 import indi.etern.musichud.client.ui.render.VerticalAlign;
 import indi.etern.musichud.interfaces.ClientConfig;
@@ -18,6 +19,8 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 import org.apache.logging.log4j.Logger;
 
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 public class ClientConfigDefinition implements ClientConfig {
@@ -54,6 +57,9 @@ public class ClientConfigDefinition implements ClientConfig {
     private final ModConfigSpec.ConfigValue<Integer> soundVolumeInterval;
     private final ModConfigSpec.ConfigValue<Boolean> muted;
     private final ModConfigSpec.ConfigValue<String> primaryChosenQuality;
+    private final ModConfigSpec.ConfigValue<String> qualityPriority;
+    private final ModConfigSpec.ConfigValue<String> qualityDisabled;
+    private final ModConfigSpec.ConfigValue<Boolean> allowUnblockedSources;
     private final ModConfigSpec.ConfigValue<String> scrobbleOption;
     private final ModConfigSpec.ConfigValue<String> multichannelMode;
 
@@ -156,9 +162,21 @@ public class ClientConfigDefinition implements ClientConfig {
                 .translation(MusicHud.MOD_ID + ".config.common.autoHide")
                 .define("hideHudWhenNotPlaying", true);
         primaryChosenQuality = builder
-                .comment("Primary chosen quality")
+                .comment("Legacy primary chosen quality; migrated into qualityPriority")
                 .translation(MusicHud.MOD_ID + ".config.common.primaryChosenQuality")
                 .define("primaryChosenQuality", Quality.LOSSLESS.name());
+        qualityPriority = builder
+                .comment("Quality priority order (JSON array of all qualities; empty migrates from primaryChosenQuality)")
+                .translation(MusicHud.MOD_ID + ".config.common.qualityPriority")
+                .define("qualityPriority", "");
+        qualityDisabled = builder
+                .comment("Disabled qualities (JSON array)")
+                .translation(MusicHud.MOD_ID + ".config.common.qualityPriority")
+                .define("qualityDisabled", "");
+        allowUnblockedSources = builder
+                .comment("Allow unblocked sources when no selected quality is available")
+                .translation(MusicHud.MOD_ID + ".config.common.allowUnblockedSources")
+                .define("allowUnblockedSources", true);
         scrobbleOption = builder
                 .comment("Scrobbling scope")
                 .translation(MusicHud.MOD_ID + ".config.common.scrobbleOption")
@@ -432,18 +450,41 @@ public class ClientConfigDefinition implements ClientConfig {
     }
 
     @Override
-    public Quality getPrimaryChosenQuality() {
-        return Quality.valueOf(primaryChosenQuality.get());
+    public QualityPriority getQualityPriority() {
+        List<Quality> order = QualityPriority.parseList(qualityPriority.get());
+        if (order.isEmpty()) {
+            QualityPriority legacy = QualityPriority.orderFromLegacy(parseLegacyPrimaryQuality());
+            return legacy.withAllowUnblocked(allowUnblockedSources.get());
+        }
+        List<Quality> disabled = QualityPriority.parseList(qualityDisabled.get());
+        if (disabled.isEmpty() && !new HashSet<>(order).containsAll(Quality.selectable())) {
+            // Legacy/partial order: qualities that were not listed were meant to be excluded.
+            disabled = new ArrayList<>(Quality.selectable());
+            disabled.removeAll(order);
+        }
+        return new QualityPriority(order, disabled, allowUnblockedSources.get());
     }
 
     @Override
-    public Quality getDefaultPrimaryChosenQuality() {
-        return Quality.valueOf(primaryChosenQuality.getDefault());
+    public QualityPriority getDefaultQualityPriority() {
+        return QualityPriority.defaults();
     }
 
     @Override
-    public void setPrimaryChosenQuality(Quality primaryChosenQuality) {
-        this.primaryChosenQuality.set(primaryChosenQuality.name());
+    public void setQualityPriority(QualityPriority priority) {
+        QualityPriority normalized = priority == null ? getDefaultQualityPriority() : priority;
+        qualityPriority.set(QualityPriority.toJson(normalized.order()));
+        qualityDisabled.set(QualityPriority.toJson(normalized.disabled()));
+        allowUnblockedSources.set(normalized.allowUnblocked());
+        primaryChosenQuality.set(normalized.first().name());
+    }
+
+    private Quality parseLegacyPrimaryQuality() {
+        try {
+            return Quality.valueOf(primaryChosenQuality.get());
+        } catch (Exception e) {
+            return Quality.LOSSLESS;
+        }
     }
 
     @Override

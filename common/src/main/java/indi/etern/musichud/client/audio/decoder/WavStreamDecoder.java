@@ -2,6 +2,10 @@ package indi.etern.musichud.client.audio.decoder;
 
 import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.OpenAlSource;
+import indi.etern.musichud.client.audio.info.AudioChannelLayout;
+import indi.etern.musichud.client.audio.info.AudioContainer;
+import indi.etern.musichud.client.audio.info.AudioOutputInfo;
+import indi.etern.musichud.client.audio.info.DecodedStreamInfo;
 import lombok.SneakyThrows;
 import org.lwjgl.openal.AL10;
 import org.lwjgl.openal.EXTFloat32;
@@ -311,6 +315,26 @@ public class WavStreamDecoder implements AudioDecoder {
         return frameSize;
     }
 
+    @Override
+    public DecodedStreamInfo getStreamInfo() {
+        long totalSamples = inputFrameBytes > 0 ? dataSize / inputFrameBytes : -1;
+        int bitrate = sampleRate * sourceChannels * bitsPerSample;
+        return new DecodedStreamInfo(
+                AudioContainer.WAV,
+                AudioChannelLayout.fromChannels(sourceChannels),
+                sampleRate,
+                sourceChannels,
+                bitsPerSample,
+                bitrate,
+                totalSamples,
+                false
+        );
+    }
+
+    @Override
+    public synchronized AudioOutputInfo getOutputInfo() {
+        return AudioOutputInfo.describe(format, sampleRate, sourceChannels, isDiscreteAttempt());
+    }
 
     @Override
     public void close() {

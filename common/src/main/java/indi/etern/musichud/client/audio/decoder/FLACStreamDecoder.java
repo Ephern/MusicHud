@@ -2,6 +2,10 @@ package indi.etern.musichud.client.audio.decoder;
 
 import indi.etern.musichud.beans.option.MultichannelMode;
 import indi.etern.musichud.client.audio.OpenAlSource;
+import indi.etern.musichud.client.audio.info.AudioChannelLayout;
+import indi.etern.musichud.client.audio.info.AudioContainer;
+import indi.etern.musichud.client.audio.info.AudioOutputInfo;
+import indi.etern.musichud.client.audio.info.DecodedStreamInfo;
 import lombok.SneakyThrows;
 import org.jflac.FLACDecoder;
 import org.jflac.frame.Frame;
@@ -16,6 +20,7 @@ public class FLACStreamDecoder implements AudioDecoder {
     private final FLACDecoder decoder;
     private final BufferedInputStream inputStream;
     private final int sampleRate;
+    private final long totalSamples;
     private final int inputFrameBytes;
     private final int bitsPerSample;
     private final int sourceChannels;
@@ -41,6 +46,7 @@ public class FLACStreamDecoder implements AudioDecoder {
         try {
             StreamInfo streamInfo = decoder.readStreamInfo();
             this.sampleRate = streamInfo.getSampleRate();
+            this.totalSamples = streamInfo.getTotalSamples();
             int channels = streamInfo.getChannels();
             int bitsPerSample = streamInfo.getBitsPerSample();
             this.sourceChannels = channels;
@@ -217,6 +223,25 @@ public class FLACStreamDecoder implements AudioDecoder {
     @Override
     public int getFrameSize() {
         return frameSize;
+    }
+
+    @Override
+    public DecodedStreamInfo getStreamInfo() {
+        return new DecodedStreamInfo(
+                AudioContainer.FLAC,
+                AudioChannelLayout.fromChannels(sourceChannels),
+                sampleRate,
+                sourceChannels,
+                bitsPerSample,
+                0,
+                totalSamples,
+                false
+        );
+    }
+
+    @Override
+    public synchronized AudioOutputInfo getOutputInfo() {
+        return AudioOutputInfo.describe(format, sampleRate, sourceChannels, isDiscreteAttempt());
     }
 
     @Override

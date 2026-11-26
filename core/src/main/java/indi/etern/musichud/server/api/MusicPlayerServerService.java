@@ -70,7 +70,7 @@ public class MusicPlayerServerService {
     private final Logger logger = MusicHud.getLogger(MusicPlayerServerService.class);
     private final Cache<CacheKey, MusicResourceInfo> musicResourceInfoCache = CacheBuilder.newBuilder()
             .expireAfterAccess(Duration.ofMinutes(5))
-            .maximumSize(20)
+            .maximumSize(100)
             .build();
     /** Consecutive resource loading failures of the current music; reset on any success. */
     private int musicResourceLoadFailureCount = 0;
@@ -735,17 +735,32 @@ public class MusicPlayerServerService {
             List<MusicDetail> musicDetails = IMusicApiService.getInstance(ApiProvider.NCM).getMusicDetailByIds(List.of(id), null);
             if (musicDetails.size() == 1) {
                 MusicDetail musicDetail = musicDetails.getFirst();
+                CacheKey cacheKey = new CacheKey(id, quality);
                 try {
                     logger.debug("Try to load music resource info from cache with id: {}", id);
-                    MusicResourceInfo musicResourceInfo = musicResourceInfoCache.get(new CacheKey(id, quality),
+                    MusicResourceInfo musicResourceInfo = musicResourceInfoCache.get(cacheKey,
                             () -> {
                                 logger.debug("Cache not found with id: {}, loading", id);
                                 return getMusicResourceInfoWithoutCache(quality, musicDetail, playerUUID);
                             });
+                    if (!musicResourceInfo.isUsable()) {
+                        musicResourceInfoCache.invalidate(cacheKey);
+                        if (quality == Quality.NONE) {
+                            onMusicResourceLoadFailure(id);
+                        }
+                        return MusicResourceInfo.NONE;
+                    }
                     if (musicResourceInfo.getUrl().equals(retryFor)) {
                         logger.debug("Reload music resource info due to client retry for url \"{}\"", retryFor);
                         musicResourceInfo = getMusicResourceInfoWithoutCache(quality, musicDetail, playerUUID);
-                        musicResourceInfoCache.put(new CacheKey(id, quality), musicResourceInfo);
+                        if (!musicResourceInfo.isUsable()) {
+                            musicResourceInfoCache.invalidate(cacheKey);
+                            if (quality == Quality.NONE) {
+                                onMusicResourceLoadFailure(id);
+                            }
+                            return MusicResourceInfo.NONE;
+                        }
+                        musicResourceInfoCache.put(cacheKey, musicResourceInfo);
                     }
                     onMusicResourceLoadSuccess(id, playerUUID, requestReceivedAt);
                     return musicResourceInfo;
@@ -844,12 +859,10 @@ public class MusicPlayerServerService {
     }
 
     private @NonNull MusicResourceInfo getMusicResourceInfoWithoutCache(Quality quality, MusicDetail musicDetail, UUID playerUUID) {
-        MusicResourceInfo resourceInfo = musicApiService.getResourceInfo(musicDetail, quality, playerUUID);
-        if (resourceInfo != null && !resourceInfo.equals(MusicResourceInfo.NONE)) {
-            return resourceInfo;
-        } else {
-            throw new RuntimeException("Failed to get resource info for music: " + musicDetail.getName() + " (ID: " + musicDetail.getId() + ")");
-        }
+        MusicResourceInfo resourceInfo = quality == Quality.NONE
+                ? musicApiService.getUnblockedResourceInfo(musicDetail, playerUUID)
+                : musicApiService.getOfficialResourceInfo(musicDetail, quality, playerUUID);
+        return resourceInfo == null ? MusicResourceInfo.NONE : resourceInfo;
     }
 
     public void removeAllIdlePlaySource(PusherInfo pusherInfo) {

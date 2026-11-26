@@ -208,9 +208,7 @@ public class CloudDriveView extends FrameLayout {
         }
         {
             usageBar = new LinearProgressBar(context, Theme.mediaProgressStyle());
-            int usageBarWidth = dp(160);
-            usageBar.setMax(usageBarWidth);
-            LinearLayout.LayoutParams usageBarParams = new LinearLayout.LayoutParams(usageBarWidth, WRAP_CONTENT);
+            LinearLayout.LayoutParams usageBarParams = new LinearLayout.LayoutParams(dp(160), WRAP_CONTENT);
             usageBarParams.setMargins(dp(12), 0, dp(8), 0);
             usageInfo.addView(usageBar, usageBarParams);
         }

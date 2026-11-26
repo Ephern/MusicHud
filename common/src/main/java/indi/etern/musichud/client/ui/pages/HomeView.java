@@ -105,6 +105,7 @@ public class HomeView extends ViewGroup {
     private LinearProgressBar progressBar;
     private TextView played;
     private TextView total;
+    private AudioQualityWidget audioQualityWidget;
     private MediaControlBar mediaControlBar;
 
     private final AtomicInteger progressUpdaterToken = new AtomicInteger();
@@ -190,6 +191,10 @@ public class HomeView extends ViewGroup {
         progressBar = null;
         played = null;
         total = null;
+        if (audioQualityWidget != null) {
+            audioQualityWidget.clear();
+            audioQualityWidget = null;
+        }
         mediaControlBar = null;
         staggeredLyricScrollView = null;
     }
@@ -234,6 +239,12 @@ public class HomeView extends ViewGroup {
 
         LinearLayout progressTexts = new LinearLayout(context);
         progressTexts.setOrientation(LinearLayout.HORIZONTAL);
+        LayoutTransition qualityTransition = new LayoutTransition();
+        qualityTransition.enableTransitionType(LayoutTransition.APPEARING);
+        qualityTransition.enableTransitionType(LayoutTransition.DISAPPEARING);
+        qualityTransition.enableTransitionType(LayoutTransition.CHANGING);
+        qualityTransition.setAnimateParentHierarchy(false);
+        progressTexts.setLayoutTransition(qualityTransition);
         infoView.addView(progressTexts, new LinearLayout.LayoutParams(MATCH_PARENT, WRAP_CONTENT));
         {
             played = new TextView(context);
@@ -241,8 +252,17 @@ public class HomeView extends ViewGroup {
             played.setTextColor(Theme.TERTIARY_TEXT_COLOR);
             LinearLayout.LayoutParams playedParams =
                     new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            playedParams.setMargins(0, dp(8), 0, 0);
+            playedParams.setMargins(0, dp(8), 0, dp(4));
             progressTexts.addView(played, playedParams);
+        }
+        progressTexts.addView(new View(context), new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
+        {
+            audioQualityWidget = new AudioQualityWidget(context);
+            LinearLayout.LayoutParams qualityParams =
+                    new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+            qualityParams.gravity = Gravity.CENTER_VERTICAL;
+            qualityParams.setMargins(0, dp(4), 0, 0);
+            progressTexts.addView(audioQualityWidget, qualityParams);
         }
         progressTexts.addView(new View(context), new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
         {
@@ -251,7 +271,7 @@ public class HomeView extends ViewGroup {
             total.setTextColor(Theme.TERTIARY_TEXT_COLOR);
             LinearLayout.LayoutParams totalParams =
                     new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
-            totalParams.setMargins(0, dp(8), 0, 0);
+            totalParams.setMargins(0, dp(8), 0, dp(4));
             progressTexts.addView(total, totalParams);
         }
 
@@ -407,6 +427,7 @@ public class HomeView extends ViewGroup {
         progressBar.setProgressFraction(nowPlayingInfo.getProgressRate());
         applyAudioStatus(StreamAudioPlayer.getInstance().getStatus());
 
+        audioQualityWidget.bind(detail.getId());
         mediaControlBar.bind(trace);
         startProgressUpdater(detail, formatter, duration);
     }
@@ -426,6 +447,7 @@ public class HomeView extends ViewGroup {
         progressBar.setVisibility(GONE);
         played.setText("");
         total.setText("");
+        audioQualityWidget.clear();
         progressUpdaterToken.incrementAndGet();
     }
 
@@ -615,13 +637,27 @@ public class HomeView extends ViewGroup {
         }
         applyAudioStatus(StreamAudioPlayer.getInstance().getStatus());
         updateCoverScale(false);
+        rebindQualityWidget();
         restartProgressUpdater();
+    }
+
+    private void rebindQualityWidget() {
+        if (audioQualityWidget == null) return;
+        MusicDetail detail = nowPlayingInfo.getCurrentlyPlayingMusicDetail();
+        if (detail == null || detail.equals(MusicDetail.NONE)) {
+            audioQualityWidget.clear();
+        } else {
+            audioQualityWidget.bind(detail.getId());
+        }
     }
 
     @Override
     protected void onDetachedFromWindow() {
         progressUpdaterToken.incrementAndGet();
         cancelCoverScaleAnimator();
+        if (audioQualityWidget != null) {
+            audioQualityWidget.clear();
+        }
         if (audioListenerRegistered) {
             StreamAudioPlayer.getInstance().getStatusChangeListener().remove(statusListener);
             audioListenerRegistered = false;

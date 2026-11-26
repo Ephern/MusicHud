@@ -161,7 +161,7 @@ public class MusicCollectionDetailView extends FrameLayout implements RouterCont
 
         FrameLayout.LayoutParams panelParams = new FrameLayout.LayoutParams(dp(PANEL_WIDTH), MATCH_PARENT);
         panelParams.gravity = Gravity.TOP | Gravity.END;
-        panelParams.setMargins(0, dp(PANEL_MARGIN_DP), dp(PANEL_MARGIN_DP), dp(PANEL_MARGIN_DP));
+        panelParams.setMargins(0, dp(64), dp(PANEL_MARGIN_DP), dp(PANEL_MARGIN_DP));
         addView(infoPanel, panelParams);
 
         topBar = new LinearLayout(context);

@@ -3,7 +3,7 @@ package indi.etern.musichud.interfaces;
 import indi.etern.musichud.MusicHud;
 import indi.etern.musichud.beans.api.AutoConnectServerFilterType;
 import indi.etern.musichud.beans.login.LoginCookieInfo;
-import indi.etern.musichud.beans.music.Quality;
+import indi.etern.musichud.beans.music.QualityPriority;
 import indi.etern.musichud.beans.user.ProfileConfigData;
 import indi.etern.musichud.beans.option.ScrobbleOption;
 import indi.etern.musichud.beans.option.MultichannelMode;
@@ -61,11 +61,11 @@ public interface ClientConfig {
 
     void setEnableHud(boolean enableHud);
 
-    Quality getPrimaryChosenQuality();
+    QualityPriority getQualityPriority();
 
-    Quality getDefaultPrimaryChosenQuality();
+    QualityPriority getDefaultQualityPriority();
 
-    void setPrimaryChosenQuality(Quality primaryChosenQuality);
+    void setQualityPriority(QualityPriority qualityPriority);
 
     String getHudVerticalPosition();
 

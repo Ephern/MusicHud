@@ -51,7 +51,7 @@ public class MusicInfoCard extends ViewGroup {
     private static final int PROGRESS_TOP_GAP_DP = 4;
     private static final int PROGRESS_HEIGHT_DP = 4;
     private static final int TIMES_TOP_GAP_DP = 6;
-    private static final int TIMES_HEIGHT_DP = 16;
+    private static final int TIMES_HEIGHT_DP = 24;
     private final UrlImageView albumImage;
     private final LinearLayout musicInfo;
     private final MarqueeTextView titleText;
@@ -62,6 +62,7 @@ public class MusicInfoCard extends ViewGroup {
     private final TextView playedTimeText;
     private final TextView totalTimeText;
     private final LayoutTransition layoutTransition;
+    private final AudioQualityWidget audioQualityWidget;
     private float coverFraction;
     private float xFraction;
     private float yFraction;
@@ -110,13 +111,27 @@ public class MusicInfoCard extends ViewGroup {
 
         progressTexts = new LinearLayout(context);
         progressTexts.setOrientation(LinearLayout.HORIZONTAL);
+        progressTexts.setGravity(Gravity.CENTER_VERTICAL);
+        LayoutTransition qualityTransition = new LayoutTransition();
+        qualityTransition.enableTransitionType(LayoutTransition.APPEARING);
+        qualityTransition.enableTransitionType(LayoutTransition.DISAPPEARING);
+        qualityTransition.enableTransitionType(LayoutTransition.CHANGING);
+        qualityTransition.setAnimateParentHierarchy(false);
+        progressTexts.setLayoutTransition(qualityTransition);
 
         playedTimeText = new TextView(context);
         playedTimeText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
         playedTimeText.setTextSize(Theme.TEXT_SIZE_NORMAL);
         progressTexts.addView(playedTimeText, new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, 0));
 
-        progressTexts.addView(new View(context), new LinearLayout.LayoutParams(WRAP_CONTENT, MATCH_PARENT, 1));
+        progressTexts.addView(new View(context), new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
+
+        audioQualityWidget = new AudioQualityWidget(context);
+        LinearLayout.LayoutParams qualityParams = new LinearLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT);
+        qualityParams.gravity = Gravity.CENTER_VERTICAL;
+        progressTexts.addView(audioQualityWidget, qualityParams);
+
+        progressTexts.addView(new View(context), new LinearLayout.LayoutParams(0, MATCH_PARENT, 1));
 
         totalTimeText = new TextView(context);
         totalTimeText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
@@ -247,6 +262,7 @@ public class MusicInfoCard extends ViewGroup {
      * recycled (off-screen) card never leaks stale content into its next slide-in.
      */
     public void clear() {
+        audioQualityWidget.clear();
         musicInfo.setLayoutTransition(null);
         try {
             albumImage.clear();
@@ -277,6 +293,7 @@ public class MusicInfoCard extends ViewGroup {
         if (musicDetailTrace == null || musicDetailTrace.value() == null || musicDetailTrace.value().equals(MusicDetail.NONE)) {
             showPlaceholder();
             titleText.setText(I18n.get(MusicHud.MOD_ID + ".text.idle"));
+            audioQualityWidget.clear();
             titleText.setTextColor(Theme.SECONDARY_TEXT_COLOR);
             artistsText.setText("");
             albumText.setText("");
@@ -286,6 +303,7 @@ public class MusicInfoCard extends ViewGroup {
             totalTimeText.setText("");
         } else {
             MusicDetail musicDetail = musicDetailTrace.value();
+            audioQualityWidget.bind(musicDetail.getId());
             titleText.setTextColor(Theme.NORMAL_TEXT_COLOR);
             Album album = musicDetail.getAlbum();
             albumImage.loadUrl(album.getPicUrl(), imageSize, imageSize);

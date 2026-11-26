@@ -1,11 +1,25 @@
 package indi.etern.musichud.client.audio.decoder;
 
+import indi.etern.musichud.client.audio.info.AudioOutputInfo;
+import indi.etern.musichud.client.audio.info.DecodedStreamInfo;
+import org.jetbrains.annotations.Nullable;
+
 public interface AudioDecoder extends AutoCloseable {
     byte[] readChunk(long maxSize);
     int getFormat();
     int getSampleRate();
 
     int getFrameSize();
+
+    /** Source stream metadata; null until the decoder has parsed its first header/frame. */
+    default @Nullable DecodedStreamInfo getStreamInfo() {
+        return null;
+    }
+
+    /** Actual OpenAL output format; null until the decoder is initialized. */
+    default @Nullable AudioOutputInfo getOutputInfo() {
+        return null;
+    }
 
     /**
      * Whether this decoder is currently emitting a discrete multichannel

@@ -6,6 +6,7 @@ import indi.etern.musichud.beans.music.Traceable;
 import indi.etern.musichud.interfaces.ClientConfig;
 import lombok.Getter;
 import org.apache.logging.log4j.Logger;
+import org.jetbrains.annotations.Nullable;
 
 import java.time.ZonedDateTime;
 import java.util.Set;
@@ -62,6 +63,21 @@ public class StreamAudioPlayer {//TODO disk cache due to cdn expired time
 
     public Status getStatus() {
         return status.get();
+    }
+
+    @Nullable
+    public synchronized PlaybackTask getCurrentTask() {
+        return currentTask;
+    }
+
+    @Nullable
+    public synchronized PlaybackTask getPendingTask() {
+        return pendingTask;
+    }
+
+    @Nullable
+    public synchronized PlaybackTask getPreloadedTask() {
+        return preloadedTask;
     }
 
     /** Read-only session-bound spectrum of the actual current/pending PCM mix. Never blocks. */

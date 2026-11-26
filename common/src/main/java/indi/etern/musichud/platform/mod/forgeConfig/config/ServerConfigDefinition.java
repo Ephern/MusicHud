@@ -62,9 +62,9 @@ public class ServerConfigDefinition implements ServerConfig {
                 .translation(MusicHud.MOD_ID + ".proxyUrl")
                 .define("proxyUrl", "https://your-proxy-url.com/?proxy=");
         enableGeneralUnblock = builder
-                .comment("Enable global unblock (recommended)")
+                .comment("Enable global unblock")
                 .translation(MusicHud.MOD_ID + ".enableGeneralUnblock")
-                .define("enableGeneralUnblock", true);
+                .define("enableGeneralUnblock", false);
         enableFlac = builder
                 .comment("Enable FLAC lossless quality")
                 .translation(MusicHud.MOD_ID + ".enableFlac")
