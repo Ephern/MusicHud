@@ -1184,7 +1184,7 @@ public class PlaybackTask {
                 int format = currentDecoder != null ? currentDecoder.getFormat() : AL10.AL_FORMAT_STEREO16;
                 int sampleRate = currentDecoder != null ? currentDecoder.getSampleRate() : 44100;
 
-                boolean sourceEmpty = source.isEmpty();
+                boolean sourceEmpty = !source.hasUnplayedBuffers();
                 boolean starving = sourceEmpty && !downloadDone
                         && ledger.prefetchBytes.get() < rebufferTargetBytes(bytesPerSecond);
                 if (starving && !rebuffering) {
@@ -1224,7 +1224,7 @@ public class PlaybackTask {
                 updateUnderrunState(expectedBytes.get(), bytesPerSecond);
                 source.updatePlaybackPosition();
 
-                if (!source.isPlaying() && source.queuedCount() > 0 && !cancelled) {
+                if (!source.isPlaying() && source.hasUnplayedBuffers() && !cancelled) {
                     source.play();
                 }
                 Thread.sleep(PLAY_LOOP_SLEEP_MS);
@@ -1299,7 +1299,7 @@ public class PlaybackTask {
     }
 
     private void updateUnderrunState(long expectedBytes, long bytesPerSecond) {
-        boolean sourceDry = source != null && source.queuedCount() == 0;
+        boolean sourceDry = source != null && !source.hasUnplayedBuffers();
         // A dry source is starving whenever the prefetch cannot yet feed it, even if
         // a few chunks are still buffered. Requiring an empty prefetch here (the old
         // !hasAudio() test) let a 1..N chunk buffer wedge playback silently in
@@ -1320,7 +1320,9 @@ public class PlaybackTask {
 
         if (downloadDone && !hasAudio() && state != PlaybackState.FADING_OUT
                 && state != PlaybackState.ERROR && state != PlaybackState.RETRYING) {
-            if (source != null && source.queuedCount() == 0) {
+            if (source != null && !source.hasUnplayedBuffers()) {
+                LOGGER.debug("Audio stream drained, fading out (queued={}, processed={})",
+                        source.queuedCount(), source.processedCount());
                 beginFadeOut(fadeOut.durationMs());
             }
         }
@@ -1627,9 +1629,6 @@ public class PlaybackTask {
         Supplier<Long> expectedBytes = () -> Math.max(0,
                 Duration.between(serverStartTime, ZonedDateTime.now()).toMillis() * bytesPerSecond / 1000)
                 / bytesPerSample * bytesPerSample;
-//        long startBytes = ledger.fedBytes.get();
-//        long droppedBytes = 0;
-//        int droppedChunks = 0;
         while (true) {
             long remaining = expectedBytes.get() - ledger.fedBytes.get();
             if (remaining <= 0) break;
@@ -1638,8 +1637,6 @@ public class PlaybackTask {
             if (head.length <= remaining) {
                 pollAudio();
                 ledger.fedBytes.addAndGet(head.length);
-//                droppedBytes += head.length;
-//                droppedChunks++;
                 logStaleDrop(head.length, bytesPerSecond);
             } else {
                 // The next chunk crosses the wall clock: trim it so the resume
@@ -1656,8 +1653,6 @@ public class PlaybackTask {
                 // buffered and will be polled again.
                 polledBytes.addAndGet(-trimmed.length);
                 ledger.fedBytes.addAndGet(drop);
-//                droppedBytes += drop;
-//                droppedChunks++;
                 logStaleDrop(drop, bytesPerSecond);
                 break;
             }

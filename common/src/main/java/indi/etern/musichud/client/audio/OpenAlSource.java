@@ -478,13 +478,20 @@ public final class OpenAlSource implements AutoCloseable {
         return AL10.alGetSourcei(source, AL10.AL_SOURCE_STATE) == AL10.AL_PLAYING;
     }
 
-    public boolean isEmpty() {
-        return queuedCount() == 0;
-    }
-
     public int queuedCount() {
         checkSourceValid();
         return AL10.alGetSourcei(source, AL10.AL_BUFFERS_QUEUED);
+    }
+
+    public int processedCount() {
+        checkSourceValid();
+        return AL10.alGetSourcei(source, AL10.AL_BUFFERS_PROCESSED);
+    }
+
+    /** Processed buffers stay attached until unqueued, so queued-only checks report stale content. */
+    public boolean hasUnplayedBuffers() {
+        int queued = queuedCount();
+        return queued > 0 && processedCount() < queued;
     }
 
     /**
